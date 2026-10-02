@@ -1,4 +1,22 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"><meta name="theme-color" content="#1B7A43"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Relatorio VSL"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><title>Relatório de Campo VSL</title><style>:root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#DCF8C6;--verde-acento:#25D366;--fundo:#ECE5DD;--bolha:#FFFFFF;--texto:#111B21;--texto-fraco:#667781;--linha:#E2E2E2;--erro:#D93025;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body,html{height:100%;margin:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--fundo);color:var(--texto);overscroll-behavior-y:none}button{font:inherit;cursor:pointer;border:none;background:0 0;color:inherit}input,select,textarea{font:inherit}.app{display:flex;flex-direction:column;height:100dvh}.oculto{display:none!important}.topo{background:var(--verde);color:#fff;padding:calc(8px + var(--safe-top)) 10px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:20}.topo .voltar{font-size:22px;line-height:1;padding:4px 2px}.topo .avatar{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:17px;flex:none}.topo .info{flex:1;min-width:0}.topo .info h1{margin:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .info p{margin:1px 0 0;font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .acoes{display:flex;gap:4px}.topo .acoes button{padding:6px 8px;border-radius:50%;font-size:18px}.topo .acoes button:active{background:rgba(255,255,255,.2)}.barra-status{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;background:#fff;border-bottom:1px solid var(--linha);color:var(--texto-fraco)}.barra-status .pill{display:flex;align-items:center;gap:5px;white-space:nowrap}.dot{width:8px;height:8px;border-radius:50%;background:#bbb;flex:none}.dot.ok{background:var(--verde-acento)}.dot.medio{background:#f0a202}.dot.ruim{background:var(--erro)}.barra-status .cresce{flex:1}.barra-status b{color:var(--texto);font-weight:600}.chat{flex:1;overflow-y:auto;padding:10px 8px 4px;background-color:var(--fundo);background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px),radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px);background-size:22px 22px;background-position:0 0,11px 11px;-webkit-overflow-scrolling:touch}.divisor{display:flex;justify-content:center;margin:12px 0 8px}.divisor span{background:#fff;border-radius:8px;padding:4px 12px;font-size:11.5px;color:var(--texto-fraco);box-shadow:0 1px 1px rgba(0,0,0,.08);text-transform:uppercase;letter-spacing:.4px}.aviso{background:#fff3cd;color:#7a5b00;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:8px auto;max-width:90%;text-align:center;box-shadow:0 1px 1px rgba(0,0,0,.08)}.msg{display:flex;margin:2px 0;padding:0 2px}.msg.eu{justify-content:flex-end}.bolha{max-width:86%;background:var(--bolha);border-radius:8px;padding:4px 6px 5px;box-shadow:0 1px .5px rgba(0,0,0,.13);position:relative}.msg.eu .bolha{background:var(--verde-claro)}.bolha.so-texto{padding:6px 9px}.bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block}.bolha .midia img,.bolha .midia video{display:block;width:100%;max-height:60vh;object-fit:cover}.bolha .play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:34px;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none}.bolha .dur{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:1px 6px;border-radius:10px}.bolha .legenda{font-size:14.5px;line-height:1.35;margin:5px 4px 0;white-space:pre-wrap;word-break:break-word}.bolha .rodape{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin:2px 4px 0;font-size:11px;color:var(--texto-fraco)}.chip-talhao{display:inline-flex;align-items:center;gap:4px;margin:5px 4px 0;background:rgba(27,122,67,.12);color:var(--verde-escuro);font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:12px}.chip-talhao.fora{background:rgba(217,48,37,.1);color:var(--erro)}.ticks{font-size:12px;letter-spacing:-2px}.ticks.ok{color:#34b7f1}.ticks.erro{color:var(--erro);letter-spacing:0}.composer{display:flex;align-items:flex-end;gap:6px;padding:6px 8px calc(6px + var(--safe-bottom));background:var(--fundo)}.composer .caixa{flex:1;display:flex;align-items:flex-end;gap:4px;background:#fff;border-radius:22px;padding:6px 6px 6px 14px;box-shadow:0 1px 2px rgba(0,0,0,.12)}.composer textarea{flex:1;border:none;outline:0;resize:none;max-height:110px;font-size:15px;line-height:1.35;padding:4px 0;background:0 0}.composer .anexo{font-size:20px;padding:2px 6px;color:var(--texto-fraco);transform:rotate(-45deg)}.btn-camera{width:48px;height:48px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;font-size:21px;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .12s}.btn-camera:active{transform:scale(.93)}.btn-camera.gravando{background:var(--erro);animation:1s infinite pulsa}@keyframes pulsa{50%{opacity:.65}}.dica-camera{font-size:11px;color:var(--texto-fraco);text-align:center;padding:0 0 4px}.camera{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}.camera video{flex:1;width:100%;object-fit:cover;background:#000}.camera .cam-topo{position:absolute;top:calc(10px + var(--safe-top));left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 14px;color:#fff;z-index:2}.camera .cam-topo button{font-size:22px;padding:6px}.rec-badge{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.5);padding:4px 10px;border-radius:14px;font-size:13px}.rec-badge .bolinha{width:9px;height:9px;border-radius:50%;background:#ff3b30;animation:1s infinite pulsa}.camera .cam-base{padding:16px 20px calc(24px + var(--safe-bottom));display:flex;align-items:center;justify-content:space-between;background:#000;color:#fff}.obturador{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.25);display:grid;place-items:center}.obturador i{display:block;width:54px;height:54px;border-radius:50%;background:#fff;transition:.15s}.obturador.gravando i{width:28px;height:28px;border-radius:7px;background:#ff3b30}.cam-base .lado{width:74px;text-align:center;font-size:13px;opacity:.9}.cam-dica{position:absolute;bottom:calc(120px + var(--safe-bottom));left:0;right:0;text-align:center;color:#fff;font-size:12.5px;opacity:.8;z-index:2}.cam-geo{position:absolute;bottom:calc(150px + var(--safe-bottom));left:0;right:0;text-align:center;color:#fff;font-size:12px;z-index:2}.cam-geo span{background:rgba(0,0,0,.5);padding:4px 10px;border-radius:12px}.tela{position:fixed;inset:0;background:#f6f6f6;z-index:50;display:flex;flex-direction:column;overflow:hidden}.tela .conteudo{flex:1;overflow-y:auto;padding:14px 14px 30px}.tela h2{font-size:15px;margin:18px 0 8px;color:var(--texto-fraco);text-transform:uppercase;letter-spacing:.5px}.campo{margin-bottom:12px}.campo label{display:block;font-size:12.5px;color:var(--texto-fraco);margin-bottom:4px}.campo input,.campo select,.campo textarea{width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:#fff;outline:0}.campo input:focus,.campo textarea:focus{border-color:var(--verde)}.linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{display:block;width:100%;padding:13px;border-radius:10px;background:var(--verde);color:#fff;font-weight:600;text-align:center;margin-top:10px}.btn.secundario{background:#fff;color:var(--verde);border:1px solid var(--verde)}.btn.perigo{background:#fff;color:var(--erro);border:1px solid var(--erro)}.btn:disabled{opacity:.5}.lista-item{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.lista-item .ic{width:42px;height:42px;border-radius:10px;background:var(--verde-claro);display:grid;place-items:center;font-size:19px;flex:none}.lista-item .txt{flex:1;min-width:0}.lista-item .txt b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lista-item .txt span{font-size:12.5px;color:var(--texto-fraco)}.badge{font-size:11px;padding:3px 8px;border-radius:10px;background:#eee;color:var(--texto-fraco);white-space:nowrap}.badge.pub{background:var(--verde-claro);color:var(--verde-escuro)}.folha{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;z-index:70;padding:8px 14px calc(18px + var(--safe-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.2);max-height:85dvh;overflow-y:auto}.folha .alca{width:40px;height:4px;border-radius:2px;background:#ccc;margin:6px auto 12px}.folha .opcao{display:flex;align-items:center;gap:14px;padding:13px 4px;font-size:15px}.folha .opcao span:first-child{width:24px;text-align:center;font-size:18px}.veu{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}.mapa-wrap{background:#fff;border-radius:12px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.mapa-wrap svg{width:100%;height:auto;display:block;background:#f3f7f3;border-radius:8px}.legenda-talhoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.legenda-talhoes span{font-size:11.5px;background:var(--verde-claro);color:var(--verde-escuro);padding:3px 8px;border-radius:10px}.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + var(--safe-bottom));background:rgba(0,0,0,.85);color:#fff;padding:10px 16px;border-radius:20px;font-size:13.5px;z-index:90;max-width:88%;text-align:center}.visor{position:fixed;inset:0;background:#000;z-index:80;display:flex;align-items:center;justify-content:center}.visor img,.visor video{max-width:100%;max-height:100%}.visor .fechar{position:absolute;top:calc(12px + var(--safe-top));left:12px;color:#fff;font-size:26px;padding:8px}.rp-tela{position:fixed;inset:0;z-index:55;background:#f2f4f2;overflow-y:auto}.rp-voltar{position:fixed;top:calc(10px + var(--safe-top));left:10px;z-index:58;background:rgba(0,0,0,.45);color:#fff;border-radius:50%;width:38px;height:38px;font-size:19px}.rp-folha{max-width:820px;margin:0 auto;background:#fff;min-height:100%}.rp-capa{background:var(--verde);color:#fff;padding:calc(22px + var(--safe-top)) 20px 18px}.rp-marca{display:flex;align-items:center;gap:12px}.rp-logo{width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:21px;flex:none}.rp-marca b{display:block;font-size:13.5px;line-height:1.25}.rp-marca span{font-size:11.5px;opacity:.85}.rp-capa h1{margin:16px 0 2px;font-size:24px;line-height:1.2}.rp-capa p{margin:0;font-size:13.5px;opacity:.9}.rp-painel{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--linha)}.rp-painel div{background:#fff;padding:11px 16px}.rp-painel span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-fraco)}.rp-painel b{font-size:14.5px}.rp-corpo{padding:8px 16px 40px}.rp-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 4px}.rp-resumo div{background:#f7f9f7;border:1px solid var(--linha);border-radius:10px;padding:9px 6px;text-align:center}.rp-resumo b{display:block;font-size:18px;color:var(--verde-escuro)}.rp-resumo span{font-size:10.5px;color:var(--texto-fraco)}.rp-nota{background:#e8f4ec;border-left:4px solid var(--verde);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:14.5px;white-space:pre-wrap}.rp-mapa{border:1px solid var(--linha);border-radius:12px;padding:10px;margin:16px 0}.rp-mapa svg{width:100%;height:auto;display:block;background:#f5f8f5;border-radius:8px}.rp-obs{font-size:11.5px;color:var(--texto-fraco);margin-top:8px}.rp-dia{position:sticky;top:0;background:#fff;margin:24px 0 12px;padding:10px 0 8px;font-size:14.5px;color:var(--verde-escuro);border-bottom:2px solid #e8f4ec;z-index:2}.rp-dia small{float:right;font-weight:400;color:var(--texto-fraco);font-size:12px}.rp-item{margin:0 0 20px}.rp-item figure{margin:0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--linha)}.rp-item img,.rp-item video{display:block;width:100%;max-height:70vh;object-fit:contain;background:#000}.rp-meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center}.rp-tag{font-size:11.5px;padding:3px 9px;border-radius:11px;background:#e8f4ec;color:var(--verde-escuro);font-weight:600}.rp-tag.cinza{background:#f0f2f1;color:var(--texto-fraco);font-weight:500}.rp-legenda{margin:6px 0 0;font-size:15px;white-space:pre-wrap}.rp-fim{text-align:center;margin:28px 0 10px;font-size:15px;color:var(--verde-escuro);font-weight:600}.rp-rodape{background:#f7f9f7;border-top:1px solid var(--linha);padding:20px;text-align:center;font-size:12.5px;color:var(--texto-fraco)}.rp-rodape b{color:var(--verde-escuro)}.rp-barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:#fff;border-top:1px solid var(--linha)}.rp-barra button{flex:1;padding:12px;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}.rp-barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}@media print{.rp-barra,.rp-voltar{display:none}.rp-dia,.rp-tela{position:static}.rp-item{break-inside:avoid}video{display:none}}.rp-logo-img{height:44px;max-width:130px;width:auto;object-fit:contain;background:#fff;padding:4px;border-radius:8px;flex:none;display:block}</style></head><body><div class="app">
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#1B7A43">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Relatorio VSL">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Relatório de Campo · VSL</title>
+<style>:root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#DCF8C6;--verde-acento:#25D366;--fundo:#ECE5DD;--bolha:#FFFFFF;--texto:#111B21;--texto-fraco:#667781;--linha:#E2E2E2;--erro:#D93025;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;margin:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--fundo);color:var(--texto);overscroll-behavior-y:none}button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}input,textarea,select{font:inherit}.app{display:flex;flex-direction:column;height:100dvh}.oculto{display:none !important}.topo{background:var(--verde);color:#fff;padding:calc(8px + var(--safe-top)) 10px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:20}.topo .voltar{font-size:22px;line-height:1;padding:4px 2px}.topo .avatar{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:17px;flex:none}.topo .info{flex:1;min-width:0}.topo .info h1{margin:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .info p{margin:1px 0 0;font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .acoes{display:flex;gap:4px}.topo .acoes button{padding:6px 8px;border-radius:50%;font-size:18px}.topo .acoes button:active{background:rgba(255,255,255,.2)}.barra-status{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;background:#fff;border-bottom:1px solid var(--linha);color:var(--texto-fraco)}.barra-status .pill{display:flex;align-items:center;gap:5px;white-space:nowrap}.dot{width:8px;height:8px;border-radius:50%;background:#bbb;flex:none}.dot.ok{background:var(--verde-acento)}.dot.medio{background:#F0A202}.dot.ruim{background:var(--erro)}.barra-status .cresce{flex:1}.barra-status b{color:var(--texto);font-weight:600}.chat{flex:1;overflow-y:auto;padding:10px 8px 4px;background-color:var(--fundo);background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px),radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px);background-size:22px 22px;background-position:0 0,11px 11px;-webkit-overflow-scrolling:touch}.divisor{display:flex;justify-content:center;margin:12px 0 8px}.divisor span{background:#fff;border-radius:8px;padding:4px 12px;font-size:11.5px;color:var(--texto-fraco);box-shadow:0 1px 1px rgba(0,0,0,.08);text-transform:uppercase;letter-spacing:.4px}.aviso{background:#FFF3CD;color:#7a5b00;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:8px auto;max-width:90%;text-align:center;box-shadow:0 1px 1px rgba(0,0,0,.08)}.msg{display:flex;margin:2px 0;padding:0 2px}.msg.eu{justify-content:flex-end}.bolha{max-width:86%;background:var(--bolha);border-radius:8px;padding:4px 6px 5px;box-shadow:0 1px .5px rgba(0,0,0,.13);position:relative}.msg.eu .bolha{background:var(--verde-claro)}.bolha.so-texto{padding:6px 9px 6px}.bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block}.bolha .midia img,.bolha .midia video{display:block;width:100%;max-height:60vh;object-fit:cover}.bolha .play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:34px;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none}.bolha .dur{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:1px 6px;border-radius:10px}.bolha .legenda{font-size:14.5px;line-height:1.35;margin:5px 4px 0;white-space:pre-wrap;word-break:break-word}.bolha .rodape{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin:2px 4px 0;font-size:11px;color:var(--texto-fraco)}.chip-talhao{display:inline-flex;align-items:center;gap:4px;margin:5px 4px 0;background:rgba(27,122,67,.12);color:var(--verde-escuro);font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:12px}.chip-talhao.fora{background:rgba(217,48,37,.1);color:var(--erro)}.ticks{font-size:12px;letter-spacing:-2px}.ticks.ok{color:#34B7F1}.ticks.erro{color:var(--erro);letter-spacing:0}.composer{display:flex;align-items:flex-end;gap:6px;padding:6px 8px calc(6px + var(--safe-bottom));background:var(--fundo)}.composer .caixa{flex:1;display:flex;align-items:flex-end;gap:4px;background:#fff;border-radius:22px;padding:6px 6px 6px 14px;box-shadow:0 1px 2px rgba(0,0,0,.12)}.composer textarea{flex:1;border:none;outline:none;resize:none;max-height:110px;font-size:15px;line-height:1.35;padding:4px 0;background:transparent}.composer .anexo{font-size:20px;padding:2px 6px;color:var(--texto-fraco);transform:rotate(-45deg)}.btn-camera{width:48px;height:48px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;font-size:21px;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .12s}.btn-camera:active{transform:scale(.93)}.btn-camera.gravando{background:var(--erro);animation:pulsa 1s infinite}@keyframes pulsa{50%{opacity:.65}}.dica-camera{font-size:11px;color:var(--texto-fraco);text-align:center;padding:0 0 4px}.camera{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}.camera video{flex:1;width:100%;object-fit:cover;background:#000}.camera .cam-topo{position:absolute;top:calc(10px + var(--safe-top));left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 14px;color:#fff;z-index:2}.camera .cam-topo button{font-size:22px;padding:6px}.rec-badge{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.5);padding:4px 10px;border-radius:14px;font-size:13px}.rec-badge .bolinha{width:9px;height:9px;border-radius:50%;background:#ff3b30;animation:pulsa 1s infinite}.camera .cam-base{padding:16px 20px calc(24px + var(--safe-bottom));display:flex;align-items:center;justify-content:space-between;background:#000;color:#fff}.obturador{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.25);display:grid;place-items:center}.obturador i{display:block;width:54px;height:54px;border-radius:50%;background:#fff;transition:all .15s}.obturador.gravando i{width:28px;height:28px;border-radius:7px;background:#ff3b30}.cam-base .lado{width:74px;text-align:center;font-size:13px;opacity:.9}.cam-dica{position:absolute;bottom:calc(120px + var(--safe-bottom));left:0;right:0;text-align:center;color:#fff;font-size:12.5px;opacity:.8;z-index:2}.cam-geo{position:absolute;bottom:calc(150px + var(--safe-bottom));left:0;right:0;text-align:center;color:#fff;font-size:12px;z-index:2}.cam-geo span{background:rgba(0,0,0,.5);padding:4px 10px;border-radius:12px}.tela{position:fixed;inset:0;background:#F6F6F6;z-index:50;display:flex;flex-direction:column;overflow:hidden}.tela .conteudo{flex:1;overflow-y:auto;padding:14px 14px 30px}.tela h2{font-size:15px;margin:18px 0 8px;color:var(--texto-fraco);text-transform:uppercase;letter-spacing:.5px}.campo{margin-bottom:12px}.campo label{display:block;font-size:12.5px;color:var(--texto-fraco);margin-bottom:4px}.campo input,.campo textarea,.campo select{width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:#fff;outline:none}.campo input:focus,.campo textarea:focus{border-color:var(--verde)}.linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{display:block;width:100%;padding:13px;border-radius:10px;background:var(--verde);color:#fff;font-weight:600;text-align:center;margin-top:10px}.btn.secundario{background:#fff;color:var(--verde);border:1px solid var(--verde)}.btn.perigo{background:#fff;color:var(--erro);border:1px solid var(--erro)}.btn:disabled{opacity:.5}.lista-item{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.lista-item .ic{width:42px;height:42px;border-radius:10px;background:var(--verde-claro);display:grid;place-items:center;font-size:19px;flex:none}.lista-item .txt{flex:1;min-width:0}.lista-item .txt b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lista-item .txt span{font-size:12.5px;color:var(--texto-fraco)}.badge{font-size:11px;padding:3px 8px;border-radius:10px;background:#eee;color:var(--texto-fraco);white-space:nowrap}.badge.pub{background:var(--verde-claro);color:var(--verde-escuro)}.folha{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;z-index:70;padding:8px 14px calc(18px + var(--safe-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.2);max-height:85dvh;overflow-y:auto}.folha .alca{width:40px;height:4px;border-radius:2px;background:#ccc;margin:6px auto 12px}.folha .opcao{display:flex;align-items:center;gap:14px;padding:13px 4px;font-size:15px}.folha .opcao span:first-child{width:24px;text-align:center;font-size:18px}.veu{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}.mapa-wrap{background:#fff;border-radius:12px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.mapa-wrap svg{width:100%;height:auto;display:block;background:#F3F7F3;border-radius:8px}.legenda-talhoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.legenda-talhoes span{font-size:11.5px;background:var(--verde-claro);color:var(--verde-escuro);padding:3px 8px;border-radius:10px}.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + var(--safe-bottom));background:rgba(0,0,0,.85);color:#fff;padding:10px 16px;border-radius:20px;font-size:13.5px;z-index:90;max-width:88%;text-align:center}.visor{position:fixed;inset:0;background:#000;z-index:80;display:flex;align-items:center;justify-content:center}.visor img,.visor video{max-width:100%;max-height:100%}.visor .fechar{position:absolute;top:calc(12px + var(--safe-top));left:12px;color:#fff;font-size:26px;padding:8px}.rp-tela{position:fixed;inset:0;z-index:55;background:#F2F4F2;overflow-y:auto}.rp-voltar{position:fixed;top:calc(10px + var(--safe-top));left:10px;z-index:58;background:rgba(0,0,0,.45);color:#fff;border-radius:50%;width:38px;height:38px;font-size:19px}.rp-folha{max-width:820px;margin:0 auto;background:#fff;min-height:100%}.rp-capa{background:var(--verde);color:#fff;padding:calc(22px + var(--safe-top)) 20px 18px}.rp-marca{display:flex;align-items:center;gap:12px}.rp-logo{width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:21px;flex:none}.rp-marca b{display:block;font-size:13.5px;line-height:1.25}.rp-marca span{font-size:11.5px;opacity:.85}.rp-capa h1{margin:16px 0 2px;font-size:24px;line-height:1.2}.rp-capa p{margin:0;font-size:13.5px;opacity:.9}.rp-painel{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--linha)}.rp-painel div{background:#fff;padding:11px 16px}.rp-painel span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-fraco)}.rp-painel b{font-size:14.5px}.rp-corpo{padding:8px 16px 40px}.rp-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 4px}.rp-resumo div{background:#F7F9F7;border:1px solid var(--linha);border-radius:10px;padding:9px 6px;text-align:center}.rp-resumo b{display:block;font-size:18px;color:var(--verde-escuro)}.rp-resumo span{font-size:10.5px;color:var(--texto-fraco)}.rp-nota{background:#E8F4EC;border-left:4px solid var(--verde);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:14.5px;white-space:pre-wrap}.rp-mapa{border:1px solid var(--linha);border-radius:12px;padding:10px;margin:16px 0}.rp-mapa svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}.rp-obs{font-size:11.5px;color:var(--texto-fraco);margin-top:8px}.rp-talhao{position:sticky;top:0;background:#fff;margin:24px 0 12px;padding:10px 0 8px;font-size:15.5px;color:var(--verde-escuro);border-bottom:2px solid var(--verde);z-index:2}.rp-talhao small{float:right;font-weight:400;color:var(--texto-fraco);font-size:12px;padding-top:4px}.rp-dia{margin:14px 0 10px;padding:0 0 4px;font-size:12.5px;font-weight:600;color:var(--texto-fraco);border-bottom:1px solid var(--linha)}.rp-item{margin:0 0 20px}.rp-item figure{margin:0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--linha)}.rp-item img,.rp-item video{display:block;width:100%;max-height:70vh;object-fit:contain;background:#000}.rp-meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center}.rp-tag{font-size:11.5px;padding:3px 9px;border-radius:11px;background:#E8F4EC;color:var(--verde-escuro);font-weight:600}.rp-tag.cinza{background:#F0F2F1;color:var(--texto-fraco);font-weight:500}.rp-legenda{margin:6px 0 0;font-size:15px;white-space:pre-wrap}.rp-fim{text-align:center;margin:28px 0 10px;font-size:15px;color:var(--verde-escuro);font-weight:600}.rp-rodape{background:#F7F9F7;border-top:1px solid var(--linha);padding:20px;text-align:center;font-size:12.5px;color:var(--texto-fraco)}.rp-rodape b{color:var(--verde-escuro)}.rp-barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:#fff;border-top:1px solid var(--linha)}.rp-barra button{flex:1;padding:12px;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}.rp-barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}@media print{.rp-voltar,.rp-barra{display:none}.rp-tela{position:static}.rp-talhao{position:static;break-after:avoid}.rp-item{break-inside:avoid}video{display:none}}.marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--texto);margin:2px 0 12px;line-height:1.3}.marcar input{width:19px;height:19px;flex:none;accent-color:var(--verde)}.rp-logo-img{height:44px;max-width:130px;width:auto;object-fit:contain;background:#fff;padding:4px;border-radius:8px;flex:none;display:block}.btn-camera.enviar{background:var(--verde-acento);font-size:22px;padding-left:3px}</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ---------- Header ---------- -->
   <header class="topo">
     <button class="voltar" id="btnMenuLista" title="Relatórios">☰</button>
     <div class="avatar" id="avatarRel">🌱</div>
@@ -11,12 +29,18 @@
       <button id="btnMais" title="Mais">⋮</button>
     </div>
   </header>
+
+  <!-- ---------- Status GPS / sync ---------- -->
   <div class="barra-status">
     <span class="pill"><i class="dot" id="dotGps"></i><span id="txtGps">GPS aguardando…</span></span>
     <span class="cresce"></span>
     <span class="pill"><i class="dot" id="dotSync"></i><span id="txtSync">—</span></span>
   </div>
+
+  <!-- ---------- Chat ---------- -->
   <main class="chat" id="chat"></main>
+
+  <!-- ---------- Composer ---------- -->
   <div class="dica-camera" id="dicaCamera">Toque para foto · Segure para vídeo</div>
   <div class="composer">
     <div class="caixa">
@@ -26,11 +50,14 @@
     <button class="btn-camera" id="btnCamera">📷</button>
   </div>
 </div>
+
 <input type="file" id="inpArquivo" accept="image/*,video/*" multiple class="oculto">
 <input type="file" id="inpFoto" accept="image/*" capture="environment" class="oculto">
 <input type="file" id="inpVideo" accept="video/*" capture="environment" class="oculto">
 <input type="file" id="inpLogo" accept="image/png,image/jpeg,image/*" class="oculto">
 <input type="file" id="inpKml" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" class="oculto">
+
+<!-- ---------- Câmera ---------- -->
 <div class="camera oculto" id="telaCamera">
   <video id="camVideo" autoplay playsinline muted></video>
   <div class="cam-topo">
@@ -46,6 +73,8 @@
     <div class="lado"></div>
   </div>
 </div>
+
+<!-- ---------- Tela: lista de relatórios ---------- -->
 <div class="tela oculto" id="telaLista">
   <header class="topo">
     <button class="voltar" data-fechar="telaLista">←</button>
@@ -59,6 +88,8 @@
     <div id="listaRelatorios"></div>
   </div>
 </div>
+
+<!-- ---------- Tela: novo/editar relatório ---------- -->
 <div class="tela oculto" id="telaRel">
   <header class="topo">
     <button class="voltar" data-fechar="telaRel">←</button>
@@ -78,10 +109,14 @@
       <div class="campo"><label>Término</label><input type="date" id="fFim"></div>
     </div>
     <div class="campo"><label>Observações gerais</label><textarea id="fObs" rows="3"></textarea></div>
+
+
     <button class="btn" id="btnSalvarRel">Salvar</button>
     <button class="btn perigo oculto" id="btnApagarRel">Apagar relatório</button>
   </div>
 </div>
+
+<!-- ---------- Tela: mapa ---------- -->
 <div class="tela oculto" id="telaMapa">
   <header class="topo">
     <button class="voltar" data-fechar="telaMapa">←</button>
@@ -94,6 +129,8 @@
     <div id="resumoTalhoes"></div>
   </div>
 </div>
+
+<!-- ---------- Tela: ajustes ---------- -->
 <div class="tela oculto" id="telaAjustes">
   <header class="topo">
     <button class="voltar" data-fechar="telaAjustes">←</button>
@@ -133,7 +170,11 @@
     <button class="btn perigo" id="btnSair">Sair da conta</button>
   </div>
 </div>
+
 <div class="rp-tela oculto" id="telaRelPronto"></div>
+
+
+<!-- ---------- Tela: entrar ---------- -->
 <div class="tela oculto" id="telaLogin" style="z-index:95">
   <div class="conteudo" style="display:flex;flex-direction:column;justify-content:center;max-width:460px;margin:0 auto;width:100%">
     <div style="text-align:center;margin-bottom:22px">
@@ -155,6 +196,8 @@
     </div>
   </div>
 </div>
+
+<!-- ---------- Tela: cadastro ---------- -->
 <div class="tela oculto" id="telaCadastro">
   <header class="topo">
     <button class="voltar" data-fechar="telaCadastro">←</button>
@@ -173,6 +216,8 @@
     <div id="listaProdutores"></div>
   </div>
 </div>
+
+<!-- ---------- Tela: produtor ---------- -->
 <div class="tela oculto" id="telaProdutor">
   <header class="topo">
     <button class="voltar" data-fechar="telaProdutor">←</button>
@@ -187,6 +232,8 @@
     <button class="btn perigo oculto" id="btnApagarProdutor">Apagar produtor</button>
   </div>
 </div>
+
+<!-- ---------- Tela: fazenda ---------- -->
 <div class="tela oculto" id="telaFazenda">
   <header class="topo">
     <button class="voltar" data-fechar="telaFazenda">←</button>
@@ -215,10 +262,2332 @@
     <button class="btn" id="btnSalvarFazenda">Salvar fazenda</button>
     <button class="btn perigo oculto" id="btnApagarFazenda">Apagar fazenda</button>
   </div>
-</div><script>!function(){"use strict";function t(t){return String(t).trim().split(/\s+/).filter(Boolean).map(function(t){const e=t.split(",").map(Number);return[e[0],e[1]]}).filter(function(t){return isFinite(t[0])&&isFinite(t[1])})}function e(e){const o=(new DOMParser).parseFromString(e,"text/xml");if(o.querySelector("parsererror"))throw new Error("KML mal formado");const n=[];return o.querySelectorAll("Placemark").forEach(function(e,o){const r=[];if(e.querySelectorAll("Polygon").forEach(function(e){const o=[],n=e.querySelector("outerBoundaryIs coordinates");n&&o.push(t(n.textContent)),e.querySelectorAll("innerBoundaryIs coordinates").forEach(function(e){o.push(t(e.textContent))}),o.length&&o[0].length>=3&&r.push(o)}),!r.length)return;const i=function(t){const e={};return t.querySelectorAll("ExtendedData > Data").forEach(function(t){const o=t.getAttribute("name"),n=t.querySelector("value");o&&(e[o]=n?n.textContent.trim():"")}),t.querySelectorAll("ExtendedData SimpleData").forEach(function(t){const o=t.getAttribute("name");o&&(e[o]=t.textContent.trim())}),e}(e),a=e.querySelector("name"),c=a?a.textContent.trim():"",u=c||i.Name||i.nome||i.TALHAO||i.Talhao||"Talhão "+(o+1);n.push({type:"Feature",properties:Object.assign({},i,{_nome_kml:c,_ordem:o+1,nome:u,id:"T"+(o+1)}),geometry:1===r.length?{type:"Polygon",coordinates:r[0]}:{type:"MultiPolygon",coordinates:r}})}),{type:"FeatureCollection",features:n}}function o(t,e){let o=!1;const n=t[0],r=t[1];for(let t=0,i=e.length-1;t<e.length;i=t++){const a=e[t][0],c=e[t][1],u=e[i][0],s=e[i][1];c>r!=s>r&&n<(u-a)*(r-c)/(s-c||1e-12)+a&&(o=!o)}return o}function n(t,e){if(!e.length||!o(t,e[0]))return!1;for(let n=1;n<e.length;n++)if(o(t,e[n]))return!1;return!0}function r(t){if(!t)return 0;const e="Polygon"===t.type?[t.coordinates]:"MultiPolygon"===t.type?t.coordinates:[];let o=0;return e.forEach(function(t){t.forEach(function(t,e){o+=(0===e?1:-1)*function(t){const e=6378137;let o=0;for(let e=0,n=t.length;e<n;e++){const r=t[e],i=t[(e+1)%n];o+=(i[0]-r[0])*Math.PI/180*(2+Math.sin(r[1]*Math.PI/180)+Math.sin(i[1]*Math.PI/180))}return Math.abs(o*e*e/2)}(t)})}),+(o/1e4).toFixed(2)}function i(t){let e=180,o=90,n=-180,r=-90;return(t.features||[]).forEach(function(t){const i=t.geometry;if(!i)return;("Polygon"===i.type?[i.coordinates]:i.coordinates).forEach(function(t){t.forEach(function(t){t.forEach(function(t){t[0]<e&&(e=t[0]),t[0]>n&&(n=t[0]),t[1]<o&&(o=t[1]),t[1]>r&&(r=t[1])})})})}),{minX:e,minY:o,maxX:n,maxY:r}}(typeof window!=="undefined"?window:globalThis).Geo={importarArquivo:async function(t){let o;o=(t.name||"").toLowerCase().endsWith(".kmz")?await async function(t){const e=new DataView(t),o=new Uint8Array(t);let n=-1;for(let t=o.length-22;t>=0&&t>o.length-66e3;t--)if(101010256===e.getUint32(t,!0)){n=t;break}if(n<0)throw new Error("KMZ inválido (EOCD não encontrado)");const r=e.getUint16(n+10,!0);let i=e.getUint32(n+16,!0);for(let t=0;t<r&&33639248===e.getUint32(i,!0);t++){const t=e.getUint16(i+10,!0),n=e.getUint32(i+20,!0),r=e.getUint16(i+28,!0),a=e.getUint16(i+30,!0),c=e.getUint16(i+32,!0),u=e.getUint32(i+42,!0),s=(new TextDecoder).decode(o.subarray(i+46,i+46+r));if(i+=46+r+a+c,!/\.kml$/i.test(s))continue;const f=u+30+e.getUint16(u+26,!0)+e.getUint16(u+28,!0),l=o.subarray(f,f+n);if(0===t)return(new TextDecoder).decode(l);if(8===t){if("undefined"==typeof DecompressionStream)throw new Error("Navegador sem suporte a descompressão. Envie o .kml em vez do .kmz.");const t=new DecompressionStream("deflate-raw"),e=new Blob([l]).stream().pipeThrough(t);return await new Response(e).text()}throw new Error("Compressão do KMZ não suportada")}throw new Error("Nenhum .kml encontrado dentro do KMZ")}(await t.arrayBuffer()):await t.text();const n=e(o);return n.features.forEach(function(t){t.properties.area_ha=r(t.geometry)}),n},atributos:function(t){const e=t&&t.features||[];if(!e.length)return[];const o=[],n={};return e.some(function(t){return t.properties._nome_kml})&&o.push({chave:"_nome_kml",rotulo:"Nome do Placemark (padrão)",amostra:e.map(function(t){return t.properties._nome_kml}).filter(Boolean).slice(0,3).join(", ")}),e.forEach(function(t){Object.keys(t.properties).forEach(function(t){if("_"===t.charAt(0)||"nome"===t||"id"===t||"area_ha"===t)return;if(n[t])return;n[t]=!0;const r=e.map(function(e){return e.properties[t]}).filter(function(t){return void 0!==t&&""!==t}).slice(0,3).join(", ");o.push({chave:t,rotulo:t,amostra:r})})}),o.push({chave:"_ordem",rotulo:"Numerar na ordem do arquivo",amostra:"Talhão 1, Talhão 2, …"}),o},aplicarNome:function(t,e){return(t.features||[]).forEach(function(t,o){const n=t.properties;let r="_ordem"===e?"Talhão "+(n._ordem||o+1):n[e];null!=r&&""!==String(r).trim()||(r="Talhão "+(n._ordem||o+1)),n.nome=String(r).trim()}),t},svgTalhoes:function(t,e){const o=e||{},n=t&&t.features||[];if(!n.length)return"";const r=i(t),a=r.maxX-r.minX||.001,c=r.maxY-r.minY||.001,u=r.minX-.04*a,s=r.maxX+.04*a,f=r.minY-.04*c,l=r.maxY+.04*c,m=1e3,h=Math.max(260,Math.round(m*((l-f)/(s-u))*Math.cos((f+l)/2*Math.PI/180))),d=function(t){return(t-u)/(s-u)*m},p=function(t){return h-(t-f)/(l-f)*h};let g='<svg viewBox="0 0 1000 '+h+'" xmlns="http://www.w3.org/2000/svg">';return n.forEach(function(t){const e=t.geometry;if(!e)return;const o="Polygon"===e.type?[e.coordinates]:e.coordinates;o.forEach(function(t){const e=t.map(function(t){return"M"+t.map(function(t){return d(t[0]).toFixed(1)+","+p(t[1]).toFixed(1)}).join("L")+"Z"}).join(" ");g+='<path d="'+e+'" fill="rgba(27,122,67,.15)" stroke="#1B7A43" stroke-width="2.5"/>'});let n=0,r=0,i=0;o.forEach(function(t){t[0].forEach(function(t){n+=t[0],r+=t[1],i++})}),g+='<text x="'+d(n/i).toFixed(1)+'" y="'+p(r/i).toFixed(1)+'" font-size="22" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif" paint-order="stroke" stroke="#fff" stroke-width="5">'+function(t){return String(null==t?"":t).replace(/[&<>"]/g,function(t){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[t]})}(t.properties.nome)+"</text>"}),(o.pontos||[]).forEach(function(t){null!=t.lat&&(g+='<circle cx="'+d(t.lon).toFixed(1)+'" cy="'+p(t.lat).toFixed(1)+'" r="8" fill="'+(t.cor||"#D93025")+'" stroke="#fff" stroke-width="2.5"/>')}),g+="</svg>",g},kmlToGeoJSON:e,talhaoDoPonto:function(t,e,o){if(!o||!o.features)return null;for(const r of o.features){const o=r.geometry;if(!o)continue;const i="Polygon"===o.type?[o.coordinates]:"MultiPolygon"===o.type?o.coordinates:[];for(const o of i)if(n([t,e],o))return{nome:r.properties.nome,id:r.properties.id,feature:r}}return null},areaHa:r,bounds:i,grausParaDMS:function(t,e){const o="lat"===e?t>=0?"N":"S":t>=0?"E":"W",n=Math.abs(t),r=Math.floor(n),i=Math.floor(60*(n-r));return r+"° "+i+"' "+(3600*(n-r-i/60)).toFixed(1)+'" '+o},pointInPolygon:n}}();
-!function(t){"use strict";let e=null;function a(t,a){return(e?Promise.resolve(e):new Promise(function(t,a){const o=indexedDB.open("krigify-relatorio",1);o.onupgradeneeded=function(t){const e=t.target.result;if(e.objectStoreNames.contains("relatorios")||e.createObjectStore("relatorios",{keyPath:"id"}),!e.objectStoreNames.contains("itens")){const t=e.createObjectStore("itens",{keyPath:"id"});t.createIndex("relatorio","relatorio_id"),t.createIndex("sync","sync_state")}e.objectStoreNames.contains("midias")||e.createObjectStore("midias",{keyPath:"id"}),e.objectStoreNames.contains("config")||e.createObjectStore("config",{keyPath:"chave"})},o.onsuccess=function(){e=o.result,t(e)},o.onerror=function(){a(o.error)}})).then(function(e){return e.transaction(t,a||"readonly").objectStore(t)})}function o(t){return new Promise(function(e,a){t.onsuccess=function(){e(t.result)},t.onerror=function(){a(t.error)}})}const n={put:async(t,e)=>o((await a(t,"readwrite")).put(e)),get:async(t,e)=>o((await a(t)).get(e)),del:async(t,e)=>o((await a(t,"readwrite")).delete(e)),all:async t=>o((await a(t)).getAll()),async itensDoRelatorio(t){const e=(await a("itens")).index("relatorio");return(await o(e.getAll(t))).sort(function(t,e){return t.capturado_em.localeCompare(e.capturado_em)})},pendentes:async()=>(await n.all("itens")).filter(function(t){return"ok"!==t.sync_state}),salvarMidia:async(t,e)=>n.put("midias",{id:t,blob:e}),async lerMidia(t){const e=await n.get("midias",t);return e?e.blob:null},async cfg(t,e){if(void 0===e){const e=await n.get("config",t);return e?e.valor:null}return n.put("config",{chave:t,valor:e})},async apagarRelatorio(t){const e=await n.itensDoRelatorio(t);for(const t of e)await n.del("midias",t.id),await n.del("itens",t.id);await n.del("relatorios",t)},async uso(){if(navigator.storage&&navigator.storage.estimate){const t=await navigator.storage.estimate();return{usado:t.usage||0,cota:t.quota||0}}return{usado:0,cota:0}}};t.DB=n,t.novoId=function(t){return(t||"")+Date.now().toString(36)+Math.random().toString(36).slice(2,8)}}(window);
-!function(a){"use strict";let t=!1;const i=[],o=a=>i.forEach(t=>{try{t(a)}catch(a){}});async function e(){const a=await DB.cfg("servidor")||{};return a.api||(a.api="https://relatorio-vsl.vicktorlima17.workers.dev"),a}async function n(a){const t=Object.assign(await e(),a||{});return await DB.cfg("servidor",t),t}async function r(a,t){const i=t||{},n=await e(),r=Object.assign({},i.headers||{});n.token&&(r.Authorization="Bearer "+n.token);const s=await fetch(n.api.replace(/\/$/,"")+a,{method:i.method||"GET",headers:r,body:i.body}),c=await s.text();let d=null;try{d=JSON.parse(c)}catch(a){}if(401===s.status)throw o({tipo:"sem-sessao"}),new Error("sessão expirada");if(!s.ok)throw new Error(d&&d.erro||"HTTP "+s.status);return d}const s=(a,t,i)=>r(a,{method:i||"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(t)});async function c(){return!!(await e()).token}async function d(){const a=await r("/api/cadastro"),t={produtores:a.produtores||[],fazendas:a.fazendas||[],safras:a.safras||[],em:(new Date).toISOString()};return t.fazendas.forEach(function(a){if("string"==typeof a.talhoes&&a.talhoes)try{a.talhoes=JSON.parse(a.talhoes)}catch(t){a.talhoes=null}}),await DB.cfg("cadastro",t),o({tipo:"cadastro"}),t}async function l(a){await s("/api/relatorio",{id:a.id,produtor_id:a.produtor_id||null,fazenda_id:a.fazenda_id||null,produtor:a.produtor,fazenda:a.fazenda,safra:a.safra,servico:a.servico,responsavel:a.responsavel,data_inicio:a.data_inicio,data_fim:a.data_fim,observacoes:a.observacoes,talhoes:a.talhoes,status:a.status,publicado_em:a.publicado_em})}async function u(a){let t=a.midia||null;if("texto"!==a.tipo&&!t){const i=await DB.lerMidia(a.id);if(!i)throw new Error("mídia ausente no aparelho");t=(await r("/api/upload",{method:"POST",headers:{"Content-Type":a.mime||"application/octet-stream","X-Item-Id":a.id,"X-Rel-Id":a.relatorio_id},body:i})).midia}await s("/api/item",{id:a.id,relatorio_id:a.relatorio_id,tipo:a.tipo,legenda:a.legenda||"",midia:t,mime:a.mime,duracao_s:a.duracao_s,bytes:a.bytes,lat:a.lat,lon:a.lon,precisao_m:a.precisao_m,altitude_m:a.altitude_m,talhao:a.talhao,talhao_id:a.talhao_id,capturado_em:a.capturado_em,ordem:a.ordem}),a.midia=t,a.sync_state="ok",a.erro=null,await DB.put("itens",a)}async function f(a){if(t)return{rodando:!0};if(!await c())return o({tipo:"sem-sessao"}),{erro:"sem-sessao"};if(!navigator.onLine)return o({tipo:"offline"}),{erro:"offline"};t=!0,o({tipo:"inicio"});let i=0,e=0;try{const t=await DB.all("relatorios");for(const n of t){if(a&&n.id!==a)continue;try{await l(n)}catch(a){e++,o({tipo:"erro",msg:a.message});continue}const t=(await DB.itensDoRelatorio(n.id)).filter(a=>"ok"!==a.sync_state);for(const a of t)try{a.sync_state="enviando",await DB.put("itens",a),o({tipo:"item",id:a.id,estado:"enviando"}),await u(a),i++,o({tipo:"item",id:a.id,estado:"ok"})}catch(t){a.sync_state="erro",a.erro=t.message,await DB.put("itens",a),e++,o({tipo:"item",id:a.id,estado:"erro",msg:t.message})}}}finally{t=!1,o({tipo:"fim",enviados:i,falhas:e})}return{enviados:i,falhas:e}}a.Sync={conf:e,salvarConf:n,entrar:async function(a,t){const i=await s("/api/entrar",{email:a,senha:t});return await n({token:i.token,nome:i.nome,email:i.email}),i},registrar:async function(a){const t=await s("/api/registrar",a);return await n({token:t.token,nome:t.nome,email:t.email}),t},sair:async function(){await n({token:null}),await DB.cfg("cadastro",{produtores:[],fazendas:[],safras:[],em:null})},logado:c,quemSou:async function(){const a=await e();return{nome:a.nome||"",email:a.email||"",api:a.api}},cadastroLocal:async function(){const a=await DB.cfg("cadastro")||{produtores:[],fazendas:[],em:null};return a.safras||(a.safras=[]),a},baixarCadastro:d,salvarProdutor:async function(a){const t=await s("/api/produtor",a);return await d(),t.id},salvarFazenda:async function(a){const t=await s("/api/fazenda",a);return await d(),t.id},salvarSafra:async function(a){const t=await s("/api/safra",a);return await d(),t.id},apagarCadastro:async function(a,t){await s("/api/apagar",{tipo:a,id:t}),await d()},salvarPerfil:async function(a){return await c()?s("/api/perfil",a):null},baixarPerfil:async function(){return await c()&&(await r("/api/perfil")).perfil||null},sincronizar:f,publicar:async function(a){if(!await c())throw new Error("entre na sua conta para publicar");await f(a.id);const t=(await DB.itensDoRelatorio(a.id)).filter(a=>"ok"!==a.sync_state);if(t.length)throw new Error(t.length+" item(ns) ainda não subiram. Tente de novo com internet.");return a.status="publicado",a.publicado_em=(new Date).toISOString(),await DB.put("relatorios",a),await l(a),(await s("/api/publicar",{id:a.id})).link},status:async function(){const a=await e();return(await fetch(a.api.replace(/\/$/,"")+"/api/status")).json()},autoSync:function(){window.addEventListener("online",()=>f()),setInterval(()=>{navigator.onLine&&f()},6e4)},aoMudar:a=>i.push(a)}}(window);
-!function(a){"use strict";const t=a=>String(null==a?"":a).replace(/[&<>"]/g,a=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[a])),e=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"],o=["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"],s=a=>{if(!a)return"—";const t=String(a).slice(0,10).split("-");return 3===t.length?`${t[2]}/${t[1]}/${t[0]}`:a};a.Relatorio={montar:function(a,i,r){const n=r||{},d=n.empresa||"VSL Consultoria e Treinamento na Agricultura",l=n.cidade||"Pontes e Lacerda · MT",p=n.logo||"",c=i.filter(a=>"foto"===a.tipo).length,v=i.filter(a=>"video"===a.tipo).length,f=new Set(i.filter(a=>a.talhao).map(a=>a.talhao)).size,g=(a.talhoes&&a.talhoes.features||[]).reduce((a,t)=>a+((t.properties||{}).area_ha||0),0),h={};i.forEach(a=>{const t=String(a.capturado_em).slice(0,10);(h[t]=h[t]||[]).push(a)});let u="";return Object.keys(h).sort().forEach(a=>{const s=h[a];u+=`<h3 class="rp-dia">${t((a=>{const t=new Date(a);return`${o[t.getDay()]}, ${String(t.getDate()).padStart(2,"0")} de ${e[t.getMonth()]} de ${t.getFullYear()}`})(s[0].capturado_em))}<small>${s.length} registro(s)</small></h3>`,s.forEach(a=>{if("texto"===a.tipo)return void(u+=`<div class="rp-nota">${t(a.legenda)}</div>`);const e=a.src||(a.asset_id?"/_blob/"+a.asset_id:"");u+='<div class="rp-item"><figure>'+("foto"===a.tipo?`<img loading="lazy" src="${e}" alt="${t(a.legenda||"")}">`:`<video controls preload="metadata" playsinline src="${e}"></video>`)+'</figure><div class="rp-meta">'+(a.talhao?`<span class="rp-tag">📍 ${t(a.talhao)}</span>`:'<span class="rp-tag cinza">📍 fora dos talhões</span>')+`<span class="rp-tag cinza">${(a=>{const t=new Date(a);return String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0")})(a.capturado_em)}</span>`+(null!=a.lat?`<span class="rp-tag cinza">${Number(a.lat).toFixed(5)}, ${Number(a.lon).toFixed(5)}</span>`:"")+(a.precisao_m?`<span class="rp-tag cinza">±${Math.round(a.precisao_m)} m</span>`:"")+("video"===a.tipo&&a.duracao_s?`<span class="rp-tag cinza">${Math.round(a.duracao_s)}s</span>`:"")+"</div>"+(a.legenda?`<p class="rp-legenda">${t(a.legenda)}</p>`:"")+"</div>"})}),`<div class="rp-folha">\n  <header class="rp-capa">\n    <div class="rp-marca">${p?'<img class="rp-logo-img" src="'+t(p)+'" alt="">':'<div class="rp-logo">🌱</div>'}<div><b>${t(d)}</b><span>${t(l)}</span></div></div>\n    <h1>${t(a.fazenda||"Relatório de visita")}</h1>\n    <p>${t(a.servico||"Relatório de visita técnica")}</p>\n  </header>\n  <div class="rp-painel">\n    <div><span>Produtor</span><b>${t(a.produtor||"—")}</b></div>\n    <div><span>Safra</span><b>${t(a.safra||"—")}</b></div>\n    <div><span>Período</span><b>${s(a.data_inicio)} – ${s(a.data_fim)}</b></div>\n    <div><span>Responsável</span><b>${t(a.responsavel||"—")}</b></div>\n  </div>\n  <div class="rp-corpo">\n    <div class="rp-resumo">\n      <div><b>${c}</b><span>fotos</span></div>\n      <div><b>${v}</b><span>vídeos</span></div>\n      <div><b>${f}</b><span>talhões</span></div>\n      <div><b>${g?g.toFixed(0):"—"}</b><span>hectares</span></div>\n    </div>\n    ${a.observacoes?`<div class="rp-nota">${t(a.observacoes)}</div>`:""}\n    ${function(a,e){const o=a&&a.features||[];if(!o.length)return"";let s=180,i=90,r=-180,n=-90;const d=(a,t)=>{const e=a.geometry;e&&("Polygon"===e.type?[e.coordinates]:e.coordinates).forEach(t)};o.forEach(a=>d(a,a=>a.forEach(a=>a.forEach(a=>{s=Math.min(s,a[0]),r=Math.max(r,a[0]),i=Math.min(i,a[1]),n=Math.max(n,a[1])}))));const l=r-s||.001,p=n-i||.001;s-=.03*l,r+=.03*l,i-=.03*p,n+=.03*p;const c=1e3,v=Math.max(300,Math.round(c*((n-i)/(r-s))*Math.cos((i+n)/2*Math.PI/180))),f=a=>(a-s)/(r-s)*c,g=a=>v-(a-i)/(n-i)*v;let h=`<svg viewBox="0 0 1000 ${v}" xmlns="http://www.w3.org/2000/svg">`;return o.forEach(a=>{d(a,a=>{const t=a.map(a=>"M"+a.map(a=>f(a[0]).toFixed(1)+","+g(a[1]).toFixed(1)).join("L")+"Z").join(" ");h+=`<path d="${t}" fill="rgba(27,122,67,.13)" stroke="#1B7A43" stroke-width="2.5"/>`});let e=0,o=0,s=0;d(a,a=>a[0].forEach(a=>{e+=a[0],o+=a[1],s++})),h+=`<text x="${f(e/s).toFixed(1)}" y="${g(o/s).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${t((a.properties||{}).nome||"")}</text>`}),e.filter(a=>null!=a.lat).forEach(a=>{h+=`<circle cx="${f(a.lon).toFixed(1)}" cy="${g(a.lat).toFixed(1)}" r="7" fill="${"video"===a.tipo?"#D93025":"#1B7A43"}" stroke="#fff" stroke-width="2.5"/>`}),h+="</svg>",`<div class="rp-mapa">${h}<div class="rp-obs">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`}(a.talhoes,i)}\n    ${u||'<div class="aviso">Nenhum registro neste relatório.</div>'}\n    <div class="rp-fim">Serviço concluído ✔️</div>\n  </div>\n  <footer class="rp-rodape"><b>${t(d)}</b><br>${t(l)}\n    ${a.publicado_em?"<br><span>Publicado em "+s(a.publicado_em)+"</span>":""}</footer>\n</div>`}}}(window);
-!function(a){"use strict";const t=a=>document.querySelector(a),o=a=>String(null==a?"":a).replace(/[&<>"]/g,a=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[a])),n=a=>t("#"+a).classList.remove("oculto"),e=a=>t("#"+a).classList.add("oculto"),r=(a,t,n)=>{a.innerHTML=t?'<div class="aviso"'+(n?' style="background:#DCF8C6;color:#146034"':"")+">"+o(t)+"</div>":""};let i=!1,s={produtores:[],fazendas:[],safras:[]},l=null,c=null,d=null;async function u(){const a=await Sync.quemSou();t("#loginEmail").value=a.email||"",n("telaLogin")}function f(){i=!i,t("#loginExtra").classList.toggle("oculto",!i),t("#btnEntrar").textContent=i?"Criar conta e entrar":"Entrar",t("#btnAlternarConta").textContent=i?"Já tenho conta":"Criar uma conta",r(t("#loginMsg"),"")}async function p(){const o=t("#loginEmail").value.trim(),n=t("#loginSenha").value,s=t("#loginMsg");if(o&&n){t("#btnEntrar").disabled=!0,r(s,i?"Criando conta…":"Entrando…");try{i?await Sync.registrar({email:o,senha:n,nome:t("#loginNome").value.trim(),convite:t("#loginConvite").value.trim()}):await Sync.entrar(o,n),t("#loginSenha").value="",r(s,""),e("telaLogin");try{const a=await Sync.baixarPerfil();if(a&&(a.empresa||a.cidade||a.logo)){const t=await DB.cfg("servidor")||{};await DB.cfg("servidor",Object.assign(t,{empresa:a.empresa||t.empresa||"",cidade:a.cidade||t.cidade||"",logo:a.logo||t.logo||""}))}}catch(a){}await v(!0),a.App&&App.aoEntrar&&await App.aoEntrar()}catch(a){r(s,a.message)}finally{t("#btnEntrar").disabled=!1}}else r(s,"Preencha e-mail e senha.")}async function m(){const a=(await Sync.conf()).api,o=prompt("Endereço do servidor:",a);o&&(await Sync.salvarConf({api:o.trim().replace(/\/$/,"")}),r(t("#loginMsg"),"Servidor atualizado.",!0))}async function v(a){try{s=a?await Sync.baixarCadastro():await Sync.cadastroLocal()}catch(a){s=await Sync.cadastroLocal()}return function(){const a=s.fazendas||[],n=s.produtores||[],e=s.safras||[];t("#subCadastro").textContent=a.length+" fazenda(s) · "+n.length+" produtor(es) · "+e.length+" safra(s)",t("#listaSafras").innerHTML=e.length?e.map(function(a){return'<div class="lista-item"><div class="ic">🌱</div><div class="txt"><b>'+o(a.nome)+'</b><span>safra cadastrada</span></div><button class="badge" data-safra="'+o(a.id)+'">remover</button></div>'}).join(""):'<div class="aviso">Nenhuma safra cadastrada. Toque em <b>+ Nova safra</b>.</div>',t("#listaFazendas").innerHTML=a.length?a.map(function(a){const t=n.find(t=>t.id===a.produtor_id);return'<div class="lista-item" data-fazenda="'+o(a.id)+'"><div class="ic">🌾</div><div class="txt"><b>'+o(a.nome)+"</b><span>"+(t?o(t.nome)+" · ":"")+(a.n_talhoes?a.n_talhoes+" talhões · "+Math.round(a.area_ha||0)+" ha":"sem KML")+'</span></div><span class="badge">editar</span></div>'}).join(""):'<div class="aviso">Nenhuma fazenda cadastrada.</div>',t("#listaProdutores").innerHTML=n.length?n.map(function(t){const n=a.filter(a=>a.produtor_id===t.id).length;return'<div class="lista-item" data-produtor="'+o(t.id)+'"><div class="ic">👤</div><div class="txt"><b>'+o(t.nome)+"</b><span>"+(t.telefone?o(t.telefone)+" · ":"")+n+' fazenda(s)</span></div><span class="badge">editar</span></div>'}).join(""):'<div class="aviso">Nenhum produtor cadastrado.</div>',document.querySelectorAll("[data-safra]").forEach(a=>a.onclick=async function(){const t=(s.safras||[]).find(t=>t.id===a.dataset.safra);t&&confirm("Remover a safra "+t.nome+" do cadastro?")&&(await Sync.apagarCadastro("safra",t.id),await v(!1))}),document.querySelectorAll("[data-fazenda]").forEach(a=>a.onclick=()=>w(a.dataset.fazenda)),document.querySelectorAll("[data-produtor]").forEach(a=>a.onclick=()=>S(a.dataset.produtor))}(),h(),s}async function g(){const a=prompt("Nome da safra:",function(){const a=new Date,t=a.getMonth()>=6?a.getFullYear():a.getFullYear()-1;return t+"/"+String((t+1)%100).padStart(2,"0")}());if(a&&a.trim())try{await Sync.salvarSafra({nome:a.trim()}),await v(!1)}catch(a){alert("Não salvou: "+a.message)}}function h(){const a=s.produtores||[],n=s.fazendas||[],e=s.safras||[],r=t("#fSafraSel");if(r){const a=r.value||r.dataset.pendente||"";let t=e.map(a=>'<option value="'+o(a.nome)+'">'+o(a.nome)+"</option>");a&&!e.some(t=>t.nome===a)&&t.unshift('<option value="'+o(a)+'">'+o(a)+"</option>"),r.innerHTML=(e.length||a?"":'<option value="">— cadastre uma safra —</option>')+t.join(""),a&&(r.value=a)}const i='<option value="">— selecione —</option>'+a.map(a=>'<option value="'+o(a.id)+'">'+o(a.nome)+"</option>").join(""),l=t("#fzProdutor");if(l){const a=l.value;l.innerHTML=i,l.value=a}const c=t("#fProdutorSel");if(c){const a=c.value;c.innerHTML=i,c.value=a}const d=t("#fFazendaSel");if(d){const a=c?c.value:"",t=a?n.filter(t=>t.produtor_id===a||!t.produtor_id):n,e=d.value;d.innerHTML='<option value="">— selecione —</option>'+t.map(a=>'<option value="'+o(a.id)+'">'+o(a.nome)+"</option>").join(""),d.value=e,y()}}function b(a){return(s.fazendas||[]).find(t=>t.id===a)||null}function z(a){return(s.produtores||[]).find(t=>t.id===a)||null}function y(){const a=t("#fTalhoesInfo");if(!a)return;const o=b(t("#fFazendaSel").value);a.textContent=o?o.n_talhoes?"📐 "+o.n_talhoes+" talhões · "+Math.round(o.area_ha||0)+" ha, já importados":"⚠️ esta fazenda ainda não tem KML":""}function S(a){c=a?z(a):null;const o=c||{};t("#tituloProdutor").textContent=a?"Editar produtor":"Novo produtor",t("#pNome").value=o.nome||"",t("#pDoc").value=o.documento||"",t("#pTel").value=o.telefone||"",t("#pObs").value=o.observacoes||"",t("#btnApagarProdutor").classList.toggle("oculto",!a),n("telaProdutor")}async function L(){const a=t("#pNome").value.trim();if(a){t("#btnSalvarProdutor").disabled=!0;try{await Sync.salvarProdutor({id:c?c.id:null,nome:a,documento:t("#pDoc").value.trim(),telefone:t("#pTel").value.trim(),observacoes:t("#pObs").value.trim()}),await v(!1),e("telaProdutor")}catch(a){alert("Não salvou: "+a.message)}finally{t("#btnSalvarProdutor").disabled=!1}}else alert("Informe o nome do produtor.")}function w(a){l=a?b(a):null,d=null;const o=l||{};t("#tituloFazenda").textContent=a?"Editar fazenda":"Nova fazenda",t("#fzNome").value=o.nome||"",t("#fzMunicipio").value=o.municipio||"",t("#fzUf").value=o.uf||"",h(),t("#fzProdutor").value=o.produtor_id||"",t("#fzCampoNomeBox").classList.add("oculto"),C(o.talhoes||null,o.n_talhoes,o.area_ha),t("#btnApagarFazenda").classList.toggle("oculto",!a),n("telaFazenda")}function C(a,n,e){const r=a&&a.features?a.features.length:n||0,i=a&&a.features?a.features.reduce((a,t)=>a+(t.properties&&t.properties.area_ha||0),0):e||0;t("#fzStatusKml").innerHTML='<div class="ic">📐</div><div class="txt"><b>'+(r?r+" talhões · "+i.toFixed(1)+" ha":"Nenhum talhão carregado")+"</b><span>"+(r?"toque no mapa abaixo para conferir":"Importe o KML da fazenda")+"</span></div>",function(a){const n=t("#fzMapa"),e=t("#fzListaTalhoes");if(!a||!a.features||!a.features.length)return n.classList.add("oculto"),n.innerHTML="",void(e.innerHTML="");n.classList.remove("oculto"),n.innerHTML=Geo.svgTalhoes(a);const r=a.features.map(function(a){const t=a.properties.area_ha;return'<tr><td style="padding:4px 8px 4px 0">'+o(a.properties.nome)+'</td><td style="padding:4px 0;text-align:right;color:#667781">'+(t?t.toFixed(1)+" ha":"—")+"</td></tr>"}).join("");e.innerHTML='<div class="lista-item" style="display:block"><table style="width:100%;font-size:13.5px">'+r+"</table></div>"}(a)}async function M(){const a=t("#fzNome").value.trim();if(a){t("#btnSalvarFazenda").disabled=!0;try{const o={id:l?l.id:null,nome:a,produtor_id:t("#fzProdutor").value||null,municipio:t("#fzMunicipio").value.trim(),uf:t("#fzUf").value.trim().toUpperCase()};d?o.talhoes=d:l&&l.talhoes&&(o.talhoes=l.talhoes),await Sync.salvarFazenda(o),await v(!1),e("telaFazenda")}catch(a){alert("Não salvou: "+a.message)}finally{t("#btnSalvarFazenda").disabled=!1}}else alert("Informe o nome da fazenda.")}a.Conta={ligar:function(){t("#btnEntrar").onclick=p,t("#btnAlternarConta").onclick=f,t("#btnTrocarServidor").onclick=m,t("#loginSenha").addEventListener("keydown",a=>{"Enter"===a.key&&p()}),t("#btnAbrirCadastro").onclick=async function(){await v(!0),n("telaCadastro")},t("#btnAtualizarCadastro").onclick=async function(){await v(!0)},t("#btnNovoProdutor").onclick=()=>S(null),t("#btnNovaFazenda").onclick=()=>w(null),t("#btnNovaSafra").onclick=g,t("#btnSalvarProdutor").onclick=L,t("#btnSalvarFazenda").onclick=M,t("#btnFzKml").onclick=()=>t("#inpKml").click(),t("#btnApagarProdutor").onclick=async function(){c&&confirm("Apagar este produtor do cadastro?")&&(await Sync.apagarCadastro("produtor",c.id),await v(!1),e("telaProdutor"))},t("#btnApagarFazenda").onclick=async function(){l&&confirm("Apagar esta fazenda e seus talhões do cadastro?")&&(await Sync.apagarCadastro("fazenda",l.id),await v(!1),e("telaFazenda"))};const a=t("#fProdutorSel"),o=t("#fFazendaSel");a&&(a.onchange=h),o&&(o.onchange=y),t("#btnSair").onclick=async function(){confirm("Sair da conta? Os relatórios já salvos continuam neste aparelho.")&&(await Sync.sair(),location.reload())},Sync.aoMudar(function(a){"sem-sessao"===a.tipo&&u()})},mostrarLogin:u,atualizarCadastro:v,fazendaPorId:b,produtorPorId:z,importarKmlFazenda:async function(a){try{const n=await Geo.importarArquivo(a);if(!n.features.length)return void alert("Nenhum polígono encontrado no arquivo.");d=n,function(a){const n=t("#fzCampoNomeBox"),e=t("#fzCampoNome"),r=t("#fzCampoNomeAmostra"),i=Geo.atributos(a);if(!i.length)return void n.classList.add("oculto");n.classList.remove("oculto"),e.innerHTML=i.map(function(a){return'<option value="'+o(a.chave)+'">'+o(a.rotulo)+"</option>"}).join("");const s=function(){const a=i.find(function(a){return a.chave===e.value});r.textContent=a&&a.amostra?"Ex.: "+a.amostra:""};e.onchange=function(){Geo.aplicarNome(d,e.value),s(),C(d)},s()}(n),C(n)}catch(a){alert("Erro no KML: "+a.message)}},preencherSelecoes:h,telaFazendaAberta:()=>!t("#telaFazenda").classList.contains("oculto"),dados:()=>s}}(window);
-!function(t){"use strict";const a=function(t){return document.querySelector(t)},e=function(t){return Array.prototype.slice.call(document.querySelectorAll(t))},o={rel:null,itens:[],pos:null,cfg:{qualidade:.82,video:720},stream:null,facing:"environment",recorder:null,chunks:[],gravando:!1,tRec:null,urls:[]};function n(t){const a=new Date(t);return String(a.getHours()).padStart(2,"0")+":"+String(a.getMinutes()).padStart(2,"0")}function i(t){const a=new Date(t),e=new Date,o=function(t,a){return t.toDateString()===a.toDateString()};if(o(a,e))return"Hoje";return o(a,new Date(e.getTime()-864e5))?"Ontem":String(a.getDate()).padStart(2,"0")+" "+["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"][a.getMonth()]+" "+a.getFullYear()}function r(t){return t=Math.round(t||0),Math.floor(t/60)+":"+String(t%60).padStart(2,"0")}function s(t){if(!t)return"0 B";const a=["B","KB","MB","GB"],e=Math.min(a.length-1,Math.floor(Math.log(t)/Math.log(1024)));return(t/Math.pow(1024,e)).toFixed(e?1:0)+" "+a[e]}function c(t,a){const e=document.createElement("div");e.className="toast",e.textContent=t,document.body.appendChild(e),setTimeout(function(){e.remove()},a||2600)}function l(t){const a=URL.createObjectURL(t);return o.urls.push(a),a}function d(t){return String(null==t?"":t).replace(/[&<>"]/g,function(t){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[t]})}function u(t){a("#"+t).classList.remove("oculto")}function v(t){a("#"+t).classList.add("oculto")}function f(){if(!o.pos)return;const t=o.pos.acc||99;a("#dotGps").className="dot "+(t<=10?"ok":t<=30?"medio":"ruim");const e=p();a("#txtGps").textContent="±"+Math.round(t)+" m"+(e?" · "+e.nome:"");const n=a("#camGeo");n&&(n.textContent="📍 ±"+Math.round(t)+" m"+(e?" · "+e.nome:" · fora dos talhões")),o.rel&&(a("#subtituloRel").textContent=m())}function p(){return o.pos&&o.rel&&o.rel.talhoes?Geo.talhaoDoPonto(o.pos.lon,o.pos.lat,o.rel.talhoes):null}function m(){if(!o.rel)return"Toque em ☰ para criar";const t=p(),a=(o.rel.talhoes&&o.rel.talhoes.features||[]).length;return[o.rel.safra?"Safra "+o.rel.safra:null,a?a+" talhões":"sem KML",t?"📍 "+t.nome:null].filter(Boolean).join(" · ")}function g(){DB.pendentes().then(function(t){const e=a("#dotSync"),o=a("#txtSync");return navigator.onLine?0===t.length?(e.className="dot ok",void(o.textContent="sincronizado")):(e.className="dot medio",void(o.textContent=t.length+" para enviar")):(e.className="dot medio",void(o.textContent="offline · "+t.length+" na fila"))})}async function h(){const t=a("#chat");if(o.urls.forEach(URL.revokeObjectURL),o.urls=[],!o.rel)return void(t.innerHTML='<div class="aviso">Nenhum relatório aberto. Toque em <b>☰</b> e crie um novo.</div>');if(o.itens=await DB.itensDoRelatorio(o.rel.id),a("#dicaCamera").textContent=j()?"Relatório finalizado — somente leitura":"Toque para foto · Segure para vídeo · Segure um registro para editar",!o.itens.length)return void(t.innerHTML='<div class="aviso">Relatório criado. Toque na <b>câmera</b> para registrar a primeira foto ou vídeo — a localização e o talhão entram automaticamente.</div><div class="aviso">Para usar como aplicativo: no navegador do celular, menu <b>⋮</b> → <b>Adicionar à tela inicial</b>.</div>');let e="",n="";for(const t of o.itens){const a=i(t.capturado_em);a!==n&&(n=a,e+='<div class="divisor"><span>'+d(a)+"</span></div>"),e+=b(t)}t.innerHTML=e;for(const a of o.itens){if("texto"===a.tipo)continue;const e=t.querySelector('[data-midia="'+a.id+'"]');if(!e)continue;const o=await DB.lerMidia(a.id);if(o){const t=l(o);"foto"===a.tipo?e.innerHTML='<img src="'+t+'" alt="">':e.innerHTML='<video src="'+t+'" preload="metadata" playsinline></video><div class="play">▶</div>'+(a.duracao_s?'<div class="dur">'+r(a.duracao_s)+"</div>":"")}else a.drive_id&&(e.innerHTML='<div style="padding:26px;color:#fff;font-size:12px;text-align:center">enviado · mídia na nuvem</div>')}t.scrollTop=t.scrollHeight}function b(t){const a="ok"===t.sync_state?'<span class="ticks ok">✓✓</span>':"erro"===t.sync_state?'<span class="ticks erro" title="'+d(t.erro||"")+'">!</span>':'<span class="ticks">✓</span>',e="texto"===t.tipo?"":t.talhao?'<div class="chip-talhao">📍 '+d(t.talhao)+(t.precisao_m?" · ±"+Math.round(t.precisao_m)+"m":"")+"</div>":'<div class="chip-talhao fora">📍 fora dos talhões'+(t.lat?"":" · sem GPS")+"</div>";return"texto"===t.tipo?'<div class="msg eu" data-id="'+t.id+'"><div class="bolha so-texto"><div class="legenda">'+d(t.legenda)+'</div><div class="rodape"><span>'+n(t.capturado_em)+"</span>"+a+"</div></div></div>":'<div class="msg eu" data-id="'+t.id+'"><div class="bolha"><div class="midia" data-midia="'+t.id+'" data-abrir="'+t.id+'"></div>'+e+(t.legenda?'<div class="legenda">'+d(t.legenda)+"</div>":"")+'<div class="rodape">'+(t.bytes?"<span>"+s(t.bytes)+"</span>":"")+"<span>"+n(t.capturado_em)+"</span>"+a+"</div></div></div>"}async function y(t,a,e){if(!o.rel)return c("Crie ou abra um relatório primeiro"),null;if(j())return c("Relatório finalizado — crie um novo para seguir registrando",3500),null;const n=p(),i=Object.assign({id:novoId(),relatorio_id:o.rel.id,tipo:t,legenda:"",mime:a?a.type:null,bytes:a?a.size:null,lat:o.pos?o.pos.lat:null,lon:o.pos?o.pos.lon:null,precisao_m:o.pos?o.pos.acc:null,altitude_m:o.pos?o.pos.alt:null,talhao:n?n.nome:null,talhao_id:n?n.id:null,capturado_em:(new Date).toISOString(),ordem:Date.now(),sync_state:"pendente"},e||{});return a&&await DB.salvarMidia(i.id,a),await DB.put("itens",i),i}async function w(t,a,e){if("foto"===a)try{t=await async function(t,a,e){const o=await createImageBitmap(t),n=Math.min(1,a/Math.max(o.width,o.height)),i=Math.round(o.width*n),r=Math.round(o.height*n),s=document.createElement("canvas");return s.width=i,s.height=r,s.getContext("2d").drawImage(o,0,0,i,r),o.close&&o.close(),await new Promise(function(t){s.toBlob(t,"image/jpeg",e)})}(t,2048,o.cfg.qualidade)}catch(t){}!function(t,a,e){const n=document.createElement("div");n.className="veu";const i=document.createElement("div");i.className="folha";const r=l(t),s=p(),c=o.rel&&o.rel.talhoes&&o.rel.talhoes.features||[],u=['<option value="">Fora dos talhões</option>'].concat(c.map(function(t){const a=t.properties.nome;return'<option value="'+d(a)+'"'+(s&&s.nome===a?" selected":"")+">"+d(a)+"</option>"})).join("");i.innerHTML='<div class="alca"></div>'+("foto"===a?'<img src="'+r+'" style="width:100%;border-radius:10px;max-height:34dvh;object-fit:cover">':'<video src="'+r+'" controls playsinline style="width:100%;border-radius:10px;max-height:34dvh"></video>')+'<div style="margin:8px 0 2px;font-size:12.5px;color:#667781">'+(o.pos?"📍 GPS ±"+Math.round(o.pos.acc)+" m"+(s?" · detectou "+d(s.nome):" · fora dos talhões"):"📍 sem GPS neste aparelho — escolha o talhão abaixo")+"</div>"+(c.length?'<div class="campo"><label>Talhão</label><select id="legTalhao">'+u+"</select></div>":"")+'<div class="campo"><textarea id="legTxt" rows="2" placeholder="Legenda (opcional)"></textarea></div><button class="btn" id="legOk">Adicionar ao relatório</button><button class="btn secundario" id="legCancel">Descartar</button>',document.body.appendChild(n),document.body.appendChild(i);const v=function(){n.remove(),i.remove()};n.onclick=v,i.querySelector("#legCancel").onclick=v,i.querySelector("#legOk").onclick=function(){const t=i.querySelector("#legTxt").value.trim(),a=i.querySelector("#legTalhao"),o=a?a.value:s?s.nome:"",n=c.find(function(t){return t.properties.nome===o});v(),e(t,o?{talhao:o,talhao_id:n?n.properties.id:null}:{talhao:null,talhao_id:null})},setTimeout(function(){i.querySelector("#legTxt").focus()},150)}(t,a,async function(n,i){await y(a,t,Object.assign({legenda:n},e||{},i||{}))&&(await h(),g(),navigator.onLine&&Sync.sincronizar(o.rel.id))})}async function x(){if(o.rel){try{const t=1080===o.cfg.video?1080:720;o.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:o.facing,width:{ideal:1080===t?1920:1280},height:{ideal:t}},audio:!0})}catch(t){return o.semCameraInterna=!0,void a("#inpFoto").click()}a("#camVideo").srcObject=o.stream,u("telaCamera"),f()}else c("Crie ou abra um relatório primeiro")}function L(){o.gravando&&k(),o.stream&&(o.stream.getTracks().forEach(function(t){t.stop()}),o.stream=null),v("telaCamera")}function S(){if(!o.stream||o.gravando)return;const t=["video/mp4;codecs=avc1","video/webm;codecs=vp9,opus","video/webm"].find(function(t){return MediaRecorder.isTypeSupported(t)})||"";o.chunks=[];const e=1080===o.cfg.video?25e5:12e5;o.recorder=new MediaRecorder(o.stream,t?{mimeType:t,videoBitsPerSecond:e}:void 0),o.recorder.ondataavailable=function(t){t.data.size&&o.chunks.push(t.data)},o.recorder.onstop=function(){const t=new Blob(o.chunks,{type:o.recorder.mimeType||"video/webm"}),a=(Date.now()-o.tInicio)/1e3;L(),w(t,"video",{duracao_s:+a.toFixed(1)})},o.recorder.start(1e3),o.gravando=!0,o.tInicio=Date.now(),a("#camObturador").classList.add("gravando"),a("#camRec").classList.remove("oculto"),a("#btnCamera").classList.add("gravando"),o.tRec=setInterval(function(){a("#camTempo").textContent=r((Date.now()-o.tInicio)/1e3)},500),navigator.vibrate&&navigator.vibrate(30)}function k(){if(o.gravando){o.gravando=!1,clearInterval(o.tRec),a("#camObturador").classList.remove("gravando"),a("#camRec").classList.add("oculto"),a("#btnCamera").classList.remove("gravando");try{o.recorder.stop()}catch(t){}}}function C(){const t=a("#camObturador");let e=null,n=!1;const i=function(){n=!1,e=setTimeout(function(){n=!0,S()},350)},r=function(){clearTimeout(e),o.gravando?k():n||async function(){const t=a("#camVideo"),e=document.createElement("canvas");e.width=t.videoWidth,e.height=t.videoHeight,e.getContext("2d").drawImage(t,0,0);const n=await new Promise(function(t){e.toBlob(t,"image/jpeg",o.cfg.qualidade)});L(),w(n,"foto")}()};t.addEventListener("touchstart",i,{passive:!0}),t.addEventListener("touchend",r),t.addEventListener("mousedown",i),t.addEventListener("mouseup",r)}async function M(){const t=(await DB.all("relatorios")).sort(function(t,a){return(a.criado_em||"").localeCompare(t.criado_em||"")}),o=a("#listaRelatorios");if(!t.length)return o.innerHTML='<div class="aviso">Nenhum relatório ainda.</div>',void(a("#subLista").textContent="0 relatórios");a("#subLista").textContent=t.length+" relatório(s)";const n=[];for(const a of t){const t=await DB.itensDoRelatorio(a.id),e=t.filter(function(t){return"ok"!==t.sync_state}).length;n.push('<div class="lista-item" data-rel="'+a.id+'"><div class="ic">'+("publicado"===a.status?"✅":"🌱")+'</div><div class="txt"><b>'+d(a.fazenda||"Sem fazenda")+"</b><span>"+d(a.produtor||"—")+" · "+t.length+" registros"+(e?" · "+e+" na fila":"")+'</span></div><span class="badge '+("publicado"===a.status?"pub":"")+'">'+("publicado"===a.status?"publicado":"rascunho")+"</span></div>")}o.innerHTML=n.join(""),e("#listaRelatorios [data-rel]").forEach(function(t){t.onclick=function(){T(t.dataset.rel),v("telaLista")}})}async function T(t){o.rel=await DB.get("relatorios",t),await DB.cfg("ultimo",t),a("#tituloRel").textContent=o.rel.fazenda||"Relatório",a("#subtituloRel").textContent=m(),a("#avatarRel").textContent="publicado"===o.rel.status?"✅":"🌱",v("telaLista"),await h(),g(),f()}function E(t){Conta.preencherSelecoes(),a("#fProdutorSel").value=t.produtor_id||"",Conta.preencherSelecoes(),a("#fFazendaSel").value=t.fazenda_id||"",a("#fSafraSel").dataset.pendente=t.safra||"",Conta.preencherSelecoes(),a("#fResponsavel").value=t.responsavel||"",a("#fServico").value=t.servico||"",a("#fInicio").value=t.data_inicio||"",a("#fFim").value=t.data_fim||"",a("#fObs").value=t.observacoes||"",Conta.preencherSelecoes(),a("#tituloTelaRel").textContent=t.id?"Editar relatório":"Novo relatório",a("#btnApagarRel").classList.toggle("oculto",!t.id)}let R=null;async function D(){const t=R||{},e=Conta.produtorPorId(a("#fProdutorSel").value),o=Conta.fazendaPorId(a("#fFazendaSel").value);if(!o)return void c("Escolha a fazenda — ou cadastre uma primeiro");const n=Object.assign({},t,{id:t.id||novoId("r"),produtor_id:e?e.id:null,fazenda_id:o.id,produtor:e?e.nome:"",fazenda:o.nome,safra:a("#fSafraSel").value.trim(),responsavel:a("#fResponsavel").value.trim(),servico:a("#fServico").value.trim(),data_inicio:a("#fInicio").value||null,data_fim:a("#fFim").value||null,observacoes:a("#fObs").value.trim(),talhoes:o.talhoes||{type:"FeatureCollection",features:[]},status:t.status||"rascunho",criado_em:t.criado_em||(new Date).toISOString()});await DB.put("relatorios",n),R=null,v("telaRel"),await T(n.id),await M(),navigator.onLine&&Sync.sincronizar(n.id)}function z(){if(!o.rel)return void c("Abra um relatório");const t=document.createElement("div");t.className="veu";const a=document.createElement("div");a.className="folha",a.innerHTML='<div class="alca"></div><div class="opcao" data-a="editar"><span>✏️</span><span>Editar dados da visita</span></div><div class="opcao" data-a="sync"><span>🔄</span><span>Sincronizar agora</span></div><div class="opcao" data-a="previa"><span>👁️</span><span>Ver como o cliente vê</span></div><div class="opcao" data-a="publicar"><span>🔗</span><span><b>Finalizar e gerar link</b></span></div><div class="opcao" data-a="lista"><span>📁</span><span>Todos os relatórios</span></div>',document.body.appendChild(t),document.body.appendChild(a);const e=function(){t.remove(),a.remove()};t.onclick=e,a.querySelectorAll(".opcao").forEach(function(t){t.onclick=async function(){const a=t.dataset.a;if(e(),"editar"===a){if(j())return void c("Relatório finalizado — não dá mais para editar os dados",3500);R=o.rel,E(o.rel),u("telaRel")}if("sync"===a){c("Sincronizando…");const t=await Sync.sincronizar();t.erro||c(t.enviados+" enviados, "+t.falhas+" falhas"),await h(),g()}"previa"===a&&A(o.rel.id,!0),"publicar"===a&&async function(){if(!o.rel)return;const t=o.itens.filter(function(t){return"ok"!==t.sync_state}).length;c(t?"Sincronizando "+t+" item(ns)…":"Publicando…",4e3);try{const t=await Sync.publicar(o.rel);o.rel=await DB.get("relatorios",o.rel.id),await h(),g(),function(t){const a=document.createElement("div");a.className="veu";const e=document.createElement("div");e.className="folha",e.innerHTML='<div class="alca"></div><h2 style="margin-top:0">Relatório publicado</h2><div class="campo"><input id="linkOut" readonly value="'+d(t)+'"></div><button class="btn" id="btnCompart">Compartilhar no WhatsApp</button><button class="btn secundario" id="btnCopiar">Copiar link</button><button class="btn secundario" id="btnAbrir">Abrir relatório</button>',document.body.appendChild(a),document.body.appendChild(e);const n=function(){a.remove(),e.remove()};a.onclick=n;const i="Relatório de visita — "+(o.rel.fazenda||"")+"\n"+t;e.querySelector("#btnCompart").onclick=function(){navigator.share?navigator.share({title:"Relatório de visita",text:i}):window.open("https://wa.me/?text="+encodeURIComponent(i),"_blank")},e.querySelector("#btnCopiar").onclick=function(){navigator.clipboard.writeText(t),c("Link copiado")},e.querySelector("#btnAbrir").onclick=function(){n(),A(o.rel.id,!1)}}(t)}catch(t){c("Não publicou: "+t.message,5e3)}}(),"lista"===a&&(await M(),u("telaLista"))}})}async function B(){const t=await DB.cfg("servidor");t&&(o.cfg=Object.assign(o.cfg,t)),a("#cfgEmpresa").value=o.cfg.empresa||"",a("#cfgCidade").value=o.cfg.cidade||"",H(),a("#cfgQualidade").value=String(o.cfg.qualidade||.82),a("#cfgVideo").value=String(o.cfg.video||720);const e=await DB.uso();a("#usoDisco").textContent=s(e.usado)+(e.cota?" de "+s(e.cota):"");const n=await Sync.quemSou();a("#infoConta").innerHTML='<div class="lista-item"><div class="ic">👤</div><div class="txt"><b>'+d(n.nome||n.email||"sem conta")+"</b><span>"+d(n.email||"")+"</span></div></div>"}async function _(){const t=await DB.cfg("servidor")||{};o.cfg=Object.assign({},t,{empresa:a("#cfgEmpresa").value.trim(),cidade:a("#cfgCidade").value.trim(),qualidade:parseFloat(a("#cfgQualidade").value),video:parseInt(a("#cfgVideo").value,10)}),await DB.cfg("servidor",o.cfg),c("Ajustes salvos"),Sync.salvarPerfil({empresa:o.cfg.empresa,cidade:o.cfg.cidade,logo:o.cfg.logo||""}).catch(function(t){c("Salvo no aparelho; servidor: "+t.message,4e3)})}function H(){const t=a("#logoPrevia");o.cfg.logo?(t.innerHTML='<div class="ic" style="background:#fff;padding:3px"><img src="'+o.cfg.logo+'" style="max-width:100%;max-height:100%;object-fit:contain"></div><div class="txt"><b>Logo definido</b><span>aparece no cabeçalho do relatório</span></div>',a("#btnRemoverLogo").classList.remove("oculto")):(t.innerHTML='<div class="ic">🏷️</div><div class="txt"><b>Nenhum logo</b><span>JPG ou PNG, aparece no cabeçalho do relatório</span></div>',a("#btnRemoverLogo").classList.add("oculto"))}async function P(){const t=a("#infoServidor");t.innerHTML='<div class="aviso">Verificando…</div>';try{const a=await Sync.status(),e=[];e.push(a.armazenamento?"✅ Armazenamento do app conectado":"❌ Sem armazenamento — rodando só neste aparelho"),e.push(a.midia?"✅ Envio de fotos e vídeos liberado":"⚠️ Esta sessão não pode enviar mídia (visualização apenas)"),e.push(navigator.geolocation?"✅ GPS disponível no navegador":"❌ GPS indisponível"),t.innerHTML='<div class="aviso" style="text-align:left">'+e.join("<br>")+"</div>"}catch(a){t.innerHTML='<div class="aviso">Falha ao verificar: '+d(a.message)+"</div>"}}function j(){return!(!o.rel||"publicado"!==o.rel.status)}function q(t){if(j())return void c("Relatório finalizado — os registros não podem mais ser alterados",3500);const a=document.createElement("div");a.className="veu";const e=document.createElement("div");e.className="folha";const n="texto"===t.tipo?"Editar observação":"Editar legenda";e.innerHTML='<div class="alca"></div><h2 style="margin-top:0">'+n+"</h2>"+(t.talhao?'<div style="font-size:12.5px;color:#667781;margin-bottom:6px">📍 '+d(t.talhao)+"</div>":"")+'<div class="campo"><textarea id="edTxt" rows="4"></textarea></div><button class="btn" id="edOk">Salvar</button><button class="btn perigo" id="edApagar">Apagar registro</button><button class="btn secundario" id="edCancel">Cancelar</button>',document.body.appendChild(a),document.body.appendChild(e);const i=e.querySelector("#edTxt");i.value=t.legenda||"";const r=function(){a.remove(),e.remove()};a.onclick=r,e.querySelector("#edCancel").onclick=r,e.querySelector("#edOk").onclick=async function(){const a=i.value.trim();"texto"!==t.tipo||a?(t.legenda=a,"ok"===t.sync_state&&(t.sync_state="pendente"),await DB.put("itens",t),r(),await h(),g(),navigator.onLine&&Sync.sincronizar(o.rel.id)):c("A observação não pode ficar vazia")},e.querySelector("#edApagar").onclick=async function(){confirm("Apagar este registro do relatório?")&&(await DB.del("midias",t.id),await DB.del("itens",t.id),r(),await h(),g(),c("Registro apagado"))},setTimeout(function(){i.focus()},150)}async function A(t,e){const n=a("#telaRelPronto");let i,r;n.classList.remove("oculto"),n.innerHTML='<div class="carregando" style="padding:60px 20px;text-align:center;color:#667781">Carregando relatório…</div>';try{if(e){i=await DB.get("relatorios",t),r=await DB.itensDoRelatorio(t);for(const t of r){if("texto"===t.tipo)continue;const a=await DB.lerMidia(t.id);a&&(t.src=l(a))}}else{const a=await Sync.lerRelatorio(t);i=a.rel,r=a.itens}}catch(t){return n.innerHTML='<button class="rp-voltar" id="rpVoltar">✕</button><div class="aviso" style="margin:80px 20px">Não foi possível abrir este relatório.<br><small>'+d(t.message)+"</small></div>",void(a("#rpVoltar").onclick=F)}n.innerHTML='<button class="rp-voltar" id="rpVoltar">✕</button>'+Relatorio.montar(i,r,{empresa:o.cfg.empresa,cidade:o.cfg.cidade,logo:o.cfg.logo})+'<div class="rp-barra"><button class="sec" id="rpPdf">Baixar PDF</button><button id="rpCompartilhar">Compartilhar</button></div>',a("#rpVoltar").onclick=F,a("#rpPdf").onclick=()=>window.print(),a("#rpCompartilhar").onclick=()=>{const a=location.origin+location.pathname+"#/r/"+t,e="Relatório de visita — "+(i.fazenda||"")+"\n"+a;navigator.share?navigator.share({title:"Relatório de visita",text:e,url:a}):(navigator.clipboard.writeText(a),c("Link copiado"))}}function F(){a("#telaRelPronto").classList.add("oculto"),a("#telaRelPronto").innerHTML="",location.hash.startsWith("#/r/")&&history.replaceState(null,"",location.pathname)}function N(){e("[data-fechar]").forEach(function(t){t.onclick=function(){v(t.dataset.fechar)}}),a("#btnMenuLista").onclick=async function(){await M(),u("telaLista")},a("#btnMais").onclick=z,a("#btnMapa").onclick=function(){!function(){const t=a("#mapaWrap");if(!o.rel||!o.rel.talhoes||!o.rel.talhoes.features.length)return t.innerHTML='<div class="aviso">Importe um KML para ver o mapa.</div>',a("#legendaTalhoes").innerHTML="",void(a("#resumoTalhoes").innerHTML="");const e=o.rel.talhoes,n=Geo.bounds(e),i=.02,r=n.maxX-n.minX||.001,s=n.maxY-n.minY||.001,c=n.minX-r*i,l=n.maxX+r*i,u=n.minY-s*i,v=n.maxY+s*i,f=1e3,p=Math.round(f*((v-u)/(l-c))*Math.cos((u+v)/2*Math.PI/180)),m=function(t){return(t-c)/(l-c)*f},g=function(t){return p-(t-u)/(v-u)*p};let h='<svg viewBox="0 0 1000 '+(p||600)+'" xmlns="http://www.w3.org/2000/svg">';e.features.forEach(function(t,a){const e=t.geometry;("Polygon"===e.type?[e.coordinates]:e.coordinates).forEach(function(t){const a=t.map(function(t){return"M"+t.map(function(t){return m(t[0]).toFixed(1)+","+g(t[1]).toFixed(1)}).join("L")+"Z"}).join(" ");h+='<path d="'+a+'" fill="rgba(27,122,67,.14)" stroke="#1B7A43" stroke-width="2.5"/>'});const o=function(t){const a="Polygon"===t.type?[t.coordinates]:t.coordinates;let e=0,o=0,n=0;return a.forEach(function(t){t[0].forEach(function(t){e+=t[0],o+=t[1],n++})}),[e/n,o/n]}(t.geometry);h+='<text x="'+m(o[0]).toFixed(1)+'" y="'+g(o[1]).toFixed(1)+'" font-size="20" fill="#146034" text-anchor="middle" font-family="sans-serif" font-weight="600">'+d(t.properties.nome)+"</text>"}),o.itens.forEach(function(t){if(!t.lat)return;const a="video"===t.tipo?"#D93025":"#1B7A43";h+='<circle cx="'+m(t.lon).toFixed(1)+'" cy="'+g(t.lat).toFixed(1)+'" r="7" fill="'+a+'" stroke="#fff" stroke-width="2.5"/>'}),o.pos&&(h+='<circle cx="'+m(o.pos.lon).toFixed(1)+'" cy="'+g(o.pos.lat).toFixed(1)+'" r="10" fill="#2196F3" stroke="#fff" stroke-width="3"/>'),h+="</svg>",t.innerHTML=h,a("#legendaTalhoes").innerHTML="<span>🟢 foto</span><span>🔴 vídeo</span><span>🔵 você</span>";const b={};o.itens.forEach(function(t){const a=t.talhao||"Fora dos talhões";b[a]=(b[a]||0)+1}),a("#resumoTalhoes").innerHTML=Object.keys(b).map(function(t){return'<div class="lista-item"><div class="ic">📍</div><div class="txt"><b>'+d(t)+"</b><span>"+b[t]+" registro(s)</span></div></div>"}).join("")||'<div class="aviso">Nenhum registro ainda.</div>',a("#subMapa").textContent=o.rel.fazenda||""}(),u("telaMapa")},a("#btnAjustes").onclick=async function(){await B(),u("telaAjustes")},a("#btnNovoRel").onclick=function(){R={},E({}),u("telaRel")},a("#btnSalvarRel").onclick=D,a("#btnSalvarCfg").onclick=_,a("#btnEscolherLogo").onclick=function(){a("#inpLogo").click()},a("#inpLogo").onchange=async function(t){const a=t.target.files[0];if(t.target.value="",a)try{o.cfg.logo=await async function(t){const a=await createImageBitmap(t),e=Math.min(1,300/a.width,120/a.height),o=Math.max(1,Math.round(a.width*e)),n=Math.max(1,Math.round(a.height*e)),i=document.createElement("canvas");i.width=o,i.height=n,i.getContext("2d").drawImage(a,0,0,o,n),a.close&&a.close();let r=i.toDataURL("image/png");if(r.length>2e5){const t=document.createElement("canvas");t.width=o,t.height=n;const a=t.getContext("2d");a.fillStyle="#fff",a.fillRect(0,0,o,n),a.drawImage(i,0,0),r=t.toDataURL("image/jpeg",.85)}return r}(a),await DB.cfg("servidor",o.cfg),H(),c("Logo carregado — toque em Salvar ajustes")}catch(t){c("Não consegui ler a imagem: "+t.message,4e3)}},a("#btnRemoverLogo").onclick=async function(){o.cfg.logo="",await DB.cfg("servidor",o.cfg),H(),c("Logo removido — toque em Salvar ajustes")},a("#btnTestar").onclick=P,a("#btnSincronizarTudo").onclick=async function(){c("Sincronizando…");c("Enviados: "+((await Sync.sincronizar()).enviados||0)),await h(),g()},a("#btnAnexo").onclick=function(){a("#inpArquivo").click()},a("#btnApagarRel").onclick=async function(){R&&R.id&&confirm("Apagar este relatório e todas as mídias locais?")&&(await DB.apagarRelatorio(R.id),R=null,o.rel=null,v("telaRel"),await M(),await h(),a("#tituloRel").textContent="Nenhum relatório aberto")};const t=a("#txtMsg");t.addEventListener("input",function(){t.style.height="auto",t.style.height=Math.min(110,t.scrollHeight)+"px"}),t.addEventListener("keydown",async function(a){if("Enter"===a.key&&!a.shiftKey){a.preventDefault();const e=t.value.trim();if(!e)return;t.value="",t.style.height="auto",await y("texto",null,{legenda:e}),await h(),g(),navigator.onLine&&Sync.sincronizar(o.rel.id)}}),a("#inpArquivo").onchange=async function(t){const a=Array.prototype.slice.call(t.target.files||[]);t.target.value="";for(const t of a){const a=t.type.startsWith("video")?"video":"foto";await new Promise(function(e){w(t,a),setTimeout(e,100)})}},["#inpFoto","#inpVideo"].forEach(function(t){a(t).onchange=async function(t){const a=t.target.files&&t.target.files[0];t.target.value="",a&&w(a,a.type.startsWith("video")?"video":"foto")}}),a("#inpKml").onchange=async function(t){const a=t.target.files[0];t.target.value="",a&&await Conta.importarKmlFazenda(a)},a("#camFechar").onclick=L,a("#camTrocar").onclick=async function(){o.facing="environment"===o.facing?"user":"environment",L(),await x()},function(){const t=a("#btnCamera");let e=null,n=!1;const i=function(t){n=!1,e=setTimeout(async function(){n=!0,o.semCameraInterna?a("#inpVideo").click():(await x(),setTimeout(S,350))},450)},r=function(t){clearTimeout(e),n?k():x()};t.addEventListener("touchstart",i,{passive:!0}),t.addEventListener("touchend",r),t.addEventListener("mousedown",i),t.addEventListener("mouseup",r)}(),C(),function(){const t=a("#chat");let e=null,n=!1;const i=function(t){const a=t.closest("[data-id]");return a&&o.itens.find(function(t){return t.id===a.dataset.id})||null},r=function(t){const a=i(t.target);a&&(n=!1,e=setTimeout(function(){n=!0,navigator.vibrate&&navigator.vibrate(20),q(a)},500))},s=function(){clearTimeout(e)};t.addEventListener("touchstart",r,{passive:!0}),t.addEventListener("touchend",s),t.addEventListener("touchmove",s,{passive:!0}),t.addEventListener("mousedown",r),t.addEventListener("mouseup",s),t.addEventListener("mouseleave",s),t.addEventListener("click",function(t){if(n)return n=!1,void t.stopPropagation();const a=i(t.target);a&&"texto"===a.tipo&&q(a)})}(),a("#chat").addEventListener("click",async function(t){const a=t.target.closest("[data-abrir]");if(!a)return;const e=o.itens.find(function(t){return t.id===a.dataset.abrir});if(!e)return;const n=await DB.lerMidia(e.id);if(!n)return;const i=l(n),r=document.createElement("div");r.className="visor",r.innerHTML='<button class="fechar">✕</button>'+("foto"===e.tipo?'<img src="'+i+'">':'<video src="'+i+'" controls autoplay playsinline></video>'),r.onclick=function(t){t.target!==r&&"fechar"!==t.target.className||r.remove()},document.body.appendChild(r)}),window.addEventListener("online",g),window.addEventListener("offline",g),Sync.aoMudar(function(t){"fim"===t.tipo&&(h(),g()),"item"===t.tipo&&"ok"===t.estado&&g()})}t.App={aoEntrar:async function(){await M(),await h(),g(),Sync.sincronizar()}},document.addEventListener("DOMContentLoaded",async function(){N(),Conta.ligar(),await B();const t=(location.hash.match(/^#\/r\/(.+)$/)||[])[1];t&&(A(t,!1),window.addEventListener("hashchange",function(){const t=(location.hash.match(/^#\/r\/(.+)$/)||[])[1];t&&A(t,!1)})),navigator.geolocation?navigator.geolocation.watchPosition(function(t){o.pos={lat:t.coords.latitude,lon:t.coords.longitude,acc:t.coords.accuracy,alt:t.coords.altitude,t:t.timestamp},f()},function(t){a("#dotGps").className="dot ruim",a("#txtGps").textContent="GPS: "+(1===t.code?"permissão negada":"sem sinal")},{enableHighAccuracy:!0,maximumAge:5e3,timeout:2e4}):a("#txtGps").textContent="GPS indisponível",Sync.autoSync();const e=await DB.cfg("ultimo");if(e){await DB.get("relatorios",e)&&await T(e)}await Sync.logado()?await Conta.atualizarCadastro(navigator.onLine):await Conta.mostrarLogin(),o.rel||(await h(),await M(),u("telaLista")),g(),"serviceWorker"in navigator&&navigator.serviceWorker.register("sw.js").catch(function(){})})}(window);
-</script></body></html>
+</div>
+
+<script>
+/* ===== js/geo.js ===== */
+;(function(){
+/* ============================================================
+   geo.js — KML/KMZ -> GeoJSON, point-in-polygon, área e formatação
+   Sem dependências externas (funciona 100% offline).
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  /* ---------- ZIP mínimo (para KMZ) usando DecompressionStream ---------- */
+  async function unzipFirstKml(arrayBuffer) {
+    const dv = new DataView(arrayBuffer);
+    const bytes = new Uint8Array(arrayBuffer);
+    // localiza End Of Central Directory
+    let eocd = -1;
+    for (let i = bytes.length - 22; i >= 0 && i > bytes.length - 66000; i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('KMZ inválido (EOCD não encontrado)');
+    const count = dv.getUint16(eocd + 10, true);
+    let ptr = dv.getUint32(eocd + 16, true);
+
+    for (let n = 0; n < count; n++) {
+      if (dv.getUint32(ptr, true) !== 0x02014b50) break;
+      const method = dv.getUint16(ptr + 10, true);
+      const compSize = dv.getUint32(ptr + 20, true);
+      const nameLen = dv.getUint16(ptr + 28, true);
+      const extraLen = dv.getUint16(ptr + 30, true);
+      const commentLen = dv.getUint16(ptr + 32, true);
+      const localOff = dv.getUint32(ptr + 42, true);
+      const name = new TextDecoder().decode(bytes.subarray(ptr + 46, ptr + 46 + nameLen));
+      ptr += 46 + nameLen + extraLen + commentLen;
+
+      if (!/\.kml$/i.test(name)) continue;
+
+      // cabeçalho local
+      const lNameLen = dv.getUint16(localOff + 26, true);
+      const lExtraLen = dv.getUint16(localOff + 28, true);
+      const dataStart = localOff + 30 + lNameLen + lExtraLen;
+      const raw = bytes.subarray(dataStart, dataStart + compSize);
+
+      if (method === 0) return new TextDecoder().decode(raw);
+      if (method === 8) {
+        if (typeof DecompressionStream === 'undefined') {
+          throw new Error('Navegador sem suporte a descompressão. Envie o .kml em vez do .kmz.');
+        }
+        const ds = new DecompressionStream('deflate-raw');
+        const stream = new Blob([raw]).stream().pipeThrough(ds);
+        return await new Response(stream).text();
+      }
+      throw new Error('Compressão do KMZ não suportada');
+    }
+    throw new Error('Nenhum .kml encontrado dentro do KMZ');
+  }
+
+  /* ---------- KML -> GeoJSON (Polygon / MultiGeometry) ---------- */
+  function parseCoords(text) {
+    return String(text).trim().split(/\s+/).filter(Boolean).map(function (t) {
+      const p = t.split(',').map(Number);
+      return [p[0], p[1]]; // [lon, lat]
+    }).filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); });
+  }
+
+  function extendedData(pm) {
+    const out = {};
+    pm.querySelectorAll('ExtendedData > Data').forEach(function (d) {
+      const k = d.getAttribute('name');
+      const v = d.querySelector('value');
+      if (k) out[k] = v ? v.textContent.trim() : '';
+    });
+    pm.querySelectorAll('ExtendedData SimpleData').forEach(function (d) {
+      const k = d.getAttribute('name');
+      if (k) out[k] = d.textContent.trim();
+    });
+    return out;
+  }
+
+  function kmlToGeoJSON(kmlText) {
+    const doc = new DOMParser().parseFromString(kmlText, 'text/xml');
+    if (doc.querySelector('parsererror')) throw new Error('KML mal formado');
+    const features = [];
+
+    doc.querySelectorAll('Placemark').forEach(function (pm, idx) {
+      const polys = [];
+      pm.querySelectorAll('Polygon').forEach(function (poly) {
+        const rings = [];
+        const outer = poly.querySelector('outerBoundaryIs coordinates');
+        if (outer) rings.push(parseCoords(outer.textContent));
+        poly.querySelectorAll('innerBoundaryIs coordinates').forEach(function (inner) {
+          rings.push(parseCoords(inner.textContent));
+        });
+        if (rings.length && rings[0].length >= 3) polys.push(rings);
+      });
+      if (!polys.length) return;
+
+      const ext = extendedData(pm);
+      const nameEl = pm.querySelector('name');
+      const nomeKml = nameEl ? nameEl.textContent.trim() : '';
+      const nome = nomeKml ||
+                   ext.Name || ext.nome || ext.TALHAO || ext.Talhao ||
+                   ('Talhão ' + (idx + 1));
+
+      features.push({
+        type: 'Feature',
+        properties: Object.assign({}, ext, {
+          _nome_kml: nomeKml,
+          _ordem: idx + 1,
+          nome: nome,
+          id: 'T' + (idx + 1)
+        }),
+        geometry: polys.length === 1
+          ? { type: 'Polygon', coordinates: polys[0] }
+          : { type: 'MultiPolygon', coordinates: polys }
+      });
+    });
+
+    return { type: 'FeatureCollection', features: features };
+  }
+
+  async function importarArquivo(file) {
+    const nome = (file.name || '').toLowerCase();
+    let kmlText;
+    if (nome.endsWith('.kmz')) {
+      kmlText = await unzipFirstKml(await file.arrayBuffer());
+    } else {
+      kmlText = await file.text();
+    }
+    const gj = kmlToGeoJSON(kmlText);
+    gj.features.forEach(function (f) { f.properties.area_ha = areaHa(f.geometry); });
+    return gj;
+  }
+
+  /* ---------- Point in polygon (ray casting) ---------- */
+  function pointInRing(pt, ring) {
+    let inside = false;
+    const x = pt[0], y = pt[1];
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function pointInPolygon(pt, rings) {
+    if (!rings.length || !pointInRing(pt, rings[0])) return false;
+    for (let i = 1; i < rings.length; i++) if (pointInRing(pt, rings[i])) return false; // buraco
+    return true;
+  }
+
+  // Retorna { nome, id, feature } ou null
+  function talhaoDoPonto(lon, lat, geojson) {
+    if (!geojson || !geojson.features) return null;
+    for (const f of geojson.features) {
+      const g = f.geometry;
+      if (!g) continue;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+      for (const rings of polys) {
+        if (pointInPolygon([lon, lat], rings)) {
+          return { nome: f.properties.nome, id: f.properties.id, feature: f };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* ---------- Área aproximada (esférica) em hectares ---------- */
+  function ringArea(ring) {
+    const R = 6378137;
+    let total = 0;
+    for (let i = 0, len = ring.length; i < len; i++) {
+      const p1 = ring[i], p2 = ring[(i + 1) % len];
+      total += (p2[0] - p1[0]) * Math.PI / 180 *
+        (2 + Math.sin(p1[1] * Math.PI / 180) + Math.sin(p2[1] * Math.PI / 180));
+    }
+    return Math.abs(total * R * R / 2);
+  }
+
+  function areaHa(geometry) {
+    if (!geometry) return 0;
+    const polys = geometry.type === 'Polygon' ? [geometry.coordinates]
+      : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+    let m2 = 0;
+    polys.forEach(function (rings) {
+      rings.forEach(function (ring, i) { m2 += (i === 0 ? 1 : -1) * ringArea(ring); });
+    });
+    return +(m2 / 10000).toFixed(2);
+  }
+
+  /* ---------- Bounds e projeção simples para desenhar em SVG ---------- */
+  function bounds(geojson) {
+    let minX = 180, minY = 90, maxX = -180, maxY = -90;
+    (geojson.features || []).forEach(function (f) {
+      const g = f.geometry; if (!g) return;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+      polys.forEach(function (rings) {
+        rings.forEach(function (ring) {
+          ring.forEach(function (p) {
+            if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+            if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+          });
+        });
+      });
+    });
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+  }
+
+  function grausParaDMS(v, eixo) {
+    const dir = eixo === 'lat' ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
+    const a = Math.abs(v);
+    const g = Math.floor(a);
+    const m = Math.floor((a - g) * 60);
+    const s = ((a - g - m / 60) * 3600).toFixed(1);
+    return g + '° ' + m + "' " + s + '" ' + dir;
+  }
+
+  /* ---------- atributos do KML: quais servem de nome ---------- */
+
+  // Devolve [{ chave, rotulo, amostra }] com os campos encontrados no arquivo.
+  function atributos(geojson) {
+    const feats = (geojson && geojson.features) || [];
+    if (!feats.length) return [];
+    const chaves = [];
+    const vistas = {};
+
+    const temNomeKml = feats.some(function (f) { return f.properties._nome_kml; });
+    if (temNomeKml) {
+      chaves.push({ chave: '_nome_kml', rotulo: 'Nome do Placemark (padrão)',
+                    amostra: feats.map(function (f) { return f.properties._nome_kml; }).filter(Boolean).slice(0, 3).join(', ') });
+    }
+
+    feats.forEach(function (f) {
+      Object.keys(f.properties).forEach(function (k) {
+        if (k.charAt(0) === '_' || k === 'nome' || k === 'id' || k === 'area_ha') return;
+        if (vistas[k]) return;
+        vistas[k] = true;
+        const amostra = feats.map(function (x) { return x.properties[k]; })
+          .filter(function (v) { return v !== undefined && v !== ''; })
+          .slice(0, 3).join(', ');
+        chaves.push({ chave: k, rotulo: k, amostra: amostra });
+      });
+    });
+
+    chaves.push({ chave: '_ordem', rotulo: 'Numerar na ordem do arquivo', amostra: 'Talhão 1, Talhão 2, …' });
+    return chaves;
+  }
+
+  // Reescreve properties.nome a partir da chave escolhida.
+  function aplicarNome(geojson, chave) {
+    (geojson.features || []).forEach(function (f, i) {
+      const p = f.properties;
+      let v = chave === '_ordem' ? ('Talhão ' + (p._ordem || i + 1)) : p[chave];
+      if (v === undefined || v === null || String(v).trim() === '') v = 'Talhão ' + (p._ordem || i + 1);
+      p.nome = String(v).trim();
+    });
+    return geojson;
+  }
+
+  /* ---------- desenho dos talhões ---------- */
+
+  function svgTalhoes(geojson, opcoes) {
+    const o = opcoes || {};
+    const feats = (geojson && geojson.features) || [];
+    if (!feats.length) return '';
+    const b = bounds(geojson);
+    const dx = (b.maxX - b.minX) || 0.001, dy = (b.maxY - b.minY) || 0.001;
+    const minX = b.minX - dx * 0.04, maxX = b.maxX + dx * 0.04;
+    const minY = b.minY - dy * 0.04, maxY = b.maxY + dy * 0.04;
+    const W = 1000;
+    const H = Math.max(260, Math.round(W * ((maxY - minY) / (maxX - minX)) *
+      Math.cos((minY + maxY) / 2 * Math.PI / 180)));
+    const px = function (l) { return (l - minX) / (maxX - minX) * W; };
+    const py = function (l) { return H - (l - minY) / (maxY - minY) * H; };
+    const esc = function (s) {
+      return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    };
+
+    let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+    feats.forEach(function (f) {
+      const g = f.geometry; if (!g) return;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+      polys.forEach(function (rings) {
+        const d = rings.map(function (ring) {
+          return 'M' + ring.map(function (p) { return px(p[0]).toFixed(1) + ',' + py(p[1]).toFixed(1); }).join('L') + 'Z';
+        }).join(' ');
+        s += '<path d="' + d + '" fill="rgba(27,122,67,.15)" stroke="#1B7A43" stroke-width="2.5"/>';
+      });
+      let sx = 0, sy = 0, n = 0;
+      polys.forEach(function (rings) { rings[0].forEach(function (p) { sx += p[0]; sy += p[1]; n++; }); });
+      s += '<text x="' + px(sx / n).toFixed(1) + '" y="' + py(sy / n).toFixed(1) +
+        '" font-size="22" font-weight="600" fill="#146034" text-anchor="middle" ' +
+        'font-family="sans-serif" paint-order="stroke" stroke="#fff" stroke-width="5">' +
+        esc(f.properties.nome) + '</text>';
+    });
+    (o.pontos || []).forEach(function (p) {
+      if (p.lat == null) return;
+      s += '<circle cx="' + px(p.lon).toFixed(1) + '" cy="' + py(p.lat).toFixed(1) +
+        '" r="8" fill="' + (p.cor || '#D93025') + '" stroke="#fff" stroke-width="2.5"/>';
+    });
+    s += '</svg>';
+    return s;
+  }
+
+  global.Geo = {
+    importarArquivo: importarArquivo,
+    atributos: atributos,
+    aplicarNome: aplicarNome,
+    svgTalhoes: svgTalhoes,
+    kmlToGeoJSON: kmlToGeoJSON,
+    talhaoDoPonto: talhaoDoPonto,
+    areaHa: areaHa,
+    bounds: bounds,
+    grausParaDMS: grausParaDMS,
+    pointInPolygon: pointInPolygon
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+})();
+
+/* ===== js/db.js ===== */
+;(function(){
+/* ============================================================
+   db.js — IndexedDB offline-first (relatórios, itens, mídias)
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  const NOME = 'krigify-relatorio';
+  const VERSAO = 1;
+  let _db = null;
+
+  function abrir() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise(function (resolve, reject) {
+      const req = indexedDB.open(NOME, VERSAO);
+      req.onupgradeneeded = function (e) {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('relatorios')) {
+          db.createObjectStore('relatorios', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('itens')) {
+          const s = db.createObjectStore('itens', { keyPath: 'id' });
+          s.createIndex('relatorio', 'relatorio_id');
+          s.createIndex('sync', 'sync_state');
+        }
+        if (!db.objectStoreNames.contains('midias')) {
+          db.createObjectStore('midias', { keyPath: 'id' }); // { id, blob }
+        }
+        if (!db.objectStoreNames.contains('config')) {
+          db.createObjectStore('config', { keyPath: 'chave' });
+        }
+      };
+      req.onsuccess = function () { _db = req.result; resolve(_db); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+
+  function tx(store, modo) {
+    return abrir().then(function (db) {
+      return db.transaction(store, modo || 'readonly').objectStore(store);
+    });
+  }
+
+  function pedido(r) {
+    return new Promise(function (res, rej) {
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+  }
+
+  const DB = {
+    async put(store, valor) { const s = await tx(store, 'readwrite'); return pedido(s.put(valor)); },
+    async get(store, id) { const s = await tx(store); return pedido(s.get(id)); },
+    async del(store, id) { const s = await tx(store, 'readwrite'); return pedido(s.delete(id)); },
+    async all(store) { const s = await tx(store); return pedido(s.getAll()); },
+
+    async itensDoRelatorio(relId) {
+      const s = await tx('itens');
+      const idx = s.index('relatorio');
+      const lista = await pedido(idx.getAll(relId));
+      return lista.sort(function (a, b) { return a.capturado_em.localeCompare(b.capturado_em); });
+    },
+
+    async pendentes() {
+      const todos = await DB.all('itens');
+      return todos.filter(function (i) { return i.sync_state !== 'ok'; });
+    },
+
+    async salvarMidia(id, blob) { return DB.put('midias', { id: id, blob: blob }); },
+    async lerMidia(id) { const m = await DB.get('midias', id); return m ? m.blob : null; },
+
+    async cfg(chave, valor) {
+      if (valor === undefined) { const r = await DB.get('config', chave); return r ? r.valor : null; }
+      return DB.put('config', { chave: chave, valor: valor });
+    },
+
+    async apagarRelatorio(relId) {
+      const itens = await DB.itensDoRelatorio(relId);
+      for (const it of itens) { await DB.del('midias', it.id); await DB.del('itens', it.id); }
+      await DB.del('relatorios', relId);
+    },
+
+    async uso() {
+      if (navigator.storage && navigator.storage.estimate) {
+        const e = await navigator.storage.estimate();
+        return { usado: e.usage || 0, cota: e.quota || 0 };
+      }
+      return { usado: 0, cota: 0 };
+    }
+  };
+
+  // id curto ordenável por tempo
+  function novoId(prefixo) {
+    const t = Date.now().toString(36);
+    const r = Math.random().toString(36).slice(2, 8);
+    return (prefixo || '') + t + r;
+  }
+
+  global.DB = DB;
+  global.novoId = novoId;
+})(window);
+
+})();
+
+/* ===== js/sync.js ===== */
+;(function(){
+/* ============================================================
+   sync.js — conversa com o servidor (login, cadastro, relatórios)
+   Tudo funciona offline: a fila fica no aparelho até a conexão voltar.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  let rodando = false;
+  const ouvintes = [];
+  const emitir = (evt) => ouvintes.forEach(f => { try { f(evt); } catch (e) {} });
+
+  /* A sessão fica guardada em dois lugares (banco do app + localStorage).
+     Se um deles for limpo pelo navegador, o outro ainda mantém o login. */
+  const CHAVE_LOCAL = 'vsl-sessao';
+
+  function lerLocal() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_LOCAL) || 'null'); } catch (e) { return null; }
+  }
+  function gravarLocal(c) {
+    try {
+      localStorage.setItem(CHAVE_LOCAL, JSON.stringify({
+        api: c.api || '', token: c.token || null, nome: c.nome || '', email: c.email || ''
+      }));
+    } catch (e) {}
+  }
+
+  async function conf() {
+    let c = null;
+    try { c = await DB.cfg('servidor'); } catch (e) { c = null; }
+    c = c || {};
+    const l = lerLocal();
+    if (!c.token && l && l.token) {          // banco limpo: recupera do localStorage
+      c.token = l.token;
+      c.nome = c.nome || l.nome || '';
+      c.email = c.email || l.email || '';
+      if (!c.api && l.api) c.api = l.api;
+      try { await DB.cfg('servidor', c); } catch (e) {}
+    }
+    if (!c.api) c.api = 'https://relatorio-vsl.vicktorlima17.workers.dev';
+    return c;
+  }
+
+  async function salvarConf(novo) {
+    const c = Object.assign(await conf(), novo || {});
+    await DB.cfg('servidor', c);
+    gravarLocal(c);
+    return c;
+  }
+
+  async function chamar(rota, opcoes) {
+    const o = opcoes || {};
+    const c = await conf();
+    const cab = Object.assign({}, o.headers || {});
+    if (c.token) cab.Authorization = 'Bearer ' + c.token;
+
+    // nunca deixa a tela travada esperando a rede
+    const corte = new AbortController();
+    const relogio = setTimeout(function () { corte.abort(); }, o.timeout || 20000);
+    let r;
+    try {
+      r = await fetch(c.api.replace(/\/$/, '') + rota, {
+        method: o.method || 'GET', headers: cab, body: o.body, signal: corte.signal
+      });
+    } catch (e) {
+      clearTimeout(relogio);
+      throw new Error(e.name === 'AbortError' ? 'servidor não respondeu' : 'sem conexão');
+    }
+    clearTimeout(relogio);
+    const txt = await r.text();
+    let j = null; try { j = JSON.parse(txt); } catch (e) {}
+    if (r.status === 401) { emitir({ tipo: 'sem-sessao' }); throw new Error('sessão expirada'); }
+    if (!r.ok) throw new Error((j && j.erro) || ('HTTP ' + r.status));
+    return j;
+  }
+
+  const comJson = (rota, dados, metodo) => chamar(rota, {
+    method: metodo || 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados)
+  });
+
+  /* ---------------- conta ---------------- */
+
+  async function entrar(email, senha) {
+    const r = await comJson('/api/entrar', { email, senha });
+    await salvarConf({ token: r.token, nome: r.nome, email: r.email });
+    return r;
+  }
+
+  async function registrar(dados) {
+    const r = await comJson('/api/registrar', dados);
+    await salvarConf({ token: r.token, nome: r.nome, email: r.email });
+    return r;
+  }
+
+  async function sair() {
+    try { localStorage.removeItem(CHAVE_LOCAL); } catch (e) {}
+    await salvarConf({ token: null });
+    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], em: null });
+  }
+
+  async function logado() {
+    const c = await conf();
+    return !!c.token;
+  }
+
+  async function quemSou() {
+    const c = await conf();
+    return { nome: c.nome || '', email: c.email || '', api: c.api };
+  }
+
+  /* ---------------- identidade da empresa ---------------- */
+
+  async function salvarPerfil(perfil) {
+    if (!(await logado())) return null;
+    return comJson('/api/perfil', perfil);
+  }
+
+  async function baixarPerfil() {
+    if (!(await logado())) return null;
+    const r = await chamar('/api/perfil');
+    return r.perfil || null;
+  }
+
+  /* ---------------- cadastro ---------------- */
+
+  async function cadastroLocal() {
+    const c = (await DB.cfg('cadastro')) || { produtores: [], fazendas: [], em: null };
+    if (!c.safras) c.safras = [];
+    return c;
+  }
+
+  async function baixarCadastro() {
+    const r = await chamar('/api/cadastro');
+    const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], em: new Date().toISOString() };
+    dados.fazendas.forEach(function (f) {
+      if (typeof f.talhoes === 'string' && f.talhoes) {
+        try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; }
+      }
+    });
+    await DB.cfg('cadastro', dados);
+    emitir({ tipo: 'cadastro' });
+    return dados;
+  }
+
+  async function salvarSafra(s) {
+    const r = await comJson('/api/safra', s);
+    await baixarCadastro();
+    return r.id;
+  }
+
+  async function salvarProdutor(p) {
+    const r = await comJson('/api/produtor', p);
+    await baixarCadastro();
+    return r.id;
+  }
+
+  async function salvarFazenda(f) {
+    const r = await comJson('/api/fazenda', f);
+    await baixarCadastro();
+    return r.id;
+  }
+
+  async function apagarCadastro(tipo, id) {
+    await comJson('/api/apagar', { tipo, id });
+    await baixarCadastro();
+  }
+
+  /* ---------------- relatórios ---------------- */
+
+  async function enviarRelatorio(rel) {
+    await comJson('/api/relatorio', {
+      id: rel.id, produtor_id: rel.produtor_id || null, fazenda_id: rel.fazenda_id || null,
+      produtor: rel.produtor, fazenda: rel.fazenda, safra: rel.safra, servico: rel.servico,
+      responsavel: rel.responsavel, data_inicio: rel.data_inicio, data_fim: rel.data_fim,
+      observacoes: rel.observacoes, talhoes: rel.talhoes,
+      status: rel.status, publicado_em: rel.publicado_em
+    });
+  }
+
+  async function enviarItem(item) {
+    let midia = item.midia || null;
+    if (item.tipo !== 'texto' && !midia) {
+      const blob = await DB.lerMidia(item.id);
+      if (!blob) throw new Error('mídia ausente no aparelho');
+      const r = await chamar('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': item.mime || 'application/octet-stream',
+          'X-Item-Id': item.id, 'X-Rel-Id': item.relatorio_id
+        },
+        body: blob,
+        timeout: 120000
+      });
+      midia = r.midia;
+    }
+    await comJson('/api/item', {
+      id: item.id, relatorio_id: item.relatorio_id, tipo: item.tipo,
+      legenda: item.legenda || '', midia: midia, mime: item.mime,
+      duracao_s: item.duracao_s, bytes: item.bytes,
+      lat: item.lat, lon: item.lon, precisao_m: item.precisao_m, altitude_m: item.altitude_m,
+      talhao: item.talhao, talhao_id: item.talhao_id,
+      capturado_em: item.capturado_em, ordem: item.ordem
+    });
+    item.midia = midia;
+    item.sync_state = 'ok';
+    item.erro = null;
+    await DB.put('itens', item);
+  }
+
+  async function sincronizar(relIdOpcional) {
+    if (rodando) return { rodando: true };
+    if (!(await logado())) { emitir({ tipo: 'sem-sessao' }); return { erro: 'sem-sessao' }; }
+    if (!navigator.onLine) { emitir({ tipo: 'offline' }); return { erro: 'offline' }; }
+
+    rodando = true; emitir({ tipo: 'inicio' });
+    let enviados = 0, falhas = 0;
+    try {
+      const relatorios = await DB.all('relatorios');
+      for (const rel of relatorios) {
+        if (relIdOpcional && rel.id !== relIdOpcional) continue;
+        try { await enviarRelatorio(rel); }
+        catch (e) { falhas++; emitir({ tipo: 'erro', msg: e.message }); continue; }
+
+        const itens = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
+        for (const item of itens) {
+          try {
+            item.sync_state = 'enviando'; await DB.put('itens', item);
+            emitir({ tipo: 'item', id: item.id, estado: 'enviando' });
+            await enviarItem(item);
+            enviados++; emitir({ tipo: 'item', id: item.id, estado: 'ok' });
+          } catch (e) {
+            item.sync_state = 'erro'; item.erro = e.message; await DB.put('itens', item);
+            falhas++; emitir({ tipo: 'item', id: item.id, estado: 'erro', msg: e.message });
+          }
+        }
+      }
+    } finally {
+      rodando = false;
+      emitir({ tipo: 'fim', enviados, falhas });
+    }
+    return { enviados, falhas };
+  }
+
+  async function publicar(rel) {
+    if (!(await logado())) throw new Error('entre na sua conta para publicar');
+    await sincronizar(rel.id);
+    const pend = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
+    if (pend.length) throw new Error(pend.length + ' item(ns) ainda não subiram. Tente de novo com internet.');
+
+    rel.status = 'publicado';
+    rel.publicado_em = new Date().toISOString();
+    await DB.put('relatorios', rel);
+    await enviarRelatorio(rel);
+    const r = await comJson('/api/publicar', { id: rel.id });
+    return r.link;
+  }
+
+  async function status() {
+    const c = await conf();
+    const r = await fetch(c.api.replace(/\/$/, '') + '/api/status');
+    return r.json();
+  }
+
+  function autoSync() {
+    window.addEventListener('online', () => sincronizar());
+    setInterval(() => { if (navigator.onLine) sincronizar(); }, 60000);
+  }
+
+  global.Sync = {
+    conf, salvarConf, entrar, registrar, sair, logado, quemSou,
+    cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
+    salvarPerfil, baixarPerfil,
+    sincronizar, publicar, status, autoSync, aoMudar: f => ouvintes.push(f)
+  };
+})(window);
+
+})();
+
+/* ===== js/relatorio.js ===== */
+;(function(){
+/* ============================================================
+   relatorio.js — tela do relatório pronto (o que o link abre)
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+
+  const fmtData = d => {
+    if (!d) return '—';
+    const p = String(d).slice(0, 10).split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+  };
+  const diaLongo = iso => {
+    const d = new Date(iso);
+    return `${DIAS[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  };
+  const hora = iso => {
+    const d = new Date(iso);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  };
+
+  function mapaSVG(talhoes, itens) {
+    const feats = (talhoes && talhoes.features) || [];
+    if (!feats.length) return '';
+    let minX = 180, minY = 90, maxX = -180, maxY = -90;
+    const each = (f, cb) => {
+      const g = f.geometry; if (!g) return;
+      (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(cb);
+    };
+    feats.forEach(f => each(f, rings => rings.forEach(r => r.forEach(p => {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    }))));
+    const dx = (maxX - minX) || 0.001, dy = (maxY - minY) || 0.001;
+    minX -= dx * 0.03; maxX += dx * 0.03; minY -= dy * 0.03; maxY += dy * 0.03;
+    const W = 1000;
+    const H = Math.max(300, Math.round(W * ((maxY - minY) / (maxX - minX)) * Math.cos((minY + maxY) / 2 * Math.PI / 180)));
+    const px = l => (l - minX) / (maxX - minX) * W, py = l => H - (l - minY) / (maxY - minY) * H;
+
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    feats.forEach(f => {
+      each(f, rings => {
+        const d = rings.map(r => 'M' + r.map(p => px(p[0]).toFixed(1) + ',' + py(p[1]).toFixed(1)).join('L') + 'Z').join(' ');
+        s += `<path d="${d}" fill="rgba(27,122,67,.13)" stroke="#1B7A43" stroke-width="2.5"/>`;
+      });
+      let sx = 0, sy = 0, n = 0;
+      each(f, rings => rings[0].forEach(p => { sx += p[0]; sy += p[1]; n++; }));
+      s += `<text x="${px(sx / n).toFixed(1)}" y="${py(sy / n).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${esc((f.properties || {}).nome || '')}</text>`;
+    });
+    itens.filter(i => i.lat != null).forEach(i => {
+      s += `<circle cx="${px(i.lon).toFixed(1)}" cy="${py(i.lat).toFixed(1)}" r="7" fill="${i.tipo === 'video' ? '#D93025' : '#1B7A43'}" stroke="#fff" stroke-width="2.5"/>`;
+    });
+    s += '</svg>';
+    return `<div class="rp-mapa">${s}<div class="rp-obs">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`;
+  }
+
+  /* Agrupa os registros por talhão, na ordem em que os talhões vêm do KML.
+     Registros fora dos talhões e observações soltas entram no fim. */
+  function agruparPorTalhao(itens, talhoes) {
+    const ordem = {}, areas = {};
+    ((talhoes && talhoes.features) || []).forEach(function (f, i) {
+      const p = f.properties || {};
+      if (p.nome) { ordem[p.nome] = i; areas[p.nome] = p.area_ha || 0; }
+    });
+
+    const mapa = {};
+    itens.forEach(function (i) {
+      const chave = i.talhao ? i.talhao : (i.tipo === 'texto' ? '\u0000notas' : '\u0000fora');
+      (mapa[chave] = mapa[chave] || []).push(i);
+    });
+
+    const chaves = Object.keys(mapa).sort(function (a, b) {
+      const pa = a.charCodeAt(0) === 0 ? 1e6 + (a === '\u0000notas' ? 1 : 0) : (ordem[a] != null ? ordem[a] : 1e5);
+      const pb = b.charCodeAt(0) === 0 ? 1e6 + (b === '\u0000notas' ? 1 : 0) : (ordem[b] != null ? ordem[b] : 1e5);
+      return pa - pb || a.localeCompare(b);
+    });
+
+    return chaves.map(function (k) {
+      const lista = mapa[k].slice().sort(function (a, b) {
+        return String(a.capturado_em).localeCompare(String(b.capturado_em));
+      });
+      const diasDistintos = {};
+      lista.forEach(function (i) { diasDistintos[String(i.capturado_em).slice(0, 10)] = 1; });
+      return {
+        chave: k,
+        titulo: k === '\u0000notas' ? 'Observações gerais' : k === '\u0000fora' ? 'Fora dos talhões' : k,
+        area: areas[k] || 0,
+        varioDia: Object.keys(diasDistintos).length > 1,
+        itens: lista
+      };
+    });
+  }
+
+  function montar(rel, itens, opcoes) {
+    const o = opcoes || {};
+    const empresa = o.empresa || 'VSL Consultoria e Treinamento na Agricultura';
+    const cidade = o.cidade || 'Pontes e Lacerda · MT';
+    const logo = o.logo || '';
+    const fotos = itens.filter(i => i.tipo === 'foto').length;
+    const videos = itens.filter(i => i.tipo === 'video').length;
+    const nTalhoes = new Set(itens.filter(i => i.talhao).map(i => i.talhao)).size;
+    const area = ((rel.talhoes && rel.talhoes.features) || []).reduce((s, f) => s + ((f.properties || {}).area_ha || 0), 0);
+
+    // ---- agrupado por talhão (ordem do KML) ----
+    const grupos = agruparPorTalhao(itens, rel.talhoes);
+
+    let corpo = '';
+    grupos.forEach(g => {
+      const extra = [g.itens.length + ' registro(s)'];
+      if (g.area) extra.push(g.area.toFixed(1).replace('.', ',') + ' ha');
+      corpo += `<h3 class="rp-talhao">${esc(g.titulo)}<small>${extra.join(' · ')}</small></h3>`;
+      let diaAtual = '';
+      g.itens.forEach(i => {
+        if (g.varioDia) {
+          const d = String(i.capturado_em).slice(0, 10);
+          if (d !== diaAtual) { diaAtual = d; corpo += `<h4 class="rp-dia">${esc(diaLongo(i.capturado_em))}</h4>`; }
+        }
+        if (i.tipo === 'texto') { corpo += `<div class="rp-nota">${esc(i.legenda)}</div>`; return; }
+        const src = i.src || (i.asset_id ? '/_blob/' + i.asset_id : '');
+        corpo += `<div class="rp-item"><figure>` +
+          (i.tipo === 'foto'
+            ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
+            : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
+          `</figure><div class="rp-meta">` +
+          `<span class="rp-tag cinza">${hora(i.capturado_em)}</span>` +
+          (i.lat != null ? `<span class="rp-tag cinza">${Number(i.lat).toFixed(5)}, ${Number(i.lon).toFixed(5)}</span>` : '') +
+          (i.precisao_m ? `<span class="rp-tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
+          (i.tipo === 'video' && i.duracao_s ? `<span class="rp-tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
+          `</div>` +
+          (i.legenda ? `<p class="rp-legenda">${esc(i.legenda)}</p>` : '') +
+          `</div>`;
+      });
+    });
+
+    return `<div class="rp-folha">
+  <header class="rp-capa">
+    <div class="rp-marca">${logo ? '<img class="rp-logo-img" src="' + esc(logo) + '" alt="">' : '<div class="rp-logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
+    <h1>${esc(rel.fazenda || 'Relatório de visita')}</h1>
+    <p>${esc(rel.servico || 'Relatório de visita técnica')}</p>
+  </header>
+  <div class="rp-painel">
+    <div><span>Produtor</span><b>${esc(rel.produtor || '—')}</b></div>
+    <div><span>Safra</span><b>${esc(rel.safra || '—')}</b></div>
+    <div><span>Período</span><b>${fmtData(rel.data_inicio)} – ${fmtData(rel.data_fim)}</b></div>
+    <div><span>Responsável</span><b>${esc(rel.responsavel || '—')}</b></div>
+  </div>
+  <div class="rp-corpo">
+    <div class="rp-resumo">
+      <div><b>${fotos}</b><span>fotos</span></div>
+      <div><b>${videos}</b><span>vídeos</span></div>
+      <div><b>${nTalhoes}</b><span>talhões</span></div>
+      <div><b>${area ? area.toFixed(0) : '—'}</b><span>hectares</span></div>
+    </div>
+    ${rel.observacoes ? `<div class="rp-nota">${esc(rel.observacoes)}</div>` : ''}
+    ${mapaSVG(rel.talhoes, itens)}
+    ${corpo || '<div class="aviso">Nenhum registro neste relatório.</div>'}
+    <div class="rp-fim">Serviço concluído ✔️</div>
+  </div>
+  <footer class="rp-rodape"><b>${esc(empresa)}</b><br>${esc(cidade)}
+    ${rel.publicado_em ? '<br><span>Publicado em ' + fmtData(rel.publicado_em) + '</span>' : ''}</footer>
+</div>`;
+  }
+
+  global.Relatorio = { montar };
+})(window);
+
+})();
+
+/* ===== js/conta.js ===== */
+;(function(){
+/* ============================================================
+   conta.js — entrar na conta e cadastro de produtores e fazendas
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const abrir = id => $('#' + id).classList.remove('oculto');
+  const fechar = id => $('#' + id).classList.add('oculto');
+  const aviso = (el, txt, ok) => { el.innerHTML = txt ? '<div class="aviso"' + (ok ? ' style="background:#DCF8C6;color:#146034"' : '') + '>' + esc(txt) + '</div>' : ''; };
+
+  let modoCriar = false;
+  let cadastro = { produtores: [], fazendas: [], safras: [] };
+  let fazendaEdicao = null, produtorEdicao = null, kmlPendente = null;
+
+  /* ---------------- login ---------------- */
+
+  async function mostrarLogin() {
+    const q = await Sync.quemSou();
+    $('#loginEmail').value = q.email || '';
+    abrir('telaLogin');
+  }
+
+  function alternarModo() {
+    modoCriar = !modoCriar;
+    $('#loginExtra').classList.toggle('oculto', !modoCriar);
+    $('#btnEntrar').textContent = modoCriar ? 'Criar conta e entrar' : 'Entrar';
+    $('#btnAlternarConta').textContent = modoCriar ? 'Já tenho conta' : 'Criar uma conta';
+    aviso($('#loginMsg'), '');
+  }
+
+  async function entrar() {
+    const email = $('#loginEmail').value.trim();
+    const senha = $('#loginSenha').value;
+    const msg = $('#loginMsg');
+    if (!email || !senha) { aviso(msg, 'Preencha e-mail e senha.'); return; }
+    $('#btnEntrar').disabled = true;
+    aviso(msg, modoCriar ? 'Criando conta…' : 'Entrando…');
+    try {
+      if (modoCriar) {
+        await Sync.registrar({
+          email, senha,
+          nome: $('#loginNome').value.trim(),
+          convite: $('#loginConvite').value.trim()
+        });
+      } else {
+        await Sync.entrar(email, senha);
+      }
+      $('#loginSenha').value = '';
+      aviso(msg, '');
+      fechar('telaLogin');
+      try {
+        const perfil = await Sync.baixarPerfil();
+        if (perfil && (perfil.empresa || perfil.cidade || perfil.logo)) {
+          const c = (await DB.cfg('servidor')) || {};
+          await DB.cfg('servidor', Object.assign(c, {
+            empresa: perfil.empresa || c.empresa || '',
+            cidade: perfil.cidade || c.cidade || '',
+            logo: perfil.logo || c.logo || ''
+          }));
+        }
+      } catch (e) { /* segue sem perfil */ }
+      await atualizarCadastro(true);
+      if (global.App && App.aoEntrar) await App.aoEntrar();
+    } catch (e) {
+      aviso(msg, e.message);
+    } finally {
+      $('#btnEntrar').disabled = false;
+    }
+  }
+
+  async function trocarServidor() {
+    const atual = (await Sync.conf()).api;
+    const novo = prompt('Endereço do servidor:', atual);
+    if (novo) { await Sync.salvarConf({ api: novo.trim().replace(/\/$/, '') }); aviso($('#loginMsg'), 'Servidor atualizado.', true); }
+  }
+
+  /* ---------------- cadastro ---------------- */
+
+  async function atualizarCadastro(baixar) {
+    try {
+      cadastro = baixar ? await Sync.baixarCadastro() : await Sync.cadastroLocal();
+    } catch (e) {
+      cadastro = await Sync.cadastroLocal();
+    }
+    renderCadastro();
+    preencherSelecoes();
+    return cadastro;
+  }
+
+  function renderCadastro() {
+    const f = cadastro.fazendas || [], p = cadastro.produtores || [], sa = cadastro.safras || [];
+    $('#subCadastro').textContent = f.length + ' fazenda(s) · ' + p.length + ' produtor(es) · ' + sa.length + ' safra(s)';
+
+    $('#listaSafras').innerHTML = sa.length ? sa.map(function (x) {
+      return '<div class="lista-item"><div class="ic">🌱</div><div class="txt"><b>' + esc(x.nome) +
+        '</b><span>safra cadastrada</span></div>' +
+        '<button class="badge" data-safra="' + esc(x.id) + '">remover</button></div>';
+    }).join('') : '<div class="aviso">Nenhuma safra cadastrada. Toque em <b>+ Nova safra</b>.</div>';
+
+    $('#listaFazendas').innerHTML = f.length ? f.map(function (x) {
+      const prod = p.find(y => y.id === x.produtor_id);
+      return '<div class="lista-item" data-fazenda="' + esc(x.id) + '">' +
+        '<div class="ic">🌾</div><div class="txt"><b>' + esc(x.nome) + '</b><span>' +
+        (prod ? esc(prod.nome) + ' · ' : '') +
+        (x.n_talhoes ? x.n_talhoes + ' talhões · ' + Math.round(x.area_ha || 0) + ' ha' : 'sem KML') +
+        '</span></div><span class="badge">editar</span></div>';
+    }).join('') : '<div class="aviso">Nenhuma fazenda cadastrada.</div>';
+
+    $('#listaProdutores').innerHTML = p.length ? p.map(function (x) {
+      const n = f.filter(y => y.produtor_id === x.id).length;
+      return '<div class="lista-item" data-produtor="' + esc(x.id) + '">' +
+        '<div class="ic">👤</div><div class="txt"><b>' + esc(x.nome) + '</b><span>' +
+        (x.telefone ? esc(x.telefone) + ' · ' : '') + n + ' fazenda(s)</span></div>' +
+        '<span class="badge">editar</span></div>';
+    }).join('') : '<div class="aviso">Nenhum produtor cadastrado.</div>';
+
+    document.querySelectorAll('[data-safra]').forEach(el => el.onclick = async function () {
+      const s = (cadastro.safras || []).find(x => x.id === el.dataset.safra);
+      if (!s || !confirm('Remover a safra ' + s.nome + ' do cadastro?')) return;
+      await Sync.apagarCadastro('safra', s.id);
+      await atualizarCadastro(false);
+    });
+    document.querySelectorAll('[data-fazenda]').forEach(el => el.onclick = () => abrirFazenda(el.dataset.fazenda));
+    document.querySelectorAll('[data-produtor]').forEach(el => el.onclick = () => abrirProdutor(el.dataset.produtor));
+  }
+
+  function sugestaoSafra() {
+    const d = new Date();
+    const a = d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
+    return a + '/' + String((a + 1) % 100).padStart(2, '0');
+  }
+
+  async function novaSafra() {
+    const nome = prompt('Nome da safra:', sugestaoSafra());
+    if (!nome || !nome.trim()) return;
+    try {
+      await Sync.salvarSafra({ nome: nome.trim() });
+      await atualizarCadastro(false);
+    } catch (e) { alert('Não salvou: ' + e.message); }
+  }
+
+  function preencherSelecoes() {
+    const p = cadastro.produtores || [], f = cadastro.fazendas || [], sa = cadastro.safras || [];
+
+    const selSafra = $('#fSafraSel');
+    if (selSafra) {
+      const v = selSafra.value || selSafra.dataset.pendente || '';
+      let ops = sa.map(x => '<option value="' + esc(x.nome) + '">' + esc(x.nome) + '</option>');
+      if (v && !sa.some(x => x.nome === v)) ops.unshift('<option value="' + esc(v) + '">' + esc(v) + '</option>');
+      selSafra.innerHTML = (sa.length || v ? '' : '<option value="">— cadastre uma safra —</option>') + ops.join('');
+      if (v) selSafra.value = v;
+    }
+    const opcoesProd = '<option value="">— selecione —</option>' +
+      p.map(x => '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>').join('');
+
+    const selFazProd = $('#fzProdutor');
+    if (selFazProd) { const v = selFazProd.value; selFazProd.innerHTML = opcoesProd; selFazProd.value = v; }
+
+    const selRelProd = $('#fProdutorSel');
+    if (selRelProd) { const v = selRelProd.value; selRelProd.innerHTML = opcoesProd; selRelProd.value = v; }
+
+    const selRelFaz = $('#fFazendaSel');
+    if (selRelFaz) {
+      const prodSel = selRelProd ? selRelProd.value : '';
+      const lista = prodSel ? f.filter(x => x.produtor_id === prodSel || !x.produtor_id) : f;
+      const v = selRelFaz.value;
+      selRelFaz.innerHTML = '<option value="">— selecione —</option>' +
+        lista.map(x => '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>').join('');
+      selRelFaz.value = v;
+      mostrarTalhoesDaFazenda();
+    }
+  }
+
+  function fazendaPorId(id) { return (cadastro.fazendas || []).find(x => x.id === id) || null; }
+  function produtorPorId(id) { return (cadastro.produtores || []).find(x => x.id === id) || null; }
+
+  function mostrarTalhoesDaFazenda() {
+    const info = $('#fTalhoesInfo'); if (!info) return;
+    const f = fazendaPorId($('#fFazendaSel').value);
+    info.textContent = f
+      ? (f.n_talhoes ? '📐 ' + f.n_talhoes + ' talhões · ' + Math.round(f.area_ha || 0) + ' ha, já importados'
+                     : '⚠️ esta fazenda ainda não tem KML')
+      : '';
+  }
+
+  /* ---------------- produtor ---------------- */
+
+  function abrirProdutor(id) {
+    produtorEdicao = id ? produtorPorId(id) : null;
+    const p = produtorEdicao || {};
+    $('#tituloProdutor').textContent = id ? 'Editar produtor' : 'Novo produtor';
+    $('#pNome').value = p.nome || ''; $('#pDoc').value = p.documento || '';
+    $('#pTel').value = p.telefone || ''; $('#pObs').value = p.observacoes || '';
+    $('#btnApagarProdutor').classList.toggle('oculto', !id);
+    abrir('telaProdutor');
+  }
+
+  async function salvarProdutor() {
+    const nome = $('#pNome').value.trim();
+    if (!nome) { alert('Informe o nome do produtor.'); return; }
+    $('#btnSalvarProdutor').disabled = true;
+    try {
+      await Sync.salvarProdutor({
+        id: produtorEdicao ? produtorEdicao.id : null, nome: nome,
+        documento: $('#pDoc').value.trim(), telefone: $('#pTel').value.trim(),
+        observacoes: $('#pObs').value.trim()
+      });
+      await atualizarCadastro(false);
+      fechar('telaProdutor');
+    } catch (e) { alert('Não salvou: ' + e.message); }
+    finally { $('#btnSalvarProdutor').disabled = false; }
+  }
+
+  /* ---------------- fazenda ---------------- */
+
+  function abrirFazenda(id) {
+    fazendaEdicao = id ? fazendaPorId(id) : null;
+    kmlPendente = null;
+    const f = fazendaEdicao || {};
+    $('#tituloFazenda').textContent = id ? 'Editar fazenda' : 'Nova fazenda';
+    $('#fzNome').value = f.nome || ''; $('#fzMunicipio').value = f.municipio || '';
+    $('#fzUf').value = f.uf || '';
+    preencherSelecoes();
+    $('#fzProdutor').value = f.produtor_id || '';
+    $('#fzCampoNomeBox').classList.add('oculto');
+    statusKmlFazenda(f.talhoes || null, f.n_talhoes, f.area_ha);
+    $('#btnApagarFazenda').classList.toggle('oculto', !id);
+    abrir('telaFazenda');
+  }
+
+  function statusKmlFazenda(gj, n, area) {
+    const qtd = gj && gj.features ? gj.features.length : (n || 0);
+    const ha = gj && gj.features
+      ? gj.features.reduce((s, x) => s + ((x.properties && x.properties.area_ha) || 0), 0)
+      : (area || 0);
+    $('#fzStatusKml').innerHTML = '<div class="ic">📐</div><div class="txt"><b>' +
+      (qtd ? qtd + ' talhões · ' + ha.toFixed(1) + ' ha' : 'Nenhum talhão carregado') + '</b><span>' +
+      (qtd ? 'toque no mapa abaixo para conferir' : 'Importe o KML da fazenda') + '</span></div>';
+    desenharTalhoes(gj);
+  }
+
+  // mapa + lista dos talhões na tela da fazenda
+  function desenharTalhoes(gj) {
+    const mapa = $('#fzMapa'), lista = $('#fzListaTalhoes');
+    if (!gj || !gj.features || !gj.features.length) {
+      mapa.classList.add('oculto'); mapa.innerHTML = ''; lista.innerHTML = '';
+      return;
+    }
+    mapa.classList.remove('oculto');
+    mapa.innerHTML = Geo.svgTalhoes(gj);
+    const linhas = gj.features.map(function (f) {
+      const a = f.properties.area_ha;
+      return '<tr><td style="padding:4px 8px 4px 0">' + esc(f.properties.nome) + '</td>' +
+        '<td style="padding:4px 0;text-align:right;color:#667781">' + (a ? a.toFixed(1) + ' ha' : '—') + '</td></tr>';
+    }).join('');
+    lista.innerHTML = '<div class="lista-item" style="display:block"><table style="width:100%;font-size:13.5px">' +
+      linhas + '</table></div>';
+  }
+
+  // seletor de qual atributo vira o nome do talhão
+  function montarSeletorNome(gj) {
+    const box = $('#fzCampoNomeBox'), sel = $('#fzCampoNome'), amo = $('#fzCampoNomeAmostra');
+    const opcoes = Geo.atributos(gj);
+    if (!opcoes.length) { box.classList.add('oculto'); return; }
+    box.classList.remove('oculto');
+    sel.innerHTML = opcoes.map(function (o) {
+      return '<option value="' + esc(o.chave) + '">' + esc(o.rotulo) + '</option>';
+    }).join('');
+    const mostrarAmostra = function () {
+      const o = opcoes.find(function (x) { return x.chave === sel.value; });
+      amo.textContent = o && o.amostra ? 'Ex.: ' + o.amostra : '';
+    };
+    sel.onchange = function () {
+      Geo.aplicarNome(kmlPendente, sel.value);
+      mostrarAmostra();
+      statusKmlFazenda(kmlPendente);
+    };
+    mostrarAmostra();
+  }
+
+  async function salvarFazenda() {
+    const nome = $('#fzNome').value.trim();
+    if (!nome) { alert('Informe o nome da fazenda.'); return; }
+    $('#btnSalvarFazenda').disabled = true;
+    try {
+      const corpo = {
+        id: fazendaEdicao ? fazendaEdicao.id : null,
+        nome: nome,
+        produtor_id: $('#fzProdutor').value || null,
+        municipio: $('#fzMunicipio').value.trim(),
+        uf: $('#fzUf').value.trim().toUpperCase()
+      };
+      if (kmlPendente) corpo.talhoes = kmlPendente;
+      else if (fazendaEdicao && fazendaEdicao.talhoes) corpo.talhoes = fazendaEdicao.talhoes;
+      await Sync.salvarFazenda(corpo);
+      await atualizarCadastro(false);
+      fechar('telaFazenda');
+    } catch (e) { alert('Não salvou: ' + e.message); }
+    finally { $('#btnSalvarFazenda').disabled = false; }
+  }
+
+  async function importarKmlFazenda(file) {
+    try {
+      const gj = await Geo.importarArquivo(file);
+      if (!gj.features.length) { alert('Nenhum polígono encontrado no arquivo.'); return; }
+      kmlPendente = gj;
+      montarSeletorNome(gj);
+      statusKmlFazenda(gj);
+    } catch (e) { alert('Erro no KML: ' + e.message); }
+  }
+
+  /* ---------------- ligações ---------------- */
+
+  function ligar() {
+    $('#btnEntrar').onclick = entrar;
+    $('#btnAlternarConta').onclick = alternarModo;
+    $('#btnTrocarServidor').onclick = trocarServidor;
+    $('#loginSenha').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
+
+    $('#btnAbrirCadastro').onclick = async function () { await atualizarCadastro(true); abrir('telaCadastro'); };
+    $('#btnAtualizarCadastro').onclick = async function () { await atualizarCadastro(true); };
+    $('#btnNovoProdutor').onclick = () => abrirProdutor(null);
+    $('#btnNovaFazenda').onclick = () => abrirFazenda(null);
+    $('#btnNovaSafra').onclick = novaSafra;
+    $('#btnSalvarProdutor').onclick = salvarProdutor;
+    $('#btnSalvarFazenda').onclick = salvarFazenda;
+    $('#btnFzKml').onclick = () => $('#inpKml').click();
+
+    $('#btnApagarProdutor').onclick = async function () {
+      if (!produtorEdicao || !confirm('Apagar este produtor do cadastro?')) return;
+      await Sync.apagarCadastro('produtor', produtorEdicao.id);
+      await atualizarCadastro(false); fechar('telaProdutor');
+    };
+    $('#btnApagarFazenda').onclick = async function () {
+      if (!fazendaEdicao || !confirm('Apagar esta fazenda e seus talhões do cadastro?')) return;
+      await Sync.apagarCadastro('fazenda', fazendaEdicao.id);
+      await atualizarCadastro(false); fechar('telaFazenda');
+    };
+
+    const selProd = $('#fProdutorSel'), selFaz = $('#fFazendaSel');
+    if (selProd) selProd.onchange = preencherSelecoes;
+    if (selFaz) selFaz.onchange = mostrarTalhoesDaFazenda;
+
+    $('#btnSair').onclick = async function () {
+      if (!confirm('Sair da conta? Os relatórios já salvos continuam neste aparelho.')) return;
+      await Sync.sair();
+      location.reload();
+    };
+
+    Sync.aoMudar(function (evt) { if (evt.tipo === 'sem-sessao') mostrarLogin(); });
+  }
+
+  global.Conta = {
+    ligar, mostrarLogin, atualizarCadastro, fazendaPorId, produtorPorId,
+    importarKmlFazenda, preencherSelecoes,
+    telaFazendaAberta: () => !$('#telaFazenda').classList.contains('oculto'),
+    dados: () => cadastro
+  };
+})(window);
+
+})();
+
+/* ===== js/app.js ===== */
+;(function(){
+/* ============================================================
+   app.js — Relatório de Campo · VSL
+   UI estilo WhatsApp: captura de foto/vídeo com GPS e talhão (KML),
+   armazenamento offline e sincronização com o servidor da VSL.
+   ============================================================ */
+(function (global) {
+  'use strict';
+
+  const $ = function (s) { return document.querySelector(s); };
+  const $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+  const st = {
+    rel: null,            // relatório aberto
+    itens: [],
+    pos: null,            // última posição GPS
+    cfg: { qualidade: 0.82, video: 720 },
+    stream: null,
+    facing: 'environment',
+    recorder: null,
+    chunks: [],
+    gravando: false,
+    tRec: null,
+    urls: []              // object URLs a revogar
+  };
+
+  /* ---------------- utilidades ---------------- */
+  function hora(iso) {
+    const d = new Date(iso);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function dataExt(iso) {
+    const d = new Date(iso);
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const hoje = new Date();
+    const mesmo = function (a, b) { return a.toDateString() === b.toDateString(); };
+    if (mesmo(d, hoje)) return 'Hoje';
+    const ontem = new Date(hoje.getTime() - 86400000);
+    if (mesmo(d, ontem)) return 'Ontem';
+    return String(d.getDate()).padStart(2, '0') + ' ' + meses[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function mmss(s) {
+    s = Math.round(s || 0);
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function bytesFmt(b) {
+    if (!b) return '0 B';
+    const u = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+    return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + u[i];
+  }
+  function toast(msg, ms) {
+    const el = document.createElement('div');
+    el.className = 'toast'; el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, ms || 2600);
+  }
+  function objURL(blob) { const u = URL.createObjectURL(blob); st.urls.push(u); return u; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function abrir(id) { $('#' + id).classList.remove('oculto'); }
+  function fechar(id) { $('#' + id).classList.add('oculto'); }
+
+  /* ---------------- GPS ---------------- */
+  function iniciarGPS() {
+    if (!navigator.geolocation) { $('#txtGps').textContent = 'GPS indisponível'; return; }
+    if (st.vigiaGps != null) { try { navigator.geolocation.clearWatch(st.vigiaGps); } catch (e) {} }
+    st.vigiaGps = navigator.geolocation.watchPosition(function (p) {
+      st.pos = {
+        lat: p.coords.latitude, lon: p.coords.longitude,
+        acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp
+      };
+      atualizarGPS();
+    }, function (err) {
+      $('#dotGps').className = 'dot ruim';
+      st.gpsNegado = err.code === 1;
+      $('#txtGps').textContent = 'GPS: ' + (st.gpsNegado ? 'permissão negada · toque' : 'sem sinal · toque');
+    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  }
+
+  // toque na faixa do GPS: tenta de novo e explica como liberar
+  function ligarToqueGps() {
+    const alvo = $('#txtGps').closest('.pill') || $('#txtGps');
+    alvo.style.cursor = 'pointer';
+    alvo.addEventListener('click', function () {
+      if (st.pos) { toast('GPS ativo: ±' + Math.round(st.pos.acc || 0) + ' m'); return; }
+      iniciarGPS();
+      if (st.gpsNegado) {
+        toast('Libere a localização: Ajustes do celular → Safari/Chrome → Localização → Permitir. Depois recarregue.', 6000);
+      } else {
+        toast('Procurando satélites… fique a céu aberto por alguns segundos.', 4000);
+      }
+    });
+  }
+
+  function atualizarGPS() {
+    if (!st.pos) return;
+    const acc = st.pos.acc || 99;
+    const dot = $('#dotGps');
+    dot.className = 'dot ' + (acc <= 10 ? 'ok' : acc <= 30 ? 'medio' : 'ruim');
+    const t = talhaoAtual();
+    $('#txtGps').textContent = '±' + Math.round(acc) + ' m' + (t ? ' · ' + t.nome : '');
+    const cg = $('#camGeo');
+    if (cg) cg.textContent = '📍 ±' + Math.round(acc) + ' m' + (t ? ' · ' + t.nome : ' · fora dos talhões');
+    if (st.rel) $('#subtituloRel').textContent = subtitulo();
+  }
+
+  function talhaoAtual() {
+    if (!st.pos || !st.rel || !st.rel.talhoes) return null;
+    return Geo.talhaoDoPonto(st.pos.lon, st.pos.lat, st.rel.talhoes);
+  }
+
+  function subtitulo() {
+    if (!st.rel) return 'Toque em ☰ para criar';
+    const t = talhaoAtual();
+    const n = (st.rel.talhoes && st.rel.talhoes.features || []).length;
+    return [st.rel.safra ? 'Safra ' + st.rel.safra : null,
+            n ? n + ' talhões' : 'sem KML',
+            t ? '📍 ' + t.nome : null].filter(Boolean).join(' · ');
+  }
+
+  /* ---------------- sync status ---------------- */
+  function atualizarSync() {
+    DB.pendentes().then(function (p) {
+      const dot = $('#dotSync'), txt = $('#txtSync');
+      if (!navigator.onLine) { dot.className = 'dot medio'; txt.textContent = 'offline · ' + p.length + ' na fila'; return; }
+      if (p.length === 0) { dot.className = 'dot ok'; txt.textContent = 'sincronizado'; return; }
+      dot.className = 'dot medio'; txt.textContent = p.length + ' para enviar';
+    });
+  }
+
+  /* ---------------- chat ---------------- */
+  async function renderChat() {
+    const chat = $('#chat');
+    st.urls.forEach(URL.revokeObjectURL); st.urls = [];
+    if (!st.rel) {
+      chat.innerHTML = '<div class="aviso">Nenhum relatório aberto. Toque em <b>☰</b> e crie um novo.</div>';
+      return;
+    }
+    st.itens = await DB.itensDoRelatorio(st.rel.id);
+    $('#dicaCamera').textContent = relFinalizado()
+      ? 'Relatório finalizado — somente leitura'
+      : 'Toque para foto · Segure para vídeo · Segure um registro para editar';
+    if (!st.itens.length) {
+      chat.innerHTML = '<div class="aviso">Relatório criado. Toque na <b>câmera</b> para registrar a primeira foto ou vídeo — a localização e o talhão entram automaticamente.</div>' +
+        '<div class="aviso">Para usar como aplicativo: no navegador do celular, menu <b>⋮</b> → <b>Adicionar à tela inicial</b>.</div>';
+      return;
+    }
+
+    let html = '';
+    let diaAtual = '';
+    for (const it of st.itens) {
+      const dia = dataExt(it.capturado_em);
+      if (dia !== diaAtual) { diaAtual = dia; html += '<div class="divisor"><span>' + esc(dia) + '</span></div>'; }
+      html += bolhaHTML(it);
+    }
+    chat.innerHTML = html;
+
+    // carrega mídias do IndexedDB
+    for (const it of st.itens) {
+      if (it.tipo === 'texto') continue;
+      const el = chat.querySelector('[data-midia="' + it.id + '"]');
+      if (!el) continue;
+      const blob = await DB.lerMidia(it.id);
+      if (blob) {
+        const u = objURL(blob);
+        if (it.tipo === 'foto') el.innerHTML = '<img src="' + u + '" alt="">';
+        else el.innerHTML = '<video src="' + u + '" preload="metadata" playsinline></video><div class="play">▶</div>' +
+          (it.duracao_s ? '<div class="dur">' + mmss(it.duracao_s) + '</div>' : '');
+      } else if (it.drive_id) {
+        el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">enviado · mídia na nuvem</div>';
+      }
+    }
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function bolhaHTML(it) {
+    const ticks = it.sync_state === 'ok'
+      ? '<span class="ticks ok">✓✓</span>'
+      : it.sync_state === 'erro'
+        ? '<span class="ticks erro" title="' + esc(it.erro || '') + '">!</span>'
+        : '<span class="ticks">✓</span>';
+
+    const chip = it.tipo === 'texto' ? '' : (it.talhao
+      ? '<div class="chip-talhao">📍 ' + esc(it.talhao) + (it.precisao_m ? ' · ±' + Math.round(it.precisao_m) + 'm' : '') + '</div>'
+      : '<div class="chip-talhao fora">📍 fora dos talhões' + (it.lat ? '' : ' · sem GPS') + '</div>');
+
+    if (it.tipo === 'texto') {
+      return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha so-texto">' +
+        '<div class="legenda">' + esc(it.legenda) + '</div>' +
+        '<div class="rodape"><span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
+    }
+
+    return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
+      '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '"></div>' +
+      chip +
+      (it.legenda ? '<div class="legenda">' + esc(it.legenda) + '</div>' : '') +
+      '<div class="rodape">' + (it.bytes ? '<span>' + bytesFmt(it.bytes) + '</span>' : '') +
+      '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
+  }
+
+  /* ---------------- captura ---------------- */
+  async function comprimirImagem(blob, maxLado, qualidade) {
+    const bmp = await createImageBitmap(blob);
+    const escala = Math.min(1, maxLado / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * escala), h = Math.round(bmp.height * escala);
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+    return await new Promise(function (res) { cv.toBlob(res, 'image/jpeg', qualidade); });
+  }
+
+  async function novoItem(tipo, blob, extras) {
+    if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return null; }
+    if (relFinalizado()) { toast('Relatório finalizado — crie um novo para seguir registrando', 3500); return null; }
+    const t = talhaoAtual();
+    const item = Object.assign({
+      id: novoId(),
+      relatorio_id: st.rel.id,
+      tipo: tipo,
+      legenda: '',
+      mime: blob ? blob.type : null,
+      bytes: blob ? blob.size : null,
+      lat: st.pos ? st.pos.lat : null,
+      lon: st.pos ? st.pos.lon : null,
+      precisao_m: st.pos ? st.pos.acc : null,
+      altitude_m: st.pos ? st.pos.alt : null,
+      talhao: t ? t.nome : null,
+      talhao_id: t ? t.id : null,
+      capturado_em: new Date().toISOString(),
+      ordem: Date.now(),
+      sync_state: 'pendente'
+    }, extras || {});
+    if (blob) await DB.salvarMidia(item.id, blob);
+    await DB.put('itens', item);
+    return item;
+  }
+
+  // Folha de legenda após a captura. Devolve uma promessa:
+  //   { legenda, talhao, talhao_id, repetir }  ou  null se foi descartada.
+  // Uma folha por vez — a próxima só abre depois que esta fecha.
+  function pedirLegenda(blob, tipo, posicao) {
+    // garante que não fica nenhuma folha antiga aberta por baixo
+    Array.prototype.slice.call(document.querySelectorAll('.folha, .veu')).forEach(function (e) { e.remove(); });
+
+    return new Promise(function (resolve) {
+      const veu = document.createElement('div'); veu.className = 'veu';
+      const folha = document.createElement('div'); folha.className = 'folha';
+      const u = objURL(blob);
+      const t = talhaoAtual();
+      const feats = (st.rel && st.rel.talhoes && st.rel.talhoes.features) || [];
+      const opcoes = ['<option value="">Fora dos talhões</option>'].concat(feats.map(function (f) {
+        const n = f.properties.nome;
+        return '<option value="' + esc(n) + '"' + (t && t.nome === n ? ' selected' : '') + '>' + esc(n) + '</option>';
+      })).join('');
+      const varios = posicao && posicao.total > 1;
+
+      folha.innerHTML =
+        '<div class="alca"></div>' +
+        (varios ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px">Arquivo ' + posicao.n + ' de ' + posicao.total + '</div>' : '') +
+        (tipo === 'foto'
+          ? '<img src="' + u + '" style="width:100%;border-radius:10px;max-height:34dvh;object-fit:cover">'
+          : '<video src="' + u + '" controls playsinline style="width:100%;border-radius:10px;max-height:34dvh"></video>') +
+        '<div style="margin:8px 0 2px;font-size:12.5px;color:#667781">' +
+          (st.pos ? '📍 GPS ±' + Math.round(st.pos.acc) + ' m' + (t ? ' · detectou ' + esc(t.nome) : ' · fora dos talhões')
+                  : '📍 sem GPS neste aparelho — escolha o talhão abaixo') + '</div>' +
+        (feats.length ? '<div class="campo"><label>Talhão</label><select id="legTalhao">' + opcoes + '</select></div>' : '') +
+        '<div class="campo"><textarea id="legTxt" rows="2" placeholder="Legenda (opcional)"></textarea></div>' +
+        (varios ? '<label class="marcar"><input type="checkbox" id="legRepetir" checked> Usar este talhão e legenda nos ' +
+                  (posicao.total - posicao.n) + ' arquivo(s) seguintes</label>' : '') +
+        '<button class="btn" id="legOk">Adicionar ao relatório</button>' +
+        '<button class="btn secundario" id="legCancel">Descartar</button>';
+      document.body.appendChild(veu); document.body.appendChild(folha);
+
+      let respondeu = false;
+      const fechar2 = function (valor) {
+        if (respondeu) return;
+        respondeu = true;
+        veu.remove(); folha.remove();
+        resolve(valor);
+      };
+      // o véu NÃO descarta a mídia: só os botões decidem (evita perder a foto num toque errado)
+      veu.onclick = function (e) { e.stopPropagation(); };
+      folha.querySelector('#legCancel').onclick = function () { fechar2(null); };
+      folha.querySelector('#legOk').onclick = function () {
+        const leg = folha.querySelector('#legTxt').value.trim();
+        const sel = folha.querySelector('#legTalhao');
+        const nome = sel ? sel.value : (t ? t.nome : '');
+        const f = feats.find(function (x) { return x.properties.nome === nome; });
+        const rep = folha.querySelector('#legRepetir');
+        fechar2({
+          legenda: leg,
+          talhao: nome || null,
+          talhao_id: nome && f ? f.properties.id : null,
+          repetir: !!(rep && rep.checked)
+        });
+      };
+      setTimeout(function () { const a = folha.querySelector('#legTxt'); if (a) a.focus(); }, 150);
+    });
+  }
+
+  // Adiciona uma mídia já com a folha de legenda. `fixo` repete talhão/legenda sem perguntar.
+  async function adicionarMidia(blob, tipo, extras, posicao, fixo) {
+    if (tipo === 'foto') {
+      try { blob = await comprimirImagem(blob, 2048, st.cfg.qualidade); } catch (e) { /* mantém original */ }
+    }
+    const r = fixo || await pedirLegenda(blob, tipo, posicao);
+    if (!r) return null;
+    const item = await novoItem(tipo, blob, Object.assign(
+      { legenda: r.legenda || '' }, extras || {},
+      { talhao: r.talhao || null, talhao_id: r.talhao_id || null }
+    ));
+    if (!item) return null;
+    await renderChat(); atualizarSync();
+    if (navigator.onLine) Sync.sincronizar(st.rel.id);
+    return r;
+  }
+
+  // Vários arquivos da galeria: um de cada vez, na ordem.
+  async function adicionarVarios(arquivos) {
+    let fixo = null;
+    for (let i = 0; i < arquivos.length; i++) {
+      const f = arquivos[i];
+      const tipo = (f.type || '').indexOf('video') === 0 ? 'video' : 'foto';
+      const r = await adicionarMidia(f, tipo, null, { n: i + 1, total: arquivos.length }, fixo);
+      if (!fixo && r && r.repetir) fixo = { legenda: r.legenda, talhao: r.talhao, talhao_id: r.talhao_id };
+    }
+    if (arquivos.length > 1) toast(arquivos.length + ' arquivo(s) processado(s)');
+  }
+
+  /* ---------------- câmera in-app ---------------- */
+  async function abrirCamera() {
+    if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return; }
+    try {
+      const alt = st.cfg.video === 1080 ? 1080 : 720;
+      st.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: st.facing, width: { ideal: alt === 1080 ? 1920 : 1280 }, height: { ideal: alt } },
+        audio: true
+      });
+    } catch (e) {
+      // sem acesso direto à câmera (iframe, permissão negada): usa a câmera do sistema
+      st.semCameraInterna = true;
+      $('#inpFoto').click();
+      return;
+    }
+    $('#camVideo').srcObject = st.stream;
+    abrir('telaCamera');
+    atualizarGPS();
+  }
+
+  function fecharCamera() {
+    if (st.gravando) pararVideo();
+    if (st.stream) { st.stream.getTracks().forEach(function (t) { t.stop(); }); st.stream = null; }
+    fechar('telaCamera');
+  }
+
+  async function tirarFoto() {
+    const v = $('#camVideo');
+    const cv = document.createElement('canvas');
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v, 0, 0);
+    const blob = await new Promise(function (r) { cv.toBlob(r, 'image/jpeg', st.cfg.qualidade); });
+    fecharCamera();
+    adicionarMidia(blob, 'foto');
+  }
+
+  function iniciarVideo() {
+    if (!st.stream || st.gravando) return;
+    const tipos = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9,opus', 'video/webm'];
+    const mime = tipos.find(function (t) { return MediaRecorder.isTypeSupported(t); }) || '';
+    st.chunks = [];
+    const taxa = st.cfg.video === 1080 ? 2500000 : 1200000;
+    st.recorder = new MediaRecorder(st.stream, mime ? { mimeType: mime, videoBitsPerSecond: taxa } : undefined);
+    st.recorder.ondataavailable = function (e) { if (e.data.size) st.chunks.push(e.data); };
+    st.recorder.onstop = function () {
+      const blob = new Blob(st.chunks, { type: st.recorder.mimeType || 'video/webm' });
+      const dur = (Date.now() - st.tInicio) / 1000;
+      fecharCamera();
+      adicionarMidia(blob, 'video', { duracao_s: +dur.toFixed(1) });
+    };
+    st.recorder.start(1000);
+    st.gravando = true; st.tInicio = Date.now();
+    $('#camObturador').classList.add('gravando');
+    $('#camRec').classList.remove('oculto');
+    $('#btnCamera').classList.add('gravando');
+    st.tRec = setInterval(function () {
+      $('#camTempo').textContent = mmss((Date.now() - st.tInicio) / 1000);
+    }, 500);
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+
+  function pararVideo() {
+    if (!st.gravando) return;
+    st.gravando = false;
+    clearInterval(st.tRec);
+    $('#camObturador').classList.remove('gravando');
+    $('#camRec').classList.add('oculto');
+    $('#btnCamera').classList.remove('gravando');
+    try { st.recorder.stop(); } catch (e) {}
+  }
+
+  /* ---------------- enviar observação escrita ---------------- */
+
+  function atualizarBotaoEnvio() {
+    const temTexto = $('#txtMsg').value.trim().length > 0;
+    st.modoEnvio = temTexto;
+    const b = $('#btnCamera');
+    b.classList.toggle('enviar', temTexto);
+    b.textContent = temTexto ? '➤' : '📷';
+    b.title = temTexto ? 'Enviar' : 'Câmera';
+    $('#dicaCamera').style.visibility = temTexto ? 'hidden' : 'visible';
+  }
+
+  async function enviarTexto() {
+    const txt = $('#txtMsg');
+    const v = txt.value.trim();
+    if (!v) return;
+    const item = await novoItem('texto', null, { legenda: v });
+    if (!item) return;
+    txt.value = ''; txt.style.height = 'auto';
+    atualizarBotaoEnvio();
+    await renderChat(); atualizarSync();
+    if (navigator.onLine) Sync.sincronizar(st.rel.id);
+  }
+
+  /* botão do composer: vira "enviar" quando há texto; senão toque = foto, segurar = vídeo */
+  function ligarBotaoCamera() {
+    const btn = $('#btnCamera');
+    let timer = null, segurou = false;
+
+    const inicio = function (e) {
+      if (st.modoEnvio) return;
+      segurou = false;
+      timer = setTimeout(async function () {
+        segurou = true;
+        if (st.semCameraInterna) { $('#inpVideo').click(); return; }
+        await abrirCamera();
+        setTimeout(iniciarVideo, 350);
+      }, 450);
+    };
+    const fim = function (e) {
+      if (st.modoEnvio) { e.preventDefault(); enviarTexto(); return; }
+      clearTimeout(timer);
+      if (segurou) { pararVideo(); return; }
+      abrirCamera();
+    };
+    btn.addEventListener('touchstart', inicio, { passive: true });
+    btn.addEventListener('touchend', fim);
+    btn.addEventListener('mousedown', inicio);
+    btn.addEventListener('mouseup', fim);
+  }
+
+  function ligarObturador() {
+    const ob = $('#camObturador');
+    let timer = null, segurou = false;
+    const inicio = function () {
+      segurou = false;
+      timer = setTimeout(function () { segurou = true; iniciarVideo(); }, 350);
+    };
+    const fim = function () {
+      clearTimeout(timer);
+      if (st.gravando) { pararVideo(); return; }
+      if (!segurou) tirarFoto();
+    };
+    ob.addEventListener('touchstart', inicio, { passive: true });
+    ob.addEventListener('touchend', fim);
+    ob.addEventListener('mousedown', inicio);
+    ob.addEventListener('mouseup', fim);
+  }
+
+  /* ---------------- relatórios ---------------- */
+  async function listarRelatorios() {
+    const rels = (await DB.all('relatorios')).sort(function (a, b) { return (b.criado_em || '').localeCompare(a.criado_em || ''); });
+    const wrap = $('#listaRelatorios');
+    if (!rels.length) { wrap.innerHTML = '<div class="aviso">Nenhum relatório ainda.</div>'; $('#subLista').textContent = '0 relatórios'; return; }
+    $('#subLista').textContent = rels.length + ' relatório(s)';
+    const partes = [];
+    for (const r of rels) {
+      const itens = await DB.itensDoRelatorio(r.id);
+      const pend = itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
+      partes.push(
+        '<div class="lista-item" data-rel="' + r.id + '">' +
+        '<div class="ic">' + (r.status === 'publicado' ? '✅' : '🌱') + '</div>' +
+        '<div class="txt"><b>' + esc(r.fazenda || 'Sem fazenda') + '</b>' +
+        '<span>' + esc(r.produtor || '—') + ' · ' + itens.length + ' registros' + (pend ? ' · ' + pend + ' na fila' : '') + '</span></div>' +
+        '<span class="badge ' + (r.status === 'publicado' ? 'pub' : '') + '">' + (r.status === 'publicado' ? 'publicado' : 'rascunho') + '</span>' +
+        '</div>');
+    }
+    wrap.innerHTML = partes.join('');
+    $$('#listaRelatorios [data-rel]').forEach(function (el) {
+      el.onclick = function () { abrirRelatorio(el.dataset.rel); fechar('telaLista'); };
+    });
+  }
+
+  async function abrirRelatorio(id) {
+    st.rel = await DB.get('relatorios', id);
+    await DB.cfg('ultimo', id);
+    $('#tituloRel').textContent = st.rel.fazenda || 'Relatório';
+    $('#subtituloRel').textContent = subtitulo();
+    $('#avatarRel').textContent = st.rel.status === 'publicado' ? '✅' : '🌱';
+    fechar('telaLista');
+    await renderChat(); atualizarSync(); atualizarGPS();
+  }
+
+  function preencherFormulario(rel) {
+    Conta.preencherSelecoes();
+    $('#fProdutorSel').value = rel.produtor_id || '';
+    Conta.preencherSelecoes();
+    $('#fFazendaSel').value = rel.fazenda_id || '';
+    $('#fSafraSel').dataset.pendente = rel.safra || '';
+    Conta.preencherSelecoes();
+    $('#fResponsavel').value = rel.responsavel || '';
+    $('#fServico').value = rel.servico || '';
+    $('#fInicio').value = rel.data_inicio || '';
+    $('#fFim').value = rel.data_fim || '';
+    $('#fObs').value = rel.observacoes || '';
+    Conta.preencherSelecoes();
+    $('#tituloTelaRel').textContent = rel.id ? 'Editar relatório' : 'Novo relatório';
+    $('#btnApagarRel').classList.toggle('oculto', !rel.id);
+  }
+
+  let relEdicao = null;
+
+  async function salvarRelatorio() {
+    const base = relEdicao || {};
+    const prod = Conta.produtorPorId($('#fProdutorSel').value);
+    const faz = Conta.fazendaPorId($('#fFazendaSel').value);
+    if (!faz) { toast('Escolha a fazenda — ou cadastre uma primeiro'); return; }
+    const rel = Object.assign({}, base, {
+      id: base.id || novoId('r'),
+      produtor_id: prod ? prod.id : null,
+      fazenda_id: faz.id,
+      produtor: prod ? prod.nome : '',
+      fazenda: faz.nome,
+      safra: $('#fSafraSel').value.trim(),
+      responsavel: $('#fResponsavel').value.trim(),
+      servico: $('#fServico').value.trim(),
+      data_inicio: $('#fInicio').value || null,
+      data_fim: $('#fFim').value || null,
+      observacoes: $('#fObs').value.trim(),
+      talhoes: faz.talhoes || { type: 'FeatureCollection', features: [] },
+      status: base.status || 'rascunho',
+      criado_em: base.criado_em || new Date().toISOString()
+    });
+    await DB.put('relatorios', rel);
+    relEdicao = null;
+    fechar('telaRel');
+    await abrirRelatorio(rel.id);
+    await listarRelatorios();
+    if (navigator.onLine) Sync.sincronizar(rel.id);
+  }
+
+  /* ---------------- mapa SVG ---------------- */
+  function desenharMapa() {
+    const wrap = $('#mapaWrap');
+    if (!st.rel || !st.rel.talhoes || !st.rel.talhoes.features.length) {
+      wrap.innerHTML = '<div class="aviso">Importe um KML para ver o mapa.</div>';
+      $('#legendaTalhoes').innerHTML = ''; $('#resumoTalhoes').innerHTML = ''; return;
+    }
+    const gj = st.rel.talhoes;
+    const b = Geo.bounds(gj);
+    const pad = 0.02;
+    const dx = (b.maxX - b.minX) || 0.001, dy = (b.maxY - b.minY) || 0.001;
+    const minX = b.minX - dx * pad, maxX = b.maxX + dx * pad;
+    const minY = b.minY - dy * pad, maxY = b.maxY + dy * pad;
+    const W = 1000, H = Math.round(W * ((maxY - minY) / (maxX - minX)) * Math.cos(((minY + maxY) / 2) * Math.PI / 180));
+    const px = function (lon) { return (lon - minX) / (maxX - minX) * W; };
+    const py = function (lat) { return H - (lat - minY) / (maxY - minY) * H; };
+
+    let svg = '<svg viewBox="0 0 ' + W + ' ' + (H || 600) + '" xmlns="http://www.w3.org/2000/svg">';
+    gj.features.forEach(function (f, i) {
+      const g = f.geometry;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+      polys.forEach(function (rings) {
+        const d = rings.map(function (ring) {
+          return 'M' + ring.map(function (p) { return px(p[0]).toFixed(1) + ',' + py(p[1]).toFixed(1); }).join('L') + 'Z';
+        }).join(' ');
+        svg += '<path d="' + d + '" fill="rgba(27,122,67,.14)" stroke="#1B7A43" stroke-width="2.5"/>';
+      });
+      const c = centroide(f.geometry);
+      svg += '<text x="' + px(c[0]).toFixed(1) + '" y="' + py(c[1]).toFixed(1) +
+        '" font-size="20" fill="#146034" text-anchor="middle" font-family="sans-serif" font-weight="600">' +
+        esc(f.properties.nome) + '</text>';
+    });
+    st.itens.forEach(function (it) {
+      if (!it.lat) return;
+      const cor = it.tipo === 'video' ? '#D93025' : '#1B7A43';
+      svg += '<circle cx="' + px(it.lon).toFixed(1) + '" cy="' + py(it.lat).toFixed(1) +
+        '" r="7" fill="' + cor + '" stroke="#fff" stroke-width="2.5"/>';
+    });
+    if (st.pos) {
+      svg += '<circle cx="' + px(st.pos.lon).toFixed(1) + '" cy="' + py(st.pos.lat).toFixed(1) +
+        '" r="10" fill="#2196F3" stroke="#fff" stroke-width="3"/>';
+    }
+    svg += '</svg>';
+    wrap.innerHTML = svg;
+
+    $('#legendaTalhoes').innerHTML = '<span>🟢 foto</span><span>🔴 vídeo</span><span>🔵 você</span>';
+    const porTalhao = {};
+    st.itens.forEach(function (it) {
+      const k = it.talhao || 'Fora dos talhões';
+      porTalhao[k] = (porTalhao[k] || 0) + 1;
+    });
+    $('#resumoTalhoes').innerHTML = Object.keys(porTalhao).map(function (k) {
+      return '<div class="lista-item"><div class="ic">📍</div><div class="txt"><b>' + esc(k) +
+        '</b><span>' + porTalhao[k] + ' registro(s)</span></div></div>';
+    }).join('') || '<div class="aviso">Nenhum registro ainda.</div>';
+    $('#subMapa').textContent = st.rel.fazenda || '';
+  }
+
+  function centroide(g) {
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+    let sx = 0, sy = 0, n = 0;
+    polys.forEach(function (rings) {
+      rings[0].forEach(function (p) { sx += p[0]; sy += p[1]; n++; });
+    });
+    return [sx / n, sy / n];
+  }
+
+  /* ---------------- menu ⋮ ---------------- */
+  function menuMais() {
+    if (!st.rel) { toast('Abra um relatório'); return; }
+    const veu = document.createElement('div'); veu.className = 'veu';
+    const folha = document.createElement('div'); folha.className = 'folha';
+    folha.innerHTML = '<div class="alca"></div>' +
+      '<div class="opcao" data-a="editar"><span>✏️</span><span>Editar dados da visita</span></div>' +
+      '<div class="opcao" data-a="sync"><span>🔄</span><span>Sincronizar agora</span></div>' +
+      '<div class="opcao" data-a="previa"><span>👁️</span><span>Ver como o cliente vê</span></div>' +
+      '<div class="opcao" data-a="publicar"><span>🔗</span><span><b>Finalizar e gerar link</b></span></div>' +
+      '<div class="opcao" data-a="lista"><span>📁</span><span>Todos os relatórios</span></div>';
+    document.body.appendChild(veu); document.body.appendChild(folha);
+    const sair = function () { veu.remove(); folha.remove(); };
+    veu.onclick = sair;
+    folha.querySelectorAll('.opcao').forEach(function (o) {
+      o.onclick = async function () {
+        const a = o.dataset.a; sair();
+        if (a === 'editar') {
+          if (relFinalizado()) { toast('Relatório finalizado — não dá mais para editar os dados', 3500); return; }
+          relEdicao = st.rel; preencherFormulario(st.rel); abrir('telaRel');
+        }
+        if (a === 'sync') { toast('Sincronizando…'); const r = await Sync.sincronizar(); if (!r.erro) toast(r.enviados + ' enviados, ' + r.falhas + ' falhas'); await renderChat(); atualizarSync(); }
+        if (a === 'previa') abrirRelatorioPronto(st.rel.id, true);
+        if (a === 'publicar') publicarRelatorio();
+        if (a === 'lista') { await listarRelatorios(); abrir('telaLista'); }
+      };
+    });
+  }
+
+  async function publicarRelatorio() {
+    if (!st.rel) return;
+    const pend = st.itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
+    toast(pend ? 'Sincronizando ' + pend + ' item(ns)…' : 'Publicando…', 4000);
+    try {
+      const link = await Sync.publicar(st.rel);
+      st.rel = await DB.get('relatorios', st.rel.id);
+      await renderChat(); atualizarSync();
+      mostrarLink(link);
+    } catch (e) {
+      toast('Não publicou: ' + e.message, 5000);
+    }
+  }
+
+  function mostrarLink(link) {
+    const veu = document.createElement('div'); veu.className = 'veu';
+    const folha = document.createElement('div'); folha.className = 'folha';
+    folha.innerHTML = '<div class="alca"></div>' +
+      '<h2 style="margin-top:0">Relatório publicado</h2>' +
+      '<div class="campo"><input id="linkOut" readonly value="' + esc(link) + '"></div>' +
+      '<button class="btn" id="btnCompart">Compartilhar no WhatsApp</button>' +
+      '<button class="btn secundario" id="btnCopiar">Copiar link</button>' +
+      '<button class="btn secundario" id="btnAbrir">Abrir relatório</button>';
+    document.body.appendChild(veu); document.body.appendChild(folha);
+    const sair = function () { veu.remove(); folha.remove(); };
+    veu.onclick = sair;
+    const texto = 'Relatório de visita — ' + (st.rel.fazenda || '') + '\n' + link;
+    folha.querySelector('#btnCompart').onclick = function () {
+      if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto });
+      else window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+    };
+    folha.querySelector('#btnCopiar').onclick = function () {
+      navigator.clipboard.writeText(link); toast('Link copiado');
+    };
+    folha.querySelector('#btnAbrir').onclick = function () {
+      sair();
+      abrirRelatorioPronto(st.rel.id, false);
+    };
+  }
+
+  /* ---------------- ajustes ---------------- */
+  async function carregarCfg() {
+    const c = await DB.cfg('servidor');
+    if (c) st.cfg = Object.assign(st.cfg, c);
+    $('#cfgEmpresa').value = st.cfg.empresa || '';
+    $('#cfgCidade').value = st.cfg.cidade || '';
+    mostrarLogo();
+    $('#cfgQualidade').value = String(st.cfg.qualidade || 0.82);
+    $('#cfgVideo').value = String(st.cfg.video || 720);
+    const u = await DB.uso();
+    $('#usoDisco').textContent = bytesFmt(u.usado) + (u.cota ? ' de ' + bytesFmt(u.cota) : '');
+    const q = await Sync.quemSou();
+    $('#infoConta').innerHTML = '<div class="lista-item"><div class="ic">👤</div><div class="txt"><b>' +
+      esc(q.nome || q.email || 'sem conta') + '</b><span>' + esc(q.email || '') + '</span></div></div>';
+  }
+
+  async function salvarCfg() {
+    const atual = (await DB.cfg('servidor')) || {};
+    st.cfg = Object.assign({}, atual, {
+      empresa: $('#cfgEmpresa').value.trim(),
+      cidade: $('#cfgCidade').value.trim(),
+      qualidade: parseFloat($('#cfgQualidade').value),
+      video: parseInt($('#cfgVideo').value, 10)
+    });
+    await DB.cfg('servidor', st.cfg);
+    toast('Ajustes salvos');
+    Sync.salvarPerfil({ empresa: st.cfg.empresa, cidade: st.cfg.cidade, logo: st.cfg.logo || '' })
+      .catch(function (e) { toast('Salvo no aparelho; servidor: ' + e.message, 4000); });
+  }
+
+  /* ---------------- logo da empresa ---------------- */
+
+  function mostrarLogo() {
+    const previa = $('#logoPrevia');
+    if (st.cfg.logo) {
+      previa.innerHTML = '<div class="ic" style="background:#fff;padding:3px"><img src="' + st.cfg.logo +
+        '" style="max-width:100%;max-height:100%;object-fit:contain"></div>' +
+        '<div class="txt"><b>Logo definido</b><span>aparece no cabeçalho do relatório</span></div>';
+      $('#btnRemoverLogo').classList.remove('oculto');
+    } else {
+      previa.innerHTML = '<div class="ic">🏷️</div><div class="txt"><b>Nenhum logo</b>' +
+        '<span>JPG ou PNG, aparece no cabeçalho do relatório</span></div>';
+      $('#btnRemoverLogo').classList.add('oculto');
+    }
+  }
+
+  async function prepararLogo(file) {
+    const bmp = await createImageBitmap(file);
+    const escala = Math.min(1, 300 / bmp.width, 120 / bmp.height);
+    const w = Math.max(1, Math.round(bmp.width * escala));
+    const h = Math.max(1, Math.round(bmp.height * escala));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+    let url = cv.toDataURL('image/png');
+    if (url.length > 200000) {
+      const cv2 = document.createElement('canvas'); cv2.width = w; cv2.height = h;
+      const c2 = cv2.getContext('2d');
+      c2.fillStyle = '#fff'; c2.fillRect(0, 0, w, h);
+      c2.drawImage(cv, 0, 0);
+      url = cv2.toDataURL('image/jpeg', 0.85);
+    }
+    return url;
+  }
+
+  async function testarConexao() {
+    const info = $('#infoServidor');
+    info.innerHTML = '<div class="aviso">Verificando…</div>';
+    try {
+      const s = await Sync.status();
+      const linhas = [];
+      linhas.push(s.armazenamento ? '✅ Armazenamento do app conectado' : '❌ Sem armazenamento — rodando só neste aparelho');
+      linhas.push(s.midia ? '✅ Envio de fotos e vídeos liberado' : '⚠️ Esta sessão não pode enviar mídia (visualização apenas)');
+      linhas.push(navigator.geolocation ? '✅ GPS disponível no navegador' : '❌ GPS indisponível');
+      info.innerHTML = '<div class="aviso" style="text-align:left">' + linhas.join('<br>') + '</div>';
+    } catch (e) {
+      info.innerHTML = '<div class="aviso">Falha ao verificar: ' + esc(e.message) + '</div>';
+    }
+  }
+
+  /* ---------------- editar registro ---------------- */
+
+  function relFinalizado() {
+    return !!(st.rel && st.rel.status === 'publicado');
+  }
+
+  function abrirEdicao(item) {
+    if (relFinalizado()) {
+      toast('Relatório finalizado — os registros não podem mais ser alterados', 3500);
+      return;
+    }
+    const veu = document.createElement('div'); veu.className = 'veu';
+    const folha = document.createElement('div'); folha.className = 'folha';
+    const titulo = item.tipo === 'texto' ? 'Editar observação' : 'Editar legenda';
+    folha.innerHTML =
+      '<div class="alca"></div>' +
+      '<h2 style="margin-top:0">' + titulo + '</h2>' +
+      (item.talhao ? '<div style="font-size:12.5px;color:#667781;margin-bottom:6px">📍 ' + esc(item.talhao) + '</div>' : '') +
+      '<div class="campo"><textarea id="edTxt" rows="4"></textarea></div>' +
+      '<button class="btn" id="edOk">Salvar</button>' +
+      '<button class="btn perigo" id="edApagar">Apagar registro</button>' +
+      '<button class="btn secundario" id="edCancel">Cancelar</button>';
+    document.body.appendChild(veu); document.body.appendChild(folha);
+    const campo = folha.querySelector('#edTxt');
+    campo.value = item.legenda || '';
+    const sair = function () { veu.remove(); folha.remove(); };
+    veu.onclick = sair;
+    folha.querySelector('#edCancel').onclick = sair;
+
+    folha.querySelector('#edOk').onclick = async function () {
+      const novo = campo.value.trim();
+      if (item.tipo === 'texto' && !novo) { toast('A observação não pode ficar vazia'); return; }
+      item.legenda = novo;
+      if (item.sync_state === 'ok') item.sync_state = 'pendente';
+      await DB.put('itens', item);
+      sair();
+      await renderChat(); atualizarSync();
+      if (navigator.onLine) Sync.sincronizar(st.rel.id);
+    };
+
+    folha.querySelector('#edApagar').onclick = async function () {
+      if (!confirm('Apagar este registro do relatório?')) return;
+      await DB.del('midias', item.id);
+      await DB.del('itens', item.id);
+      sair();
+      await renderChat(); atualizarSync();
+      toast('Registro apagado');
+    };
+
+    setTimeout(function () { campo.focus(); }, 150);
+  }
+
+  function ligarEdicaoNoChat() {
+    const chat = $('#chat');
+    let timer = null, segurou = false;
+
+    const achaItem = function (alvo) {
+      const el = alvo.closest('[data-id]');
+      if (!el) return null;
+      return st.itens.find(function (i) { return i.id === el.dataset.id; }) || null;
+    };
+
+    const inicio = function (e) {
+      const item = achaItem(e.target);
+      if (!item) return;
+      segurou = false;
+      timer = setTimeout(function () {
+        segurou = true;
+        if (navigator.vibrate) navigator.vibrate(20);
+        abrirEdicao(item);
+      }, 500);
+    };
+    const fim = function () { clearTimeout(timer); };
+
+    chat.addEventListener('touchstart', inicio, { passive: true });
+    chat.addEventListener('touchend', fim);
+    chat.addEventListener('touchmove', fim, { passive: true });
+    chat.addEventListener('mousedown', inicio);
+    chat.addEventListener('mouseup', fim);
+    chat.addEventListener('mouseleave', fim);
+
+    // toque simples numa observação de texto abre a edição direto
+    chat.addEventListener('click', function (e) {
+      if (segurou) { segurou = false; e.stopPropagation(); return; }
+      const item = achaItem(e.target);
+      if (item && item.tipo === 'texto') abrirEdicao(item);
+    });
+  }
+
+  /* ---------------- tela do relatório pronto ---------------- */
+  async function abrirRelatorioPronto(id, local) {
+    const tela = $('#telaRelPronto');
+    tela.classList.remove('oculto');
+    tela.innerHTML = '<div class="carregando" style="padding:60px 20px;text-align:center;color:#667781">Carregando relatório…</div>';
+
+    let rel, itens;
+    try {
+      if (local) {
+        rel = await DB.get('relatorios', id);
+        itens = await DB.itensDoRelatorio(id);
+        for (const it of itens) {
+          if (it.tipo === 'texto') continue;
+          const blob = await DB.lerMidia(it.id);
+          if (blob) it.src = objURL(blob);
+        }
+      } else {
+        const r = await Sync.lerRelatorio(id);
+        rel = r.rel; itens = r.itens;
+      }
+    } catch (e) {
+      tela.innerHTML = '<button class="rp-voltar" id="rpVoltar">✕</button>' +
+        '<div class="aviso" style="margin:80px 20px">Não foi possível abrir este relatório.<br><small>' + esc(e.message) + '</small></div>';
+      $('#rpVoltar').onclick = fecharRelatorioPronto;
+      return;
+    }
+
+    tela.innerHTML = '<button class="rp-voltar" id="rpVoltar">✕</button>' +
+      Relatorio.montar(rel, itens, { empresa: st.cfg.empresa, cidade: st.cfg.cidade, logo: st.cfg.logo }) +
+      '<div class="rp-barra">' +
+      '<button class="sec" id="rpPdf">Baixar PDF</button>' +
+      '<button id="rpCompartilhar">Compartilhar</button></div>';
+
+    $('#rpVoltar').onclick = fecharRelatorioPronto;
+    $('#rpPdf').onclick = () => window.print();
+    $('#rpCompartilhar').onclick = () => {
+      const link = location.origin + location.pathname + '#/r/' + id;
+      const texto = 'Relatório de visita — ' + (rel.fazenda || '') + '\n' + link;
+      if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto, url: link });
+      else { navigator.clipboard.writeText(link); toast('Link copiado'); }
+    };
+  }
+
+  function fecharRelatorioPronto() {
+    $('#telaRelPronto').classList.add('oculto');
+    $('#telaRelPronto').innerHTML = '';
+    if (location.hash.startsWith('#/r/')) history.replaceState(null, '', location.pathname);
+  }
+
+  /* ---------------- eventos ---------------- */
+  function ligarEventos() {
+    $$('[data-fechar]').forEach(function (b) { b.onclick = function () { fechar(b.dataset.fechar); }; });
+
+    $('#btnMenuLista').onclick = async function () { await listarRelatorios(); abrir('telaLista'); };
+    $('#btnMais').onclick = menuMais;
+    $('#btnMapa').onclick = function () { desenharMapa(); abrir('telaMapa'); };
+    $('#btnAjustes').onclick = async function () { await carregarCfg(); abrir('telaAjustes'); };
+    $('#btnNovoRel').onclick = function () { relEdicao = {}; preencherFormulario({}); abrir('telaRel'); };
+    $('#btnSalvarRel').onclick = salvarRelatorio;
+    $('#btnSalvarCfg').onclick = salvarCfg;
+    $('#btnEscolherLogo').onclick = function () { $('#inpLogo').click(); };
+    $('#inpLogo').onchange = async function (e) {
+      const f = e.target.files[0]; e.target.value = '';
+      if (!f) return;
+      try {
+        st.cfg.logo = await prepararLogo(f);
+        await DB.cfg('servidor', st.cfg);
+        mostrarLogo();
+        toast('Logo carregado — toque em Salvar ajustes');
+      } catch (err) { toast('Não consegui ler a imagem: ' + err.message, 4000); }
+    };
+    $('#btnRemoverLogo').onclick = async function () {
+      st.cfg.logo = '';
+      await DB.cfg('servidor', st.cfg);
+      mostrarLogo();
+      toast('Logo removido — toque em Salvar ajustes');
+    };
+    $('#btnTestar').onclick = testarConexao;
+    $('#btnSincronizarTudo').onclick = async function () { toast('Sincronizando…'); const r = await Sync.sincronizar(); toast('Enviados: ' + (r.enviados || 0)); await renderChat(); atualizarSync(); };
+    $('#btnAnexo').onclick = function () { $('#inpArquivo').click(); };
+
+    $('#btnApagarRel').onclick = async function () {
+      if (!relEdicao || !relEdicao.id) return;
+      if (!confirm('Apagar este relatório e todas as mídias locais?')) return;
+      await DB.apagarRelatorio(relEdicao.id);
+      relEdicao = null; st.rel = null;
+      fechar('telaRel'); await listarRelatorios(); await renderChat();
+      $('#tituloRel').textContent = 'Nenhum relatório aberto';
+    };
+
+    // texto simples
+    const txt = $('#txtMsg');
+    txt.addEventListener('input', function () {
+      txt.style.height = 'auto'; txt.style.height = Math.min(110, txt.scrollHeight) + 'px';
+      atualizarBotaoEnvio();
+    });
+    txt.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarTexto(); }
+    });
+
+    // arquivos (galeria / câmera nativa)
+    $('#inpArquivo').onchange = async function (e) {
+      const files = Array.prototype.slice.call(e.target.files || []);
+      e.target.value = '';
+      if (!files.length) return;
+      if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return; }
+      if (relFinalizado()) { toast('Relatório finalizado — crie um novo para seguir registrando', 3500); return; }
+      await adicionarVarios(files);
+    };
+
+    ['#inpFoto', '#inpVideo'].forEach(function (sel) {
+      $(sel).onchange = async function (e) {
+        const f = e.target.files && e.target.files[0]; e.target.value = '';
+        if (f) await adicionarMidia(f, (f.type || '').indexOf('video') === 0 ? 'video' : 'foto');
+      };
+    });
+
+    // KML — entra no cadastro da fazenda
+    $('#inpKml').onchange = async function (e) {
+      const f = e.target.files[0]; e.target.value = '';
+      if (f) await Conta.importarKmlFazenda(f);
+    };
+
+    // câmera
+    $('#camFechar').onclick = fecharCamera;
+    $('#camTrocar').onclick = async function () {
+      st.facing = st.facing === 'environment' ? 'user' : 'environment';
+      fecharCamera(); await abrirCamera();
+    };
+    ligarBotaoCamera();
+    ligarObturador();
+
+    // visor de mídia
+    ligarEdicaoNoChat();
+
+    $('#chat').addEventListener('click', async function (e) {
+      const alvo = e.target.closest('[data-abrir]');
+      if (!alvo) return;
+      const it = st.itens.find(function (i) { return i.id === alvo.dataset.abrir; });
+      if (!it) return;
+      const blob = await DB.lerMidia(it.id);
+      if (!blob) return;
+      const u = objURL(blob);
+      const v = document.createElement('div'); v.className = 'visor';
+      v.innerHTML = '<button class="fechar">✕</button>' +
+        (it.tipo === 'foto' ? '<img src="' + u + '">' : '<video src="' + u + '" controls autoplay playsinline></video>');
+      v.onclick = function (ev) { if (ev.target === v || ev.target.className === 'fechar') v.remove(); };
+      document.body.appendChild(v);
+    });
+
+    window.addEventListener('online', atualizarSync);
+    window.addEventListener('offline', atualizarSync);
+    Sync.aoMudar(function (evt) {
+      if (evt.tipo === 'fim') { renderChat(); atualizarSync(); }
+      if (evt.tipo === 'item' && evt.estado === 'ok') atualizarSync();
+    });
+  }
+
+  /* ---------------- init ---------------- */
+  async function init() {
+    ligarEventos();
+    Conta.ligar();
+    // pede ao navegador para não apagar os dados do app quando o aparelho ficar cheio
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function (ja) {
+        if (!ja) navigator.storage.persist().catch(function () {});
+      }).catch(function () {});
+    }
+    await carregarCfg();
+
+    // link do relatório: #/r/<id> abre direto a tela do cliente
+    const alvo = (location.hash.match(/^#\/r\/(.+)$/) || [])[1];
+    if (alvo) {
+      abrirRelatorioPronto(alvo, false);
+      window.addEventListener('hashchange', function () {
+        const a = (location.hash.match(/^#\/r\/(.+)$/) || [])[1];
+        if (a) abrirRelatorioPronto(a, false);
+      });
+    }
+
+    iniciarGPS();
+    ligarToqueGps();
+    Sync.autoSync();
+    const ultimo = await DB.cfg('ultimo');
+    if (ultimo) {
+      const r = await DB.get('relatorios', ultimo);
+      if (r) { await abrirRelatorio(ultimo); }
+    }
+    if (!(await Sync.logado())) {
+      await Conta.mostrarLogin();
+    } else {
+      await Conta.atualizarCadastro(navigator.onLine);
+    }
+    if (!st.rel) { await renderChat(); await listarRelatorios(); abrir('telaLista'); }
+    atualizarSync();
+    atualizarBotaoEnvio();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    }
+  }
+
+  global.App = {
+    aoEntrar: async function () {
+      await listarRelatorios();
+      await renderChat();
+      atualizarSync();
+      Sync.sincronizar();
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', init);
+})(window);
+
+})();
+</script>
+</body>
+</html>
