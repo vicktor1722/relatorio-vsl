@@ -6,6 +6,7 @@ import { conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } fro
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { paginaRelatorio, paginaSimples } from './pagina.js';
+import { registrarAcesso } from './acessos.js';
 import { criarConta, ehAdmin, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
 
 const CORS = {
@@ -75,6 +76,8 @@ export default {
           perfil = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
             .bind(rel.usuario_id).first();
         }
+        // conta a visualização (o admin abre com ?sc=1 para não se contar)
+        if (req.method === 'GET' && url.searchParams.get('sc') !== '1') ctx.waitUntil(registrarAcesso(env, req, id));
         return html(paginaRelatorio(rel, results || [], env, origem, perfil));
       }
 
