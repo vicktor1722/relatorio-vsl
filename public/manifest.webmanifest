@@ -1,0 +1,25 @@
+{
+  "name": "Relatório de Campo · VSL",
+  "short_name": "Relatório",
+  "description": "Registro fotográfico e em vídeo de visitas técnicas, com GPS e talhão automático.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ECE5DD",
+  "theme_color": "#1B7A43",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "relatorio-vsl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Relatório de Campo VSL — app de visita técnica, API e painel",
+  "scripts": {
+    "build": "node construir.js site",
+    "dev": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "banco": "wrangler d1 execute relatorio-vsl --remote --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.135.0"
+  }
+}

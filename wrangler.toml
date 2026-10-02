@@ -1,0 +1,29 @@
+name = "relatorio-vsl"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# ---------- banco dos relatórios ----------
+[[d1_databases]]
+binding = "DB"
+database_name = "relatorio-vsl"
+database_id = "4b3c8552-f505-4db1-b2c5-a774a9d7f1bf"
+
+# ---------- fotos e vídeos (10 GB grátis) ----------
+[[r2_buckets]]
+binding = "MIDIA"
+bucket_name = "relatorio-vsl"
+
+# ---------- textos do cabeçalho do relatório ----------
+[vars]
+EMPRESA = "VSL CONSULTORIA E TREINAMENTO NA AGRICULTURA LTDA"
+CIDADE = "Pontes e Lacerda · MT"
+
+# SEGREDO e CONVITE ficam como SEGREDOS no painel da Cloudflare,
+# nunca neste arquivo (ele é público no GitHub).
+
+# ---------- o app de campo ----------
+# "npm run build" gera a pasta site/ com o index.html de arquivo único
+[assets]
+directory = "./site"
+binding = "ASSETS"
+run_worker_first = ["/r/*", "/img/*", "/api/*", "/oauth/*", "/admin", "/admin/*"]

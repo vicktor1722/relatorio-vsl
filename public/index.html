@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#1B7A43">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Relatório de Campo · VSL</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <!-- ---------- Header ---------- -->
+  <header class="topo">
+    <button class="voltar" id="btnMenuLista" title="Relatórios">☰</button>
+    <div class="avatar" id="avatarRel">🌱</div>
+    <div class="info">
+      <h1 id="tituloRel">Nenhum relatório aberto</h1>
+      <p id="subtituloRel">Toque em ☰ para criar</p>
+    </div>
+    <div class="acoes">
+      <button id="btnMapa" title="Mapa">🗺️</button>
+      <button id="btnMais" title="Mais">⋮</button>
+    </div>
+  </header>
+
+  <!-- ---------- Status GPS / sync ---------- -->
+  <div class="barra-status">
+    <span class="pill"><i class="dot" id="dotGps"></i><span id="txtGps">GPS aguardando…</span></span>
+    <span class="cresce"></span>
+    <span class="pill"><i class="dot" id="dotSync"></i><span id="txtSync">—</span></span>
+  </div>
+
+  <!-- ---------- Chat ---------- -->
+  <main class="chat" id="chat"></main>
+
+  <!-- ---------- Composer ---------- -->
+  <div class="dica-camera" id="dicaCamera">Toque para foto · Segure para vídeo</div>
+  <div class="composer">
+    <div class="caixa">
+      <button class="anexo" id="btnAnexo" title="Anexar">📎</button>
+      <textarea id="txtMsg" rows="1" placeholder="Observação…"></textarea>
+    </div>
+    <button class="btn-camera" id="btnCamera">📷</button>
+  </div>
+</div>
+
+<input type="file" id="inpArquivo" accept="image/*,video/*" multiple class="oculto">
+<input type="file" id="inpFoto" accept="image/*" capture="environment" class="oculto">
+<input type="file" id="inpVideo" accept="video/*" capture="environment" class="oculto">
+<input type="file" id="inpLogo" accept="image/png,image/jpeg,image/*" class="oculto">
+<input type="file" id="inpKml" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" class="oculto">
+
+<!-- ---------- Câmera ---------- -->
+<div class="camera oculto" id="telaCamera">
+  <video id="camVideo" autoplay playsinline muted></video>
+  <div class="cam-topo">
+    <button id="camFechar">✕</button>
+    <div class="rec-badge oculto" id="camRec"><i class="bolinha"></i><span id="camTempo">0:00</span></div>
+    <button id="camTrocar">🔄</button>
+  </div>
+  <div class="cam-geo"><span id="camGeo">📍 localizando…</span></div>
+  <div class="cam-dica" id="camDica">Toque = foto · Segure = vídeo</div>
+  <div class="cam-base">
+    <div class="lado" id="camInfo"></div>
+    <button class="obturador" id="camObturador"><i></i></button>
+    <div class="lado"></div>
+  </div>
+</div>
+
+<!-- ---------- Tela: lista de relatórios ---------- -->
+<div class="tela oculto" id="telaLista">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaLista">←</button>
+    <div class="info"><h1>Relatórios</h1><p id="subLista">—</p></div>
+    <div class="acoes"><button id="btnAjustes" title="Ajustes">⚙️</button></div>
+  </header>
+  <div class="conteudo">
+    <button class="btn" id="btnNovoRel">+ Novo relatório</button>
+    <button class="btn secundario" id="btnAbrirCadastro">Produtores e fazendas</button>
+    <h2>Em andamento</h2>
+    <div id="listaRelatorios"></div>
+  </div>
+</div>
+
+<!-- ---------- Tela: novo/editar relatório ---------- -->
+<div class="tela oculto" id="telaRel">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaRel">←</button>
+    <div class="info"><h1 id="tituloTelaRel">Novo relatório</h1><p>Dados da visita</p></div>
+  </header>
+  <div class="conteudo">
+    <div class="campo"><label>Produtor</label><select id="fProdutorSel"></select></div>
+    <div class="campo"><label>Fazenda</label><select id="fFazendaSel"></select>
+      <div id="fTalhoesInfo" style="font-size:12.5px;color:var(--texto-fraco);margin-top:5px"></div></div>
+    <div class="linha2">
+      <div class="campo"><label>Safra</label><select id="fSafraSel"></select></div>
+      <div class="campo"><label>Responsável</label><input id="fResponsavel" placeholder="Vicktor Lima"></div>
+    </div>
+    <div class="campo"><label>Serviço</label><input id="fServico" placeholder="Ex.: Levantamento topográfico / Coleta de solo"></div>
+    <div class="linha2">
+      <div class="campo"><label>Início</label><input type="date" id="fInicio"></div>
+      <div class="campo"><label>Término</label><input type="date" id="fFim"></div>
+    </div>
+    <div class="campo"><label>Observações gerais</label><textarea id="fObs" rows="3"></textarea></div>
+
+
+    <button class="btn" id="btnSalvarRel">Salvar</button>
+    <button class="btn perigo oculto" id="btnApagarRel">Apagar relatório</button>
+  </div>
+</div>
+
+<!-- ---------- Tela: mapa ---------- -->
+<div class="tela oculto" id="telaMapa">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaMapa">←</button>
+    <div class="info"><h1>Mapa da visita</h1><p id="subMapa">—</p></div>
+  </header>
+  <div class="conteudo">
+    <div class="mapa-wrap" id="mapaWrap"></div>
+    <div class="legenda-talhoes" id="legendaTalhoes"></div>
+    <h2>Resumo por talhão</h2>
+    <div id="resumoTalhoes"></div>
+  </div>
+</div>
+
+<!-- ---------- Tela: ajustes ---------- -->
+<div class="tela oculto" id="telaAjustes">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaAjustes">←</button>
+    <div class="info"><h1>Ajustes</h1><p>Identidade e qualidade de mídia</p></div>
+  </header>
+  <div class="conteudo">
+    <div id="infoConta"></div>
+    <div class="campo"><label>Empresa no cabeçalho do relatório</label><input id="cfgEmpresa" placeholder="VSL Consultoria e Treinamento na Agricultura"></div>
+    <div class="campo"><label>Cidade</label><input id="cfgCidade" placeholder="Pontes e Lacerda · MT"></div>
+    <div class="campo"><label>Logo da empresa</label>
+      <div id="logoPrevia" class="lista-item">
+        <div class="ic">🏷️</div>
+        <div class="txt"><b>Nenhum logo</b><span>JPG ou PNG, aparece no cabeçalho do relatório</span></div>
+      </div>
+      <button class="btn secundario" id="btnEscolherLogo" style="margin-top:8px">Escolher imagem</button>
+      <button class="btn secundario oculto" id="btnRemoverLogo">Remover logo</button>
+    </div>
+    <div class="campo"><label>Qualidade das fotos</label>
+      <select id="cfgQualidade">
+        <option value="0.72">Econômica — ~300 KB, sincroniza rápido</option>
+        <option value="0.82" selected>Padrão — ~500 KB</option>
+        <option value="0.92">Alta — ~1,2 MB</option>
+      </select>
+    </div>
+    <div class="campo"><label>Qualidade do vídeo</label>
+      <select id="cfgVideo">
+        <option value="720" selected>720p — 9 MB por minuto (recomendado)</option>
+        <option value="1080">1080p — 19 MB por minuto</option>
+      </select>
+    </div>
+    <button class="btn" id="btnSalvarCfg">Salvar ajustes</button>
+    <button class="btn secundario" id="btnTestar">Verificar armazenamento</button>
+    <div id="infoServidor"></div>
+    <h2>Armazenamento</h2>
+    <div class="lista-item"><div class="ic">💾</div><div class="txt"><b id="usoDisco">—</b><span>uso do app neste aparelho</span></div></div>
+    <button class="btn secundario" id="btnSincronizarTudo">Sincronizar tudo agora</button>
+    <button class="btn perigo" id="btnSair">Sair da conta</button>
+  </div>
+</div>
+
+<div class="rp-tela oculto" id="telaRelPronto"></div>
+
+
+<!-- ---------- Tela: entrar ---------- -->
+<div class="tela oculto" id="telaLogin" style="z-index:95">
+  <div class="conteudo" style="display:flex;flex-direction:column;justify-content:center;max-width:460px;margin:0 auto;width:100%">
+    <div style="text-align:center;margin-bottom:22px">
+      <div style="width:72px;height:72px;border-radius:18px;background:var(--verde);display:grid;place-items:center;font-size:34px;margin:0 auto 12px">🌱</div>
+      <h1 style="margin:0;font-size:21px">Relatório de Campo</h1>
+      <p style="margin:4px 0 0;color:var(--texto-fraco);font-size:13.5px">VSL Consultoria</p>
+    </div>
+    <div class="campo"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="username" placeholder="voce@exemplo.com"></div>
+    <div class="campo"><label>Senha</label><input id="loginSenha" type="password" autocomplete="current-password" placeholder="sua senha"></div>
+    <div id="loginExtra" class="oculto">
+      <div class="campo"><label>Seu nome</label><input id="loginNome" placeholder="Vicktor Lima"></div>
+      <div class="campo"><label>Código de convite</label><input id="loginConvite" placeholder="código que libera a criação"></div>
+    </div>
+    <button class="btn" id="btnEntrar">Entrar</button>
+    <button class="btn secundario oculto" id="btnAlternarConta">Criar uma conta</button>
+    <div id="loginMsg"></div>
+    <p style="margin:14px 0 0;font-size:12.5px;color:var(--texto-fraco);text-align:center">
+      As contas são criadas pelo administrador da VSL.</p>
+    <div style="margin-top:18px;text-align:center">
+      <button id="btnTrocarServidor" style="font-size:12.5px;color:var(--texto-fraco);text-decoration:underline">endereço do servidor</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Tela: cadastro ---------- -->
+<div class="tela oculto" id="telaCadastro">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaCadastro">←</button>
+    <div class="info"><h1>Cadastro</h1><p id="subCadastro">—</p></div>
+    <div class="acoes"><button id="btnAtualizarCadastro" title="Atualizar">🔄</button></div>
+  </header>
+  <div class="conteudo">
+    <button class="btn" id="btnNovaFazenda">+ Nova fazenda</button>
+    <button class="btn secundario" id="btnNovoProdutor">+ Novo produtor</button>
+    <button class="btn secundario" id="btnNovaSafra">+ Nova safra</button>
+    <h2>Safras</h2>
+    <div id="listaSafras"></div>
+    <h2>Fazendas</h2>
+    <div id="listaFazendas"></div>
+    <h2>Produtores</h2>
+    <div id="listaProdutores"></div>
+  </div>
+</div>
+
+<!-- ---------- Tela: produtor ---------- -->
+<div class="tela oculto" id="telaProdutor">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaProdutor">←</button>
+    <div class="info"><h1 id="tituloProdutor">Novo produtor</h1><p>Dados do cliente</p></div>
+  </header>
+  <div class="conteudo">
+    <div class="campo"><label>Nome</label><input id="pNome" placeholder="Ex.: João Paulo Pereira"></div>
+    <div class="campo"><label>CPF / CNPJ</label><input id="pDoc" placeholder="opcional"></div>
+    <div class="campo"><label>Telefone</label><input id="pTel" placeholder="opcional"></div>
+    <div class="campo"><label>Observações</label><textarea id="pObs" rows="3"></textarea></div>
+    <button class="btn" id="btnSalvarProdutor">Salvar</button>
+    <button class="btn perigo oculto" id="btnApagarProdutor">Apagar produtor</button>
+  </div>
+</div>
+
+<!-- ---------- Tela: fazenda ---------- -->
+<div class="tela oculto" id="telaFazenda">
+  <header class="topo">
+    <button class="voltar" data-fechar="telaFazenda">←</button>
+    <div class="info"><h1 id="tituloFazenda">Nova fazenda</h1><p>Com os talhões do KML</p></div>
+  </header>
+  <div class="conteudo">
+    <div class="campo"><label>Nome da fazenda</label><input id="fzNome" placeholder="Ex.: Fazenda Paturi"></div>
+    <div class="campo"><label>Produtor</label><select id="fzProdutor"></select></div>
+    <div class="linha2">
+      <div class="campo"><label>Município</label><input id="fzMunicipio" placeholder="Pontes e Lacerda"></div>
+      <div class="campo"><label>UF</label><input id="fzUf" placeholder="MT" maxlength="2"></div>
+    </div>
+    <h2>Talhões</h2>
+    <div id="fzStatusKml" class="lista-item">
+      <div class="ic">📐</div>
+      <div class="txt"><b>Nenhum talhão carregado</b><span>Importe o KML da fazenda</span></div>
+    </div>
+    <button class="btn secundario" id="btnFzKml">Importar KML / KMZ</button>
+    <div class="campo oculto" id="fzCampoNomeBox" style="margin-top:12px">
+      <label>O nome do talhão vem de</label>
+      <select id="fzCampoNome"></select>
+      <div id="fzCampoNomeAmostra" style="font-size:12px;color:var(--texto-fraco);margin-top:5px"></div>
+    </div>
+    <div class="mapa-wrap oculto" id="fzMapa" style="margin-top:12px"></div>
+    <div id="fzListaTalhoes"></div>
+    <button class="btn" id="btnSalvarFazenda">Salvar fazenda</button>
+    <button class="btn perigo oculto" id="btnApagarFazenda">Apagar fazenda</button>
+  </div>
+</div>
+
+<script src="js/geo.js"></script>
+<script src="js/db.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/relatorio.js"></script>
+<script src="js/conta.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
