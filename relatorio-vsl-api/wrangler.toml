@@ -1,0 +1,25 @@
+name = "relatorio-vsl"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "relatorio-vsl"
+database_id = "COLE_AQUI_O_ID_DO_D1"
+
+[vars]
+EMPRESA = "VSL CONSULTORIA E TREINAMENTO NA AGRICULTURA LTDA"
+CIDADE = "Pontes e Lacerda · MT"
+
+# fotos e vídeos (opcional nesta fase):
+# [[r2_buckets]]
+# binding = "MIDIA"
+# bucket_name = "relatorio-vsl"
+
+# [[kv_namespaces]]
+# binding = "MIDIA_KV"
+# id = "COLE_AQUI_O_ID_DO_KV"
+
+# segredos (painel > Settings > Variables and Secrets):
+#   SEGREDO  -> texto longo que assina os tokens de login
+#   CONVITE  -> código exigido para criar conta nova
