@@ -314,6 +314,21 @@ input,textarea,select{font:inherit}
 .rp-tag{font-size:11.5px;padding:3px 9px;border-radius:11px;background:#E8F4EC;color:var(--verde-escuro);font-weight:600}
 .rp-tag.cinza{background:#F0F2F1;color:var(--texto-fraco);font-weight:500}
 .rp-legenda{margin:6px 0 0;font-size:15px;white-space:pre-wrap}
+.rp-grupo{margin:0 0 16px;background:#fff;border:1px solid var(--linha);border-radius:12px;padding:8px}
+.rp-grupo-leg{margin:10px 4px 4px;font-size:14.5px;color:#4d5d54;white-space:pre-wrap}
+.rp-grade{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rp-grade.n1{grid-template-columns:1fr}
+.rp-grade .rp-item{margin:0;min-width:0}
+.rp-grade img,.rp-grade video{aspect-ratio:4/3;object-fit:cover;max-height:none}
+.rp-grade.n1 img,.rp-grade.n1 video{aspect-ratio:auto;object-fit:contain;max-height:70vh}
+.rp-grade .rp-tag{font-size:10.5px;padding:2px 7px}
+.rp-item img{cursor:zoom-in}
+.visor-rel{bottom:auto;height:var(--altura,100%);flex-direction:column;z-index:90;background:rgba(0,0,0,.96)}
+.visor-rel img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom}
+.visor-rel .visor-x{position:absolute;top:calc(12px + var(--safe-top));left:12px;z-index:2;width:44px;height:44px;
+  border-radius:50%;background:rgba(255,255,255,.18);color:#fff;font-size:22px;line-height:44px;text-align:center;border:0}
+.visor-rel .visor-leg{position:absolute;left:0;right:0;bottom:0;padding:28px 16px calc(18px + var(--safe-bottom));
+  color:#fff;font-size:15px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.7));pointer-events:none}
 .rp-fim{text-align:center;margin:28px 0 10px;font-size:15px;color:var(--verde-escuro);font-weight:600}
 .rp-rodape{background:#F7F9F7;border-top:1px solid var(--linha);padding:20px;text-align:center;font-size:12.5px;color:var(--texto-fraco)}
 .rp-rodape b{color:var(--verde-escuro)}
@@ -322,7 +337,7 @@ input,textarea,select{font:inherit}
 .rp-barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}
 @media print{.rp-voltar,.rp-barra{display:none}.rp-tela{position:static}
   .rp-talhao{position:static;break-after:avoid}
-  .rp-item{break-inside:avoid}video{display:none}}
+  .rp-item,.rp-grupo{break-inside:avoid}video{display:none}}
 /* caixinha "usar este talhão nos próximos" na folha de legenda */
 .marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--texto);margin:2px 0 12px;line-height:1.3}
 .marcar input{width:19px;height:19px;flex:none;accent-color:var(--verde)}
