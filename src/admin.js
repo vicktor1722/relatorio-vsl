@@ -46,7 +46,10 @@ export async function resumoAdmin(env) {
            (SELECT COUNT(*) FROM itens i WHERE i.relatorio_id = r.id AND i.tipo='foto') AS fotos,
            (SELECT COUNT(*) FROM itens i WHERE i.relatorio_id = r.id AND i.tipo='video') AS videos
       FROM relatorios r LEFT JOIN usuarios u ON u.id = r.usuario_id
-     ORDER BY COALESCE(r.data_inicio, r.criado_em) DESC
+     ORDER BY (r.status = 'publicado') DESC,
+              replace(CASE WHEN r.status = 'publicado'
+                           THEN COALESCE(r.publicado_em, r.atualizado_em, r.criado_em)
+                           ELSE COALESCE(r.atualizado_em, r.criado_em) END, 'T', ' ') DESC
      LIMIT 500
   `).all();
 
