@@ -29,6 +29,15 @@ h2.talhao{position:sticky;top:0;background:#fff;margin:26px 0 12px;padding:10px 
 h2.talhao small{float:right;font-weight:400;color:var(--fraco);font-size:12px;padding-top:4px}
 h3.dia{margin:16px 0 10px;padding:0 0 4px;font-size:13px;font-weight:600;color:var(--fraco);
  border-bottom:1px solid var(--linha)}
+.grupo{margin:0 0 16px;background:#fff;border:1px solid var(--linha);border-radius:12px;padding:8px}
+.grupo-leg{margin:10px 4px 4px;font-size:14.5px;color:#4d5d54;white-space:pre-wrap}
+.grade{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grade.n1{grid-template-columns:1fr}
+.grade .item{margin:0;min-width:0}
+.grade img,.grade video{aspect-ratio:4/3;object-fit:cover;max-height:none}
+.grade.n1 img,.grade.n1 video{aspect-ratio:auto;object-fit:contain;max-height:70vh}
+.grade .tag{font-size:10.5px;padding:2px 7px}
+@media(min-width:700px){.grade.n2{grid-template-columns:1fr 1fr}.grade.n3{grid-template-columns:1fr 1fr 1fr}}
 .item{margin:0 0 22px}
 .item figure{margin:0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--linha)}
 .item img,.item video{display:block;width:100%;max-height:70vh;object-fit:contain;background:#000}
@@ -48,8 +57,17 @@ footer b{color:var(--verde-escuro)}
 .barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 16px;background:#fff;border-top:1px solid var(--linha)}
 .barra button{flex:1;padding:11px;border:none;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}
 .barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}
+.item img{cursor:zoom-in}
+.visor{position:fixed;left:0;right:0;top:0;height:100vh;height:100dvh;z-index:90;background:rgba(0,0,0,.96);
+ display:flex;align-items:center;justify-content:center}
+.visor img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom}
+.visor .x{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;z-index:2;width:44px;height:44px;border-radius:50%;
+ background:rgba(255,255,255,.18);color:#fff;font-size:22px;line-height:44px;text-align:center;border:0;cursor:pointer}
+.visor .leg{position:absolute;left:0;right:0;bottom:0;padding:28px 16px calc(18px + env(safe-area-inset-bottom));color:#fff;
+ font-size:15px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.7));pointer-events:none}
+@media print{.visor{display:none}}
 @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.barra{display:none}
- h2.talhao{position:static;break-after:avoid}.item{break-inside:avoid}video{display:none}}
+ h2.talhao{position:static;break-after:avoid}.item,.grupo{break-inside:avoid}video{display:none}}
 `;
 
 function fmtData(d) {
@@ -140,6 +158,42 @@ function agruparPorTalhao(itens, talhoes) {
     });
 }
 
+
+/* Dentro de um talhão: junta os registros de mesma legenda num grupo só. */
+const normLeg = s => String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase();
+function gruposDeLegenda(lista) {
+  const ordem = [], mapa = {};
+  lista.forEach(i => {
+    const k = normLeg(i.legenda);
+    if (!mapa[k]) { mapa[k] = { titulo: String(i.legenda || '').trim(), itens: [] }; ordem.push(k); }
+    mapa[k].itens.push(i);
+  });
+  return ordem.map(k => mapa[k]);
+}
+
+function celulaMidia(i) {
+  const src = '/img/' + encodeURIComponent(i.midia);
+  return `<div class="item"><figure>` +
+    (i.tipo === 'foto'
+      ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
+      : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
+    `</figure><div class="meta">` +
+    `<span class="tag cinza">${hora(i.capturado_em)}</span>` +
+    (i.lat != null ? `<span class="tag cinza">${i.lat.toFixed(5)}, ${i.lon.toFixed(5)}</span>` : '') +
+    (i.precisao_m ? `<span class="tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
+    (i.tipo === 'video' && i.duracao_s ? `<span class="tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
+    `</div></div>`;
+}
+
+// cada grupo vira um cartão: fotos em grade e a legenda logo abaixo (como no modelo de referência)
+function blocoGrupos(midias) {
+  return gruposDeLegenda(midias).map(g => {
+    const n = g.itens.length;
+    return `<div class="grupo"><div class="grade n${Math.min(n, 3)}">${g.itens.map(celulaMidia).join('')}</div>` +
+      (g.titulo ? `<p class="grupo-leg">${esc(g.titulo)}</p>` : '') + `</div>`;
+  }).join('');
+}
+
 export function paginaRelatorio(rel, itens, env, origem, perfil) {
   const p = perfil || {};
   const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
@@ -156,31 +210,30 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
 
   const grupos = agruparPorTalhao(itens, talhoes);
 
+  // observações gerais (texto solto) sobem para logo depois do mapa
+  const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
+  const notasTopo = (rel.observacoes ? `<div class="nota">${esc(rel.observacoes)}</div>` : '') +
+    (gNotas ? gNotas.itens.map(i => `<div class="nota">${esc(i.legenda)}</div>`).join('') : '');
+  const obsGerais = notasTopo ? `<h2 class="talhao">Observações gerais</h2>${notasTopo}` : '';
+
   let corpo = '';
-  grupos.forEach(g => {
+  grupos.filter(g => g.chave !== '\u0000notas').forEach(g => {
     const extra = [g.itens.length + ' registro(s)'];
     if (g.area) extra.push(g.area.toFixed(1).replace('.', ',') + ' ha');
     corpo += `<h2 class="talhao">${esc(g.titulo)}<small>${extra.join(' · ')}</small></h2>`;
-    let diaAtual = '';
+
+    // separa por dia quando o talhão foi visitado em mais de um dia
+    const segmentos = [];
     g.itens.forEach(i => {
-      if (g.varioDia) {
-        const d = String(i.capturado_em).slice(0, 10);
-        if (d !== diaAtual) { diaAtual = d; corpo += `<h3 class="dia">${esc(diaLongo(i.capturado_em))}</h3>`; }
-      }
-      if (i.tipo === 'texto') { corpo += `<div class="nota">${esc(i.legenda)}</div>`; return; }
-      const src = '/img/' + encodeURIComponent(i.midia);
-      corpo += `<div class="item"><figure>` +
-        (i.tipo === 'foto'
-          ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
-          : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
-        `</figure><div class="meta">` +
-        `<span class="tag cinza">${hora(i.capturado_em)}</span>` +
-        (i.lat != null ? `<span class="tag cinza">${i.lat.toFixed(5)}, ${i.lon.toFixed(5)}</span>` : '') +
-        (i.precisao_m ? `<span class="tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
-        (i.tipo === 'video' && i.duracao_s ? `<span class="tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
-        `</div>` +
-        (i.legenda ? `<p class="legenda">${esc(i.legenda)}</p>` : '') +
-        `</div>`;
+      const d = g.varioDia ? String(i.capturado_em).slice(0, 10) : '';
+      let seg = segmentos[segmentos.length - 1];
+      if (!seg || seg.d !== d) { seg = { d, iso: i.capturado_em, lista: [] }; segmentos.push(seg); }
+      seg.lista.push(i);
+    });
+    segmentos.forEach(seg => {
+      if (g.varioDia) corpo += `<h3 class="dia">${esc(diaLongo(seg.iso))}</h3>`;
+      seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="nota">${esc(i.legenda)}</div>`; });
+      corpo += blocoGrupos(seg.lista.filter(i => i.tipo !== 'texto'));
     });
   });
 
@@ -221,8 +274,8 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     <div><b>${talhoesVisitados}</b><span>talhões registrados</span></div>
     <div><b>${areaTotal ? areaTotal.toFixed(0) : '—'}</b><span>hectares mapeados</span></div>
   </div>
-  ${rel.observacoes ? `<div class="nota">${esc(rel.observacoes)}</div>` : ''}
   ${mapaSVG(talhoes, itens)}
+  ${obsGerais}
   ${corpo}
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600">Serviço concluído ✔️</div>
 </div>
@@ -232,6 +285,25 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   <button class="sec" onclick="window.print()">Baixar PDF</button>
   <button onclick="if(navigator.share){navigator.share({title:document.title,url:location.href})}else{navigator.clipboard.writeText(location.href);alert('Link copiado')}">Compartilhar</button>
 </div>
+<script>
+(function(){
+  function fechar(v){ v.remove(); document.removeEventListener('keydown', tecla); }
+  function tecla(e){ if(e.key==='Escape'){ var v=document.querySelector('.visor'); if(v) fechar(v); } }
+  document.addEventListener('click', function(e){
+    var img = e.target.closest && e.target.closest('.item img');
+    if(!img || document.querySelector('.visor')) return;
+    var v = document.createElement('div'); v.className = 'visor';
+    var b = document.createElement('button'); b.className = 'x'; b.type = 'button'; b.setAttribute('aria-label','Fechar'); b.textContent = '\u2715';
+    var im = document.createElement('img'); im.src = img.currentSrc || img.src; im.alt = '';
+    v.appendChild(b); v.appendChild(im);
+    var leg = img.getAttribute('alt');
+    if(leg){ var l = document.createElement('div'); l.className = 'leg'; l.textContent = leg; v.appendChild(l); }
+    v.addEventListener('click', function(ev){ if(ev.target.tagName !== 'IMG') fechar(v); });
+    document.addEventListener('keydown', tecla);
+    document.body.appendChild(v);
+  });
+})();
+</script>
 </div></body></html>`;
 }
 
