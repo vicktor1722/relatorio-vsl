@@ -94,6 +94,43 @@
     });
   }
 
+
+  /* Dentro de um talhão: junta os registros que têm a mesma legenda num grupo só
+     (comparação sem diferenciar maiúsculas/espaços), na ordem em que aparecem. */
+  const normLeg = s => String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase();
+  function gruposDeLegenda(lista) {
+    const ordem = [], mapa = {};
+    lista.forEach(function (i) {
+      const k = normLeg(i.legenda);
+      if (!mapa[k]) { mapa[k] = { titulo: String(i.legenda || '').trim(), itens: [] }; ordem.push(k); }
+      mapa[k].itens.push(i);
+    });
+    return ordem.map(function (k) { return mapa[k]; });
+  }
+
+  function celulaMidia(i) {
+    const src = i.src || (i.asset_id ? '/_blob/' + i.asset_id : '');
+    return `<div class="rp-item"><figure>` +
+      (i.tipo === 'foto'
+        ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
+        : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
+      `</figure><div class="rp-meta">` +
+      `<span class="rp-tag cinza">${hora(i.capturado_em)}</span>` +
+      (i.lat != null ? `<span class="rp-tag cinza">${Number(i.lat).toFixed(5)}, ${Number(i.lon).toFixed(5)}</span>` : '') +
+      (i.precisao_m ? `<span class="rp-tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
+      (i.tipo === 'video' && i.duracao_s ? `<span class="rp-tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
+      `</div></div>`;
+  }
+
+  // cada grupo vira um cartão: fotos em grade e a legenda logo abaixo (como no modelo de referência)
+  function blocoGrupos(midias) {
+    return gruposDeLegenda(midias).map(function (g) {
+      const n = g.itens.length;
+      return `<div class="rp-grupo"><div class="rp-grade n${Math.min(n, 2)}">${g.itens.map(celulaMidia).join('')}</div>` +
+        (g.titulo ? `<p class="rp-grupo-leg">${esc(g.titulo)}</p>` : '') + `</div>`;
+    }).join('');
+  }
+
   function montar(rel, itens, opcoes) {
     const o = opcoes || {};
     const empresa = o.empresa || 'VSL Consultoria e Treinamento na Agricultura';
@@ -107,31 +144,31 @@
     // ---- agrupado por talhão (ordem do KML) ----
     const grupos = agruparPorTalhao(itens, rel.talhoes);
 
+    // observações gerais (texto solto) sobem para logo depois do mapa
+    const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
+    const notasTopo = (rel.observacoes ? `<div class="rp-nota">${esc(rel.observacoes)}</div>` : '') +
+      (gNotas ? gNotas.itens.map(i => `<div class="rp-nota">${esc(i.legenda)}</div>`).join('') : '');
+    const obsGerais = notasTopo
+      ? `<h3 class="rp-talhao">Observações gerais</h3>${notasTopo}` : '';
+
     let corpo = '';
-    grupos.forEach(g => {
+    grupos.filter(g => g.chave !== '\u0000notas').forEach(g => {
       const extra = [g.itens.length + ' registro(s)'];
       if (g.area) extra.push(g.area.toFixed(1).replace('.', ',') + ' ha');
       corpo += `<h3 class="rp-talhao">${esc(g.titulo)}<small>${extra.join(' · ')}</small></h3>`;
-      let diaAtual = '';
+
+      // separa por dia quando o talhão foi visitado em mais de um dia
+      const segmentos = [];
       g.itens.forEach(i => {
-        if (g.varioDia) {
-          const d = String(i.capturado_em).slice(0, 10);
-          if (d !== diaAtual) { diaAtual = d; corpo += `<h4 class="rp-dia">${esc(diaLongo(i.capturado_em))}</h4>`; }
-        }
-        if (i.tipo === 'texto') { corpo += `<div class="rp-nota">${esc(i.legenda)}</div>`; return; }
-        const src = i.src || (i.asset_id ? '/_blob/' + i.asset_id : '');
-        corpo += `<div class="rp-item"><figure>` +
-          (i.tipo === 'foto'
-            ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
-            : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
-          `</figure><div class="rp-meta">` +
-          `<span class="rp-tag cinza">${hora(i.capturado_em)}</span>` +
-          (i.lat != null ? `<span class="rp-tag cinza">${Number(i.lat).toFixed(5)}, ${Number(i.lon).toFixed(5)}</span>` : '') +
-          (i.precisao_m ? `<span class="rp-tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
-          (i.tipo === 'video' && i.duracao_s ? `<span class="rp-tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
-          `</div>` +
-          (i.legenda ? `<p class="rp-legenda">${esc(i.legenda)}</p>` : '') +
-          `</div>`;
+        const d = g.varioDia ? String(i.capturado_em).slice(0, 10) : '';
+        let seg = segmentos[segmentos.length - 1];
+        if (!seg || seg.d !== d) { seg = { d: d, iso: i.capturado_em, lista: [] }; segmentos.push(seg); }
+        seg.lista.push(i);
+      });
+      segmentos.forEach(seg => {
+        if (g.varioDia) corpo += `<h4 class="rp-dia">${esc(diaLongo(seg.iso))}</h4>`;
+        seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="rp-nota">${esc(i.legenda)}</div>`; });
+        corpo += blocoGrupos(seg.lista.filter(i => i.tipo !== 'texto'));
       });
     });
 
@@ -154,8 +191,8 @@
       <div><b>${nTalhoes}</b><span>talhões</span></div>
       <div><b>${area ? area.toFixed(0) : '—'}</b><span>hectares</span></div>
     </div>
-    ${rel.observacoes ? `<div class="rp-nota">${esc(rel.observacoes)}</div>` : ''}
     ${mapaSVG(rel.talhoes, itens)}
+    ${obsGerais}
     ${corpo || '<div class="aviso">Nenhum registro neste relatório.</div>'}
     <div class="rp-fim">Serviço concluído ✔️</div>
   </div>
@@ -163,6 +200,26 @@
     ${rel.publicado_em ? '<br><span>Publicado em ' + fmtData(rel.publicado_em) + '</span>' : ''}</footer>
 </div>`;
   }
+
+
+  /* Toque na foto: abre só ela em tela cheia, com ✕ para voltar ao relatório. */
+  function abrirImagem(src, legenda) {
+    if (!src || document.querySelector('.visor-rel')) return;
+    const v = document.createElement('div');
+    v.className = 'visor visor-rel';
+    v.innerHTML = '<button class="visor-x" type="button" aria-label="Fechar">✕</button>' +
+      '<img src="' + esc(src) + '" alt="">' +
+      (legenda ? '<div class="visor-leg">' + esc(legenda) + '</div>' : '');
+    function fechar() { v.remove(); document.removeEventListener('keydown', tecla); }
+    function tecla(e) { if (e.key === 'Escape') fechar(); }
+    v.addEventListener('click', function (e) { if (e.target.tagName !== 'IMG') fechar(); });
+    document.addEventListener('keydown', tecla);
+    document.body.appendChild(v);
+  }
+  document.addEventListener('click', function (e) {
+    const img = e.target && e.target.closest ? e.target.closest('.rp-item img') : null;
+    if (img) abrirImagem(img.currentSrc || img.src, img.getAttribute('alt') || '');
+  });
 
   global.Relatorio = { montar };
 })(window);
