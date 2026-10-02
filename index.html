@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Relatório de Campo · VSL</title>
-<style>:root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#DCF8C6;--verde-acento:#25D366;--fundo:#ECE5DD;--bolha:#FFFFFF;--texto:#111B21;--texto-fraco:#667781;--linha:#E2E2E2;--erro:#D93025;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;margin:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--fundo);color:var(--texto);overscroll-behavior-y:none}button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}input,textarea,select{font:inherit}.app{display:flex;flex-direction:column;height:100dvh}.oculto{display:none !important}.topo{background:var(--verde);color:#fff;padding:calc(8px + var(--safe-top)) 10px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:20}.topo .voltar{font-size:22px;line-height:1;padding:4px 2px}.topo .avatar{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:17px;flex:none}.topo .info{flex:1;min-width:0}.topo .info h1{margin:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .info p{margin:1px 0 0;font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .acoes{display:flex;gap:4px}.topo .acoes button{padding:6px 8px;border-radius:50%;font-size:18px}.topo .acoes button:active{background:rgba(255,255,255,.2)}.barra-status{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;background:#fff;border-bottom:1px solid var(--linha);color:var(--texto-fraco)}.barra-status .pill{display:flex;align-items:center;gap:5px;white-space:nowrap}.dot{width:8px;height:8px;border-radius:50%;background:#bbb;flex:none}.dot.ok{background:var(--verde-acento)}.dot.medio{background:#F0A202}.dot.ruim{background:var(--erro)}.barra-status .cresce{flex:1}.barra-status b{color:var(--texto);font-weight:600}.chat{flex:1;overflow-y:auto;padding:10px 8px 4px;background-color:var(--fundo);background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px),radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px);background-size:22px 22px;background-position:0 0,11px 11px;-webkit-overflow-scrolling:touch}.divisor{display:flex;justify-content:center;margin:12px 0 8px}.divisor span{background:#fff;border-radius:8px;padding:4px 12px;font-size:11.5px;color:var(--texto-fraco);box-shadow:0 1px 1px rgba(0,0,0,.08);text-transform:uppercase;letter-spacing:.4px}.aviso{background:#FFF3CD;color:#7a5b00;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:8px auto;max-width:90%;text-align:center;box-shadow:0 1px 1px rgba(0,0,0,.08)}.msg{display:flex;margin:2px 0;padding:0 2px}.msg.eu{justify-content:flex-end}.bolha{max-width:86%;background:var(--bolha);border-radius:8px;padding:4px 6px 5px;box-shadow:0 1px .5px rgba(0,0,0,.13);position:relative}.msg.eu .bolha{background:var(--verde-claro)}.bolha.so-texto{padding:6px 9px 6px}.bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block}.bolha .midia img,.bolha .midia video{display:block;width:100%;max-height:60vh;object-fit:cover}.bolha .play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:34px;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none}.bolha .dur{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:1px 6px;border-radius:10px}.bolha .legenda{font-size:14.5px;line-height:1.35;margin:5px 4px 0;white-space:pre-wrap;word-break:break-word}.bolha .rodape{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin:2px 4px 0;font-size:11px;color:var(--texto-fraco)}.chip-talhao{display:inline-flex;align-items:center;gap:4px;margin:5px 4px 0;background:rgba(27,122,67,.12);color:var(--verde-escuro);font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:12px}.chip-talhao.fora{background:rgba(217,48,37,.1);color:var(--erro)}.ticks{font-size:12px;letter-spacing:-2px}.ticks.ok{color:#34B7F1}.ticks.erro{color:var(--erro);letter-spacing:0}.composer{display:flex;align-items:flex-end;gap:6px;padding:6px 8px calc(6px + var(--safe-bottom));background:var(--fundo)}.composer .caixa{flex:1;display:flex;align-items:flex-end;gap:4px;background:#fff;border-radius:22px;padding:6px 6px 6px 14px;box-shadow:0 1px 2px rgba(0,0,0,.12)}.composer textarea{flex:1;border:none;outline:none;resize:none;max-height:110px;font-size:15px;line-height:1.35;padding:4px 0;background:transparent}.composer .anexo{font-size:20px;padding:2px 6px;color:var(--texto-fraco);transform:rotate(-45deg)}.btn-camera{width:48px;height:48px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;font-size:21px;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .12s}.btn-camera:active{transform:scale(.93)}.btn-camera.gravando{background:var(--erro);animation:pulsa 1s infinite}@keyframes pulsa{50%{opacity:.65}}.dica-camera{font-size:11px;color:var(--texto-fraco);text-align:center;padding:0 0 4px}.camera{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}.camera video{flex:1;width:100%;object-fit:cover;background:#000}.camera .cam-topo{position:absolute;top:calc(10px + var(--safe-top));left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 14px;color:#fff;z-index:2}.camera .cam-topo button{font-size:22px;padding:6px}.rec-badge{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.5);padding:4px 10px;border-radius:14px;font-size:13px}.rec-badge .bolinha{width:9px;height:9px;border-radius:50%;background:#ff3b30;animation:pulsa 1s infinite}.camera .cam-base{padding:16px 20px calc(24px + var(--safe-bottom));display:flex;align-items:center;justify-content:space-between;background:#000;color:#fff}.obturador{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.25);display:grid;place-items:center}.obturador i{display:block;width:54px;height:54px;border-radius:50%;background:#fff;transition:all .15s}.obturador.gravando i{width:28px;height:28px;border-radius:7px;background:#ff3b30}.cam-base .lado{width:74px;text-align:center;font-size:13px;opacity:.9}.cam-dica{position:absolute;bottom:calc(120px + var(--safe-bottom));left:0;right:0;text-align:center;color:#fff;font-size:12.5px;opacity:.8;z-index:2}.cam-geo{position:absolute;bottom:calc(150px + var(--safe-bottom));left:0;right:0;text-align:center;color:#fff;font-size:12px;z-index:2}.cam-geo span{background:rgba(0,0,0,.5);padding:4px 10px;border-radius:12px}.tela{position:fixed;inset:0;background:#F6F6F6;z-index:50;display:flex;flex-direction:column;overflow:hidden}.tela .conteudo{flex:1;overflow-y:auto;padding:14px 14px 30px}.tela h2{font-size:15px;margin:18px 0 8px;color:var(--texto-fraco);text-transform:uppercase;letter-spacing:.5px}.campo{margin-bottom:12px}.campo label{display:block;font-size:12.5px;color:var(--texto-fraco);margin-bottom:4px}.campo input,.campo textarea,.campo select{width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:#fff;outline:none}.campo input:focus,.campo textarea:focus{border-color:var(--verde)}.linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{display:block;width:100%;padding:13px;border-radius:10px;background:var(--verde);color:#fff;font-weight:600;text-align:center;margin-top:10px}.btn.secundario{background:#fff;color:var(--verde);border:1px solid var(--verde)}.btn.perigo{background:#fff;color:var(--erro);border:1px solid var(--erro)}.btn:disabled{opacity:.5}.lista-item{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.lista-item .ic{width:42px;height:42px;border-radius:10px;background:var(--verde-claro);display:grid;place-items:center;font-size:19px;flex:none}.lista-item .txt{flex:1;min-width:0}.lista-item .txt b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lista-item .txt span{font-size:12.5px;color:var(--texto-fraco)}.badge{font-size:11px;padding:3px 8px;border-radius:10px;background:#eee;color:var(--texto-fraco);white-space:nowrap}.badge.pub{background:var(--verde-claro);color:var(--verde-escuro)}.folha{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;z-index:70;padding:8px 14px calc(18px + var(--safe-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.2);max-height:85dvh;overflow-y:auto}.folha .alca{width:40px;height:4px;border-radius:2px;background:#ccc;margin:6px auto 12px}.folha .opcao{display:flex;align-items:center;gap:14px;padding:13px 4px;font-size:15px}.folha .opcao span:first-child{width:24px;text-align:center;font-size:18px}.veu{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:65}.mapa-wrap{background:#fff;border-radius:12px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.mapa-wrap svg{width:100%;height:auto;display:block;background:#F3F7F3;border-radius:8px}.legenda-talhoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.legenda-talhoes span{font-size:11.5px;background:var(--verde-claro);color:var(--verde-escuro);padding:3px 8px;border-radius:10px}.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + var(--safe-bottom));background:rgba(0,0,0,.85);color:#fff;padding:10px 16px;border-radius:20px;font-size:13.5px;z-index:90;max-width:88%;text-align:center}.visor{position:fixed;inset:0;background:#000;z-index:80;display:flex;align-items:center;justify-content:center}.visor img,.visor video{max-width:100%;max-height:100%}.visor .fechar{position:absolute;top:calc(12px + var(--safe-top));left:12px;color:#fff;font-size:26px;padding:8px}.rp-tela{position:fixed;inset:0;z-index:55;background:#F2F4F2;overflow-y:auto}.rp-voltar{position:fixed;top:calc(10px + var(--safe-top));left:10px;z-index:58;background:rgba(0,0,0,.45);color:#fff;border-radius:50%;width:38px;height:38px;font-size:19px}.rp-folha{max-width:820px;margin:0 auto;background:#fff;min-height:100%}.rp-capa{background:var(--verde);color:#fff;padding:calc(22px + var(--safe-top)) 20px 18px}.rp-marca{display:flex;align-items:center;gap:12px}.rp-logo{width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:21px;flex:none}.rp-marca b{display:block;font-size:13.5px;line-height:1.25}.rp-marca span{font-size:11.5px;opacity:.85}.rp-capa h1{margin:16px 0 2px;font-size:24px;line-height:1.2}.rp-capa p{margin:0;font-size:13.5px;opacity:.9}.rp-painel{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--linha)}.rp-painel div{background:#fff;padding:11px 16px}.rp-painel span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-fraco)}.rp-painel b{font-size:14.5px}.rp-corpo{padding:8px 16px 40px}.rp-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 4px}.rp-resumo div{background:#F7F9F7;border:1px solid var(--linha);border-radius:10px;padding:9px 6px;text-align:center}.rp-resumo b{display:block;font-size:18px;color:var(--verde-escuro)}.rp-resumo span{font-size:10.5px;color:var(--texto-fraco)}.rp-nota{background:#E8F4EC;border-left:4px solid var(--verde);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:14.5px;white-space:pre-wrap}.rp-mapa{border:1px solid var(--linha);border-radius:12px;padding:10px;margin:16px 0}.rp-mapa svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}.rp-obs{font-size:11.5px;color:var(--texto-fraco);margin-top:8px}.rp-talhao{position:sticky;top:0;background:#fff;margin:24px 0 12px;padding:10px 0 8px;font-size:15.5px;color:var(--verde-escuro);border-bottom:2px solid var(--verde);z-index:2}.rp-talhao small{float:right;font-weight:400;color:var(--texto-fraco);font-size:12px;padding-top:4px}.rp-dia{margin:14px 0 10px;padding:0 0 4px;font-size:12.5px;font-weight:600;color:var(--texto-fraco);border-bottom:1px solid var(--linha)}.rp-item{margin:0 0 20px}.rp-item figure{margin:0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--linha)}.rp-item img,.rp-item video{display:block;width:100%;max-height:70vh;object-fit:contain;background:#000}.rp-meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center}.rp-tag{font-size:11.5px;padding:3px 9px;border-radius:11px;background:#E8F4EC;color:var(--verde-escuro);font-weight:600}.rp-tag.cinza{background:#F0F2F1;color:var(--texto-fraco);font-weight:500}.rp-legenda{margin:6px 0 0;font-size:15px;white-space:pre-wrap}.rp-fim{text-align:center;margin:28px 0 10px;font-size:15px;color:var(--verde-escuro);font-weight:600}.rp-rodape{background:#F7F9F7;border-top:1px solid var(--linha);padding:20px;text-align:center;font-size:12.5px;color:var(--texto-fraco)}.rp-rodape b{color:var(--verde-escuro)}.rp-barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:#fff;border-top:1px solid var(--linha)}.rp-barra button{flex:1;padding:12px;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}.rp-barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}@media print{.rp-voltar,.rp-barra{display:none}.rp-tela{position:static}.rp-talhao{position:static;break-after:avoid}.rp-item{break-inside:avoid}video{display:none}}.marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--texto);margin:2px 0 12px;line-height:1.3}.marcar input{width:19px;height:19px;flex:none;accent-color:var(--verde)}.rp-logo-img{height:44px;max-width:130px;width:auto;object-fit:contain;background:#fff;padding:4px;border-radius:8px;flex:none;display:block}.btn-camera.enviar{background:var(--verde-acento);font-size:22px;padding-left:3px}</style>
+<style>:root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#DCF8C6;--verde-acento:#25D366;--fundo:#ECE5DD;--bolha:#FFFFFF;--texto:#111B21;--texto-fraco:#667781;--linha:#E2E2E2;--erro:#D93025;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);--altura:100dvh}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;margin:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--fundo);color:var(--texto);overscroll-behavior-y:none}button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}input,textarea,select{font:inherit}.app{display:flex;flex-direction:column;height:100vh;height:var(--altura)}.oculto{display:none !important}.topo{background:var(--verde);color:#fff;padding:calc(8px + var(--safe-top)) 10px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:20}.topo .voltar{font-size:22px;line-height:1;padding:4px 2px}.topo .avatar{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:17px;flex:none}.topo .info{flex:1;min-width:0}.topo .info h1{margin:0;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .info p{margin:1px 0 0;font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topo .acoes{display:flex;gap:4px}.topo .acoes button{padding:6px 8px;border-radius:50%;font-size:18px}.topo .acoes button:active{background:rgba(255,255,255,.2)}.barra-status{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;background:#fff;border-bottom:1px solid var(--linha);color:var(--texto-fraco);overflow:hidden}.barra-status .pill{display:flex;align-items:center;gap:5px;white-space:nowrap;min-width:0}.barra-status .pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dot{width:8px;height:8px;border-radius:50%;background:#bbb;flex:none}.dot.ok{background:var(--verde-acento)}.dot.medio{background:#F0A202}.dot.ruim{background:var(--erro)}.barra-status .cresce{flex:1}.barra-status b{color:var(--texto);font-weight:600}.chat{flex:1;overflow-y:auto;padding:10px 8px 4px;background-color:var(--fundo);background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px),radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px);background-size:22px 22px;background-position:0 0,11px 11px;-webkit-overflow-scrolling:touch}.divisor{display:flex;justify-content:center;margin:12px 0 8px}.divisor span{background:#fff;border-radius:8px;padding:4px 12px;font-size:11.5px;color:var(--texto-fraco);box-shadow:0 1px 1px rgba(0,0,0,.08);text-transform:uppercase;letter-spacing:.4px}.aviso{background:#FFF3CD;color:#7a5b00;border-radius:8px;padding:8px 12px;font-size:12.5px;margin:8px auto;max-width:90%;text-align:center;box-shadow:0 1px 1px rgba(0,0,0,.08)}.msg{display:flex;margin:2px 0;padding:0 2px}.msg.eu{justify-content:flex-end}.bolha{max-width:86%;background:var(--bolha);border-radius:8px;padding:4px 6px 5px;box-shadow:0 1px .5px rgba(0,0,0,.13);position:relative}.msg.eu .bolha{background:var(--verde-claro)}.bolha.so-texto{padding:6px 9px 6px}.bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block}.bolha .midia img,.bolha .midia video{display:block;width:100%;max-height:60vh;object-fit:cover}.bolha .play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:34px;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none}.bolha .dur{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:1px 6px;border-radius:10px}.bolha .legenda{font-size:14.5px;line-height:1.35;margin:5px 4px 0;white-space:pre-wrap;word-break:break-word}.bolha .rodape{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin:2px 4px 0;font-size:11px;color:var(--texto-fraco)}.chip-talhao{display:inline-flex;align-items:center;gap:4px;margin:5px 4px 0;background:rgba(27,122,67,.12);color:var(--verde-escuro);font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:12px}.chip-talhao.fora{background:rgba(217,48,37,.1);color:var(--erro)}.ticks{font-size:12px;letter-spacing:-2px}.ticks.ok{color:#34B7F1}.ticks.erro{color:var(--erro);letter-spacing:0}.composer{display:flex;align-items:flex-end;gap:6px;padding:6px 8px calc(6px + var(--safe-bottom));background:var(--fundo)}.composer .caixa{flex:1;display:flex;align-items:flex-end;gap:4px;background:#fff;border-radius:22px;padding:6px 6px 6px 14px;box-shadow:0 1px 2px rgba(0,0,0,.12)}.composer textarea{flex:1;border:none;outline:none;resize:none;max-height:110px;font-size:15px;line-height:1.35;padding:4px 0;background:transparent}.composer .anexo{font-size:20px;padding:2px 6px;color:var(--texto-fraco);transform:rotate(-45deg)}.btn-camera{width:48px;height:48px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;font-size:21px;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .12s}.btn-camera:active{transform:scale(.93)}.btn-camera.gravando{background:var(--erro);animation:pulsa 1s infinite}@keyframes pulsa{50%{opacity:.65}}.dica-camera{font-size:11px;color:var(--texto-fraco);text-align:center;padding:0 0 4px}.camera{position:fixed;top:0;left:0;right:0;background:#000;z-index:60;display:flex;flex-direction:column;overflow:hidden;height:100vh;height:var(--altura);max-height:var(--altura)}.camera video{flex:1 1 auto;min-height:0;width:100%;object-fit:cover;background:#000}.camera .cam-topo{position:absolute;top:calc(10px + var(--safe-top));left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 14px;color:#fff;z-index:2}.camera .cam-topo button{font-size:22px;padding:6px}.rec-badge{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.5);padding:4px 10px;border-radius:14px;font-size:13px}.rec-badge .bolinha{width:9px;height:9px;border-radius:50%;background:#ff3b30;animation:pulsa 1s infinite}.camera .cam-base{flex:0 0 auto;min-height:116px;padding:12px 20px calc(14px + var(--safe-bottom));display:flex;align-items:center;justify-content:space-between;background:#000;color:#fff}.obturador{width:70px;height:70px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.25);display:grid;place-items:center;flex:none}.obturador i{display:block;width:50px;height:50px;border-radius:50%;background:#fff;transition:all .15s}.obturador.gravando i{width:26px;height:26px;border-radius:7px;background:#ff3b30}.cam-base .lado{width:70px;text-align:center;font-size:13px;opacity:.9}.cam-dica{position:absolute;bottom:calc(116px + var(--safe-bottom) + 8px);left:0;right:0;text-align:center;color:#fff;font-size:12.5px;opacity:.8;z-index:2}.cam-geo{position:absolute;bottom:calc(116px + var(--safe-bottom) + 34px);left:0;right:0;text-align:center;color:#fff;font-size:12px;z-index:2}@media (max-height:620px){.camera .cam-base{min-height:96px;padding-top:8px}.obturador{width:60px;height:60px;border-width:4px}.obturador i{width:42px;height:42px}.cam-dica{display:none}.cam-geo{bottom:calc(96px + var(--safe-bottom) + 8px)}}.cam-geo span{background:rgba(0,0,0,.5);padding:4px 10px;border-radius:12px}.tela{position:fixed;top:0;left:0;right:0;height:100vh;height:var(--altura);background:#F6F6F6;z-index:50;display:flex;flex-direction:column;overflow:hidden}.tela .conteudo{flex:1;overflow-y:auto;padding:14px 14px 30px}.tela h2{font-size:15px;margin:18px 0 8px;color:var(--texto-fraco);text-transform:uppercase;letter-spacing:.5px}.campo{margin-bottom:12px}.campo label{display:block;font-size:12.5px;color:var(--texto-fraco);margin-bottom:4px}.campo input,.campo textarea,.campo select{width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:#fff;outline:none}.campo input:focus,.campo textarea:focus{border-color:var(--verde)}.linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{display:block;width:100%;padding:13px;border-radius:10px;background:var(--verde);color:#fff;font-weight:600;text-align:center;margin-top:10px}.btn.secundario{background:#fff;color:var(--verde);border:1px solid var(--verde)}.btn.perigo{background:#fff;color:var(--erro);border:1px solid var(--erro)}.btn:disabled{opacity:.5}.lista-item{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06);overflow:hidden}.lista-item .ic{width:42px;height:42px;border-radius:10px;background:var(--verde-claro);display:grid;place-items:center;font-size:19px;flex:none}.lista-item .txt{flex:1;min-width:0}.lista-item .txt b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lista-item .txt span{display:block;font-size:12.5px;color:var(--texto-fraco);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{font-size:11px;padding:3px 8px;border-radius:10px;background:#eee;color:var(--texto-fraco);white-space:nowrap;flex:none}.acao-env{width:40px;height:40px;flex:none;margin-left:8px;border-radius:50%;background:var(--verde);color:#fff;font-size:18px;line-height:1;display:grid;place-items:center;border:none}.acao-env.pronto{background:#fff;color:var(--verde);border:1.5px solid var(--verde)}.acao-env.esperando{background:#F0A202;animation:respira 1.6s ease-in-out infinite}.acao-env:disabled{opacity:.6}.acao-env:active{transform:scale(.92)}.badge.fila{background:#FFF3DC;color:#8A5A00}@keyframes respira{0%,100%{opacity:1}50%{opacity:.55}}.badge.pub{background:var(--verde-claro);color:var(--verde-escuro)}.folha{position:relative;width:100%;background:#fff;border-radius:16px 16px 0 0;z-index:70;padding:8px 14px calc(18px + var(--safe-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.2);max-height:88%;overflow-y:auto;-webkit-overflow-scrolling:touch}.folha .btn{position:relative;z-index:1}.folha .alca{width:40px;height:4px;border-radius:2px;background:#ccc;margin:6px auto 12px}.folha .opcao{display:flex;align-items:center;gap:14px;padding:13px 4px;font-size:15px}.folha .opcao span:first-child{width:24px;text-align:center;font-size:18px}.veu{position:fixed;top:0;left:0;right:0;height:100vh;height:var(--altura);background:rgba(0,0,0,.45);z-index:65;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}.mapa-wrap{background:#fff;border-radius:12px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}.mapa-wrap svg{width:100%;height:auto;display:block;background:#F3F7F3;border-radius:8px}.legenda-talhoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.legenda-talhoes span{font-size:11.5px;background:var(--verde-claro);color:var(--verde-escuro);padding:3px 8px;border-radius:10px}.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + var(--safe-bottom));background:rgba(0,0,0,.85);color:#fff;padding:10px 16px;border-radius:20px;font-size:13.5px;z-index:90;max-width:88%;text-align:center}.visita{display:flex;align-items:center;gap:8px;margin:16px 0 10px;padding:8px 10px;background:#fff;border-radius:10px;border-left:4px solid var(--verde);box-shadow:0 1px 2px rgba(0,0,0,.07)}.visita b{flex:1;min-width:0;font-size:13px;color:var(--verde-escuro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.visita>span{font-size:11px;color:var(--texto-fraco);white-space:nowrap}.visita.fechada{border-left-color:#9AA8A0;background:#F4F6F4}.visita.fechada b{color:var(--texto-fraco)}.visita-env{width:34px;height:34px;flex:none;border-radius:50%;border:none;background:var(--verde);color:#fff;font-size:15px;display:grid;place-items:center}.visita.fechada .visita-env{background:#fff;color:var(--verde);border:1.5px solid var(--verde)}.visita-env:active{transform:scale(.92)}.toast.clicavel{background:var(--verde);font-weight:600;padding:12px 18px;box-shadow:0 4px 16px rgba(0,0,0,.3)}.visor{position:fixed;inset:0;background:#000;z-index:80;display:flex;align-items:center;justify-content:center}.visor img,.visor video{max-width:100%;max-height:100%}.visor .fechar{position:absolute;top:calc(12px + var(--safe-top));left:12px;color:#fff;font-size:26px;padding:8px}.rp-tela{position:fixed;inset:0;z-index:55;background:#F2F4F2;overflow-y:auto}.rp-voltar{position:fixed;top:calc(10px + var(--safe-top));left:10px;z-index:58;background:rgba(0,0,0,.45);color:#fff;border-radius:50%;width:38px;height:38px;font-size:19px}.rp-folha{max-width:820px;margin:0 auto;background:#fff;min-height:100%}.rp-capa{background:var(--verde);color:#fff;padding:calc(22px + var(--safe-top)) 20px 18px}.rp-marca{display:flex;align-items:center;gap:12px}.rp-logo{width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:21px;flex:none}.rp-marca b{display:block;font-size:13.5px;line-height:1.25}.rp-marca span{font-size:11.5px;opacity:.85}.rp-capa h1{margin:16px 0 2px;font-size:24px;line-height:1.2}.rp-capa p{margin:0;font-size:13.5px;opacity:.9}.rp-painel{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--linha)}.rp-painel div{background:#fff;padding:11px 16px}.rp-painel span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-fraco)}.rp-painel b{font-size:14.5px}.rp-corpo{padding:8px 16px 40px}.rp-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 4px}.rp-resumo div{background:#F7F9F7;border:1px solid var(--linha);border-radius:10px;padding:9px 6px;text-align:center}.rp-resumo b{display:block;font-size:18px;color:var(--verde-escuro)}.rp-resumo span{font-size:10.5px;color:var(--texto-fraco)}.rp-nota{background:#E8F4EC;border-left:4px solid var(--verde);padding:10px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:14.5px;white-space:pre-wrap}.rp-mapa{border:1px solid var(--linha);border-radius:12px;padding:10px;margin:16px 0}.rp-mapa svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}.rp-obs{font-size:11.5px;color:var(--texto-fraco);margin-top:8px}.rp-talhao{position:sticky;top:0;background:#fff;margin:24px 0 12px;padding:10px 0 8px;font-size:15.5px;color:var(--verde-escuro);border-bottom:2px solid var(--verde);z-index:2}.rp-talhao small{float:right;font-weight:400;color:var(--texto-fraco);font-size:12px;padding-top:4px}.rp-dia{margin:14px 0 10px;padding:0 0 4px;font-size:12.5px;font-weight:600;color:var(--texto-fraco);border-bottom:1px solid var(--linha)}.rp-item{margin:0 0 20px}.rp-item figure{margin:0;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--linha)}.rp-item img,.rp-item video{display:block;width:100%;max-height:70vh;object-fit:contain;background:#000}.rp-meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0;align-items:center}.rp-tag{font-size:11.5px;padding:3px 9px;border-radius:11px;background:#E8F4EC;color:var(--verde-escuro);font-weight:600}.rp-tag.cinza{background:#F0F2F1;color:var(--texto-fraco);font-weight:500}.rp-legenda{margin:6px 0 0;font-size:15px;white-space:pre-wrap}.rp-fim{text-align:center;margin:28px 0 10px;font-size:15px;color:var(--verde-escuro);font-weight:600}.rp-rodape{background:#F7F9F7;border-top:1px solid var(--linha);padding:20px;text-align:center;font-size:12.5px;color:var(--texto-fraco)}.rp-rodape b{color:var(--verde-escuro)}.rp-barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:#fff;border-top:1px solid var(--linha)}.rp-barra button{flex:1;padding:12px;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}.rp-barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}@media print{.rp-voltar,.rp-barra{display:none}.rp-tela{position:static}.rp-talhao{position:static;break-after:avoid}.rp-item{break-inside:avoid}video{display:none}}.marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--texto);margin:2px 0 12px;line-height:1.3}.marcar input{width:19px;height:19px;flex:none;accent-color:var(--verde)}.rp-logo-img{height:44px;max-width:130px;width:auto;object-fit:contain;background:#fff;padding:4px;border-radius:8px;flex:none;display:block}.btn-camera.enviar{background:var(--verde-acento);font-size:22px;padding-left:3px}</style>
 </head>
 <body>
 
@@ -946,10 +946,59 @@
 
     rel.status = 'publicado';
     rel.publicado_em = new Date().toISOString();
+    rel.na_fila = false;
     await DB.put('relatorios', rel);
     await enviarRelatorio(rel);
     const r = await comJson('/api/publicar', { id: rel.id });
     return r.link;
+  }
+
+  /* ---------------- fila de publicação (offline) ----------------
+     Sem internet o relatório é marcado como "na fila": fica fechado para
+     edição, guardado no aparelho, e sobe sozinho quando a conexão voltar. */
+
+  async function marcarParaEnvio(rel) {
+    rel.na_fila = true;
+    rel.status = 'fila';
+    rel.fila_desde = new Date().toISOString();
+    await DB.put('relatorios', rel);
+    emitir({ tipo: 'fila', id: rel.id });
+    return rel;
+  }
+
+  async function cancelarEnvio(rel) {
+    rel.na_fila = false;
+    rel.status = 'rascunho';
+    await DB.put('relatorios', rel);
+    emitir({ tipo: 'fila', id: rel.id });
+    return rel;
+  }
+
+  // chamada pelo autoSync: tenta publicar tudo que está esperando
+  let publicando = false;
+  async function publicarPendentes() {
+    if (publicando) return [];
+    if (!navigator.onLine) return [];
+    if (!(await logado())) return [];
+    publicando = true;
+    const prontos = [];
+    try {
+      const rels = (await DB.all('relatorios')).filter(function (r) {
+        return r.na_fila && r.status !== 'publicado';
+      });
+      for (const rel of rels) {
+        try {
+          const link = await publicar(rel);
+          prontos.push({ rel: rel, link: link });
+          emitir({ tipo: 'publicado', id: rel.id, link: link, fazenda: rel.fazenda || '' });
+        } catch (e) {
+          emitir({ tipo: 'fila-erro', id: rel.id, msg: e.message });
+        }
+      }
+    } finally {
+      publicando = false;
+    }
+    return prontos;
   }
 
   async function status() {
@@ -958,16 +1007,33 @@
     return r.json();
   }
 
+  let emRodada = false;
+  async function rodada() {
+    if (emRodada || !navigator.onLine) return;
+    emRodada = true;
+    try {
+      await sincronizar();
+      await publicarPendentes();
+    } finally {
+      emRodada = false;
+    }
+  }
+
   function autoSync() {
-    window.addEventListener('online', () => sincronizar());
-    setInterval(() => { if (navigator.onLine) sincronizar(); }, 60000);
+    window.addEventListener('online', function () { setTimeout(rodada, 1200); });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && navigator.onLine) rodada();
+    });
+    setInterval(rodada, 60000);
+    if (navigator.onLine) setTimeout(rodada, 2500);
   }
 
   global.Sync = {
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    sincronizar, publicar, status, autoSync, aoMudar: f => ouvintes.push(f)
+    sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);
 
@@ -1526,8 +1592,9 @@
   const $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
 
   const st = {
-    rel: null,            // relatório aberto
-    itens: [],
+    rel: null,            // visita aberta (a que recebe os registros de agora)
+    visitas: [],          // todas as visitas da conversa (mesma fazenda)
+    itens: [],            // registros de todas as visitas, em ordem
     pos: null,            // última posição GPS
     cfg: { qualidade: 0.82, video: 720 },
     stream: null,
@@ -1564,11 +1631,16 @@
     const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
     return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + u[i];
   }
-  function toast(msg, ms) {
+  function toast(msg, ms, aoTocar) {
     const el = document.createElement('div');
     el.className = 'toast'; el.textContent = msg;
+    if (aoTocar) {
+      el.classList.add('clicavel');
+      el.onclick = function () { el.remove(); aoTocar(); };
+    }
     document.body.appendChild(el);
     setTimeout(function () { el.remove(); }, ms || 2600);
+    return el;
   }
   function objURL(blob) { const u = URL.createObjectURL(blob); st.urls.push(u); return u; }
   function esc(s) {
@@ -1580,6 +1652,22 @@
   function fechar(id) { $('#' + id).classList.add('oculto'); }
 
   /* ---------------- GPS ---------------- */
+  /* Altura real da janela. No navegador de dentro do WhatsApp/Instagram a barra
+     de baixo cobre parte da tela e o botão da câmera ficava cortado. */
+  function medirAltura() {
+    const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    if (h) document.documentElement.style.setProperty('--altura', Math.round(h) + 'px');
+  }
+  function ligarMedidaDeAltura() {
+    medirAltura();
+    window.addEventListener('resize', medirAltura);
+    window.addEventListener('orientationchange', function () { setTimeout(medirAltura, 250); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', medirAltura);
+    // o Safari muda a altura logo depois de abrir
+    setTimeout(medirAltura, 300);
+    setTimeout(medirAltura, 1200);
+  }
+
   function iniciarGPS() {
     if (!navigator.geolocation) { $('#txtGps').textContent = 'GPS indisponível'; return; }
     if (st.vigiaGps != null) { try { navigator.geolocation.clearWatch(st.vigiaGps); } catch (e) {} }
@@ -1632,19 +1720,90 @@
     if (!st.rel) return 'Toque em ☰ para criar';
     const t = talhaoAtual();
     const n = (st.rel.talhoes && st.rel.talhoes.features || []).length;
+    const v = (st.visitas || []).length;
     return [st.rel.safra ? 'Safra ' + st.rel.safra : null,
+            v > 1 ? v + ' visitas' : null,
             n ? n + ' talhões' : 'sem KML',
             t ? '📍 ' + t.nome : null].filter(Boolean).join(' · ');
   }
 
   /* ---------------- sync status ---------------- */
   function atualizarSync() {
-    DB.pendentes().then(function (p) {
+    Promise.all([DB.pendentes(), DB.all('relatorios')]).then(function (r) {
+      const p = r[0];
+      const fila = r[1].filter(function (x) { return x.na_fila && x.status !== 'publicado'; }).length;
       const dot = $('#dotSync'), txt = $('#txtSync');
-      if (!navigator.onLine) { dot.className = 'dot medio'; txt.textContent = 'offline · ' + p.length + ' na fila'; return; }
-      if (p.length === 0) { dot.className = 'dot ok'; txt.textContent = 'sincronizado'; return; }
-      dot.className = 'dot medio'; txt.textContent = p.length + ' para enviar';
+      const sufixo = fila ? ' · ' + fila + ' relat.' : '';
+      if (!navigator.onLine) {
+        dot.className = 'dot medio';
+        txt.textContent = 'offline · ' + p.length + ' na fila' + sufixo;
+        return;
+      }
+      if (p.length === 0 && !fila) { dot.className = 'dot ok'; txt.textContent = 'sincronizado'; return; }
+      dot.className = 'dot medio';
+      txt.textContent = (p.length ? p.length + ' para enviar' : 'enviando') + sufixo;
     });
+  }
+
+  /* ---------------- conversa (uma por fazenda) ----------------
+     Cada fazenda tem uma conversa só. Dentro dela ficam as visitas, uma embaixo
+     da outra. Visita finalizada fica trancada; a próxima continua na mesma tela. */
+
+  function chaveConversa(r) {
+    return r.fazenda_id || ('nome:' + String(r.fazenda || '').trim().toLowerCase());
+  }
+
+  function visitaFechada(r) {
+    return !!(r && (r.status === 'publicado' || r.na_fila));
+  }
+
+  async function visitasDa(rel) {
+    if (!rel) return [];
+    const k = chaveConversa(rel);
+    return (await DB.all('relatorios'))
+      .filter(function (r) { return chaveConversa(r) === k; })
+      .sort(function (a, b) { return String(a.criado_em || '').localeCompare(String(b.criado_em || '')); });
+  }
+
+  function hojeISO() { return new Date().toISOString().slice(0, 10); }
+
+  // a visita que recebe os registros de agora; cria uma nova se a última foi fechada
+  async function visitaAberta() {
+    if (st.rel && !visitaFechada(st.rel)) return st.rel;
+    const base = st.rel || (st.visitas && st.visitas[st.visitas.length - 1]);
+    if (!base) { toast('Abra ou crie um relatório primeiro'); return null; }
+    const novo = {
+      id: novoId(),
+      produtor_id: base.produtor_id || null, fazenda_id: base.fazenda_id || null,
+      produtor: base.produtor || '', fazenda: base.fazenda || '',
+      safra: base.safra || '', servico: base.servico || '',
+      responsavel: base.responsavel || '', talhoes: base.talhoes || null,
+      data_inicio: hojeISO(), data_fim: hojeISO(), observacoes: '',
+      status: 'rascunho', criado_em: new Date().toISOString()
+    };
+    await DB.put('relatorios', novo);
+    await DB.cfg('ultimo', novo.id);
+    st.rel = novo;
+    toast('Nova visita de ' + dataCurta(hojeISO()) + ' nesta conversa', 3500);
+    if (navigator.onLine) Sync.sincronizar(novo.id);
+    return novo;
+  }
+
+  function dataCurta(iso) {
+    const p = String(iso || '').slice(0, 10).split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] : (iso || '');
+  }
+
+  function divisorVisita(v, n) {
+    const fechada = visitaFechada(v);
+    const estado = v.status === 'publicado' ? 'enviada' : v.na_fila ? 'na fila' : 'em aberto';
+    return '<div class="visita' + (fechada ? ' fechada' : '') + '" data-visita="' + v.id + '">' +
+      '<b>' + (fechada ? '🔒 ' : '✏️ ') + 'Visita ' + n + ' · ' + esc(dataCurta(v.data_inicio || v.criado_em)) + '</b>' +
+      '<span>' + estado + '</span>' +
+      '<button class="visita-env" data-env="' + v.id + '" title="' +
+        (v.status === 'publicado' ? 'Link do cliente' : 'Finalizar e enviar esta visita') + '">' +
+        (v.status === 'publicado' ? '🔗' : v.na_fila ? '⏳' : '🔄') + '</button>' +
+      '</div>';
   }
 
   /* ---------------- chat ---------------- */
@@ -1652,27 +1811,50 @@
     const chat = $('#chat');
     st.urls.forEach(URL.revokeObjectURL); st.urls = [];
     if (!st.rel) {
-      chat.innerHTML = '<div class="aviso">Nenhum relatório aberto. Toque em <b>☰</b> e crie um novo.</div>';
-      return;
-    }
-    st.itens = await DB.itensDoRelatorio(st.rel.id);
-    $('#dicaCamera').textContent = relFinalizado()
-      ? 'Relatório finalizado — somente leitura'
-      : 'Toque para foto · Segure para vídeo · Segure um registro para editar';
-    if (!st.itens.length) {
-      chat.innerHTML = '<div class="aviso">Relatório criado. Toque na <b>câmera</b> para registrar a primeira foto ou vídeo — a localização e o talhão entram automaticamente.</div>' +
-        '<div class="aviso">Para usar como aplicativo: no navegador do celular, menu <b>⋮</b> → <b>Adicionar à tela inicial</b>.</div>';
+      chat.innerHTML = '<div class="aviso">Nenhuma conversa aberta. Toque em <b>☰</b> e crie um relatório.</div>';
       return;
     }
 
+    st.visitas = await visitasDa(st.rel);
+    // a visita corrente é a última ainda aberta
+    const abertas = st.visitas.filter(function (v) { return !visitaFechada(v); });
+    if (abertas.length) {
+      const atual = abertas[abertas.length - 1];
+      if (!st.rel || st.rel.id !== atual.id) { st.rel = atual; await DB.cfg('ultimo', atual.id); }
+    }
+
+    $('#dicaCamera').textContent = visitaFechada(st.rel)
+      ? 'Visita fechada — o próximo registro abre uma visita nova'
+      : 'Toque para foto · Segure para vídeo · Segure um registro para editar';
+
+    st.itens = [];
     let html = '';
-    let diaAtual = '';
-    for (const it of st.itens) {
-      const dia = dataExt(it.capturado_em);
-      if (dia !== diaAtual) { diaAtual = dia; html += '<div class="divisor"><span>' + esc(dia) + '</span></div>'; }
-      html += bolhaHTML(it);
+    for (let vi = 0; vi < st.visitas.length; vi++) {
+      const v = st.visitas[vi];
+      const itens = await DB.itensDoRelatorio(v.id);
+      html += divisorVisita(v, vi + 1);
+      if (!itens.length) {
+        html += '<div class="aviso">Visita sem registros ainda. Toque na câmera.</div>';
+        continue;
+      }
+      let diaAtual = '';
+      for (const it of itens) {
+        const dia = dataExt(it.capturado_em);
+        if (dia !== diaAtual) { diaAtual = dia; html += '<div class="divisor"><span>' + esc(dia) + '</span></div>'; }
+        html += bolhaHTML(it);
+        st.itens.push(it);
+      }
+    }
+
+    if (!st.itens.length && st.visitas.length <= 1) {
+      html += '<div class="aviso">Toque na <b>câmera</b> para o primeiro registro — a localização e o talhão entram automaticamente.</div>' +
+        '<div class="aviso">Para usar como aplicativo: no navegador do celular, <b>Adicionar à tela inicial</b>.</div>';
     }
     chat.innerHTML = html;
+
+    $$('#chat [data-env]').forEach(function (b) {
+      b.onclick = function (ev) { ev.stopPropagation(); enviarDaLista(b); };
+    });
 
     // carrega mídias do IndexedDB
     for (const it of st.itens) {
@@ -1685,8 +1867,10 @@
         if (it.tipo === 'foto') el.innerHTML = '<img src="' + u + '" alt="">';
         else el.innerHTML = '<video src="' + u + '" preload="metadata" playsinline></video><div class="play">▶</div>' +
           (it.duracao_s ? '<div class="dur">' + mmss(it.duracao_s) + '</div>' : '');
-      } else if (it.drive_id) {
+      } else if (it.midia || it.drive_id) {
         el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">enviado · mídia na nuvem</div>';
+      } else {
+        el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">⚠️ arquivo não ficou guardado neste aparelho</div>';
       }
     }
     chat.scrollTop = chat.scrollHeight;
@@ -1718,23 +1902,56 @@
   }
 
   /* ---------------- captura ---------------- */
-  async function comprimirImagem(blob, maxLado, qualidade) {
-    const bmp = await createImageBitmap(blob);
-    const escala = Math.min(1, maxLado / Math.max(bmp.width, bmp.height));
-    const w = Math.round(bmp.width * escala), h = Math.round(bmp.height * escala);
+
+  /* Traz o arquivo para a memória na hora. No iPhone o File da galeria deixa de
+     poder ser lido pouco depois (principalmente HEIC), e a foto sumia. */
+  async function materializar(file) {
+    const buf = await file.arrayBuffer();
+    return new Blob([buf], { type: file.type || 'application/octet-stream' });
+  }
+
+  function desenhar(fonte, lado, alt, qualidade) {
+    const escala = Math.min(1, 2048 / Math.max(lado, alt));
+    const w = Math.max(1, Math.round(lado * escala)), h = Math.max(1, Math.round(alt * escala));
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-    cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
-    bmp.close && bmp.close();
-    return await new Promise(function (res) { cv.toBlob(res, 'image/jpeg', qualidade); });
+    cv.getContext('2d').drawImage(fonte, 0, 0, w, h);
+    return new Promise(function (res) { cv.toBlob(res, 'image/jpeg', qualidade); });
+  }
+
+  async function comprimirImagem(blob, maxLado, qualidade) {
+    // caminho normal
+    try {
+      const bmp = await createImageBitmap(blob);
+      const r = await desenhar(bmp, bmp.width, bmp.height, qualidade);
+      bmp.close && bmp.close();
+      if (r && r.size) return r;
+    } catch (e) { /* cai no plano B */ }
+
+    // plano B: <img> — o Safari decodifica HEIC aqui e devolve JPEG
+    return await new Promise(function (res) {
+      const u = URL.createObjectURL(blob);
+      const im = new Image();
+      im.onload = async function () {
+        try {
+          const r = await desenhar(im, im.naturalWidth, im.naturalHeight, qualidade);
+          URL.revokeObjectURL(u);
+          res(r && r.size ? r : blob);
+        } catch (e) { URL.revokeObjectURL(u); res(blob); }
+      };
+      im.onerror = function () { URL.revokeObjectURL(u); res(blob); };
+      im.src = u;
+    });
   }
 
   async function novoItem(tipo, blob, extras) {
     if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return null; }
-    if (relFinalizado()) { toast('Relatório finalizado — crie um novo para seguir registrando', 3500); return null; }
+    // visita fechada? abre uma nova na mesma conversa, com a data de hoje
+    const alvo = await visitaAberta();
+    if (!alvo) return null;
     const t = talhaoAtual();
     const item = Object.assign({
       id: novoId(),
-      relatorio_id: st.rel.id,
+      relatorio_id: alvo.id,
       tipo: tipo,
       legenda: '',
       mime: blob ? blob.type : null,
@@ -1788,7 +2005,7 @@
                   (posicao.total - posicao.n) + ' arquivo(s) seguintes</label>' : '') +
         '<button class="btn" id="legOk">Adicionar ao relatório</button>' +
         '<button class="btn secundario" id="legCancel">Descartar</button>';
-      document.body.appendChild(veu); document.body.appendChild(folha);
+      veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
 
       let respondeu = false;
       const fechar2 = function (valor) {
@@ -1798,7 +2015,7 @@
         resolve(valor);
       };
       // o véu NÃO descarta a mídia: só os botões decidem (evita perder a foto num toque errado)
-      veu.onclick = function (e) { e.stopPropagation(); };
+      veu.onclick = function (e) { if (e.target === veu) e.stopPropagation(); };
       folha.querySelector('#legCancel').onclick = function () { fechar2(null); };
       folha.querySelector('#legOk').onclick = function () {
         const leg = folha.querySelector('#legTxt').value.trim();
@@ -1824,26 +2041,39 @@
     }
     const r = fixo || await pedirLegenda(blob, tipo, posicao);
     if (!r) return null;
-    const item = await novoItem(tipo, blob, Object.assign(
-      { legenda: r.legenda || '' }, extras || {},
-      { talhao: r.talhao || null, talhao_id: r.talhao_id || null }
-    ));
-    if (!item) return null;
-    await renderChat(); atualizarSync();
-    if (navigator.onLine) Sync.sincronizar(st.rel.id);
-    return r;
+    try {
+      const item = await novoItem(tipo, blob, Object.assign(
+        { legenda: r.legenda || '' }, extras || {},
+        { talhao: r.talhao || null, talhao_id: r.talhao_id || null }
+      ));
+      if (!item) return null;
+      await renderChat(); atualizarSync();
+      if (navigator.onLine) Sync.sincronizar(st.rel.id);
+      return r;
+    } catch (e) {
+      // nunca falhar calado: antes a foto simplesmente sumia
+      toast('Não deu para guardar este arquivo: ' + (e.message || e), 5000);
+      return r;
+    }
   }
 
   // Vários arquivos da galeria: um de cada vez, na ordem.
   async function adicionarVarios(arquivos) {
-    let fixo = null;
+    let fixo = null, ok = 0;
     for (let i = 0; i < arquivos.length; i++) {
-      const f = arquivos[i];
-      const tipo = (f.type || '').indexOf('video') === 0 ? 'video' : 'foto';
-      const r = await adicionarMidia(f, tipo, null, { n: i + 1, total: arquivos.length }, fixo);
+      let b;
+      try {
+        b = await materializar(arquivos[i]);          // lê o arquivo agora, enquanto dá
+      } catch (e) {
+        toast('Não consegui ler ' + (arquivos[i].name || 'o arquivo') + '. Tente pela câmera do app.', 5000);
+        continue;
+      }
+      const tipo = (b.type || '').indexOf('video') === 0 ? 'video' : 'foto';
+      const r = await adicionarMidia(b, tipo, null, { n: i + 1, total: arquivos.length }, fixo);
+      if (r) ok++;
       if (!fixo && r && r.repetir) fixo = { legenda: r.legenda, talhao: r.talhao, talhao_id: r.talhao_id };
     }
-    if (arquivos.length > 1) toast(arquivos.length + ' arquivo(s) processado(s)');
+    if (arquivos.length > 1) toast(ok + ' de ' + arquivos.length + ' adicionado(s)');
   }
 
   /* ---------------- câmera in-app ---------------- */
@@ -1863,6 +2093,8 @@
     }
     $('#camVideo').srcObject = st.stream;
     abrir('telaCamera');
+    medirAltura();
+    setTimeout(medirAltura, 400);
     atualizarGPS();
   }
 
@@ -1986,38 +2218,186 @@
     ob.addEventListener('mouseup', fim);
   }
 
-  /* ---------------- relatórios ---------------- */
+  /* ---------------- conversas (uma linha por fazenda) ---------------- */
   async function listarRelatorios() {
-    const rels = (await DB.all('relatorios')).sort(function (a, b) { return (b.criado_em || '').localeCompare(a.criado_em || ''); });
+    const rels = await DB.all('relatorios');
     const wrap = $('#listaRelatorios');
-    if (!rels.length) { wrap.innerHTML = '<div class="aviso">Nenhum relatório ainda.</div>'; $('#subLista').textContent = '0 relatórios'; return; }
-    $('#subLista').textContent = rels.length + ' relatório(s)';
+    if (!rels.length) {
+      wrap.innerHTML = '<div class="aviso">Nenhum relatório ainda.</div>';
+      $('#subLista').textContent = '0 conversas';
+      return;
+    }
+
+    // agrupa por fazenda
+    const grupos = {};
+    rels.forEach(function (r) {
+      const k = chaveConversa(r);
+      (grupos[k] = grupos[k] || []).push(r);
+    });
+    const chaves = Object.keys(grupos);
+    chaves.forEach(function (k) {
+      grupos[k].sort(function (a, b) { return String(a.criado_em || '').localeCompare(String(b.criado_em || '')); });
+    });
+    chaves.sort(function (a, b) {
+      const ua = grupos[a][grupos[a].length - 1].criado_em || '';
+      const ub = grupos[b][grupos[b].length - 1].criado_em || '';
+      return ub.localeCompare(ua);
+    });
+    $('#subLista').textContent = chaves.length + ' conversa(s) · ' + rels.length + ' visita(s)';
+
     const partes = [];
-    for (const r of rels) {
-      const itens = await DB.itensDoRelatorio(r.id);
-      const pend = itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
+    for (const k of chaves) {
+      const visitas = grupos[k];
+      const ultima = visitas[visitas.length - 1];
+      let registros = 0, pend = 0;
+      for (const v of visitas) {
+        const itens = await DB.itensDoRelatorio(v.id);
+        registros += itens.length;
+        pend += itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
+      }
+      const porEnviar = visitas.filter(function (v) { return v.status !== 'publicado'; });
+      const naFila = visitas.some(function (v) { return v.na_fila; });
+      const icone = naFila ? '📤' : porEnviar.length ? '🌱' : '✅';
+      const selo = naFila ? 'na fila' : porEnviar.length ? porEnviar.length + ' em aberto' : 'tudo enviado';
+      const classeSelo = naFila ? 'fila' : porEnviar.length ? '' : 'pub';
+      const classeBotao = naFila ? ' esperando' : porEnviar.length ? '' : ' pronto';
+      const icoBotao = naFila ? '⏳' : porEnviar.length ? '🔄' : '🔗';
+
       partes.push(
-        '<div class="lista-item" data-rel="' + r.id + '">' +
-        '<div class="ic">' + (r.status === 'publicado' ? '✅' : '🌱') + '</div>' +
-        '<div class="txt"><b>' + esc(r.fazenda || 'Sem fazenda') + '</b>' +
-        '<span>' + esc(r.produtor || '—') + ' · ' + itens.length + ' registros' + (pend ? ' · ' + pend + ' na fila' : '') + '</span></div>' +
-        '<span class="badge ' + (r.status === 'publicado' ? 'pub' : '') + '">' + (r.status === 'publicado' ? 'publicado' : 'rascunho') + '</span>' +
+        '<div class="lista-item" data-rel="' + ultima.id + '">' +
+        '<div class="ic">' + icone + '</div>' +
+        '<div class="txt"><b>' + esc(ultima.fazenda || 'Sem fazenda') + '</b>' +
+        '<span>' + esc(ultima.produtor || '—') + ' · ' + visitas.length + ' visita(s) · ' + registros + ' registros' +
+          (pend ? ' · ' + pend + ' a enviar' : '') + '</span></div>' +
+        '<span class="badge ' + classeSelo + '">' + selo + '</span>' +
+        '<button class="acao-env' + classeBotao + '" data-conversa="' + esc(k) + '" title="Enviar uma visita">' +
+          icoBotao + '</button>' +
         '</div>');
     }
     wrap.innerHTML = partes.join('');
     $$('#listaRelatorios [data-rel]').forEach(function (el) {
       el.onclick = function () { abrirRelatorio(el.dataset.rel); fechar('telaLista'); };
     });
+    $$('#listaRelatorios [data-conversa]').forEach(function (b) {
+      b.onclick = function (ev) { ev.stopPropagation(); escolherVisita(grupos[b.dataset.conversa] || []); };
+    });
+  }
+
+  /* Qual visita enviar: com uma só vai direto; com várias, pergunta. */
+  async function escolherVisita(visitas) {
+    if (!visitas.length) return;
+    if (visitas.length === 1) {
+      return enviarDaLista({ dataset: { env: visitas[0].id }, textContent: '🔄', disabled: false });
+    }
+    const veu = document.createElement('div'); veu.className = 'veu';
+    const folha = document.createElement('div'); folha.className = 'folha';
+    const linhas = [];
+    for (let i = 0; i < visitas.length; i++) {
+      const v = visitas[i];
+      const itens = await DB.itensDoRelatorio(v.id);
+      const estado = v.status === 'publicado' ? 'já enviada · ver link'
+        : v.na_fila ? 'na fila, esperando internet'
+          : itens.length + ' registro(s) · pronta para enviar';
+      linhas.push(
+        '<div class="opcao" data-v="' + v.id + '">' +
+        '<span>' + (v.status === 'publicado' ? '🔗' : v.na_fila ? '⏳' : '🔄') + '</span>' +
+        '<span><b>Visita ' + (i + 1) + ' · ' + esc(dataCurta(v.data_inicio || v.criado_em)) + '</b>' +
+        '<small style="display:block;color:var(--texto-fraco);font-size:12px">' + esc(estado) + '</small></span>' +
+        '</div>');
+    }
+    folha.innerHTML = '<div class="alca"></div>' +
+      '<h2 style="margin-top:0">Qual visita enviar?</h2>' +
+      '<p style="margin:0 0 8px;font-size:13px;color:var(--texto-fraco)">' +
+        esc(visitas[0].fazenda || '') + '</p>' + linhas.join('');
+    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
+    const sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    folha.querySelectorAll('.opcao').forEach(function (o) {
+      o.onclick = function () {
+        const id = o.dataset.v; sair();
+        enviarDaLista({ dataset: { env: id }, textContent: '🔄', disabled: false });
+      };
+    });
+  }
+
+  // Botão da lista: finaliza o relatório, sobe tudo e devolve o link do cliente.
+  // Sem internet ele entra na fila e sobe sozinho quando a conexão voltar.
+  async function enviarDaLista(botao) {
+    const rel = await DB.get('relatorios', botao.dataset.env);
+    if (!rel) return;
+
+    if (rel.status === 'publicado') { mostrarLink(await linkDe(rel), rel); return; }
+
+    const itens = await DB.itensDoRelatorio(rel.id);
+
+    // já estava na fila: tenta agora, ou deixa voltar a rascunho
+    if (rel.na_fila) {
+      if (!navigator.onLine) {
+        if (confirm('Ainda sem internet. Ele sobe sozinho assim que conectar.\n\nQuer tirar da fila e voltar a editar?')) {
+          await Sync.cancelarEnvio(rel);
+          if (st.rel && st.rel.id === rel.id) { st.rel = await DB.get('relatorios', rel.id); await renderChat(); }
+          await listarRelatorios();
+        }
+        return;
+      }
+      return tentarPublicar(rel, botao, itens);
+    }
+
+    if (!itens.length) { toast('Este relatório ainda não tem nenhum registro.', 3500); return; }
+
+    if (!navigator.onLine) {
+      if (!confirm('Finalizar "' + (rel.fazenda || 'relatório') + '" com ' + itens.length + ' registro(s)?\n\n' +
+                   'Você está sem internet: ele fica guardado no aparelho e sobe sozinho quando a conexão voltar. ' +
+                   'A partir de agora ele não pode mais ser editado.')) return;
+      await Sync.marcarParaEnvio(rel);
+      if (st.rel && st.rel.id === rel.id) { st.rel = await DB.get('relatorios', rel.id); await renderChat(); }
+      await listarRelatorios(); atualizarSync();
+      toast('Guardado. Sobe sozinho quando a internet voltar.', 5000);
+      return;
+    }
+
+    if (!confirm('Finalizar "' + (rel.fazenda || 'relatório') + '" e enviar para a nuvem?\n\n' +
+                 itens.length + ' registro(s). Depois de finalizado ele não pode mais ser editado.')) return;
+    return tentarPublicar(rel, botao, itens);
+  }
+
+  async function tentarPublicar(rel, botao, itens) {
+    const antes = botao.textContent;
+    botao.textContent = '⏳'; botao.disabled = true;
+    const pend = itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
+    toast(pend ? 'Enviando ' + pend + ' arquivo(s)…' : 'Publicando…', 8000);
+    try {
+      const link = await Sync.publicar(rel);
+      if (st.rel && st.rel.id === rel.id) {
+        st.rel = await DB.get('relatorios', rel.id);
+        await renderChat();
+      }
+      await listarRelatorios();
+      atualizarSync();
+      mostrarLink(link, rel);
+    } catch (e) {
+      // não deu agora: fica na fila, nada se perde
+      await Sync.marcarParaEnvio(rel);
+      await listarRelatorios(); atualizarSync();
+      toast('Não consegui enviar agora (' + e.message + '). Ficou na fila e sobe sozinho.', 6000);
+    }
+  }
+
+  async function linkDe(rel) {
+    const c = await Sync.conf();
+    return String(c.api).replace(/\/$/, '') + '/r/' + rel.id;
   }
 
   async function abrirRelatorio(id) {
     st.rel = await DB.get('relatorios', id);
+    if (!st.rel) return;
     await DB.cfg('ultimo', id);
+    fechar('telaLista');
+    await renderChat();                       // ajusta st.rel para a visita aberta
     $('#tituloRel').textContent = st.rel.fazenda || 'Relatório';
     $('#subtituloRel').textContent = subtitulo();
-    $('#avatarRel').textContent = st.rel.status === 'publicado' ? '✅' : '🌱';
-    fechar('telaLista');
-    await renderChat(); atualizarSync(); atualizarGPS();
+    $('#avatarRel').textContent = visitaFechada(st.rel) ? (st.rel.na_fila ? '📤' : '✅') : '🌱';
+    atualizarSync(); atualizarGPS();
   }
 
   function preencherFormulario(rel) {
@@ -2053,7 +2433,7 @@
       safra: $('#fSafraSel').value.trim(),
       responsavel: $('#fResponsavel').value.trim(),
       servico: $('#fServico').value.trim(),
-      data_inicio: $('#fInicio').value || null,
+      data_inicio: $('#fInicio').value || hojeISO(),
       data_fim: $('#fFim').value || null,
       observacoes: $('#fObs').value.trim(),
       talhoes: faz.talhoes || { type: 'FeatureCollection', features: [] },
@@ -2146,14 +2526,14 @@
       '<div class="opcao" data-a="previa"><span>👁️</span><span>Ver como o cliente vê</span></div>' +
       '<div class="opcao" data-a="publicar"><span>🔗</span><span><b>Finalizar e gerar link</b></span></div>' +
       '<div class="opcao" data-a="lista"><span>📁</span><span>Todos os relatórios</span></div>';
-    document.body.appendChild(veu); document.body.appendChild(folha);
+    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const sair = function () { veu.remove(); folha.remove(); };
-    veu.onclick = sair;
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
     folha.querySelectorAll('.opcao').forEach(function (o) {
       o.onclick = async function () {
         const a = o.dataset.a; sair();
         if (a === 'editar') {
-          if (relFinalizado()) { toast('Relatório finalizado — não dá mais para editar os dados', 3500); return; }
+          if (relFinalizado()) { toast('Esta visita já foi finalizada — crie um registro novo para abrir outra', 4000); return; }
           relEdicao = st.rel; preencherFormulario(st.rel); abrir('telaRel');
         }
         if (a === 'sync') { toast('Sincronizando…'); const r = await Sync.sincronizar(); if (!r.erro) toast(r.enviados + ' enviados, ' + r.falhas + ' falhas'); await renderChat(); atualizarSync(); }
@@ -2164,7 +2544,15 @@
     });
   }
 
+  // o item "Finalizar e gerar link" do menu ⋮ usa o mesmo caminho do botão da lista,
+  // incluindo a fila quando está sem internet
   async function publicarRelatorio() {
+    if (!st.rel) return;
+    const falso = { dataset: { env: st.rel.id }, textContent: '🔄', disabled: false };
+    return enviarDaLista(falso);
+  }
+
+  async function publicarRelatorioAntigo() {
     if (!st.rel) return;
     const pend = st.itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
     toast(pend ? 'Sincronizando ' + pend + ' item(ns)…' : 'Publicando…', 4000);
@@ -2172,25 +2560,29 @@
       const link = await Sync.publicar(st.rel);
       st.rel = await DB.get('relatorios', st.rel.id);
       await renderChat(); atualizarSync();
-      mostrarLink(link);
+      await listarRelatorios();
+      mostrarLink(link, st.rel);
     } catch (e) {
       toast('Não publicou: ' + e.message, 5000);
     }
   }
 
-  function mostrarLink(link) {
+  function mostrarLink(link, relOpcional) {
+    const rel = relOpcional || st.rel || {};
     const veu = document.createElement('div'); veu.className = 'veu';
     const folha = document.createElement('div'); folha.className = 'folha';
     folha.innerHTML = '<div class="alca"></div>' +
       '<h2 style="margin-top:0">Relatório publicado</h2>' +
+      '<p style="margin:0 0 10px;font-size:13.5px;color:var(--texto-fraco)">' +
+        esc(rel.fazenda || '') + (rel.produtor ? ' · ' + esc(rel.produtor) : '') + '</p>' +
       '<div class="campo"><input id="linkOut" readonly value="' + esc(link) + '"></div>' +
-      '<button class="btn" id="btnCompart">Compartilhar no WhatsApp</button>' +
+      '<button class="btn" id="btnCompart">Enviar para o cliente</button>' +
       '<button class="btn secundario" id="btnCopiar">Copiar link</button>' +
       '<button class="btn secundario" id="btnAbrir">Abrir relatório</button>';
-    document.body.appendChild(veu); document.body.appendChild(folha);
-    const sair = function () { veu.remove(); folha.remove(); };
-    veu.onclick = sair;
-    const texto = 'Relatório de visita — ' + (st.rel.fazenda || '') + '\n' + link;
+    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
+    const sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    const texto = 'Relatório de visita — ' + (rel.fazenda || '') + '\n' + link;
     folha.querySelector('#btnCompart').onclick = function () {
       if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto });
       else window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
@@ -2200,7 +2592,7 @@
     };
     folha.querySelector('#btnAbrir').onclick = function () {
       sair();
-      abrirRelatorioPronto(st.rel.id, false);
+      abrirRelatorioPronto(rel.id, false);
     };
   }
 
@@ -2288,12 +2680,13 @@
   /* ---------------- editar registro ---------------- */
 
   function relFinalizado() {
-    return !!(st.rel && st.rel.status === 'publicado');
+    return !!(st.rel && (st.rel.status === 'publicado' || st.rel.na_fila));
   }
 
-  function abrirEdicao(item) {
-    if (relFinalizado()) {
-      toast('Relatório finalizado — os registros não podem mais ser alterados', 3500);
+  async function abrirEdicao(item) {
+    const dono = st.visitas.find(function (v) { return v.id === item.relatorio_id; });
+    if (visitaFechada(dono)) {
+      toast('Esta visita já foi finalizada — os registros dela não mudam mais', 3800);
       return;
     }
     const veu = document.createElement('div'); veu.className = 'veu';
@@ -2307,11 +2700,11 @@
       '<button class="btn" id="edOk">Salvar</button>' +
       '<button class="btn perigo" id="edApagar">Apagar registro</button>' +
       '<button class="btn secundario" id="edCancel">Cancelar</button>';
-    document.body.appendChild(veu); document.body.appendChild(folha);
+    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const campo = folha.querySelector('#edTxt');
     campo.value = item.legenda || '';
     const sair = function () { veu.remove(); folha.remove(); };
-    veu.onclick = sair;
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
     folha.querySelector('#edCancel').onclick = sair;
 
     folha.querySelector('#edOk').onclick = async function () {
@@ -2480,14 +2873,14 @@
       e.target.value = '';
       if (!files.length) return;
       if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return; }
-      if (relFinalizado()) { toast('Relatório finalizado — crie um novo para seguir registrando', 3500); return; }
       await adicionarVarios(files);
     };
 
     ['#inpFoto', '#inpVideo'].forEach(function (sel) {
       $(sel).onchange = async function (e) {
         const f = e.target.files && e.target.files[0]; e.target.value = '';
-        if (f) await adicionarMidia(f, (f.type || '').indexOf('video') === 0 ? 'video' : 'foto');
+        if (!f) return;
+        await adicionarVarios([f]);
       };
     });
 
@@ -2526,14 +2919,24 @@
 
     window.addEventListener('online', atualizarSync);
     window.addEventListener('offline', atualizarSync);
-    Sync.aoMudar(function (evt) {
+    Sync.aoMudar(async function (evt) {
       if (evt.tipo === 'fim') { renderChat(); atualizarSync(); }
       if (evt.tipo === 'item' && evt.estado === 'ok') atualizarSync();
+      if (evt.tipo === 'fila') { listarRelatorios(); atualizarSync(); }
+      // a fila subiu sozinha quando a internet voltou
+      if (evt.tipo === 'publicado') {
+        if (st.rel && st.rel.id === evt.id) { st.rel = await DB.get('relatorios', evt.id); await renderChat(); }
+        await listarRelatorios(); atualizarSync();
+        const r = await DB.get('relatorios', evt.id);
+        toast('Relatório de ' + (evt.fazenda || '') + ' publicado — toque para pegar o link', 10000,
+          function () { mostrarLink(evt.link, r); });
+      }
     });
   }
 
   /* ---------------- init ---------------- */
   async function init() {
+    ligarMedidaDeAltura();
     ligarEventos();
     Conta.ligar();
     // pede ao navegador para não apagar os dados do app quando o aparelho ficar cheio
