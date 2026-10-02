@@ -64,7 +64,12 @@ export default {
           'Este link não existe ou o relatório ainda não foi finalizado pelo técnico.'), 404);
         const { results } = await env.DB.prepare(
           'SELECT * FROM itens WHERE relatorio_id = ? ORDER BY capturado_em ASC').bind(id).all();
-        return html(paginaRelatorio(rel, results || [], env, origem));
+        let perfil = null;
+        if (rel.usuario_id) {
+          perfil = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
+            .bind(rel.usuario_id).first();
+        }
+        return html(paginaRelatorio(rel, results || [], env, origem, perfil));
       }
 
       /* ================= conta ================= */
@@ -107,6 +112,27 @@ export default {
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
 
+      /* ---------- identidade da empresa ---------- */
+
+      if (rota === '/api/perfil' && req.method === 'GET') {
+        const r = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?').bind(me.id).first();
+        return json({ ok: true, perfil: r || { empresa: '', cidade: '', logo: '' } });
+      }
+
+      if (rota === '/api/perfil' && req.method === 'POST') {
+        const b = await req.json();
+        const logo = typeof b.logo === 'string' ? b.logo : '';
+        if (logo && logo.length > 400000) return json({ erro: 'imagem muito grande (máx. ~300 KB)' }, 400);
+        await env.DB.prepare(`
+          INSERT INTO perfis (usuario_id, empresa, cidade, logo, atualizado_em)
+          VALUES (?,?,?,?,datetime('now'))
+          ON CONFLICT(usuario_id) DO UPDATE SET
+            empresa=excluded.empresa, cidade=excluded.cidade, logo=excluded.logo,
+            atualizado_em=datetime('now')
+        `).bind(me.id, String(b.empresa || ''), String(b.cidade || ''), logo).run();
+        return json({ ok: true });
+      }
+
       /* ---------- cadastro ---------- */
 
       if (rota === '/api/cadastro' && req.method === 'GET') {
@@ -114,7 +140,27 @@ export default {
           'SELECT * FROM produtores WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
         const faz = await env.DB.prepare(
           'SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
-        return json({ ok: true, produtores: prod.results || [], fazendas: faz.results || [] });
+        const saf = await env.DB.prepare(
+          'SELECT * FROM safras WHERE usuario_id = ? ORDER BY nome DESC').bind(me.id).all();
+        return json({
+          ok: true,
+          produtores: prod.results || [],
+          fazendas: faz.results || [],
+          safras: saf.results || []
+        });
+      }
+
+      if (rota === '/api/safra' && req.method === 'POST') {
+        const b = await req.json();
+        const nome = String(b.nome || '').trim();
+        if (!nome) return json({ erro: 'informe o nome da safra' }, 400);
+        const ja = await env.DB.prepare('SELECT id FROM safras WHERE usuario_id = ? AND nome = ?')
+          .bind(me.id, nome).first();
+        if (ja) return json({ ok: true, id: ja.id, repetido: true });
+        const id = b.id || novoId('s');
+        await env.DB.prepare('INSERT INTO safras (id,usuario_id,nome) VALUES (?,?,?)')
+          .bind(id, me.id, nome).run();
+        return json({ ok: true, id: id });
       }
 
       if (rota === '/api/produtor' && req.method === 'POST') {
@@ -162,6 +208,8 @@ export default {
           await env.DB.prepare('DELETE FROM produtores WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
         } else if (b.tipo === 'fazenda') {
           await env.DB.prepare('DELETE FROM fazendas WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
+        } else if (b.tipo === 'safra') {
+          await env.DB.prepare('DELETE FROM safras WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
         } else return json({ erro: 'tipo inválido' }, 400);
         return json({ ok: true });
       }

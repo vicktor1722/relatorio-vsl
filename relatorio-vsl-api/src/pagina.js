@@ -14,6 +14,7 @@ body{margin:0;background:#F2F4F2;color:var(--texto);line-height:1.5;
 header.capa{background:var(--verde);color:#fff;padding:22px 22px 18px}
 header.capa .marca{display:flex;align-items:center;gap:12px}
 header.capa .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:22px;flex:none}
+header.capa img.logo{width:auto;max-width:120px;height:46px;object-fit:contain;background:#fff;padding:4px;border-radius:8px;display:block}
 header.capa .marca b{display:block;font-size:14.5px}
 header.capa .marca span{font-size:11.5px;opacity:.85}
 header.capa h1{margin:16px 0 2px;font-size:25px;line-height:1.2}
@@ -102,9 +103,11 @@ function mapaSVG(talhoes, itens) {
   return `<div class="mapa">${s}<div style="font-size:11.5px;color:#6B7B72;margin-top:8px">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`;
 }
 
-export function paginaRelatorio(rel, itens, env, origem) {
-  const empresa = env.EMPRESA || 'VSL Consultoria';
-  const cidade = env.CIDADE || '';
+export function paginaRelatorio(rel, itens, env, origem, perfil) {
+  const p = perfil || {};
+  const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
+  const cidade = p.cidade || env.CIDADE || '';
+  const logo = p.logo || '';
   let talhoes = null;
   try { talhoes = rel.talhoes ? JSON.parse(rel.talhoes) : null; } catch (e) {}
 
@@ -158,7 +161,9 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 <style>${CSS}</style>
 </head><body><div class="folha">
 <header class="capa">
-  <div class="marca"><div class="logo">🌱</div><div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
+  <div class="marca">${logo
+      ? `<img class="logo" src="${esc(logo)}" alt="">`
+      : '<div class="logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
   <h1>${esc(rel.fazenda || 'Relatório de visita')}</h1>
   <p class="sub">${esc(rel.servico || 'Relatório de visita técnica')}</p>
 </header>
