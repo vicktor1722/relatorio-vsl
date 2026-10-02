@@ -286,7 +286,15 @@
         else el.innerHTML = '<video src="' + u + '" preload="metadata" playsinline></video><div class="play">▶</div>' +
           (it.duracao_s ? '<div class="dur">' + mmss(it.duracao_s) + '</div>' : '');
       } else if (it.midia || it.drive_id) {
-        el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">enviado · mídia na nuvem</div>';
+        const mini = await DB.lerMini(it.id);
+        if (mini) {
+          el.innerHTML = '<img src="' + objURL(mini) + '" alt="">' +
+            (it.tipo === 'video' ? '<div class="play">▶</div>' : '') +
+            '<div class="dur" style="right:auto;left:6px">☁️ na nuvem</div>';
+        } else {
+          el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">' +
+            (it.tipo === 'video' ? '▶ vídeo ' : '') + 'enviado · mídia na nuvem</div>';
+        }
       } else {
         el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">⚠️ arquivo não ficou guardado neste aparelho</div>';
       }
@@ -1200,6 +1208,11 @@
           if (it.tipo === 'texto') continue;
           const blob = await DB.lerMidia(it.id);
           if (blob) it.src = objURL(blob);
+          else if (it.midia) {
+            // original já está na nuvem: usa a nuvem quando há internet, senão a miniatura
+            const mini = await DB.lerMini(it.id);
+            it.src = navigator.onLine ? await Sync.urlMidia(it) : (mini ? objURL(mini) : '');
+          }
         }
       } else {
         const r = await Sync.lerRelatorio(id);
@@ -1326,8 +1339,13 @@
       const it = st.itens.find(function (i) { return i.id === alvo.dataset.abrir; });
       if (!it) return;
       const blob = await DB.lerMidia(it.id);
-      if (!blob) return;
-      const u = objURL(blob);
+      let u = null;
+      if (blob) u = objURL(blob);
+      else if (it.midia) {
+        if (!navigator.onLine) { toast('Sem internet: o original está na nuvem. Conecte para abrir.'); return; }
+        u = await Sync.urlMidia(it);
+      }
+      if (!u) return;
       const v = document.createElement('div'); v.className = 'visor';
       v.innerHTML = '<button class="fechar">✕</button>' +
         (it.tipo === 'foto' ? '<img src="' + u + '">' : '<video src="' + u + '" controls autoplay playsinline></video>');
@@ -1338,7 +1356,7 @@
     window.addEventListener('online', atualizarSync);
     window.addEventListener('offline', atualizarSync);
     Sync.aoMudar(async function (evt) {
-      if (evt.tipo === 'fim') { renderChat(); atualizarSync(); }
+      if (evt.tipo === 'fim' || evt.tipo === 'liberado') { renderChat(); atualizarSync(); }
       if (evt.tipo === 'item' && evt.estado === 'ok') atualizarSync();
       if (evt.tipo === 'fila') { listarRelatorios(); atualizarSync(); }
       // a fila subiu sozinha quando a internet voltou

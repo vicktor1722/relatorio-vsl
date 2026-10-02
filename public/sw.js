@@ -1,7 +1,7 @@
 /* Service worker — o app abre sem internet, mas sempre pega a versão nova quando há rede.
    HTML: rede primeiro (cai para o cache se estiver offline).
    Ícones e manifesto: cache primeiro. */
-const CACHE = 'relatorio-vsl-v4';
+const CACHE = 'relatorio-vsl-v6';
 const ESPERA_MS = 3500;   // se a rede não responder nisso, abre pelo cache
 const ESTATICOS = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];
 

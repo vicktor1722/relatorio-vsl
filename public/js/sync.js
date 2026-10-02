@@ -208,6 +208,79 @@
     await DB.put('itens', item);
   }
 
+
+  /* ---------------- liberar o aparelho depois de sincronizar ----------------
+     A foto/vídeo fica guardada no aparelho até subir. Só depois de conferir que o
+     arquivo está de fato na nuvem é que o original sai do aparelho (fica a miniatura). */
+
+  async function urlMidia(item) {
+    if (!item || !item.midia) return null;
+    const c = await conf();
+    return c.api.replace(/\/$/, '') + '/img/' + encodeURIComponent(item.midia);
+  }
+
+  async function estaNaNuvem(item) {
+    try {
+      const u = await urlMidia(item); if (!u) return false;
+      const corte = new AbortController();
+      const t = setTimeout(function () { corte.abort(); }, 15000);
+      const r = await fetch(u, { signal: corte.signal, cache: 'no-store' });
+      clearTimeout(t);
+      const ok = r.ok;
+      try { if (r.body) r.body.cancel(); } catch (e) {}
+      return ok;
+    } catch (e) { return false; }
+  }
+
+  function miniatura(blob) {
+    return new Promise(function (res) {
+      const u = URL.createObjectURL(blob);
+      const im = new Image();
+      im.onload = function () {
+        try {
+          const lado = Math.max(im.naturalWidth, im.naturalHeight) || 1;
+          const e = Math.min(1, 720 / lado);
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(im.naturalWidth * e));
+          cv.height = Math.max(1, Math.round(im.naturalHeight * e));
+          cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+          cv.toBlob(function (b) {
+            URL.revokeObjectURL(u);
+            if (!b) return res(null);
+            b.arrayBuffer().then(function (buf) { res({ bytes: buf, tipo: 'image/jpeg' }); }, function () { res(null); });
+          }, 'image/jpeg', 0.72);
+        } catch (e) { URL.revokeObjectURL(u); res(null); }
+      };
+      im.onerror = function () { URL.revokeObjectURL(u); res(null); };
+      im.src = u;
+    });
+  }
+
+  async function liberarItem(item) {
+    if (!item || item.tipo === 'texto' || item.sync_state !== 'ok' || !item.midia) return false;
+    if (!(await DB.temOriginal(item.id))) return false;
+    if (!(await estaNaNuvem(item))) return false;          // sem confirmação, o original fica
+    let mini = null;
+    if (item.tipo === 'foto') {
+      const blob = await DB.lerMidia(item.id);
+      mini = blob ? await miniatura(blob) : null;
+      if (!mini) return false;                              // não deu para gerar a miniatura: não arrisca
+    }
+    await DB.liberarMidia(item.id, mini);
+    return true;
+  }
+
+  async function liberarSincronizados() {
+    if (!navigator.onLine) return 0;
+    let n = 0;
+    try {
+      const todos = await DB.all('itens');
+      for (const it of todos) { if (await liberarItem(it)) n++; }
+    } catch (e) {}
+    if (n) emitir({ tipo: 'liberado', n: n });
+    return n;
+  }
+
   async function sincronizar(relIdOpcional) {
     if (rodando) return { rodando: true };
     if (!(await logado())) { emitir({ tipo: 'sem-sessao' }); return { erro: 'sem-sessao' }; }
@@ -229,6 +302,7 @@
             emitir({ tipo: 'item', id: item.id, estado: 'enviando' });
             await enviarItem(item);
             enviados++; emitir({ tipo: 'item', id: item.id, estado: 'ok' });
+            try { await liberarItem(item); } catch (e) {}
           } catch (e) {
             item.sync_state = 'erro'; item.erro = e.message; await DB.put('itens', item);
             falhas++; emitir({ tipo: 'item', id: item.id, estado: 'erro', msg: e.message });
@@ -318,6 +392,7 @@
     try {
       await sincronizar();
       await publicarPendentes();
+      await liberarSincronizados();
     } finally {
       emRodada = false;
     }
@@ -336,7 +411,7 @@
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);

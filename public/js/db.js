@@ -65,8 +65,42 @@
       return todos.filter(function (i) { return i.sync_state !== 'ok'; });
     },
 
-    async salvarMidia(id, blob) { return DB.put('midias', { id: id, blob: blob }); },
-    async lerMidia(id) { const m = await DB.get('midias', id); return m ? m.blob : null; },
+    // Guarda os BYTES (ArrayBuffer), não o Blob: o Safari do iPhone costuma falhar com
+    // "Error preparing Blob/File data to be stored in object store". Ainda lê registros antigos.
+    async salvarMidia(id, blob) {
+      const tipo = (blob && blob.type) || 'application/octet-stream';
+      let buf = null;
+      try { buf = await blob.arrayBuffer(); }
+      catch (e) {
+        buf = await new Promise(function (ok, no) {
+          const fr = new FileReader();
+          fr.onload = function () { ok(fr.result); };
+          fr.onerror = function () { no(fr.error || new Error('leitura falhou')); };
+          fr.readAsArrayBuffer(blob);
+        });
+      }
+      return DB.put('midias', { id: id, bytes: buf, tipo: tipo });
+    },
+    async lerMidia(id) {
+      const m = await DB.get('midias', id);
+      if (!m) return null;
+      if (m.bytes) return new Blob([m.bytes], { type: m.tipo || 'application/octet-stream' });
+      return m.blob || null;
+    },
+    // Depois que a mídia subiu para a nuvem: apaga o arquivo grande do aparelho e,
+    // se for foto, deixa só uma miniatura para o chat continuar mostrando offline.
+    async liberarMidia(id, mini) {
+      if (mini) return DB.put('midias', { id: id, mini: mini.bytes, tipoMini: mini.tipo, liberada: true });
+      return DB.del('midias', id);
+    },
+    async lerMini(id) {
+      const m = await DB.get('midias', id);
+      return m && m.mini ? new Blob([m.mini], { type: m.tipoMini || 'image/jpeg' }) : null;
+    },
+    async temOriginal(id) {
+      const m = await DB.get('midias', id);
+      return !!(m && (m.bytes || m.blob));
+    },
 
     async cfg(chave, valor) {
       if (valor === undefined) { const r = await DB.get('config', chave); return r ? r.valor : null; }
