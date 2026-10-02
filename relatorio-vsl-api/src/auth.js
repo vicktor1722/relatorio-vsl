@@ -27,7 +27,7 @@ export async function hashSenha(senha, saltB64) {
   const salt = saltB64 ? deB64url(saltB64) : crypto.getRandomValues(new Uint8Array(16));
   const chave = await crypto.subtle.importKey('raw', te.encode(senha), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, 100000: 150000, hash: 'SHA-256' }, chave, 256);
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, chave, 256);
   return b64url(salt) + '$' + b64url(bits);
 }
 
