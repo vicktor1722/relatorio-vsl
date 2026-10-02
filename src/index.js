@@ -34,7 +34,7 @@ export default {
 
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
-        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0 });
+        return json({ ok: true, midia: e.modo || null, conectado: e.conectado !== false, usado: e.usado || 0, limite: e.limite || 0 });
       }
 
       if (rota.startsWith('/img/')) {
@@ -285,7 +285,8 @@ export default {
         if (!itemId || !relId) return json({ erro: 'faltam X-Item-Id / X-Rel-Id' }, 400);
 
         const dono = await env.DB.prepare('SELECT usuario_id FROM relatorios WHERE id = ?').bind(relId).first();
-        if (dono && dono.usuario_id && dono.usuario_id !== me.id) return json({ erro: 'relatório de outro usuário' }, 403);
+        if (!dono) return json({ erro: 'relatório não encontrado no servidor' }, 404);
+        if (dono.usuario_id && dono.usuario_id !== me.id) return json({ erro: 'relatório de outro usuário' }, 403);
 
         const existente = await env.DB.prepare('SELECT midia FROM itens WHERE id = ?').bind(itemId).first();
         if (existente && existente.midia) return json({ ok: true, midia: existente.midia, repetido: true });
@@ -298,6 +299,11 @@ export default {
 
       if (rota === '/api/item' && req.method === 'POST') {
         const i = await req.json();
+        const donoItem = await env.DB.prepare('SELECT usuario_id FROM relatorios WHERE id = ?').bind(i.relatorio_id).first();
+        if (!donoItem) return json({ erro: 'relatório não encontrado no servidor' }, 404);
+        if (donoItem.usuario_id && donoItem.usuario_id !== me.id) return json({ erro: 'relatório de outro usuário' }, 403);
+        if (!i.id || !i.relatorio_id || !i.tipo || !i.capturado_em) return json({ erro: 'item incompleto' }, 400);
+        if (i.tipo !== 'texto' && !i.midia) return json({ erro: 'mídia ainda não foi armazenada' }, 400);
         await env.DB.prepare(`
           INSERT INTO itens (id,relatorio_id,tipo,legenda,midia,mime,duracao_s,bytes,lat,lon,precisao_m,altitude_m,talhao,talhao_id,capturado_em,ordem)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -316,6 +322,9 @@ export default {
         const rel = await env.DB.prepare('SELECT usuario_id FROM relatorios WHERE id = ?').bind(id).first();
         if (!rel) return json({ erro: 'relatório não encontrado no servidor' }, 404);
         if (rel.usuario_id && rel.usuario_id !== me.id) return json({ erro: 'relatório de outro usuário' }, 403);
+        const pend = await env.DB.prepare("SELECT COUNT(*) AS n FROM itens WHERE relatorio_id = ? AND tipo <> 'texto' AND (midia IS NULL OR midia = '')")
+          .bind(id).first();
+        if (Number(pend && pend.n || 0) > 0) return json({ erro: 'há mídia pendente de armazenamento; sincronize novamente antes de publicar' }, 409);
         await env.DB.prepare("UPDATE relatorios SET status='publicado', publicado_em=datetime('now'), atualizado_em=datetime('now') WHERE id = ?")
           .bind(id).run();
         return json({ ok: true, link: origem + '/r/' + id });
