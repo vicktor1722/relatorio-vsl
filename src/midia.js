@@ -18,11 +18,13 @@ export async function salvar(env, { chave, mime, dados }) {
   const modo = onde(env);
 
   if (modo === 'r2') {
+    if (!env.MIDIA) throw new Error('armazenamento R2 não configurado');
     await env.MIDIA.put(chave, dados, { httpMetadata: { contentType: mime } });
     return { chave, bytes: dados.byteLength };
   }
 
   if (modo === 'kv') {
+    if (!env.MIDIA_KV) throw new Error('armazenamento KV não configurado');
     if (dados.byteLength > 25 * 1024 * 1024) throw new Error('arquivo maior que 25 MB (limite do KV)');
     await env.MIDIA_KV.put(chave, dados, { metadata: { mime } });
     return { chave, bytes: dados.byteLength };
@@ -51,7 +53,7 @@ export async function ler(env, chave) {
     return { corpo: r.value, mime: (r.metadata && r.metadata.mime) || 'application/octet-stream' };
   }
 
-  return null;
+  throw new Error('nenhum armazenamento de mídia configurado');
 }
 
 export async function espaco(env) {
