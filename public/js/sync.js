@@ -68,7 +68,11 @@
     clearTimeout(relogio);
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (e) {}
-    if (r.status === 401) { emitir({ tipo: 'sem-sessao' }); throw new Error('sessão expirada'); }
+    if (r.status === 401) {
+      // no login, 401 quer dizer e-mail/senha errados — não é sessão expirada
+      if (rota === '/api/entrar' || rota === '/api/registrar') throw new Error((j && j.erro) || 'e-mail ou senha incorretos');
+      emitir({ tipo: 'sem-sessao' }); throw new Error('sessão expirada');
+    }
     if (!r.ok) throw new Error((j && j.erro) || ('HTTP ' + r.status));
     return j;
   }
@@ -97,6 +101,17 @@
     try { localStorage.removeItem(CHAVE_LOCAL); } catch (e) {}
     await salvarConf({ token: null });
     await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], em: null });
+  }
+
+  // Outra conta entrou neste aparelho: zera tudo que era da conta anterior
+  // (relatórios, fotos, identidade da empresa, cadastro). Mantém só o login e o endereço do servidor.
+  async function limparDadosLocais() {
+    for (const loja of ['relatorios', 'itens', 'midias']) await DB.limpar(loja);
+    const c = await conf();
+    delete c.empresa; delete c.cidade; delete c.logo;
+    await DB.cfg('servidor', c);
+    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], em: null });
+    await DB.cfg('ultimo', null);
   }
 
   async function logado() {
@@ -411,7 +426,7 @@
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    limparDadosLocais, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);
