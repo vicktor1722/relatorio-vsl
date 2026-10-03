@@ -26,7 +26,10 @@ export async function ehAdmin(env, me) {
 
 /* ---------------- dados ---------------- */
 
-export async function resumoAdmin(env) {
+export async function resumoAdmin(env, me, adm) {
+  // conta comum: só enxerga o que é dela; administrador enxerga tudo
+  const meu = adm ? '' : ' AND r.usuario_id = ?';
+  const arg = adm ? [] : [me.id];
   const contas = await env.DB.prepare(`
     SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id) AS relatorios,
@@ -35,8 +38,9 @@ export async function resumoAdmin(env) {
            (SELECT COUNT(*) FROM fazendas f WHERE f.usuario_id = u.id) AS fazendas,
            (SELECT MAX(r.atualizado_em) FROM relatorios r WHERE r.usuario_id = u.id) AS ultima_atividade
       FROM usuarios u
+     WHERE ${adm ? '1=1' : 'u.id = ?'}
      ORDER BY u.criado_em DESC
-  `).all();
+  `).bind(...(adm ? [] : [me.id])).all();
 
   const relatorios = await env.DB.prepare(`
     SELECT r.id, r.fazenda, r.produtor, r.safra, r.servico, r.responsavel,
@@ -46,12 +50,13 @@ export async function resumoAdmin(env) {
            (SELECT COUNT(*) FROM itens i WHERE i.relatorio_id = r.id AND i.tipo='foto') AS fotos,
            (SELECT COUNT(*) FROM itens i WHERE i.relatorio_id = r.id AND i.tipo='video') AS videos
       FROM relatorios r LEFT JOIN usuarios u ON u.id = r.usuario_id
+     WHERE 1=1${meu}
      ORDER BY (r.status = 'publicado') DESC,
               replace(CASE WHEN r.status = 'publicado'
                            THEN COALESCE(r.publicado_em, r.atualizado_em, r.criado_em)
                            ELSE COALESCE(r.atualizado_em, r.criado_em) END, 'T', ' ') DESC
      LIMIT 500
-  `).all();
+  `).bind(...arg).all();
 
   // um ponto por relatório: a média das coordenadas dos registros daquela visita
   const pontos = await env.DB.prepare(`
@@ -61,10 +66,10 @@ export async function resumoAdmin(env) {
       FROM itens i
       JOIN relatorios r ON r.id = i.relatorio_id
       LEFT JOIN usuarios u ON u.id = r.usuario_id
-     WHERE i.lat IS NOT NULL AND i.lon IS NOT NULL
+     WHERE i.lat IS NOT NULL AND i.lon IS NOT NULL${meu}
      GROUP BY i.relatorio_id
      LIMIT 1000
-  `).all();
+  `).bind(...arg).all();
 
   const acessos = await contagemAcessos(env);
   (relatorios.results || []).forEach((r) => {
@@ -74,10 +79,14 @@ export async function resumoAdmin(env) {
     r.ultimo_acesso = a.ultimo || null;
   });
 
-  const itens = await env.DB.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes FROM itens').first();
+  const itens = adm
+    ? await env.DB.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes FROM itens').first()
+    : await env.DB.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(i.bytes),0) AS bytes FROM itens i
+        JOIN relatorios r ON r.id = i.relatorio_id WHERE r.usuario_id = ?`).bind(me.id).first();
 
   return {
     ok: true,
+    eu: { admin: !!adm, id: me.id, nome: me.nome || '', email: me.email || '' },
     contas: contas.results || [],
     relatorios: relatorios.results || [],
     pontos: pontos.results || [],
@@ -127,7 +136,7 @@ export function paginaAdmin(empresa) {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#1B7A43">
-<title>Administração · ${esc(empresa || 'Relatório VSL')}</title>
+<title>Painel · ${esc(empresa || 'Relatório VSL')}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#E8F4EC;--texto:#1B2B22;
@@ -191,7 +200,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 </head><body>
 
 <div id="telaEntrar" class="entrar">
-  <h1>Administração</h1>
+  <h1>Painel de relatórios</h1>
   <p>${esc(empresa || 'Relatório de Campo VSL')}</p>
   <div class="campo"><label>E-mail</label><input id="eMail" type="email" autocomplete="username"></div>
   <div class="campo"><label>Senha</label><input id="eSenha" type="password" autocomplete="current-password"></div>
@@ -201,13 +210,13 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 
 <div id="telaPainel" style="display:none">
   <header class="topo">
-    <div style="flex:1"><h1>Administração<small id="quem"></small></h1></div>
+    <div style="flex:1"><h1 id="titulo">Administração<small id="quem"></small></h1></div>
     <button id="btnAtualizar">Atualizar</button>
     <button id="btnSair">Sair</button>
   </header>
   <div class="abas">
     <button class="on" data-aba="dash">Dashboard</button>
-    <button data-aba="contas">Contas</button>
+    <button data-aba="contas" id="abaContas">Contas</button>
     <button data-aba="rels">Relatórios</button>
   </div>
   <main>
@@ -251,8 +260,8 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 
     <section class="painel" id="pRels">
       <div class="caixa">
-        <h2>Todos os relatórios</h2>
-        <div class="campo"><input id="filtro" placeholder="filtrar por fazenda, produtor ou conta"></div>
+        <h2 id="hRels">Todos os relatórios</h2>
+        <div class="campo"><input id="filtro" placeholder="filtrar por fazenda, produtor ou safra"></div>
         <div class="rolagem"><table id="tRels"></table></div>
       </div>
     </section>
@@ -334,11 +343,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     try {
       dados = await api('/api/admin/resumo');
     } catch (e) {
-      if (String(e.message).indexOf('admin') >= 0 || String(e.message).indexOf('403') >= 0) {
-        aviso($('#eMsg'), 'Esta conta não tem acesso de administrador.', true);
-      } else {
-        aviso($('#eMsg'), e.message, true);
-      }
+      aviso($('#eMsg'), e.message, true);
       token = ''; try { localStorage.removeItem(CHAVE); } catch (er) {}
       $('#telaEntrar').style.display = '';
       $('#telaPainel').style.display = 'none';
@@ -346,7 +351,14 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     }
     $('#telaEntrar').style.display = 'none';
     $('#telaPainel').style.display = '';
-    $('#quem').textContent = dados.totais.contas + ' contas · ' + dados.totais.relatorios + ' relatórios';
+    var adm = !!(dados.eu && dados.eu.admin);
+    $('#titulo').firstChild.nodeValue = adm ? 'Administração' : 'Meus relatórios';
+    $('#quem').textContent = adm
+      ? dados.totais.contas + ' contas · ' + dados.totais.relatorios + ' relatórios'
+      : (dados.eu.nome || dados.eu.email) + ' · ' + dados.totais.relatorios + ' relatórios';
+    $('#abaContas').style.display = adm ? '' : 'none';
+    $('#hRels').textContent = adm ? 'Todos os relatórios' : 'Meus relatórios';
+    if (!adm && $('#pContas').classList.contains('on')) document.querySelector('.abas button[data-aba="dash"]').click();
     desenharKpis();
     desenharContas();
     desenharRelatorios();
@@ -357,8 +369,9 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
   function desenharKpis() {
     var t = dados.totais;
     var pub = dados.relatorios.filter(function (r) { return r.status === 'publicado'; }).length;
+    var adm = !!(dados.eu && dados.eu.admin);
     $('#kpis').innerHTML =
-      cartao(t.contas, 'contas') +
+      (adm ? cartao(t.contas, 'contas') : '') +
       cartao(t.relatorios, 'relatórios') +
       cartao(pub, 'já enviados ao cliente') +
       cartao(t.registros, 'fotos, vídeos e notas') +
