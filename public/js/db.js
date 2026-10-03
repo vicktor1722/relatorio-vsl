@@ -52,6 +52,7 @@
     async get(store, id) { const s = await tx(store); return pedido(s.get(id)); },
     async del(store, id) { const s = await tx(store, 'readwrite'); return pedido(s.delete(id)); },
     async all(store) { const s = await tx(store); return pedido(s.getAll()); },
+    async limpar(store) { const s = await tx(store, 'readwrite'); return pedido(s.clear()); },
 
     async itensDoRelatorio(relId) {
       const s = await tx('itens');
