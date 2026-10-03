@@ -130,8 +130,10 @@ export default {
 
       /* ---------- administração ---------- */
       if (rota.startsWith('/api/admin/')) {
-        if (!(await ehAdmin(env, me))) return json({ erro: 'esta conta não tem acesso de administrador' }, 403);
-        if (rota === '/api/admin/resumo') return json(await resumoAdmin(env));
+        const adm = await ehAdmin(env, me);
+        // qualquer conta vê o próprio painel; admin vê o de todos
+        if (rota === '/api/admin/resumo') return json(await resumoAdmin(env, me, adm));
+        if (!adm) return json({ erro: 'esta conta não tem acesso de administrador' }, 403);
         if (rota === '/api/admin/usuario' && req.method === 'POST') {
           try { return json(await criarConta(env, await req.json())); }
           catch (e) { return json({ erro: e.message }, 400); }
