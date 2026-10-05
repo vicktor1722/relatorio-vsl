@@ -194,6 +194,38 @@ function blocoGrupos(midias) {
   }).join('');
 }
 
+/* Junta várias visitas já publicadas (mesma conta) em um único relatório para o cliente. */
+export function juntarRelatorios(rels) {
+  const lista = rels.slice().sort((a, b) =>
+    String(a.data_inicio || a.criado_em).localeCompare(String(b.data_inicio || b.criado_em)));
+  const unicos = (campo, sep) => [...new Set(lista.map(r => String(r[campo] || '').trim()).filter(Boolean))].join(sep);
+  const datas = lista.map(r => String(r.data_inicio || r.criado_em || '').slice(0, 10)).filter(Boolean);
+  const fins = lista.map(r => String(r.data_fim || r.data_inicio || r.criado_em || '').slice(0, 10)).filter(Boolean);
+
+  // polígonos: cada talhão aparece uma vez só, mesmo que esteja em várias visitas
+  const vistos = new Set(), feats = [];
+  lista.forEach(r => {
+    let t = null; try { t = r.talhoes ? JSON.parse(r.talhoes) : null; } catch (e) {}
+    ((t && t.features) || []).forEach(f => {
+      const k = (f.properties && f.properties.nome) || JSON.stringify(f.geometry || '');
+      if (!vistos.has(k)) { vistos.add(k); feats.push(f); }
+    });
+  });
+
+  const obs = lista.filter(r => r.observacoes)
+    .map(r => `${fmtData(r.data_inicio || r.criado_em)}: ${r.observacoes}`).join('\n');
+
+  return Object.assign({}, lista[0], {
+    fazenda: unicos('fazenda', ' · '), produtor: unicos('produtor', ', '), safra: unicos('safra', ', '),
+    servico: unicos('servico', ' · '), responsavel: unicos('responsavel', ', '),
+    data_inicio: datas.sort()[0] || null, data_fim: fins.sort().pop() || null,
+    observacoes: obs,
+    talhoes: feats.length ? JSON.stringify({ type: 'FeatureCollection', features: feats }) : '',
+    publicado_em: lista.map(r => r.publicado_em).filter(Boolean).sort().pop() || null,
+    _n: lista.length
+  });
+}
+
 export function paginaRelatorio(rel, itens, env, origem, perfil) {
   const p = perfil || {};
   const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
@@ -213,7 +245,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
   // observações gerais (texto solto) sobem para logo depois do mapa
   const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
   const notasTopo = (rel.observacoes ? `<div class="nota">${esc(rel.observacoes)}</div>` : '') +
-    (gNotas ? gNotas.itens.map(i => `<div class="nota">${esc(i.legenda)}</div>`).join('') : '');
+    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${fmtData(i.capturado_em)}</b> · ` : ''}${esc(i.legenda)}</div>`).join('') : '');
   const obsGerais = notasTopo ? `<h2 class="talhao">Observações gerais</h2>${notasTopo}` : '';
 
   let corpo = '';
@@ -237,7 +269,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
     });
   });
 
-  const titulo = `Relatório de visita — ${rel.fazenda || ''}`;
+  const titulo = `${rel._n > 1 ? 'Relatório de ' + rel._n + ' visitas' : 'Relatório de visita'} — ${rel.fazenda || ''}`;
   const descricao = [rel.servico, rel.produtor, `${fotos} fotos`, videos ? `${videos} vídeos` : null]
     .filter(Boolean).join(' · ');
 
@@ -269,6 +301,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 </div>
 <div class="corpo">
   <div class="resumo">
+    ${rel._n > 1 ? `<div><b>${rel._n}</b><span>visitas</span></div>` : ''}
     <div><b>${fotos}</b><span>fotos</span></div>
     <div><b>${videos}</b><span>vídeos</span></div>
     <div><b>${talhoesVisitados}</b><span>talhões registrados</span></div>
