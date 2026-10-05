@@ -5,7 +5,7 @@
 import { conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
-import { paginaRelatorio, paginaSimples } from './pagina.js';
+import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { registrarAcesso } from './acessos.js';
 import { criarConta, ehAdmin, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
 
@@ -64,7 +64,34 @@ export default {
       }
 
       if (rota.startsWith('/r/')) {
-        const id = rota.slice(3).replace(/\/$/, '');
+        let bruto = rota.slice(3).replace(/\/$/, '');
+        try { bruto = decodeURIComponent(bruto); } catch (e) {}
+        const ids = [...new Set(bruto.split(/[+,\s]+/).filter(Boolean))].slice(0, 20);
+
+        // link único com várias visitas: /r/<id1>+<id2>+...
+        if (ids.length > 1) {
+          const marcas = ids.map(() => '?').join(',');
+          const { results: rels } = await env.DB.prepare(
+            `SELECT * FROM relatorios WHERE status = 'publicado' AND id IN (${marcas})`).bind(...ids).all();
+          const donos = new Set((rels || []).map((r) => r.usuario_id || ''));
+          if (!rels || rels.length !== ids.length || donos.size !== 1) {
+            return html(paginaSimples('Relatório não disponível',
+              'Este link não existe ou alguma das visitas ainda não foi finalizada pelo técnico.'), 404);
+          }
+          const { results: todos } = await env.DB.prepare(
+            `SELECT * FROM itens WHERE relatorio_id IN (${marcas}) ORDER BY capturado_em ASC`).bind(...ids).all();
+          let perfilJ = null;
+          if (rels[0].usuario_id) {
+            perfilJ = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
+              .bind(rels[0].usuario_id).first();
+          }
+          if (req.method === 'GET' && url.searchParams.get('sc') !== '1') {
+            ids.forEach((i) => ctx.waitUntil(registrarAcesso(env, req, i)));
+          }
+          return html(paginaRelatorio(juntarRelatorios(rels), todos || [], env, origem, perfilJ));
+        }
+
+        const id = ids[0] || '';
         const rel = await env.DB.prepare('SELECT * FROM relatorios WHERE id = ? AND status = ?')
           .bind(id, 'publicado').first();
         if (!rel) return html(paginaSimples('Relatório não disponível',
