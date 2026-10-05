@@ -285,6 +285,40 @@
     return true;
   }
 
+  // Traz de volta o que a conta já enviou para a nuvem e não está mais neste aparelho
+  // (relatórios e registros; as fotos continuam na nuvem e aparecem de lá).
+  async function restaurarDaNuvem() {
+    if (!navigator.onLine) throw new Error('sem conexão');
+    const j = await chamar('/api/restaurar');
+    const locais = new Set((await DB.all('relatorios')).map(function (r) { return r.id; }));
+    const novos = (j.relatorios || []).filter(function (r) { return !locais.has(r.id); });
+    const ids = new Set(novos.map(function (r) { return r.id; }));
+    let nRel = 0, nIt = 0;
+    for (const r of novos) {
+      let talh = r.talhoes;
+      if (typeof talh === 'string') { try { talh = talh ? JSON.parse(talh) : null; } catch (e) { talh = null; } }
+      await DB.put('relatorios', {
+        id: r.id, produtor_id: r.produtor_id || null, fazenda_id: r.fazenda_id || null,
+        produtor: r.produtor || '', fazenda: r.fazenda || '', safra: r.safra || '', servico: r.servico || '',
+        responsavel: r.responsavel || '', data_inicio: r.data_inicio, data_fim: r.data_fim,
+        observacoes: r.observacoes || '', talhoes: talh || null,
+        status: r.status || 'rascunho', publicado_em: r.publicado_em || null,
+        criado_em: r.criado_em || new Date().toISOString()
+      });
+      nRel++;
+    }
+    const jaTem = new Set((await DB.all('itens')).map(function (i) { return i.id; }));
+    for (const i of (j.itens || [])) {
+      if (!ids.has(i.relatorio_id) || jaTem.has(i.id)) continue;
+      await DB.put('itens', Object.assign({}, i, { sync_state: 'ok', erro: null }));
+      nIt++;
+    }
+    return {
+      relatorios: nRel, itens: nIt,
+      abertos: novos.filter(function (r) { return r.status !== 'publicado'; }).map(function (r) { return r.id; })
+    };
+  }
+
   async function liberarSincronizados() {
     if (!navigator.onLine) return 0;
     let n = 0;
@@ -426,7 +460,7 @@
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    limparDadosLocais, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    limparDadosLocais, restaurarDaNuvem, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);
