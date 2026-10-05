@@ -1277,6 +1277,16 @@
     };
     $('#btnTestar').onclick = testarConexao;
     $('#btnSincronizarTudo').onclick = async function () { toast('Sincronizando…'); const r = await Sync.sincronizar(); toast('Enviados: ' + (r.enviados || 0)); await renderChat(); atualizarSync(); };
+    $('#btnRecuperar').onclick = async function () {
+      toast('Buscando na nuvem…', 4000);
+      try {
+        const r = await Sync.restaurarDaNuvem();
+        await listarRelatorios(); atualizarSync();
+        toast(r.relatorios
+          ? 'Recuperei ' + r.relatorios + ' visita(s) e ' + r.itens + ' registro(s). Veja na lista de conversas.'
+          : 'Não havia nada novo na nuvem para trazer.', 6000);
+      } catch (e) { toast('Não consegui recuperar: ' + e.message, 5000); }
+    };
     $('#btnAnexo').onclick = function () { $('#inpArquivo').click(); };
 
     $('#btnApagarRel').onclick = async function () {
@@ -1393,6 +1403,12 @@
       });
     }
 
+    try {
+      if (/[?&]recuperar=1/.test(location.search)) {
+        localStorage.setItem('vsl-recuperar', '1');
+        history.replaceState(null, '', location.pathname);
+      }
+    } catch (e) {}
     iniciarGPS();
     ligarToqueGps();
     Sync.autoSync();
@@ -1405,6 +1421,7 @@
       await Conta.mostrarLogin();
     } else {
       await Conta.atualizarCadastro(navigator.onLine);
+      await recuperarSeSolicitado();
     }
     if (!st.rel) { await renderChat(); await listarRelatorios(); abrir('telaLista'); }
     atualizarSync();
@@ -1414,8 +1431,26 @@
     }
   }
 
+  // Link de recuperação: amvs.ia.br/?recuperar=1 — traz da nuvem o que sumiu do aparelho
+  async function recuperarSeSolicitado() {
+    let ped = false;
+    try { ped = !!localStorage.getItem('vsl-recuperar'); } catch (e) {}
+    if (!ped || !navigator.onLine || !(await Sync.logado())) return;
+    try {
+      toast('Recuperando seus relatórios da nuvem…', 5000);
+      const r = await Sync.restaurarDaNuvem();
+      try { localStorage.removeItem('vsl-recuperar'); } catch (e) {}
+      await listarRelatorios(); atualizarSync();
+      if (r.abertos.length === 1) { await abrirRelatorio(r.abertos[0]); }
+      toast(r.relatorios
+        ? 'Recuperado: ' + r.relatorios + ' visita(s) e ' + r.itens + ' registro(s). Pode continuar.'
+        : 'Não havia nada novo na nuvem para trazer.', 7000);
+    } catch (e) { toast('Não consegui recuperar: ' + e.message + '. Abra o link de novo com internet.', 6000); }
+  }
+
   global.App = {
     aoEntrar: async function () {
+      await recuperarSeSolicitado();
       await listarRelatorios();
       await renderChat();
       atualizarSync();
