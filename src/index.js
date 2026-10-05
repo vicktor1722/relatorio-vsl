@@ -255,6 +255,18 @@ export default {
 
       /* ---------- relatórios ---------- */
 
+      // tudo o que a conta já mandou para a nuvem — o app usa para recuperar o que sumiu do aparelho
+      if (rota === '/api/restaurar' && req.method === 'GET') {
+        const rels = await env.DB.prepare('SELECT * FROM relatorios WHERE usuario_id = ? ORDER BY criado_em DESC LIMIT 300')
+          .bind(me.id).all();
+        const itens = await env.DB.prepare(`
+          SELECT i.id, i.relatorio_id, i.tipo, i.legenda, i.midia, i.mime, i.duracao_s, i.bytes, i.lat, i.lon,
+                 i.precisao_m, i.altitude_m, i.talhao, i.talhao_id, i.capturado_em, i.ordem
+            FROM itens i JOIN relatorios r ON r.id = i.relatorio_id
+           WHERE r.usuario_id = ? ORDER BY i.capturado_em LIMIT 5000`).bind(me.id).all();
+        return json({ ok: true, relatorios: rels.results || [], itens: itens.results || [] });
+      }
+
       if (rota === '/api/relatorios' && req.method === 'GET') {
         const r = await env.DB.prepare(
           'SELECT id,fazenda,produtor,safra,status,publicado_em,criado_em FROM relatorios WHERE usuario_id = ? ORDER BY criado_em DESC LIMIT 200')
