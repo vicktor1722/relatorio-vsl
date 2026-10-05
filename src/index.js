@@ -231,6 +231,14 @@ export default {
 
       if (rota === '/api/produtor' && req.method === 'POST') {
         const p = await req.json();
+        // sem id = cadastro novo: se a conta já tem um produtor com esse nome, devolve o existente
+        if (!p.id) {
+          // (comparação em JS: o lower() do SQLite não entende acentos, ex.: JOÃO x João)
+          const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+          const { results: todos } = await env.DB.prepare('SELECT id, nome FROM produtores WHERE usuario_id = ?').bind(me.id).all();
+          const ja = (todos || []).find((x) => norm(x.nome) === norm(p.nome));
+          if (ja) return json({ ok: true, id: ja.id, repetido: true });
+        }
         const id = p.id || novoId('p');
         await env.DB.prepare(`
           INSERT INTO produtores (id,usuario_id,nome,documento,telefone,observacoes,atualizado_em)
@@ -245,6 +253,24 @@ export default {
 
       if (rota === '/api/fazenda' && req.method === 'POST') {
         const f = await req.json();
+        // sem id = cadastro novo: mesma fazenda (nome + produtor) já cadastrada? devolve a existente
+        if (!f.id) {
+          const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+          const { results: todas } = await env.DB.prepare('SELECT id, nome, produtor_id, talhoes FROM fazendas WHERE usuario_id = ?').bind(me.id).all();
+          const ja = (todas || []).find((x) => norm(x.nome) === norm(f.nome) && (x.produtor_id || '') === (f.produtor_id || ''));
+          if (ja) {
+            // se a existente está sem talhões e esta veio com KML, aproveita o KML
+            const novo = f.talhoes ? (typeof f.talhoes === 'string' ? f.talhoes : JSON.stringify(f.talhoes)) : '';
+            if (novo && !ja.talhoes) {
+              let n2 = 0, a2 = 0;
+              try { const o2 = JSON.parse(novo); n2 = (o2.features || []).length;
+                a2 = (o2.features || []).reduce((s, x) => s + ((x.properties && x.properties.area_ha) || 0), 0); } catch (e) {}
+              await env.DB.prepare("UPDATE fazendas SET talhoes = ?, n_talhoes = ?, area_ha = ?, atualizado_em = datetime('now') WHERE id = ? AND usuario_id = ?")
+                .bind(novo, n2, a2, ja.id, me.id).run();
+            }
+            return json({ ok: true, id: ja.id, repetido: true });
+          }
+        }
         const id = f.id || novoId('f');
         const gj = f.talhoes ? (typeof f.talhoes === 'string' ? f.talhoes : JSON.stringify(f.talhoes)) : '';
         let n = 0, area = 0;
