@@ -88,10 +88,18 @@
 
   /* ---------------- cadastro ---------------- */
 
+  let estadoCadastro = { falha: null, conta: '' };
+  let ultimaBaixa = 0;
+
   async function atualizarCadastro(baixar) {
+    if (baixar) {
+      estadoCadastro = { falha: null, conta: String((await Sync.conf()).email || '') };
+      ultimaBaixa = Date.now();
+    }
     try {
       cadastro = baixar ? await Sync.baixarCadastro() : await Sync.cadastroLocal();
     } catch (e) {
+      estadoCadastro.falha = e.message || 'erro';
       cadastro = await Sync.cadastroLocal();
     }
     renderCadastro();
@@ -99,9 +107,51 @@
     return cadastro;
   }
 
+  // atualização silenciosa ao voltar para o app, para vários celulares da mesma conta ficarem iguais
+  async function atualizarSePrecisar() {
+    if (!navigator.onLine || Date.now() - ultimaBaixa < 30000) return;
+    if (!(await Sync.logado())) return;
+    await atualizarCadastro(true);
+  }
+
+  // o mesmo cliente nunca é cadastrado duas vezes: confere a lista da nuvem antes de criar
+  const norm = function (s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); };
+  async function jaCadastrado(tipo, nome, produtorId) {
+    if (navigator.onLine) await atualizarCadastro(true);
+    const lista = tipo === 'produtor' ? (cadastro.produtores || []) : (cadastro.fazendas || []);
+    return lista.find(function (x) {
+      return norm(x.nome) === norm(nome) && (tipo === 'produtor' || (x.produtor_id || '') === (produtorId || ''));
+    });
+  }
+
+  function statusCadastro() {
+    let el = $('#avisoCadastro');
+    if (!el) {
+      const ref = $('#btnNovaFazenda');
+      if (!ref || !ref.parentNode) return;
+      el = document.createElement('div'); el.id = 'avisoCadastro';
+      ref.parentNode.insertBefore(el, ref);
+    }
+    const quando = cadastro.em ? new Date(cadastro.em) : null;
+    const hh = quando && !isNaN(quando)
+      ? quando.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
+        quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+    if (estadoCadastro.falha) {
+      el.className = 'aviso';
+      el.innerHTML = '⚠️ Não consegui atualizar da nuvem agora (' + esc(estadoCadastro.falha) + '). ' +
+        'Mostrando a última lista salva neste aparelho (' + hh + '). Toque em 🔄 para tentar de novo.';
+    } else {
+      el.className = '';
+      el.innerHTML = '<div style="font-size:12px;color:#6B7B72;margin:0 2px 10px">Atualizado da nuvem em ' + hh +
+        (estadoCadastro.conta ? ' · conta ' + esc(estadoCadastro.conta) : '') +
+        ' — a lista é a mesma em todos os aparelhos desta conta.</div>';
+    }
+  }
+
   function renderCadastro() {
     const f = cadastro.fazendas || [], p = cadastro.produtores || [], sa = cadastro.safras || [];
     $('#subCadastro').textContent = f.length + ' fazenda(s) · ' + p.length + ' produtor(es) · ' + sa.length + ' safra(s)';
+    statusCadastro();
 
     $('#listaSafras').innerHTML = sa.length ? sa.map(function (x) {
       return '<div class="lista-item"><div class="ic">🌱</div><div class="txt"><b>' + esc(x.nome) +
@@ -212,11 +262,19 @@
     if (!nome) { alert('Informe o nome do produtor.'); return; }
     $('#btnSalvarProdutor').disabled = true;
     try {
+      if (!produtorEdicao) {
+        const ja = await jaCadastrado('produtor', nome);
+        if (ja) {
+          alert('O produtor "' + ja.nome + '" já está cadastrado nesta conta. Para alterar, toque nele na lista.');
+          fechar('telaProdutor'); return;
+        }
+      }
       await Sync.salvarProdutor({
         id: produtorEdicao ? produtorEdicao.id : null, nome: nome,
         documento: $('#pDoc').value.trim(), telefone: $('#pTel').value.trim(),
         observacoes: $('#pObs').value.trim()
       });
+      if (Sync.foiRepetido()) alert('Esse produtor já estava cadastrado em outro aparelho. Mantive o cadastro que já existe.');
       await atualizarCadastro(false);
       fechar('telaProdutor');
     } catch (e) { alert('Não salvou: ' + e.message); }
@@ -295,6 +353,13 @@
     if (!nome) { alert('Informe o nome da fazenda.'); return; }
     $('#btnSalvarFazenda').disabled = true;
     try {
+      if (!fazendaEdicao) {
+        const ja = await jaCadastrado('fazenda', nome, $('#fzProdutor').value || '');
+        if (ja) {
+          alert('A fazenda "' + ja.nome + '" já está cadastrada para esse produtor. Para alterar, toque nela na lista.');
+          fechar('telaFazenda'); return;
+        }
+      }
       const corpo = {
         id: fazendaEdicao ? fazendaEdicao.id : null,
         nome: nome,
@@ -305,6 +370,7 @@
       if (kmlPendente) corpo.talhoes = kmlPendente;
       else if (fazendaEdicao && fazendaEdicao.talhoes) corpo.talhoes = fazendaEdicao.talhoes;
       await Sync.salvarFazenda(corpo);
+      if (Sync.foiRepetido()) alert('Essa fazenda já estava cadastrada em outro aparelho. Mantive o cadastro que já existe.');
       await atualizarCadastro(false);
       fechar('telaFazenda');
     } catch (e) { alert('Não salvou: ' + e.message); }
@@ -363,7 +429,7 @@
   }
 
   global.Conta = {
-    ligar, mostrarLogin, atualizarCadastro, fazendaPorId, produtorPorId,
+    ligar, mostrarLogin, atualizarCadastro, atualizarSePrecisar, fazendaPorId, produtorPorId,
     importarKmlFazenda, preencherSelecoes,
     telaFazendaAberta: () => !$('#telaFazenda').classList.contains('oculto'),
     dados: () => cadastro
