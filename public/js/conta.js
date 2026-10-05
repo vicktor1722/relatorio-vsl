@@ -396,7 +396,12 @@
     $('#loginSenha').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 
     $('#btnAbrirCadastro').onclick = async function () { await atualizarCadastro(true); abrir('telaCadastro'); };
-    $('#btnAtualizarCadastro').onclick = async function () { await atualizarCadastro(true); };
+    $('#btnAtualizarCadastro').onclick = async function () {
+      const b = this; b.disabled = true;
+      const el = $('#avisoCadastro');
+      if (el) { el.className = ''; el.innerHTML = '<div style="font-size:12px;color:#6B7B72;margin:0 2px 10px">Atualizando da nuvem…</div>'; }
+      try { await atualizarCadastro(true); } finally { b.disabled = false; }
+    };
     $('#btnNovoProdutor').onclick = () => abrirProdutor(null);
     $('#btnNovaFazenda').onclick = () => abrirFazenda(null);
     $('#btnNovaSafra').onclick = novaSafra;
