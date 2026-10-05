@@ -236,6 +236,11 @@ input,textarea,select{font:inherit}
 .folha .alca{width:40px;height:4px;border-radius:2px;background:#ccc;margin:6px auto 12px}
 .folha .opcao{display:flex;align-items:center;gap:14px;padding:13px 4px;font-size:15px}
 .folha .opcao span:first-child{width:24px;text-align:center;font-size:18px}
+.folha .opcao.sel{gap:12px;cursor:pointer}
+.folha .opcao.sel input{width:22px;height:22px;accent-color:var(--verde);flex:none}
+.folha .opcao.sel span:first-of-type{width:auto;text-align:left;font-size:15px}
+.folha .opcao.desab{opacity:.5}
+.visita{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .veu{
   position:fixed;top:0;left:0;right:0;height:100vh;height:var(--altura);
   background:rgba(0,0,0,.45);z-index:65;
