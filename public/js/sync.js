@@ -232,6 +232,19 @@
      A foto/vídeo fica guardada no aparelho até subir. Só depois de conferir que o
      arquivo está de fato na nuvem é que o original sai do aparelho (fica a miniatura). */
 
+  // Endereço que vai nos links dos clientes: sempre o domínio próprio, mesmo que este aparelho
+  // tenha aberto/instalado o app pelo endereço antigo (workers.dev).
+  const DOMINIO_PUBLICO = 'https://amvs.ia.br';
+  async function baseLink() {
+    const c = await conf();
+    let b = String(c.api || '').replace(/\/$/, '');
+    try { if (/\.workers\.dev$/i.test(new URL(b).hostname)) b = DOMINIO_PUBLICO; } catch (e) {}
+    return b || DOMINIO_PUBLICO;
+  }
+  function linkPublico(link) {
+    return String(link || '').replace(/^https?:\/\/[^/]*\.workers\.dev/i, DOMINIO_PUBLICO);
+  }
+
   async function urlMidia(item) {
     if (!item || !item.midia) return null;
     const c = await conf();
@@ -381,7 +394,7 @@
     await DB.put('relatorios', rel);
     await enviarRelatorio(rel);
     const r = await comJson('/api/publicar', { id: rel.id });
-    return r.link;
+    return linkPublico(r.link);
   }
 
   /* ---------------- fila de publicação (offline) ----------------
@@ -464,7 +477,7 @@
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    limparDadosLocais, restaurarDaNuvem, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);
