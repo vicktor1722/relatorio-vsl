@@ -709,6 +709,88 @@
     });
   }
 
+  /* ---------- várias visitas em um único link ----------
+     Segurar o dedo numa visita liga a seleção. Só entram visitas já enviadas. */
+  function aoSegurar(el, fn) {
+    let t = null;
+    const ini = function () { clearTimeout(t); t = setTimeout(function () {
+      el.__segurou = true;
+      if (navigator.vibrate) navigator.vibrate(20);
+      fn();
+    }, 550); };
+    const fim = function () { clearTimeout(t); };
+    el.addEventListener('touchstart', ini, { passive: true });
+    el.addEventListener('touchend', fim);
+    el.addEventListener('touchmove', fim, { passive: true });
+    el.addEventListener('touchcancel', fim);
+    el.addEventListener('mousedown', ini);
+    el.addEventListener('mouseup', fim);
+    el.addEventListener('mouseleave', fim);
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+
+  async function linkUnico(visitas) {
+    const c = await Sync.conf();
+    return String(c.api).replace(/\/$/, '') + '/r/' + visitas.map(function (v) { return v.id; }).join('+');
+  }
+
+  async function selecionarVisitas(visitas, idInicial) {
+    const ord = visitas.slice().sort(function (a, b) {
+      return String(a.data_inicio || a.criado_em).localeCompare(String(b.data_inicio || b.criado_em));
+    });
+    if (!ord.some(function (v) { return v.status === 'publicado'; })) {
+      toast('Envie uma visita primeiro: só visitas já enviadas entram no link único.', 5000);
+      return;
+    }
+    const sel = new Set();
+    const ini = ord.find(function (v) { return v.id === idInicial; });
+    if (ini && ini.status === 'publicado') sel.add(ini.id);
+    else if (ini) toast('Essa visita ainda não foi enviada. Marque as que já foram.', 4000);
+
+    const veu = document.createElement('div'); veu.className = 'veu';
+    const folha = document.createElement('div'); folha.className = 'folha';
+    const linhas = [];
+    for (let i = 0; i < ord.length; i++) {
+      const v = ord[i];
+      const itens = await DB.itensDoRelatorio(v.id);
+      const ok = v.status === 'publicado';
+      linhas.push(
+        '<label class="opcao sel' + (ok ? '' : ' desab') + '">' +
+        '<input type="checkbox" data-v="' + v.id + '"' + (ok ? '' : ' disabled') + (sel.has(v.id) ? ' checked' : '') + '>' +
+        '<span><b>Visita ' + (i + 1) + ' · ' + esc(dataCurta(v.data_inicio || v.criado_em)) + '</b>' +
+        '<small style="display:block;color:var(--texto-fraco);font-size:12px">' +
+          itens.length + ' registro(s) · ' + (ok ? 'enviada' : 'ainda não enviada') + '</small></span></label>');
+    }
+    folha.innerHTML = '<div class="alca"></div>' +
+      '<h2 style="margin-top:0">Juntar visitas em um link</h2>' +
+      '<p style="margin:0 0 8px;font-size:13px;color:var(--texto-fraco)">' + esc(ord[0].fazenda || '') +
+      ' · marque as datas que o cliente vai receber no mesmo relatório</p>' + linhas.join('') +
+      '<button class="btn" id="btnJuntar" style="margin-top:12px"></button>' +
+      '<button class="btn secundario" id="btnJuntarFechar">Cancelar</button>';
+    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
+    const sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    folha.querySelector('#btnJuntarFechar').onclick = sair;
+    const btn = folha.querySelector('#btnJuntar');
+    const atualizar = function () {
+      sel.clear();
+      folha.querySelectorAll('input[data-v]:checked').forEach(function (x) { sel.add(x.dataset.v); });
+      btn.disabled = sel.size < 1;
+      btn.textContent = sel.size < 2 ? 'Marque 2 ou mais visitas' : 'Gerar link único (' + sel.size + ' visitas)';
+      btn.disabled = sel.size < 2;
+    };
+    folha.querySelectorAll('input[data-v]').forEach(function (x) { x.onchange = atualizar; });
+    atualizar();
+    btn.onclick = async function () {
+      const esc2 = ord.filter(function (v) { return sel.has(v.id); });
+      if (esc2.length < 2) return;
+      sair();
+      mostrarLink(await linkUnico(esc2), {
+        fazenda: esc2[0].fazenda, produtor: esc2[0].produtor, multi: true, n: esc2.length
+      });
+    };
+  }
+
   /* Qual visita enviar: com uma só vai direto; com várias, pergunta. */
   async function escolherVisita(visitas) {
     if (!visitas.length) return;
@@ -733,13 +815,16 @@
     }
     folha.innerHTML = '<div class="alca"></div>' +
       '<h2 style="margin-top:0">Qual visita enviar?</h2>' +
+      '<p style="margin:0 0 4px;font-size:12px;color:var(--texto-fraco)">Segure o dedo numa visita para juntar várias em um só link.</p>' +
       '<p style="margin:0 0 8px;font-size:13px;color:var(--texto-fraco)">' +
         esc(visitas[0].fazenda || '') + '</p>' + linhas.join('');
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const sair = function () { veu.remove(); };
     veu.onclick = function (e) { if (e.target === veu) sair(); };
     folha.querySelectorAll('.opcao').forEach(function (o) {
+      aoSegurar(o, function () { const id = o.dataset.v; sair(); selecionarVisitas(visitas, id); });
       o.onclick = function () {
+        if (o.__segurou) { o.__segurou = false; return; }
         const id = o.dataset.v; sair();
         enviarDaLista({ dataset: { env: id }, textContent: '🔄', disabled: false });
       };
@@ -998,7 +1083,7 @@
     const veu = document.createElement('div'); veu.className = 'veu';
     const folha = document.createElement('div'); folha.className = 'folha';
     folha.innerHTML = '<div class="alca"></div>' +
-      '<h2 style="margin-top:0">Relatório publicado</h2>' +
+      '<h2 style="margin-top:0">' + (rel.multi ? 'Relatório único · ' + rel.n + ' visitas' : 'Relatório publicado') + '</h2>' +
       '<p style="margin:0 0 10px;font-size:13.5px;color:var(--texto-fraco)">' +
         esc(rel.fazenda || '') + (rel.produtor ? ' · ' + esc(rel.produtor) : '') + '</p>' +
       '<div class="campo"><input id="linkOut" readonly value="' + esc(link) + '"></div>' +
@@ -1008,7 +1093,7 @@
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const sair = function () { veu.remove(); };
     veu.onclick = function (e) { if (e.target === veu) sair(); };
-    const texto = 'Relatório de visita — ' + (rel.fazenda || '') + '\n' + link;
+    const texto = (rel.multi ? 'Relatório de visitas — ' : 'Relatório de visita — ') + (rel.fazenda || '') + '\n' + link;
     folha.querySelector('#btnCompart').onclick = function () {
       if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto });
       else window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
@@ -1018,7 +1103,8 @@
     };
     folha.querySelector('#btnAbrir').onclick = function () {
       sair();
-      abrirRelatorioPronto(rel.id, false);
+      if (rel.multi) window.open(link, '_blank');
+      else abrirRelatorioPronto(rel.id, false);
     };
   }
 
@@ -1158,7 +1244,7 @@
 
   function ligarEdicaoNoChat() {
     const chat = $('#chat');
-    let timer = null, segurou = false;
+    let timer = null, segurou = false, segurouVisita = false;
 
     const achaItem = function (alvo) {
       const el = alvo.closest('[data-id]');
@@ -1184,6 +1270,30 @@
     chat.addEventListener('mousedown', inicio);
     chat.addEventListener('mouseup', fim);
     chat.addEventListener('mouseleave', fim);
+
+    // segurar o cabeçalho de uma visita: juntar visitas já enviadas em um link só
+    let tv = null;
+    const iniV = function (e) {
+      const d = e.target.closest && e.target.closest('.visita');
+      if (!d || e.target.closest('.visita-env')) return;
+      clearTimeout(tv);
+      tv = setTimeout(function () {
+        segurouVisita = true;
+        if (navigator.vibrate) navigator.vibrate(20);
+        selecionarVisitas(st.visitas || [], d.dataset.visita);
+      }, 550);
+    };
+    const fimV = function () { clearTimeout(tv); };
+    chat.addEventListener('touchstart', iniV, { passive: true });
+    chat.addEventListener('touchend', fimV);
+    chat.addEventListener('touchmove', fimV, { passive: true });
+    chat.addEventListener('mousedown', iniV);
+    chat.addEventListener('mouseup', fimV);
+    chat.addEventListener('mouseleave', fimV);
+    chat.addEventListener('contextmenu', function (e) { if (e.target.closest && e.target.closest('.visita')) e.preventDefault(); });
+    chat.addEventListener('click', function (e) {
+      if (segurouVisita) { segurouVisita = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
 
     // toque simples numa observação de texto abre a edição direto
     chat.addEventListener('click', function (e) {
