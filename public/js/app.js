@@ -1522,6 +1522,11 @@
     iniciarGPS();
     ligarToqueGps();
     Sync.autoSync();
+    // cadastro (produtores, fazendas, safras) é da conta: confere a nuvem ao voltar para o app
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) Conta.atualizarSePrecisar().catch(function () {});
+    });
+    window.addEventListener('online', function () { setTimeout(function () { Conta.atualizarSePrecisar().catch(function () {}); }, 1500); });
     const ultimo = await DB.cfg('ultimo');
     if (ultimo) {
       const r = await DB.get('relatorios', ultimo);
