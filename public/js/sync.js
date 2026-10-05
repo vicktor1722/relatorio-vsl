@@ -164,14 +164,18 @@
     return r.id;
   }
 
+  let repetidoNoServidor = false;   // o último cadastro já existia na conta (outro aparelho tinha criado)
+
   async function salvarProdutor(p) {
     const r = await comJson('/api/produtor', p);
+    repetidoNoServidor = !!r.repetido;
     await baixarCadastro();
     return r.id;
   }
 
   async function salvarFazenda(f) {
     const r = await comJson('/api/fazenda', f);
+    repetidoNoServidor = !!r.repetido;
     await baixarCadastro();
     return r.id;
   }
@@ -460,7 +464,7 @@
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    limparDadosLocais, restaurarDaNuvem, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    limparDadosLocais, restaurarDaNuvem, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);
