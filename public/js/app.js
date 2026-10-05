@@ -730,8 +730,7 @@
   }
 
   async function linkUnico(visitas) {
-    const c = await Sync.conf();
-    return String(c.api).replace(/\/$/, '') + '/r/' + visitas.map(function (v) { return v.id; }).join('+');
+    return (await Sync.baseLink()) + '/r/' + visitas.map(function (v) { return v.id; }).join('+');
   }
 
   async function selecionarVisitas(visitas, idInicial) {
@@ -895,8 +894,7 @@
   }
 
   async function linkDe(rel) {
-    const c = await Sync.conf();
-    return String(c.api).replace(/\/$/, '') + '/r/' + rel.id;
+    return (await Sync.baseLink()) + '/r/' + rel.id;
   }
 
   async function abrirRelatorio(id) {
