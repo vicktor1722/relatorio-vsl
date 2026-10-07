@@ -181,7 +181,7 @@ input,textarea,select{font:inherit}
 
 /* ---------- Telas / modais ---------- */
 .tela{
-  position:fixed;top:0;left:0;right:0;height:100vh;height:var(--altura);
+  position:fixed;top:var(--topo,0px);left:0;right:0;height:100vh;height:var(--altura);
   background:#F6F6F6;z-index:50;display:flex;flex-direction:column;overflow:hidden
 }
 .tela .conteudo{flex:1;overflow-y:auto;padding:14px 14px 30px}
@@ -242,7 +242,7 @@ input,textarea,select{font:inherit}
 .folha .opcao.desab{opacity:.5}
 .visita{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .veu{
-  position:fixed;top:0;left:0;right:0;height:100vh;height:var(--altura);
+  position:fixed;top:var(--topo,0px);left:0;right:0;height:100vh;height:var(--altura);
   background:rgba(0,0,0,.45);z-index:65;
   display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden
 }
@@ -348,3 +348,7 @@ input,textarea,select{font:inherit}
 .marcar input{width:19px;height:19px;flex:none;accent-color:var(--verde)}
 .rp-logo-img{height:44px;max-width:130px;width:auto;object-fit:contain;background:#fff;padding:4px;border-radius:8px;flex:none;display:block}
 .btn-camera.enviar{background:var(--verde-acento);font-size:22px;padding-left:3px}
+
+/* teclado aberto: encolhe a prévia para o campo de texto ficar logo acima do teclado */
+.teclado .folha img,.teclado .folha video{max-height:14dvh!important}
+.teclado .folha .alca{margin-bottom:6px}
