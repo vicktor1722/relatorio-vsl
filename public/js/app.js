@@ -73,14 +73,22 @@
   /* Altura real da janela. No navegador de dentro do WhatsApp/Instagram a barra
      de baixo cobre parte da tela e o botão da câmera ficava cortado. */
   function medirAltura() {
-    const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-    if (h) document.documentElement.style.setProperty('--altura', Math.round(h) + 'px');
+    const vv = window.visualViewport;
+    const h = (vv && vv.height) || window.innerHeight;
+    const raiz = document.documentElement;
+    if (h) raiz.style.setProperty('--altura', Math.round(h) + 'px');
+    // iPhone: com o teclado aberto a janela visível desliza; folhas e telas
+    // precisam acompanhar o topo dela, senão o texto fica longe do teclado.
+    raiz.style.setProperty('--topo', Math.round((vv && vv.offsetTop) || 0) + 'px');
+    st.altMax = Math.max(st.altMax || 0, h || 0);
+    raiz.classList.toggle('teclado', !!h && h < st.altMax - 150);
   }
   function ligarMedidaDeAltura() {
     medirAltura();
     window.addEventListener('resize', medirAltura);
     window.addEventListener('orientationchange', function () { setTimeout(medirAltura, 250); });
     if (window.visualViewport) window.visualViewport.addEventListener('resize', medirAltura);
+    if (window.visualViewport) window.visualViewport.addEventListener('scroll', medirAltura);
     // o Safari muda a altura logo depois de abrir
     setTimeout(medirAltura, 300);
     setTimeout(medirAltura, 1200);
@@ -506,11 +514,17 @@
   async function abrirCamera() {
     if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return; }
     try {
-      const alt = st.cfg.video === 1080 ? 1080 : 720;
-      st.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: st.facing, width: { ideal: alt === 1080 ? 1920 : 1280 }, height: { ideal: alt } },
-        audio: true
-      });
+      // o iPhone pergunta a permissão a cada getUserMedia: reaproveita a câmera já aberta
+      // (ela fica ligada por alguns minutos entre uma foto e outra) e só pergunta quando precisa
+      st.stream = streamViva();
+      if (!st.stream) {
+        const alt = st.cfg.video === 1080 ? 1080 : 720;
+        st.stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: st.facing, width: { ideal: alt === 1080 ? 1920 : 1280 }, height: { ideal: alt } },
+          audio: true
+        });
+      }
+      clearTimeout(st.tCam);
     } catch (e) {
       // sem acesso direto à câmera (iframe, permissão negada): usa a câmera do sistema
       st.semCameraInterna = true;
@@ -524,10 +538,32 @@
     atualizarGPS();
   }
 
-  function fecharCamera() {
-    if (st.gravando) pararVideo();
+  // a câmera já aberta só serve se as trilhas ainda estão vivas e é a mesma frente/trás
+  function streamViva() {
+    const s = st.stream;
+    if (!s) return null;
+    const trilhas = s.getTracks();
+    const vivas = trilhas.length > 0 && trilhas.every(function (t) { return t.readyState === 'live'; });
+    const v = s.getVideoTracks()[0];
+    const f = v && v.getSettings ? v.getSettings().facingMode : null;
+    if (vivas && (!f || f === st.facing)) return s;
+    pararStream();
+    return null;
+  }
+
+  function pararStream() {
+    clearTimeout(st.tCam);
     if (st.stream) { st.stream.getTracks().forEach(function (t) { t.stop(); }); st.stream = null; }
+  }
+
+  // parar = true desliga a câmera de vez; senão ela fica pronta por 3 minutos para a próxima foto
+  function fecharCamera(parar) {
+    if (st.gravando) pararVideo();
     fechar('telaCamera');
+    const vid = $('#camVideo'); if (vid) vid.srcObject = null;
+    clearTimeout(st.tCam);
+    if (parar === true) pararStream();
+    else if (st.stream) st.tCam = setTimeout(pararStream, 180000);
   }
 
   async function tirarFoto() {
@@ -1440,10 +1476,10 @@
     };
 
     // câmera
-    $('#camFechar').onclick = fecharCamera;
+    $('#camFechar').onclick = function () { fecharCamera(true); };
     $('#camTrocar').onclick = async function () {
       st.facing = st.facing === 'environment' ? 'user' : 'environment';
-      fecharCamera(); await abrirCamera();
+      fecharCamera(true); await abrirCamera();
     };
     ligarBotaoCamera();
     ligarObturador();
@@ -1520,6 +1556,8 @@
     iniciarGPS();
     ligarToqueGps();
     Sync.autoSync();
+    // ao sair do app a câmera é desligada (o iPhone mata a trilha de qualquer jeito)
+    document.addEventListener('visibilitychange', function () { if (document.hidden && !st.gravando) pararStream(); });
     // cadastro (produtores, fazendas, safras) é da conta: confere a nuvem ao voltar para o app
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) Conta.atualizarSePrecisar().catch(function () {});
