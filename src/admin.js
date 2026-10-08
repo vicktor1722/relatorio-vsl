@@ -26,6 +26,70 @@ export async function ehAdmin(env, me) {
 
 /* ---------------- dados ---------------- */
 
+/* ---------------- prazo de uso de cada conta ---------------- */
+
+// Quantos dias a pessoa vai usar o app. Sem informar, vale 1 ano. 0 = sem prazo.
+// A tabela é criada sozinha na primeira chamada (sem migração manual).
+export const PRAZO_PADRAO = 365;
+let prazosPronta = null;
+
+function garantirPrazos(env) {
+  if (!prazosPronta) {
+    prazosPronta = env.DB.prepare(`CREATE TABLE IF NOT EXISTS prazos_conta (
+      usuario_id    TEXT PRIMARY KEY,
+      dias          INTEGER NOT NULL,
+      atualizado_em TEXT DEFAULT (datetime('now'))
+    )`).run().catch((e) => { prazosPronta = null; throw e; });
+  }
+  return prazosPronta;
+}
+
+function lerPrazo(valor, padrao) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return padrao;
+  const n = Math.floor(Number(valor));
+  if (!Number.isFinite(n) || n < 0 || n > 3650) throw new Error('o prazo deve ser de 0 a 3650 dias (0 = sem prazo)');
+  return n;
+}
+
+function criadoEm(txt) {
+  let t = String(txt || '').trim();
+  if (!t) return NaN;
+  if (t.indexOf('T') < 0) t = t.replace(' ', 'T');
+  if (!/(Z|[+-]\d\d:?\d\d)$/.test(t)) t += 'Z';
+  return Date.parse(t);
+}
+
+async function aplicarPrazos(env, contas) {
+  let mapa = new Map();
+  try {
+    await garantirPrazos(env);
+    const { results } = await env.DB.prepare('SELECT usuario_id, dias FROM prazos_conta').all();
+    (results || []).forEach((r) => mapa.set(r.usuario_id, Number(r.dias)));
+  } catch (e) { mapa = new Map(); }
+  const agora = Date.now();
+  contas.forEach((c) => {
+    const criado = criadoEm(c.criado_em);
+    const dias = mapa.has(c.id) ? mapa.get(c.id) : (Number(c.admin) === 1 ? 0 : PRAZO_PADRAO);
+    c.dias_conta = isNaN(criado) ? null : Math.max(0, Math.floor((agora - criado) / 86400000));
+    c.prazo_dias = dias > 0 ? dias : null;
+    c.prazo_proprio = mapa.has(c.id);
+    c.restam = (c.prazo_dias != null && c.dias_conta != null) ? c.prazo_dias - c.dias_conta : null;
+    c.vence_em = (c.prazo_dias != null && !isNaN(criado))
+      ? new Date(criado + c.prazo_dias * 86400000).toISOString().slice(0, 10) : null;
+  });
+}
+
+export async function definirPrazo(env, id, dias) {
+  const n = lerPrazo(dias, null);
+  if (n === null) throw new Error('informe o prazo em dias (0 = sem prazo)');
+  const u = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ?').bind(id).first();
+  if (!u) throw new Error('conta não encontrada');
+  await garantirPrazos(env);
+  await env.DB.prepare(`INSERT INTO prazos_conta (usuario_id, dias, atualizado_em) VALUES (?,?,datetime('now'))
+    ON CONFLICT(usuario_id) DO UPDATE SET dias = excluded.dias, atualizado_em = datetime('now')`).bind(id, n).run();
+  return { ok: true, id, dias: n };
+}
+
 export async function resumoAdmin(env, me, adm) {
   // conta comum: só enxerga o que é dela; administrador enxerga tudo
   const meu = adm ? '' : ' AND r.usuario_id = ?';
@@ -41,6 +105,8 @@ export async function resumoAdmin(env, me, adm) {
      WHERE ${adm ? '1=1' : 'u.id = ?'}
      ORDER BY u.criado_em DESC
   `).bind(...(adm ? [] : [me.id])).all();
+
+  if (adm) await aplicarPrazos(env, contas.results || []);
 
   const relatorios = await env.DB.prepare(`
     SELECT r.id, r.fazenda, r.produtor, r.safra, r.servico, r.responsavel,
@@ -106,10 +172,12 @@ export async function criarConta(env, corpo) {
   if (senha.length < 6) throw new Error('a senha precisa de pelo menos 6 caracteres');
   const existe = await env.DB.prepare('SELECT id FROM usuarios WHERE email = ?').bind(email).first();
   if (existe) throw new Error('já existe uma conta com esse e-mail');
+  const prazo = lerPrazo(corpo.prazo_dias, corpo.admin ? 0 : PRAZO_PADRAO);
   const id = novoId('u');
   await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin) VALUES (?,?,?,?,?)')
     .bind(id, email, await hashSenha(senha), String(corpo.nome || '').trim(), corpo.admin ? 1 : 0).run();
-  return { ok: true, id, email };
+  try { await definirPrazo(env, id, prazo); } catch (e) { /* a conta já existe; o prazo pode ser ajustado depois */ }
+  return { ok: true, id, email, prazo_dias: prazo };
 }
 
 export async function promover(env, id, valor) {
@@ -169,6 +237,13 @@ tr:last-child td{border-bottom:none}
 .selo{font-size:11px;padding:2px 8px;border-radius:10px;background:#eee;color:var(--fraco);white-space:nowrap}
 .selo.pub{background:var(--verde-claro);color:var(--verde-escuro);font-weight:600}
 .selo.adm{background:#FFF3DC;color:#8A5A00;font-weight:600}
+.selo.venc{background:#FDECEA;color:#8A1C12;font-weight:600}
+.selo.perto{background:#FFF3DC;color:#8A5A00;font-weight:600}
+.peq{color:var(--fraco);font-size:11.5px}
+.aviso.perto{background:#FFF8E6;border-left-color:#E8A317;color:#6B4A00}
+.aviso button.selo{margin-left:6px;cursor:pointer;border:1px solid var(--linha)}
+.pre{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.pre button{cursor:pointer;border:1px solid var(--linha);background:#fff;border-radius:14px;padding:5px 11px;font-size:12.5px;color:var(--verde-escuro)}
 .campo{margin-bottom:10px}
 .campo label{display:block;font-size:12px;color:var(--fraco);margin-bottom:4px}
 .campo input,.campo select{width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:9px;font-size:15px;background:#fff}
@@ -220,6 +295,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     <button data-aba="rels">Relatórios</button>
   </div>
   <main>
+    <div id="avisoPrazos"></div>
     <section class="painel on" id="pDash">
       <div class="cartoes" id="kpis"></div>
       <div class="caixa">
@@ -248,6 +324,12 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
           <div class="campo"><label>Acesso</label>
             <select id="nAdmin"><option value="0">Usuário comum</option><option value="1">Administrador</option></select>
           </div>
+        </div>
+        <div class="campo"><label>Período de uso, em dias (365 = 1 ano · 0 = sem prazo)</label>
+          <input id="nPrazo" type="number" min="0" max="3650" value="365" inputmode="numeric">
+        </div>
+        <div style="font-size:12px;color:var(--fraco);margin:-4px 0 12px">
+          Quando a conta completar esse período, aparece um aviso aqui no painel. O acesso dela não é bloqueado.
         </div>
         <button class="btn" id="btnCriar">Criar conta</button>
         <div id="nMsg"></div>
@@ -360,6 +442,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     $('#hRels').textContent = adm ? 'Todos os relatórios' : 'Meus relatórios';
     if (!adm && $('#pContas').classList.contains('on')) document.querySelector('.abas button[data-aba="dash"]').click();
     desenharKpis();
+    desenharPrazos();
     desenharContas();
     desenharRelatorios();
     desenharBarras();
@@ -370,8 +453,10 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     var t = dados.totais;
     var pub = dados.relatorios.filter(function (r) { return r.status === 'publicado'; }).length;
     var adm = !!(dados.eu && dados.eu.admin);
+    var vencidas = (dados.contas || []).filter(function (c) { return c.restam != null && c.restam <= 0; }).length;
     $('#kpis').innerHTML =
       (adm ? cartao(t.contas, 'contas') : '') +
+      (adm && vencidas ? cartao(vencidas, vencidas === 1 ? 'conta com prazo vencido' : 'contas com prazo vencido') : '') +
       cartao(t.relatorios, 'relatórios') +
       cartao(pub, 'já enviados ao cliente') +
       cartao(t.registros, 'fotos, vídeos e notas') +
@@ -385,16 +470,17 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') + '</td>' +
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
         '<td>' + c.produtores + ' / ' + c.fazendas + '</td>' +
-        '<td>' + dataBR(c.criado_em) + '</td>' +
+        '<td>' + usoCel(c) + '</td>' +
         '<td>' + dataBR(c.ultima_atividade) + '</td>' +
         '<td class="acoes">' +
+          '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ' +
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
           (Number(c.admin) === 1 ? 'tirar admin' : 'tornar admin') + '</button>' +
         '</td></tr>';
     }).join('');
     $('#tContas').innerHTML =
-      '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Criada</th><th>Última atividade</th><th></th></tr>' + linhas;
+      '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Tempo de uso</th><th>Última atividade</th><th></th></tr>' + linhas;
     document.querySelectorAll('[data-prom]').forEach(function (b) {
       b.onclick = async function () {
         b.disabled = true;
@@ -405,6 +491,88 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     document.querySelectorAll('[data-senha]').forEach(function (b) {
       b.onclick = function () { abrirTrocaSenha(b.dataset.senha, b.dataset.email); };
     });
+    ligarPrazos();
+  }
+
+  /* ---------- tempo de uso e prazo de cada conta ---------- */
+  function diasTxt(n) { return n + (n === 1 ? ' dia' : ' dias'); }
+
+  function usoCel(c) {
+    var h = '<b>' + (c.dias_conta == null ? '—' : diasTxt(c.dias_conta)) + '</b><br><span class="peq">desde ' + dataBR(c.criado_em) + '</span><br>';
+    if (c.prazo_dias == null) return h + '<span class="selo">sem prazo</span>';
+    var r = c.restam;
+    if (r == null) return h + '<span class="selo">prazo de ' + diasTxt(c.prazo_dias) + '</span>';
+    if (r < 0) return h + '<span class="selo venc">prazo venceu há ' + diasTxt(-r) + '</span>';
+    if (r === 0) return h + '<span class="selo venc">prazo completo hoje</span>';
+    if (r <= 30) return h + '<span class="selo perto">vence em ' + diasTxt(r) + ' (' + dataBR(c.vence_em) + ')</span>';
+    return h + '<span class="selo pub">restam ' + diasTxt(r) + '</span><br><span class="peq">prazo de ' + diasTxt(c.prazo_dias) + '</span>';
+  }
+
+  // aviso no topo do painel: contas que completaram o prazo ou estão a 30 dias de completar
+  function desenharPrazos() {
+    var el = $('#avisoPrazos');
+    var adm = !!(dados.eu && dados.eu.admin);
+    if (!adm) { el.innerHTML = ''; return; }
+    var lista = (dados.contas || []).filter(function (c) { return c.prazo_dias != null && c.restam != null && c.restam <= 30; })
+      .sort(function (a, b) { return a.restam - b.restam; });
+    el.innerHTML = lista.map(function (c) {
+      var nome = '<b>' + esc(c.nome || c.email) + '</b>';
+      var ref = c.prazo_dias === 365 ? '1 ano de uso' : 'o prazo de ' + diasTxt(c.prazo_dias);
+      var txt, cls = '';
+      if (c.restam < 0) { cls = ' ruim'; txt = '⚠️ ' + nome + ' completou ' + ref + ' (venceu há ' + diasTxt(-c.restam) + ', em ' + dataBR(c.vence_em) + ').'; }
+      else if (c.restam === 0) { cls = ' ruim'; txt = '⚠️ ' + nome + ' completa ' + ref + ' hoje.'; }
+      else {
+        cls = ' perto';
+        txt = '⏳ ' + nome + (c.prazo_dias === 365
+          ? ' completa 1 ano de uso em ' + diasTxt(c.restam)
+          : ': o prazo de ' + diasTxt(c.prazo_dias) + ' termina em ' + diasTxt(c.restam)) + ' (' + dataBR(c.vence_em) + ').';
+      }
+      return '<div class="aviso' + cls + '">' + txt + '<button class="selo" data-prazo="' + esc(c.id) + '">ajustar prazo</button></div>';
+    }).join('');
+    ligarPrazos();
+  }
+
+  function ligarPrazos() {
+    document.querySelectorAll('[data-prazo]').forEach(function (b) {
+      b.onclick = function () { abrirPrazo(b.dataset.prazo); };
+    });
+  }
+
+  function abrirPrazo(id) {
+    var c = (dados.contas || []).filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var veu = document.createElement('div'); veu.className = 'veu';
+    var cx = document.createElement('div'); cx.className = 'modal';
+    cx.innerHTML =
+      '<h2 style="margin:0 0 4px">Prazo de uso</h2>' +
+      '<p style="margin:0 0 14px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) +
+        (c.dias_conta == null ? '' : ' · usa há ' + diasTxt(c.dias_conta)) + '</p>' +
+      '<div class="campo"><label>Prazo, em dias, contado desde a criação da conta (0 = sem prazo)</label>' +
+      '<input id="pzDias" type="number" min="0" max="3650" inputmode="numeric" value="' + (c.prazo_dias == null ? 0 : c.prazo_dias) + '"></div>' +
+      '<div class="pre">' +
+        '<button type="button" data-d="30">30 dias</button><button type="button" data-d="90">3 meses</button>' +
+        '<button type="button" data-d="180">6 meses</button><button type="button" data-d="365">1 ano</button>' +
+        '<button type="button" data-d="730">2 anos</button><button type="button" data-d="0">sem prazo</button>' +
+      '</div>' +
+      '<div id="pzMsg"></div>' +
+      '<button class="btn" id="pzOk">Salvar prazo</button>' +
+      '<button class="btn sec" id="pzCancel" style="margin-top:8px">Cancelar</button>';
+    veu.appendChild(cx); document.body.appendChild(veu);
+    var sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    cx.querySelector('#pzCancel').onclick = sair;
+    cx.querySelectorAll('.pre button').forEach(function (b) {
+      b.onclick = function () { cx.querySelector('#pzDias').value = b.dataset.d; };
+    });
+    cx.querySelector('#pzOk').onclick = async function () {
+      var msg = cx.querySelector('#pzMsg');
+      aviso(msg, 'Salvando…');
+      try {
+        await api('/api/admin/prazo', { id: id, dias: cx.querySelector('#pzDias').value });
+        sair();
+        await abrirPainel();
+      } catch (e) { aviso(msg, e.message, true); }
+    };
   }
 
   /* ---------- trocar a senha de uma conta ---------- */
@@ -574,9 +742,10 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         nome: $('#nNome').value.trim(),
         email: $('#nEmail').value.trim(),
         senha: $('#nSenha').value,
-        admin: $('#nAdmin').value === '1'
+        admin: $('#nAdmin').value === '1',
+        prazo_dias: $('#nPrazo').value
       });
-      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = '';
+      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365';
       aviso(msg, 'Conta criada.');
       await abrirPainel();
       document.querySelector('.abas button[data-aba="contas"]').click();
