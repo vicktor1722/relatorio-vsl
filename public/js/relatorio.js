@@ -202,23 +202,62 @@
   }
 
 
-  /* Toque na foto: abre só ela em tela cheia, com ✕ para voltar ao relatório. */
-  function abrirImagem(src, legenda) {
-    if (!src || document.querySelector('.visor-rel')) return;
+  /* Toque na foto: abre em tela cheia, com ✕ para voltar ao relatório.
+     Setas ‹ › (ou arrastar para o lado) passam para a foto anterior/seguinte. */
+  function abrirImagem(lista, idx) {
+    if (!lista || !lista.length || document.querySelector('.visor-rel')) return;
     const v = document.createElement('div');
     v.className = 'visor visor-rel';
     v.innerHTML = '<button class="visor-x" type="button" aria-label="Fechar">✕</button>' +
-      '<img src="' + esc(src) + '" alt="">' +
-      (legenda ? '<div class="visor-leg">' + esc(legenda) + '</div>' : '');
+      '<div class="visor-cont"></div>' +
+      '<button class="visor-nav ant" type="button" aria-label="Foto anterior">‹</button>' +
+      '<button class="visor-nav prox" type="button" aria-label="Próxima foto">›</button>' +
+      '<img src="" alt=""><div class="visor-leg"></div>';
+    const img = v.querySelector('img'), leg = v.querySelector('.visor-leg'), cont = v.querySelector('.visor-cont');
+    let i = idx;
+    function mostrar() {
+      const f = lista[i];
+      img.src = f.src; leg.textContent = f.legenda || ''; leg.style.display = f.legenda ? '' : 'none';
+      cont.textContent = lista.length > 1 ? (i + 1) + ' / ' + lista.length : '';
+      v.querySelector('.ant').style.display = i > 0 ? '' : 'none';
+      v.querySelector('.prox').style.display = i < lista.length - 1 ? '' : 'none';
+      [i - 1, i + 1].forEach(function (k) { if (lista[k]) { const pre = new Image(); pre.src = lista[k].src; } });
+    }
+    function ir(d) { const n = i + d; if (n < 0 || n >= lista.length) return; i = n; mostrar(); }
     function fechar() { v.remove(); document.removeEventListener('keydown', tecla); }
-    function tecla(e) { if (e.key === 'Escape') fechar(); }
-    v.addEventListener('click', function (e) { if (e.target.tagName !== 'IMG') fechar(); });
+    function tecla(e) {
+      if (e.key === 'Escape') fechar();
+      else if (e.key === 'ArrowLeft') ir(-1);
+      else if (e.key === 'ArrowRight') ir(1);
+    }
+    v.addEventListener('click', function (e) {
+      const t = e.target;
+      if (t.closest && t.closest('.ant')) { ir(-1); return; }
+      if (t.closest && t.closest('.prox')) { ir(1); return; }
+      if (t.tagName !== 'IMG') fechar();
+    });
+    // arrastar para o lado (só quando não está com zoom de pinça)
+    let x0 = null, y0 = 0;
+    v.addEventListener('touchstart', function (e) {
+      const z = (window.visualViewport && window.visualViewport.scale) || 1;
+      if (e.touches.length === 1 && z <= 1.02) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; } else x0 = null;
+    }, { passive: true });
+    v.addEventListener('touchend', function (e) {
+      if (x0 == null) return;
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) ir(dx < 0 ? 1 : -1);
+    }, { passive: true });
     document.addEventListener('keydown', tecla);
     document.body.appendChild(v);
+    mostrar();
   }
   document.addEventListener('click', function (e) {
     const img = e.target && e.target.closest ? e.target.closest('.rp-item img') : null;
-    if (img) abrirImagem(img.currentSrc || img.src, img.getAttribute('alt') || '');
+    if (!img) return;
+    const todas = Array.prototype.slice.call(document.querySelectorAll('.rp-item img'));
+    const lista = todas.map(function (m) { return { src: m.currentSrc || m.src, legenda: m.getAttribute('alt') || '' }; });
+    abrirImagem(lista, Math.max(0, todas.indexOf(img)));
   });
 
   global.Relatorio = { montar };
