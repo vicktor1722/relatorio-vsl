@@ -352,3 +352,11 @@ input,textarea,select{font:inherit}
 /* teclado aberto: encolhe a prévia para o campo de texto ficar logo acima do teclado */
 .teclado .folha img,.teclado .folha video{max-height:14dvh!important}
 .teclado .folha .alca{margin-bottom:6px}
+/* setas para passar de uma foto para outra */
+.visor-rel .visor-cont{position:absolute;top:calc(22px + var(--safe-top));right:14px;z-index:2;color:#fff;font-size:14px;font-weight:600;
+  background:rgba(255,255,255,.18);border-radius:14px;padding:4px 12px;pointer-events:none}
+.visor-rel .visor-cont:empty{display:none}
+.visor-rel .visor-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:46px;height:64px;border:0;
+  background:rgba(255,255,255,.18);color:#fff;font-size:34px;line-height:60px;text-align:center;padding:0}
+.visor-rel .visor-nav.ant{left:0;border-radius:0 12px 12px 0}
+.visor-rel .visor-nav.prox{right:0;border-radius:12px 0 0 12px}
