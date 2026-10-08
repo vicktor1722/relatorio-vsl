@@ -392,7 +392,7 @@
   function ligar() {
     $('#btnEntrar').onclick = entrar;
     $('#btnAlternarConta').onclick = alternarModo;
-    $('#btnTrocarServidor').onclick = trocarServidor;
+    if ($('#btnTrocarServidor')) $('#btnTrocarServidor').onclick = trocarServidor;
     $('#loginSenha').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 
     $('#btnAbrirCadastro').onclick = async function () { await atualizarCadastro(true); abrir('telaCadastro'); };
