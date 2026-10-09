@@ -165,6 +165,36 @@ export async function resumoAdmin(env, me, adm) {
   };
 }
 
+// áreas (talhões do KML importado) das fazendas, para desenhar no mapa do painel.
+// conta comum vê só as dela; administrador vê todas. As coordenadas vão com 5 casas (~1 m) para pesar menos.
+export async function areasAdmin(env, me, adm) {
+  const { results } = await env.DB.prepare(`
+    SELECT f.id, f.nome, f.area_ha, f.talhoes, u.email AS conta, p.nome AS produtor
+      FROM fazendas f
+      LEFT JOIN usuarios u ON u.id = f.usuario_id
+      LEFT JOIN produtores p ON p.id = f.produtor_id
+     WHERE f.talhoes IS NOT NULL AND f.talhoes != ''${adm ? '' : ' AND f.usuario_id = ?'}
+     LIMIT 400
+  `).bind(...(adm ? [] : [me.id])).all();
+  const arred = (c) => Array.isArray(c)
+    ? (typeof c[0] === 'number' ? c.slice(0, 2).map((v) => Math.round(v * 1e5) / 1e5) : c.map(arred))
+    : c;
+  const areas = [];
+  (results || []).forEach((r) => {
+    let gj = null;
+    try { gj = JSON.parse(r.talhoes); } catch (e) { return; }
+    const feats = ((gj && gj.features) || [])
+      .filter((f) => f && f.geometry && f.geometry.coordinates)
+      .map((f) => ({
+        type: 'Feature',
+        properties: { nome: (f.properties || {}).nome || '', area_ha: (f.properties || {}).area_ha || null },
+        geometry: { type: f.geometry.type, coordinates: arred(f.geometry.coordinates) }
+      }));
+    if (feats.length) areas.push({ id: r.id, fazenda: r.nome, produtor: r.produtor || '', conta: r.conta || '', area_ha: r.area_ha, features: feats });
+  });
+  return { ok: true, areas };
+}
+
 export async function criarConta(env, corpo) {
   const email = String(corpo.email || '').trim().toLowerCase();
   const senha = String(corpo.senha || '');
@@ -264,6 +294,13 @@ tr:last-child td{border-bottom:none}
 .resp-linha .trilho{height:14px;background:#eef3ef;border-radius:7px;overflow:hidden}
 .resp-linha .trilho i{display:block;height:100%;background:var(--verde);border-radius:7px}
 .resp-linha .num{text-align:right;white-space:nowrap}
+.cab-caixa{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.cab-caixa h2{margin:0}
+.btn-mini{border:1px solid var(--linha);background:#fff;color:var(--verde-escuro);border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.btn-mini:hover{background:#f1f6f2}
+.caixa.cheia{position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;margin:0;border-radius:0;display:flex;flex-direction:column;padding:12px}
+.caixa.cheia #mapa{flex:1;height:auto;min-height:0}
+body.sem-rolagem{overflow:hidden}
 .resp-linha.clic{cursor:pointer;border-radius:8px;margin:0 -6px;padding:6px}
 .resp-linha.clic:hover{background:#f1f6f2}
 .resp-linha.clic .nome{text-decoration:underline;text-decoration-color:#b9d3c0;text-underline-offset:3px}
@@ -316,14 +353,14 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         <div class="legenda-barras"></div>
       </div>
       <div class="caixa">
-        <h2>Relatórios por responsável</h2>
+        <div class="cab-caixa"><h2>Relatórios por responsável</h2><button class="btn-mini" id="btnResp" aria-expanded="true">▾ Recolher</button></div>
         <div id="porResp"></div>
       </div>
-      <div class="caixa">
-        <h2>Onde foram as visitas</h2>
+      <div class="caixa" id="caixaMapa">
+        <div class="cab-caixa"><h2>Onde foram as visitas</h2><button class="btn-mini" id="btnTelaCheia">⛶ Tela cheia</button></div>
         <div id="mapa"></div>
         <div style="font-size:11.5px;color:var(--fraco);margin-top:8px">
-          🟢 visita enviada · 🟠 ainda em aberto · cada ponto é a média das fotos daquela visita
+          🟢 visita enviada · 🟠 ainda em aberto · cada ponto é a média das fotos daquela visita · área verde = KML importado da fazenda
         </div>
       </div>
     </section>
@@ -377,7 +414,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
   var CHAVE = 'vsl-admin-token';
   var token = '';
   try { token = localStorage.getItem(CHAVE) || ''; } catch (e) {}
-  var dados = null, mapa = null, camada = null;
+  var dados = null, mapa = null, camada = null, camadaAreas = null;
 
   function aviso(el, txt, ruim) {
     el.innerHTML = txt ? '<div class="aviso' + (ruim ? ' ruim' : '') + '">' + esc(txt) + '</div>' : '';
@@ -789,8 +826,11 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         maxZoom: 19, attribution: '© OpenStreetMap'
       }).addTo(mapa);
       mapa.setView([-15.2, -59.3], 7);
+      mapa.createPane('areas').style.zIndex = 350;   // as áreas ficam por baixo dos pontos
     }
     if (camada) mapa.removeLayer(camada);
+    if (camadaAreas) { mapa.removeLayer(camadaAreas); camadaAreas = null; }
+    carregarAreas(pts);
     if (!pts.length) return;
     camada = L.layerGroup(pts.map(function (p) {
       var cor = p.status === 'publicado' ? '#1B7A43' : '#F0A202';
@@ -805,6 +845,61 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     })).addTo(mapa);
     mapa.fitBounds(L.latLngBounds(pts.map(function (p) { return [p.lat, p.lon]; })).pad(0.25));
   }
+
+  // desenha no mapa os talhões dos KMLs importados (buscados à parte, porque pesam mais)
+  function carregarAreas(pts) {
+    api('/api/admin/areas').then(function (r) {
+      if (!mapa) return;
+      if (camadaAreas) { mapa.removeLayer(camadaAreas); camadaAreas = null; }
+      var grupo = L.featureGroup();
+      (r.areas || []).forEach(function (a) {
+        L.geoJSON({ type: 'FeatureCollection', features: a.features }, {
+          pane: 'areas',
+          style: { color: '#146034', weight: 1.5, fillColor: '#2FA05A', fillOpacity: 0.22 },
+          onEachFeature: function (f, camadaF) {
+            var p = f.properties || {};
+            camadaF.bindPopup('<b>' + esc(a.fazenda || '—') + '</b>' + (a.produtor ? '<br>' + esc(a.produtor) : '') +
+              (p.nome ? '<br>Talhão: ' + esc(p.nome) : '') +
+              (p.area_ha ? '<br>' + Number(p.area_ha).toFixed(1).replace('.', ',') + ' ha' : '') +
+              '<br><span style="color:#6B7B72;font-size:11px">' + esc(a.conta || '') + '</span>');
+          }
+        }).addTo(grupo);
+      });
+      camadaAreas = grupo.addTo(mapa);
+      // sem nenhuma visita com GPS ainda, enquadra nas áreas
+      if (!pts.length && grupo.getLayers().length) mapa.fitBounds(grupo.getBounds().pad(0.1));
+    }).catch(function () { /* sem as áreas o mapa continua mostrando as visitas */ });
+  }
+
+  // mapa em tela cheia (Esc sai)
+  function telaCheia(ligar) {
+    var cx = $('#caixaMapa');
+    var on = typeof ligar === 'boolean' ? ligar : !cx.classList.contains('cheia');
+    cx.classList.toggle('cheia', on);
+    document.body.classList.toggle('sem-rolagem', on);
+    $('#btnTelaCheia').textContent = on ? '✕ Sair da tela cheia' : '⛶ Tela cheia';
+    if (mapa) setTimeout(function () { mapa.invalidateSize(); }, 60);
+    if (!on) cx.scrollIntoView({ block: 'start' });
+  }
+  $('#btnTelaCheia').onclick = function () { telaCheia(); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('#caixaMapa').classList.contains('cheia')) telaCheia(false);
+  });
+
+  // quadro "Relatórios por responsável": recolher e expandir (lembra a escolha neste aparelho)
+  var respAberto = true;
+  try { respAberto = localStorage.getItem('vsl-resp-aberto') !== '0'; } catch (e) {}
+  function aplicarResp() {
+    $('#porResp').style.display = respAberto ? '' : 'none';
+    $('#btnResp').textContent = respAberto ? '▾ Recolher' : '▸ Expandir';
+    $('#btnResp').setAttribute('aria-expanded', respAberto ? 'true' : 'false');
+  }
+  $('#btnResp').onclick = function () {
+    respAberto = !respAberto;
+    try { localStorage.setItem('vsl-resp-aberto', respAberto ? '1' : '0'); } catch (e) {}
+    aplicarResp();
+  };
+  aplicarResp();
 
   /* ---------- criar conta ---------- */
   $('#btnCriar').onclick = async function () {
