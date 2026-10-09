@@ -1142,8 +1142,8 @@
     };
     folha.querySelector('#btnAbrir').onclick = function () {
       sair();
-      if (rel.multi) window.open(link, '_blank');
-      else abrirRelatorioPronto(rel.id, false);
+      // abre a página pública do cliente (a mesma que vai no WhatsApp)
+      window.open(link, '_blank');
     };
   }
 
@@ -1344,6 +1344,12 @@
 
   /* ---------------- tela do relatório pronto ---------------- */
   async function abrirRelatorioPronto(id, local) {
+    // link antigo #/r/<id> (de quem recebeu): se o relatório não é deste aparelho, vai para a página pública do cliente
+    if (!local && !(await DB.get('relatorios', id))) {
+      location.replace('/r/' + encodeURIComponent(id));
+      return;
+    }
+    if (!local) local = true;
     const tela = $('#telaRelPronto');
     tela.classList.remove('oculto');
     tela.innerHTML = '<div class="carregando" style="padding:60px 20px;text-align:center;color:#667781">Carregando relatório…</div>';
@@ -1382,8 +1388,9 @@
 
     $('#rpVoltar').onclick = fecharRelatorioPronto;
     $('#rpPdf').onclick = () => window.print();
-    $('#rpCompartilhar').onclick = () => {
-      const link = location.origin + location.pathname + '#/r/' + id;
+    $('#rpCompartilhar').onclick = async () => {
+      if (rel.status !== 'publicado') { toast('Finalize o relatório para gerar o link de envio', 4000); return; }
+      const link = (await Sync.baseLink()) + '/r/' + id;
       const texto = 'Relatório de visita — ' + (rel.fazenda || '') + '\n' + link;
       if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto, url: link });
       else { navigator.clipboard.writeText(link); toast('Link copiado'); }
