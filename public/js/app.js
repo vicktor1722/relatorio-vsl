@@ -951,8 +951,11 @@
     Conta.preencherSelecoes();
     $('#fFazendaSel').value = rel.fazenda_id || '';
     $('#fSafraSel').dataset.pendente = rel.safra || '';
+    // novo relatório: se a conta tem um único responsável, já vem escolhido
+    const unico = ((Conta.dados() || {}).responsaveis || []);
+    $('#fResponsavel').dataset.pendente = rel.responsavel || (!rel.id && unico.length === 1 ? unico[0].nome : '');
+    $('#fResponsavel').innerHTML = '';
     Conta.preencherSelecoes();
-    $('#fResponsavel').value = rel.responsavel || '';
     $('#fServico').value = rel.servico || '';
     $('#fInicio').value = rel.data_inicio || '';
     $('#fFim').value = rel.data_fim || '';
