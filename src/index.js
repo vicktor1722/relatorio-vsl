@@ -15,8 +15,9 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Item-Id,X-Rel-Id'
 };
 
-// cada conta pode cadastrar até 4 responsáveis (nomes que aparecem para escolher no relatório)
+// cada conta pode cadastrar até 4 responsáveis (nomes que aparecem para escolher no relatório); a conta administradora, até 6
 const MAX_RESPONSAVEIS = 4;
+const MAX_RESPONSAVEIS_ADMIN = 6;
 let respPronta = null;
 function garantirResponsaveis(env) {
   if (!respPronta) {
@@ -233,13 +234,14 @@ export default {
           await garantirResponsaveis(env);
           resp = await env.DB.prepare('SELECT * FROM responsaveis WHERE usuario_id = ? ORDER BY criado_em, nome').bind(me.id).all();
         } catch (e) { /* sem responsáveis por enquanto */ }
+        const limiteResp = (await ehAdmin(env, me)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
         return json({
           ok: true,
           produtores: prod.results || [],
           fazendas: faz.results || [],
           safras: saf.results || [],
           responsaveis: resp.results || [],
-          max_responsaveis: MAX_RESPONSAVEIS
+          max_responsaveis: limiteResp
         });
       }
 
@@ -253,12 +255,13 @@ export default {
         const ja = (results || []).find((x) => norm(x.nome) === norm(nome));
         if (ja) return json({ ok: true, id: ja.id, repetido: true });
         const id = novoId('o');
-        // o limite é conferido dentro do próprio INSERT, então dois aparelhos ao mesmo tempo não passam de 4
+        const limiteResp = (await ehAdmin(env, me)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
+        // o limite é conferido dentro do próprio INSERT, então dois aparelhos ao mesmo tempo não passam do limite
         const r = await env.DB.prepare(`INSERT INTO responsaveis (id, usuario_id, nome)
           SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM responsaveis WHERE usuario_id = ?) < ?`)
-          .bind(id, me.id, nome, me.id, MAX_RESPONSAVEIS).run();
+          .bind(id, me.id, nome, me.id, limiteResp).run();
         if (!r.meta || !r.meta.changes) {
-          return json({ erro: 'limite de ' + MAX_RESPONSAVEIS + ' responsáveis por conta. Remova um para cadastrar outro.' }, 400);
+          return json({ erro: 'limite de ' + limiteResp + ' responsáveis por conta. Remova um para cadastrar outro.' }, 400);
         }
         return json({ ok: true, id: id });
       }
