@@ -11,7 +11,7 @@
   const aviso = (el, txt, ok) => { el.innerHTML = txt ? '<div class="aviso"' + (ok ? ' style="background:#DCF8C6;color:#146034"' : '') + '>' + esc(txt) + '</div>' : ''; };
 
   let modoCriar = false;
-  let cadastro = { produtores: [], fazendas: [], safras: [] };
+  let cadastro = { produtores: [], fazendas: [], safras: [], responsaveis: [] };
   let fazendaEdicao = null, produtorEdicao = null, kmlPendente = null;
 
   /* ---------------- login ---------------- */
@@ -149,7 +149,7 @@
   }
 
   function renderCadastro() {
-    const f = cadastro.fazendas || [], p = cadastro.produtores || [], sa = cadastro.safras || [];
+    const f = cadastro.fazendas || [], p = cadastro.produtores || [], sa = cadastro.safras || [], rs = cadastro.responsaveis || [];
     $('#subCadastro').textContent = f.length + ' fazenda(s) · ' + p.length + ' produtor(es) · ' + sa.length + ' safra(s)';
     statusCadastro();
 
@@ -158,6 +158,15 @@
         '</b><span>safra cadastrada</span></div>' +
         '<button class="badge" data-safra="' + esc(x.id) + '">remover</button></div>';
     }).join('') : '<div class="aviso">Nenhuma safra cadastrada. Toque em <b>+ Nova safra</b>.</div>';
+
+    const maxResp = cadastro.max_responsaveis || 4;
+    $('#contaResp').textContent = '(' + rs.length + ' de ' + maxResp + ')';
+    $('#btnNovoResp').disabled = rs.length >= maxResp;
+    $('#listaResp').innerHTML = rs.length ? rs.map(function (x) {
+      return '<div class="lista-item"><div class="ic">🧑‍🌾</div><div class="txt"><b>' + esc(x.nome) +
+        '</b><span>aparece na escolha de responsável do relatório</span></div>' +
+        '<button class="badge" data-resp="' + esc(x.id) + '">remover</button></div>';
+    }).join('') : '<div class="aviso">Nenhum responsável cadastrado. Toque em <b>+ Novo responsável</b> (até ' + maxResp + ').</div>';
 
     $('#listaFazendas').innerHTML = f.length ? f.map(function (x) {
       const prod = p.find(y => y.id === x.produtor_id);
@@ -182,6 +191,12 @@
       await Sync.apagarCadastro('safra', s.id);
       await atualizarCadastro(false);
     });
+    document.querySelectorAll('[data-resp]').forEach(el => el.onclick = async function () {
+      const r = (cadastro.responsaveis || []).find(x => x.id === el.dataset.resp);
+      if (!r || !confirm('Remover ' + r.nome + ' dos responsáveis? Os relatórios já feitos continuam com o nome dele.')) return;
+      try { await Sync.apagarCadastro('responsavel', r.id); await atualizarCadastro(false); }
+      catch (e) { alert('Não removeu: ' + e.message); }
+    });
     document.querySelectorAll('[data-fazenda]').forEach(el => el.onclick = () => abrirFazenda(el.dataset.fazenda));
     document.querySelectorAll('[data-produtor]').forEach(el => el.onclick = () => abrirProdutor(el.dataset.produtor));
   }
@@ -201,8 +216,37 @@
     } catch (e) { alert('Não salvou: ' + e.message); }
   }
 
+  // pede o nome e cadastra o responsável (até 4 por conta). Devolve o nome salvo ou null.
+  async function novoResponsavel() {
+    const maxResp = cadastro.max_responsaveis || 4;
+    if ((cadastro.responsaveis || []).length >= maxResp) {
+      alert('Já são ' + maxResp + ' responsáveis. Remova um em Cadastro para cadastrar outro.'); return null;
+    }
+    if (!navigator.onLine) { alert('Sem internet: conecte para cadastrar o responsável.'); return null; }
+    const nome = prompt('Nome do responsável:', '');
+    if (!nome || !nome.trim()) return null;
+    try {
+      await Sync.salvarResponsavel(nome.trim());
+      await atualizarCadastro(false);
+      return nome.trim().replace(/\s+/g, ' ');
+    } catch (e) { alert('Não salvou: ' + e.message); return null; }
+  }
+
   function preencherSelecoes() {
-    const p = cadastro.produtores || [], f = cadastro.fazendas || [], sa = cadastro.safras || [];
+    const p = cadastro.produtores || [], f = cadastro.fazendas || [], sa = cadastro.safras || [], rs = cadastro.responsaveis || [];
+
+    const selResp = $('#fResponsavel');
+    if (selResp) {
+      const v = selResp.value && selResp.value !== '__novo__' ? selResp.value : (selResp.dataset.pendente || '');
+      const ops = rs.map(x => '<option value="' + esc(x.nome) + '">' + esc(x.nome) + '</option>');
+      // nome já gravado no relatório e que não está mais na lista (ex.: digitado antes, ou removido) continua escolhível
+      if (v && !rs.some(x => x.nome === v)) ops.unshift('<option value="' + esc(v) + '">' + esc(v) + '</option>');
+      const podeNovo = rs.length < (cadastro.max_responsaveis || 4);
+      selResp.innerHTML = '<option value="">— selecione —</option>' + ops.join('') +
+        (podeNovo ? '<option value="__novo__">＋ Novo responsável…</option>' : '');
+      selResp.value = v;
+      if (selResp.value !== v) selResp.value = '';
+    }
 
     const selSafra = $('#fSafraSel');
     if (selSafra) {
@@ -405,6 +449,16 @@
     $('#btnNovoProdutor').onclick = () => abrirProdutor(null);
     $('#btnNovaFazenda').onclick = () => abrirFazenda(null);
     $('#btnNovaSafra').onclick = novaSafra;
+    $('#btnNovoResp').onclick = async function () { await novoResponsavel(); };
+    $('#fResponsavel').addEventListener('change', async function () {
+      const sel = this;
+      if (sel.value !== '__novo__') { sel.dataset.pendente = sel.value; return; }
+      const nome = await novoResponsavel();
+      sel.dataset.pendente = nome || sel.dataset.pendente || '';
+      if (!nome) sel.dataset.pendente = '';
+      preencherSelecoes();
+      sel.value = nome || '';
+    });
     $('#btnSalvarProdutor').onclick = salvarProdutor;
     $('#btnSalvarFazenda').onclick = salvarFazenda;
     $('#btnFzKml').onclick = () => $('#inpKml').click();
