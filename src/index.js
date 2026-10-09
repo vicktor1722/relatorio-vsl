@@ -15,6 +15,21 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Item-Id,X-Rel-Id'
 };
 
+// cada conta pode cadastrar até 4 responsáveis (nomes que aparecem para escolher no relatório)
+const MAX_RESPONSAVEIS = 4;
+let respPronta = null;
+function garantirResponsaveis(env) {
+  if (!respPronta) {
+    respPronta = env.DB.prepare(`CREATE TABLE IF NOT EXISTS responsaveis (
+      id         TEXT PRIMARY KEY,
+      usuario_id TEXT NOT NULL,
+      nome       TEXT NOT NULL,
+      criado_em  TEXT DEFAULT (datetime('now'))
+    )`).run().catch((e) => { respPronta = null; throw e; });
+  }
+  return respPronta;
+}
+
 const json = (dados, status = 200) => new Response(JSON.stringify(dados), {
   status, headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, CORS)
 });
@@ -213,12 +228,39 @@ export default {
           'SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
         const saf = await env.DB.prepare(
           'SELECT * FROM safras WHERE usuario_id = ? ORDER BY nome DESC').bind(me.id).all();
+        let resp = { results: [] };
+        try {
+          await garantirResponsaveis(env);
+          resp = await env.DB.prepare('SELECT * FROM responsaveis WHERE usuario_id = ? ORDER BY criado_em, nome').bind(me.id).all();
+        } catch (e) { /* sem responsáveis por enquanto */ }
         return json({
           ok: true,
           produtores: prod.results || [],
           fazendas: faz.results || [],
-          safras: saf.results || []
+          safras: saf.results || [],
+          responsaveis: resp.results || [],
+          max_responsaveis: MAX_RESPONSAVEIS
         });
+      }
+
+      if (rota === '/api/responsavel' && req.method === 'POST') {
+        const b = await req.json();
+        const nome = String(b.nome || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+        if (!nome) return json({ erro: 'informe o nome do responsável' }, 400);
+        await garantirResponsaveis(env);
+        const { results } = await env.DB.prepare('SELECT id, nome FROM responsaveis WHERE usuario_id = ?').bind(me.id).all();
+        const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        const ja = (results || []).find((x) => norm(x.nome) === norm(nome));
+        if (ja) return json({ ok: true, id: ja.id, repetido: true });
+        const id = novoId('o');
+        // o limite é conferido dentro do próprio INSERT, então dois aparelhos ao mesmo tempo não passam de 4
+        const r = await env.DB.prepare(`INSERT INTO responsaveis (id, usuario_id, nome)
+          SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM responsaveis WHERE usuario_id = ?) < ?`)
+          .bind(id, me.id, nome, me.id, MAX_RESPONSAVEIS).run();
+        if (!r.meta || !r.meta.changes) {
+          return json({ erro: 'limite de ' + MAX_RESPONSAVEIS + ' responsáveis por conta. Remova um para cadastrar outro.' }, 400);
+        }
+        return json({ ok: true, id: id });
       }
 
       if (rota === '/api/safra' && req.method === 'POST') {
@@ -305,6 +347,9 @@ export default {
           await env.DB.prepare('DELETE FROM produtores WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
         } else if (b.tipo === 'fazenda') {
           await env.DB.prepare('DELETE FROM fazendas WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
+        } else if (b.tipo === 'responsavel') {
+          await garantirResponsaveis(env);
+          await env.DB.prepare('DELETE FROM responsaveis WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
         } else if (b.tipo === 'safra') {
           await env.DB.prepare('DELETE FROM safras WHERE id = ? AND usuario_id = ?').bind(b.id, me.id).run();
         } else return json({ erro: 'tipo inválido' }, 400);
