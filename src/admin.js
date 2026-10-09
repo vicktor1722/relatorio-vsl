@@ -264,6 +264,11 @@ tr:last-child td{border-bottom:none}
 .resp-linha .trilho{height:14px;background:#eef3ef;border-radius:7px;overflow:hidden}
 .resp-linha .trilho i{display:block;height:100%;background:var(--verde);border-radius:7px}
 .resp-linha .num{text-align:right;white-space:nowrap}
+.resp-linha.clic{cursor:pointer;border-radius:8px;margin:0 -6px;padding:6px}
+.resp-linha.clic:hover{background:#f1f6f2}
+.resp-linha.clic .nome{text-decoration:underline;text-decoration-color:#b9d3c0;text-underline-offset:3px}
+.chip-filtro{display:inline-flex;align-items:center;gap:8px;background:#e8f3ec;color:var(--verde-escuro);border-radius:999px;padding:5px 6px 5px 12px;font-size:13px;margin:0 0 12px}
+.chip-filtro button{border:none;background:#fff;color:var(--verde-escuro);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
 .resp-linha .num span{display:block;color:var(--fraco);font-size:11px}
 a{color:var(--verde-escuro)}
 .entrar{max-width:360px;margin:60px auto;background:#fff;border:1px solid var(--linha);border-radius:14px;padding:22px}
@@ -355,6 +360,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
       <div class="caixa">
         <h2 id="hRels">Todos os relatórios</h2>
         <div class="campo"><input id="filtro" placeholder="filtrar por fazenda, produtor ou safra"></div>
+        <div id="chipResp"></div>
         <div class="rolagem"><table id="tRels"></table></div>
       </div>
     </section>
@@ -643,9 +649,23 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
       u + (u === 1 ? ' visitante' : ' visitantes') + quando + '</span>';
   }
 
+  // filtro vindo do quadro "Relatórios por responsável": { nome, conta } ou null
+  var filtroResp = null;
+  function nomeResp(r) { return String(r.responsavel || '').trim().replace(/ +/g, ' ').toLowerCase(); }
+
   function desenharRelatorios() {
     var termo = ($('#filtro').value || '').toLowerCase();
+    var chip = $('#chipResp');
+    if (filtroResp) {
+      chip.innerHTML = '<span class="chip-filtro">Responsável: <b>' + (filtroResp.nome ? esc(filtroResp.nome) : 'sem responsável') + '</b>' +
+        (filtroResp.conta ? ' · ' + esc(filtroResp.conta) : '') + '<button id="limparResp">limpar ✕</button></span>';
+      $('#limparResp').onclick = function () { filtroResp = null; desenharRelatorios(); };
+    } else { chip.innerHTML = ''; }
     var lista = dados.relatorios.filter(function (r) {
+      if (filtroResp) {
+        if (nomeResp(r) !== filtroResp.nome.toLowerCase()) return false;
+        if (filtroResp.conta && String(r.conta || '') !== filtroResp.conta) return false;
+      }
       if (!termo) return true;
       return [r.fazenda, r.produtor, r.conta, r.safra, r.servico, r.responsavel].join(' ').toLowerCase().indexOf(termo) >= 0;
     });
@@ -676,7 +696,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     dados.relatorios.forEach(function (r) {
       var nome = String(r.responsavel || '').trim().replace(/ +/g, ' ');
       var chave = (adm ? String(r.conta || '') : '') + '|' + nome.toLowerCase();
-      var g = grupos[chave] || (grupos[chave] = { nome: nome, conta: r.conta || '', total: 0, enviados: 0 });
+      var g = grupos[chave] || (grupos[chave] = { chave: chave, nome: nome, conta: r.conta || '', total: 0, enviados: 0 });
       g.total++;
       if (r.status === 'publicado') g.enviados++;
     });
@@ -690,11 +710,23 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     var max = Math.max.apply(null, lista.map(function (g) { return g.total; }));
     el.innerHTML = lista.map(function (g) {
       var larg = Math.max(4, Math.round(g.total / max * 100));
-      return '<div class="resp-linha"><div class="nome">' + (g.nome ? esc(g.nome) : '<span style="color:var(--fraco);font-weight:400">Sem responsável</span>') +
+      return '<div class="resp-linha clic" data-k="' + esc(g.chave) + '" title="Ver os relatórios deste responsável"><div class="nome">' + (g.nome ? esc(g.nome) : '<span style="color:var(--fraco);font-weight:400">Sem responsável</span>') +
         (adm && g.conta ? '<small>' + esc(g.conta) + '</small>' : '') + '</div>' +
         '<div class="trilho"><i style="width:' + larg + '%"></i></div>' +
         '<div class="num"><b>' + g.total + '</b><span>' + g.enviados + ' enviado' + (g.enviados === 1 ? '' : 's') + '</span></div></div>';
     }).join('');
+    // clicar no responsável abre a aba Relatórios já filtrada por ele
+    el.querySelectorAll('.resp-linha').forEach(function (linha) {
+      linha.onclick = function () {
+        var g = grupos[linha.getAttribute('data-k')];
+        if (!g) return;
+        filtroResp = { nome: g.nome, conta: adm ? g.conta : '' };
+        $('#filtro').value = '';
+        document.querySelector('.abas button[data-aba="rels"]').click();
+        desenharRelatorios();
+        window.scrollTo(0, 0);
+      };
+    });
   }
 
   function desenharBarras() {
