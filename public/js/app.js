@@ -191,7 +191,11 @@
       .sort(function (a, b) { return String(a.criado_em || '').localeCompare(String(b.criado_em || '')); });
   }
 
-  function hojeISO() { return new Date().toISOString().slice(0, 10); }
+  // data de hoje no fuso do aparelho (toISOString viraria o dia depois das 20h em Mato Grosso)
+  function hojeISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
 
   // a visita que recebe os registros de agora; cria uma nova se a última foi fechada
   async function visitaAberta() {
@@ -957,9 +961,6 @@
     $('#fResponsavel').innerHTML = '';
     Conta.preencherSelecoes();
     $('#fServico').value = rel.servico || '';
-    $('#fInicio').value = rel.data_inicio || '';
-    $('#fFim').value = rel.data_fim || '';
-    $('#fObs').value = rel.observacoes || '';
     Conta.preencherSelecoes();
     $('#tituloTelaRel').textContent = rel.id ? 'Editar relatório' : 'Novo relatório';
     $('#btnApagarRel').classList.toggle('oculto', !rel.id);
@@ -981,9 +982,10 @@
       safra: $('#fSafraSel').value.trim(),
       responsavel: $('#fResponsavel').value.trim(),
       servico: $('#fServico').value.trim(),
-      data_inicio: $('#fInicio').value || hojeISO(),
-      data_fim: $('#fFim').value || null,
-      observacoes: $('#fObs').value.trim(),
+      // início = dia em que o relatório foi aberto; término = dia em que foi finalizado (preenchido ao finalizar)
+      data_inicio: base.data_inicio || hojeISO(),
+      data_fim: base.data_fim || hojeISO(),
+      observacoes: base.observacoes || '',
       talhoes: faz.talhoes || { type: 'FeatureCollection', features: [] },
       status: base.status || 'rascunho',
       criado_em: base.criado_em || new Date().toISOString()
