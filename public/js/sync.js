@@ -397,6 +397,8 @@
 
     rel.status = 'publicado';
     rel.publicado_em = new Date().toISOString();
+    // término = dia em que o relatório foi fechado (se ficou na fila offline, o dia em que entrou na fila)
+    rel.data_fim = diaLocal(rel.fila_desde || rel.publicado_em);
     rel.na_fila = false;
     await DB.put('relatorios', rel);
     await enviarRelatorio(rel);
@@ -408,10 +410,17 @@
      Sem internet o relatório é marcado como "na fila": fica fechado para
      edição, guardado no aparelho, e sobe sozinho quando a conexão voltar. */
 
+  // dia (AAAA-MM-DD) no fuso do aparelho
+  function diaLocal(iso) {
+    const d = iso ? new Date(iso) : new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   async function marcarParaEnvio(rel) {
     rel.na_fila = true;
     rel.status = 'fila';
     rel.fila_desde = new Date().toISOString();
+    rel.data_fim = diaLocal(rel.fila_desde);
     await DB.put('relatorios', rel);
     emitir({ tipo: 'fila', id: rel.id });
     return rel;
@@ -419,6 +428,7 @@
 
   async function cancelarEnvio(rel) {
     rel.na_fila = false;
+    rel.fila_desde = null;
     rel.status = 'rascunho';
     await DB.put('relatorios', rel);
     emitir({ tipo: 'fila', id: rel.id });
