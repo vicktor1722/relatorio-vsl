@@ -100,7 +100,7 @@
   async function sair() {
     try { localStorage.removeItem(CHAVE_LOCAL); } catch (e) {}
     await salvarConf({ token: null });
-    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], em: null });
+    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
   }
 
   // Outra conta entrou neste aparelho: zera tudo que era da conta anterior
@@ -110,7 +110,7 @@
     const c = await conf();
     delete c.empresa; delete c.cidade; delete c.logo;
     await DB.cfg('servidor', c);
-    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], em: null });
+    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
     await DB.cfg('ultimo', null);
   }
 
@@ -142,12 +142,13 @@
   async function cadastroLocal() {
     const c = (await DB.cfg('cadastro')) || { produtores: [], fazendas: [], em: null };
     if (!c.safras) c.safras = [];
+    if (!c.responsaveis) c.responsaveis = [];
     return c;
   }
 
   async function baixarCadastro() {
     const r = await chamar('/api/cadastro');
-    const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], em: new Date().toISOString() };
+    const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], responsaveis: r.responsaveis || [], max_responsaveis: r.max_responsaveis || 4, em: new Date().toISOString() };
     dados.fazendas.forEach(function (f) {
       if (typeof f.talhoes === 'string' && f.talhoes) {
         try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; }
@@ -160,6 +161,12 @@
 
   async function salvarSafra(s) {
     const r = await comJson('/api/safra', s);
+    await baixarCadastro();
+    return r.id;
+  }
+
+  async function salvarResponsavel(nome) {
+    const r = await comJson('/api/responsavel', { nome: nome });
     await baixarCadastro();
     return r.id;
   }
@@ -475,7 +482,7 @@
 
   global.Sync = {
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
-    cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, apagarCadastro,
+    cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
     salvarPerfil, baixarPerfil,
     limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
