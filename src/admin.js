@@ -258,6 +258,13 @@ tr:last-child td{border-bottom:none}
 .barras div span{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:9.5px;color:var(--fraco);white-space:nowrap}
 .barras div b{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--verde-escuro)}
 .legenda-barras{height:26px}
+.resp-linha{display:grid;grid-template-columns:minmax(90px,170px) 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:13px}
+.resp-linha .nome{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resp-linha .nome small{display:block;font-weight:400;color:var(--fraco);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.resp-linha .trilho{height:14px;background:#eef3ef;border-radius:7px;overflow:hidden}
+.resp-linha .trilho i{display:block;height:100%;background:var(--verde);border-radius:7px}
+.resp-linha .num{text-align:right;white-space:nowrap}
+.resp-linha .num span{display:block;color:var(--fraco);font-size:11px}
 a{color:var(--verde-escuro)}
 .entrar{max-width:360px;margin:60px auto;background:#fff;border:1px solid var(--linha);border-radius:14px;padding:22px}
 .entrar h1{margin:0 0 4px;font-size:19px}
@@ -302,6 +309,10 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         <h2>Visitas por dia</h2>
         <div class="barras" id="barras"></div>
         <div class="legenda-barras"></div>
+      </div>
+      <div class="caixa">
+        <h2>Relatórios por responsável</h2>
+        <div id="porResp"></div>
       </div>
       <div class="caixa">
         <h2>Onde foram as visitas</h2>
@@ -446,6 +457,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     desenharContas();
     desenharRelatorios();
     desenharBarras();
+    desenharResp();
     desenharMapa();
   }
 
@@ -635,7 +647,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     var termo = ($('#filtro').value || '').toLowerCase();
     var lista = dados.relatorios.filter(function (r) {
       if (!termo) return true;
-      return [r.fazenda, r.produtor, r.conta, r.safra, r.servico].join(' ').toLowerCase().indexOf(termo) >= 0;
+      return [r.fazenda, r.produtor, r.conta, r.safra, r.servico, r.responsavel].join(' ').toLowerCase().indexOf(termo) >= 0;
     });
     var linhas = lista.map(function (r) {
       var sel = r.status === 'publicado'
@@ -644,6 +656,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
       return '<tr><td>' + dataBR(r.data_inicio || r.criado_em) + '</td>' +
         '<td><b>' + esc(r.fazenda || '—') + '</b><br><span style="color:var(--fraco);font-size:12px">' + esc(r.produtor || '') + '</span></td>' +
         '<td>' + esc(r.safra || '—') + '</td>' +
+        '<td>' + (r.responsavel ? esc(r.responsavel) : '<span style="color:var(--fraco)">—</span>') + '</td>' +
         '<td>' + r.registros + '<br><span style="color:var(--fraco);font-size:11.5px">' + r.fotos + ' fotos · ' + r.videos + ' vídeos</span></td>' +
         '<td>' + esc(r.conta || '—') + '</td>' +
         '<td>' + sel + '</td>' +
@@ -651,10 +664,38 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         '<td>' + (r.status === 'publicado' ? '<a href="/r/' + esc(r.id) + '?sc=1" target="_blank">abrir</a>' : '—') + '</td></tr>';
     }).join('');
     $('#tRels').innerHTML =
-      '<tr><th>Data</th><th>Fazenda</th><th>Safra</th><th>Registros</th><th>Conta</th><th>Status</th><th>Acessos</th><th></th></tr>' +
-      (linhas || '<tr><td colspan="8" style="color:var(--fraco)">Nada encontrado.</td></tr>');
+      '<tr><th>Data</th><th>Fazenda</th><th>Safra</th><th>Responsável</th><th>Registros</th><th>Conta</th><th>Status</th><th>Acessos</th><th></th></tr>' +
+      (linhas || '<tr><td colspan="9" style="color:var(--fraco)">Nada encontrado.</td></tr>');
   }
   $('#filtro').addEventListener('input', function () { if (dados) desenharRelatorios(); });
+
+  // quantos relatórios cada responsável fez (o administrador vê também de qual conta é cada um)
+  function desenharResp() {
+    var adm = !!(dados.eu && dados.eu.admin);
+    var grupos = {};
+    dados.relatorios.forEach(function (r) {
+      var nome = String(r.responsavel || '').trim().replace(/ +/g, ' ');
+      var chave = (adm ? String(r.conta || '') : '') + '|' + nome.toLowerCase();
+      var g = grupos[chave] || (grupos[chave] = { nome: nome, conta: r.conta || '', total: 0, enviados: 0 });
+      g.total++;
+      if (r.status === 'publicado') g.enviados++;
+    });
+    var lista = Object.keys(grupos).map(function (k) { return grupos[k]; })
+      .sort(function (a, b) {
+        if (!a.nome !== !b.nome) return a.nome ? -1 : 1;
+        return b.total - a.total || a.nome.localeCompare(b.nome);
+      });
+    var el = $('#porResp');
+    if (!lista.length) { el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhum relatório ainda.</div>'; return; }
+    var max = Math.max.apply(null, lista.map(function (g) { return g.total; }));
+    el.innerHTML = lista.map(function (g) {
+      var larg = Math.max(4, Math.round(g.total / max * 100));
+      return '<div class="resp-linha"><div class="nome">' + (g.nome ? esc(g.nome) : '<span style="color:var(--fraco);font-weight:400">Sem responsável</span>') +
+        (adm && g.conta ? '<small>' + esc(g.conta) + '</small>' : '') + '</div>' +
+        '<div class="trilho"><i style="width:' + larg + '%"></i></div>' +
+        '<div class="num"><b>' + g.total + '</b><span>' + g.enviados + ' enviado' + (g.enviados === 1 ? '' : 's') + '</span></div></div>';
+    }).join('');
+  }
 
   function desenharBarras() {
     var porDia = {};
