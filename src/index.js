@@ -6,6 +6,7 @@ import { conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } fro
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
+import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
 import { areasAdmin, criarConta, definirPrazo, ehAdmin, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
 
@@ -82,6 +83,9 @@ export default {
       if (rota.startsWith('/r/')) {
         let bruto = rota.slice(3).replace(/\/$/, '');
         try { bruto = decodeURIComponent(bruto); } catch (e) {}
+        // /r/<id>/traduzir?lang=en devolve as legendas e textos do relatório traduzidos (pt → en/es)
+        const querTraduzir = /\/traduzir$/.test(bruto);
+        if (querTraduzir) bruto = bruto.replace(/\/traduzir$/, '');
         const ids = [...new Set(bruto.split(/[+,\s]+/).filter(Boolean))].slice(0, 20);
 
         // link único com várias visitas: /r/<id1>+<id2>+...
@@ -96,6 +100,9 @@ export default {
           }
           const { results: todos } = await env.DB.prepare(
             `SELECT * FROM itens WHERE relatorio_id IN (${marcas}) ORDER BY capturado_em ASC`).bind(...ids).all();
+          if (querTraduzir) {
+            return json(await traduzirRelatorio(env, [juntarRelatorios(rels), ...rels], todos || [], url.searchParams.get('lang')));
+          }
           let perfilJ = null;
           if (rels[0].usuario_id) {
             perfilJ = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
@@ -114,6 +121,7 @@ export default {
           'Este link não existe ou o relatório ainda não foi finalizado pelo técnico.'), 404);
         const { results } = await env.DB.prepare(
           'SELECT * FROM itens WHERE relatorio_id = ? ORDER BY capturado_em ASC').bind(id).all();
+        if (querTraduzir) return json(await traduzirRelatorio(env, [rel], results || [], url.searchParams.get('lang')));
         let perfil = null;
         if (rel.usuario_id) {
           perfil = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
