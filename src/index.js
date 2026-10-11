@@ -8,7 +8,7 @@ import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
-import { areasAdmin, criarConta, definirPrazo, ehAdmin, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
+import { areasAdmin, criarConta, definirPrazo, ehAdmin, excluirConta, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -194,6 +194,11 @@ export default {
           const b = await req.json();
           if (b.id === me.id && !b.admin) return json({ erro: 'não dá para tirar o seu próprio acesso' }, 400);
           return json(await promover(env, b.id, b.admin));
+        }
+        if (rota === '/api/admin/excluir' && req.method === 'POST') {
+          const b = await req.json();
+          try { return json(await excluirConta(env, me, b.id, b.email)); }
+          catch (e) { return json({ erro: e.message }, 400); }
         }
         if (rota === '/api/admin/prazo' && req.method === 'POST') {
           const b = await req.json();
