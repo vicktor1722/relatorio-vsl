@@ -58,6 +58,12 @@ footer b{color:var(--verde-escuro)}
 .barra button{flex:1;padding:11px;border:none;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}
 .barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}
 .item img{cursor:zoom-in}
+.barra-idioma{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding:9px 16px;background:#fff;border-bottom:1px solid var(--linha);font-size:12.5px;color:var(--fraco)}
+.barra-idioma button{border:1px solid var(--linha);background:#fff;color:var(--verde-escuro);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer}
+.barra-idioma button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.barra-idioma .aviso-trad{margin-left:auto}
+.barra-idioma .aviso-trad button{border:0;background:none;color:var(--verde);text-decoration:underline;padding:0 0 0 4px;font-weight:500}
+@media print{.barra-idioma{display:none}}
 .visor{position:fixed;left:0;right:0;top:0;height:100vh;height:100dvh;z-index:90;background:rgba(0,0,0,.96);
  display:flex;align-items:center;justify-content:center}
 .visor img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom}
@@ -81,6 +87,11 @@ function fmtData(d) {
   if (!d) return '—';
   const p = String(d).slice(0, 10).split('-');
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+}
+// data que o navegador reescreve no idioma do leitor (o texto de dentro é o fallback em português)
+function dataSpan(d) {
+  if (!d) return '—';
+  return `<span data-d="${esc(String(d).slice(0, 10))}">${fmtData(d)}</span>`;
 }
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
@@ -127,7 +138,7 @@ function mapaSVG(talhoes, itens) {
     s += `<circle cx="${px(i.lon).toFixed(1)}" cy="${py(i.lat).toFixed(1)}" r="7" fill="${i.tipo === 'video' ? '#D93025' : '#1B7A43'}" stroke="#fff" stroke-width="2.5"/>`;
   });
   s += '</svg>';
-  return `<div class="mapa">${s}<div style="font-size:11.5px;color:#6B7B72;margin-top:8px">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`;
+  return `<div class="mapa">${s}<div style="font-size:11.5px;color:#6B7B72;margin-top:8px" data-i="legenda_mapa">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`;
 }
 
 /* Agrupa os registros por talhão, na ordem em que os talhões vêm do KML. */
@@ -197,7 +208,7 @@ function blocoGrupos(midias) {
   return gruposDeLegenda(midias).map(g => {
     const n = g.itens.length;
     return `<div class="grupo"><div class="grade n${Math.min(n, 3)}">${g.itens.map(celulaMidia).join('')}</div>` +
-      (g.titulo ? `<p class="grupo-leg">${esc(g.titulo)}</p>` : '') + `</div>`;
+      (g.titulo ? `<p class="grupo-leg" data-tr>${esc(g.titulo)}</p>` : '') + `</div>`;
   }).join('');
 }
 
@@ -233,6 +244,166 @@ export function juntarRelatorios(rels) {
   });
 }
 
+
+/* ---------- idiomas do relatório (português, inglês, espanhol) ---------- */
+const DICT = {
+  pt: {
+    rel_visita: 'Relatório de visita', rel_visitas: 'Relatório de {n} visitas',
+    sub_padrao: 'Relatório de visita técnica',
+    produtor: 'Produtor', safra: 'Safra', periodo: 'Período', responsavel: 'Responsável',
+    visitas: 'visitas', fotos: 'fotos', videos: 'vídeos', talhoes_reg: 'talhões registrados', ha_map: 'hectares mapeados',
+    legenda_mapa: '🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda',
+    obs_gerais: 'Observações gerais', fora: 'Fora dos talhões', reg: '{n} registro(s)',
+    concluido: 'Serviço concluído ✔️', pdf: 'Baixar PDF', compartilhar: 'Compartilhar', link_copiado: 'Link copiado',
+    publicado: 'Publicado em {d}',
+    traduzindo: 'Traduzindo…', auto: 'Tradução automática', ver_original: 'ver original', indisp: 'Tradução indisponível no momento'
+  },
+  en: {
+    rel_visita: 'Visit report', rel_visitas: 'Report of {n} visits',
+    sub_padrao: 'Technical visit report',
+    produtor: 'Producer', safra: 'Crop season', periodo: 'Period', responsavel: 'Responsible',
+    visitas: 'visits', fotos: 'photos', videos: 'videos', talhoes_reg: 'fields recorded', ha_map: 'hectares mapped',
+    legenda_mapa: '🟢 photos · 🔴 videos · farm KML polygons',
+    obs_gerais: 'General notes', fora: 'Outside the fields', reg: '{n} record(s)',
+    concluido: 'Service completed ✔️', pdf: 'Download PDF', compartilhar: 'Share', link_copiado: 'Link copied',
+    publicado: 'Published on {d}',
+    traduzindo: 'Translating…', auto: 'Automatic translation', ver_original: 'view original', indisp: 'Translation unavailable right now'
+  },
+  es: {
+    rel_visita: 'Informe de visita', rel_visitas: 'Informe de {n} visitas',
+    sub_padrao: 'Informe de visita técnica',
+    produtor: 'Productor', safra: 'Campaña', periodo: 'Período', responsavel: 'Responsable',
+    visitas: 'visitas', fotos: 'fotos', videos: 'videos', talhoes_reg: 'lotes registrados', ha_map: 'hectáreas mapeadas',
+    legenda_mapa: '🟢 fotos · 🔴 videos · polígonos del KML de la finca',
+    obs_gerais: 'Observaciones generales', fora: 'Fuera de los lotes', reg: '{n} registro(s)',
+    concluido: 'Servicio concluido ✔️', pdf: 'Descargar PDF', compartilhar: 'Compartir', link_copiado: 'Enlace copiado',
+    publicado: 'Publicado el {d}',
+    traduzindo: 'Traduciendo…', auto: 'Traducción automática', ver_original: 'ver original', indisp: 'Traducción no disponible por ahora'
+  }
+};
+
+// roda no navegador do cliente: escolhe o idioma (o do aparelho, ou o que ele já tinha escolhido),
+// reescreve os rótulos e pede a tradução das legendas e observações
+const SCRIPT_IDIOMA = String.raw`
+(function(){
+  var D = __DICT__;
+  var LANGS = ['pt','en','es'];
+  var atual = 'pt';
+  var cache = {};
+  var barra = document.getElementById('idiomas');
+  var aviso = document.getElementById('avisoTrad');
+  function norm(s){ return String(s == null ? '' : s).replace(/\r\n?/g, '\n').trim(); }
+  function t(k, v){
+    var s = (D[atual] && D[atual][k]) || D.pt[k] || k;
+    if (v) for (var n in v) s = s.split('{' + n + '}').join(v[n]);
+    return s;
+  }
+  window.__t = t;
+  function loc(){ return atual === 'pt' ? 'pt-BR' : atual === 'es' ? 'es' : 'en-US'; }
+  function fmtData(iso){
+    var p = String(iso || '').slice(0, 10).split('-');
+    if (p.length !== 3) return iso || '—';
+    if (atual === 'en') {
+      try { return new Intl.DateTimeFormat('en-US', {year:'numeric', month:'short', day:'numeric', timeZone:'UTC'}).format(new Date(Date.UTC(+p[0], +p[1]-1, +p[2]))); } catch(e) {}
+    }
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function diaLongo(iso){
+    try { return new Intl.DateTimeFormat(loc(), {weekday:'long', day:'2-digit', month:'long', year:'numeric', timeZone:'UTC'}).format(new Date(iso)); }
+    catch(e) { return null; }
+  }
+  function guardar(e){ if (e.getAttribute('data-o') == null) e.setAttribute('data-o', e.textContent); }
+
+  function aplicarRotulos(){
+    document.querySelectorAll('[data-i]').forEach(function(e){
+      guardar(e);
+      if (atual === 'pt') { e.textContent = e.getAttribute('data-o'); return; }
+      var d = e.getAttribute('data-d');
+      e.textContent = t(e.getAttribute('data-i'), {n: e.getAttribute('data-n'), d: d ? fmtData(d) : ''});
+    });
+    document.querySelectorAll('[data-d]:not([data-i])').forEach(function(e){
+      guardar(e);
+      e.textContent = atual === 'pt' ? e.getAttribute('data-o') : fmtData(e.getAttribute('data-d'));
+    });
+    document.querySelectorAll('[data-dia]').forEach(function(e){
+      guardar(e);
+      e.textContent = atual === 'pt' ? e.getAttribute('data-o') : (diaLongo(e.getAttribute('data-dia')) || e.getAttribute('data-o'));
+    });
+    var n = +document.body.getAttribute('data-n') || 1;
+    document.title = t(n > 1 ? 'rel_visitas' : 'rel_visita', {n: n}) + ' — ' + (document.body.getAttribute('data-fz') || '');
+  }
+
+  function aplicarTraducao(mapa){
+    document.querySelectorAll('[data-tr]').forEach(function(e){
+      guardar(e);
+      var o = e.getAttribute('data-o'), tr = mapa[norm(o)];
+      e.textContent = (atual !== 'pt' && tr) ? tr : o;
+    });
+    document.querySelectorAll('.item img[alt]').forEach(function(im){
+      if (im.getAttribute('data-oalt') == null) im.setAttribute('data-oalt', im.getAttribute('alt'));
+      var o = im.getAttribute('data-oalt'), tr = mapa[norm(o)];
+      im.setAttribute('alt', (atual !== 'pt' && tr) ? tr : o);
+    });
+  }
+
+  function buscar(lang, fim){
+    if (cache[lang]) return fim(cache[lang]);
+    var base = location.pathname.replace(/\/$/, '');
+    fetch(base + '/traduzir?lang=' + lang).then(function(r){ return r.json(); })
+      .then(function(j){ if (j && j.ok && !j.indisponivel) cache[lang] = j; fim(j); })
+      .catch(function(){ fim(null); });
+  }
+
+  function marcar(){
+    barra.querySelectorAll('button[data-l]').forEach(function(b){
+      var on = b.getAttribute('data-l') === atual;
+      b.className = on ? 'on' : '';
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function mudar(lang, salvar){
+    if (LANGS.indexOf(lang) < 0) lang = 'pt';
+    atual = lang;
+    document.documentElement.lang = lang === 'pt' ? 'pt-BR' : lang;
+    if (salvar) { try { localStorage.setItem('idioma-relatorio', lang); } catch(e) {} }
+    marcar();
+    aplicarRotulos();
+    aviso.textContent = '';
+    if (lang === 'pt') { aplicarTraducao({}); return; }
+    aviso.textContent = t('traduzindo');
+    buscar(lang, function(j){
+      if (atual !== lang) return;
+      var mapa = (j && j.traducoes) || {};
+      aplicarTraducao(mapa);
+      aviso.textContent = '';
+      if (!j || !j.ok || j.indisponivel) { aviso.textContent = t('indisp'); return; }
+      aviso.appendChild(document.createTextNode('🌐 ' + t('auto')));
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = t('ver_original');
+      b.onclick = function(){ mudar('pt', true); };
+      aviso.appendChild(b);
+    });
+  }
+
+  barra.addEventListener('click', function(ev){
+    var b = ev.target.closest && ev.target.closest('button[data-l]');
+    if (b) mudar(b.getAttribute('data-l'), true);
+  });
+
+  function inicial(){
+    try { var q = new URLSearchParams(location.search).get('lang'); if (q && LANGS.indexOf(q) >= 0) return q; } catch(e) {}
+    try { var s = localStorage.getItem('idioma-relatorio'); if (s && LANGS.indexOf(s) >= 0) return s; } catch(e) {}
+    var prefs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || 'pt'];
+    for (var i = 0; i < prefs.length; i++) {
+      var c = String(prefs[i]).toLowerCase().slice(0, 2);
+      if (LANGS.indexOf(c) >= 0) return c;
+    }
+    return 'pt';
+  }
+  mudar(inicial(), false);
+})();
+`;
+
 export function paginaRelatorio(rel, itens, env, origem, perfil) {
   const p = perfil || {};
   const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
@@ -251,15 +422,16 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
 
   // observações gerais (texto solto) sobem para logo depois do mapa
   const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
-  const notasTopo = (rel.observacoes ? `<div class="nota">${esc(rel.observacoes)}</div>` : '') +
-    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${fmtData(i.capturado_em)}</b> · ` : ''}${esc(i.legenda)}</div>`).join('') : '');
-  const obsGerais = notasTopo ? `<h2 class="talhao">Observações gerais</h2>${notasTopo}` : '';
+  const notasTopo = (rel.observacoes ? `<div class="nota"><span data-tr>${esc(rel.observacoes)}</span></div>` : '') +
+    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${dataSpan(i.capturado_em)}</b> · ` : ''}<span data-tr>${esc(i.legenda)}</span></div>`).join('') : '');
+  const obsGerais = notasTopo ? `<h2 class="talhao"><span data-i="obs_gerais">Observações gerais</span></h2>${notasTopo}` : '';
 
   let corpo = '';
   grupos.filter(g => g.chave !== '\u0000notas').forEach(g => {
-    const extra = [g.itens.length + ' registro(s)'];
+    const extra = [`<span data-i="reg" data-n="${g.itens.length}">${g.itens.length} registro(s)</span>`];
     if (g.area) extra.push(g.area.toFixed(1).replace('.', ',') + ' ha');
-    corpo += `<h2 class="talhao">${esc(g.titulo)}<small>${extra.join(' · ')}</small></h2>`;
+    const tituloG = g.chave === '\u0000fora' ? '<span data-i="fora">Fora dos talhões</span>' : esc(g.titulo);
+    corpo += `<h2 class="talhao">${tituloG}<small>${extra.join(' · ')}</small></h2>`;
 
     // separa por dia quando o talhão foi visitado em mais de um dia
     const segmentos = [];
@@ -270,8 +442,8 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
       seg.lista.push(i);
     });
     segmentos.forEach(seg => {
-      if (g.varioDia) corpo += `<h3 class="dia">${esc(diaLongo(seg.iso))}</h3>`;
-      seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="nota">${esc(i.legenda)}</div>`; });
+      if (g.varioDia) corpo += `<h3 class="dia" data-dia="${esc(seg.iso)}">${esc(diaLongo(seg.iso))}</h3>`;
+      seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="nota"><span data-tr>${esc(i.legenda)}</span></div>`; });
       corpo += blocoGrupos(seg.lista.filter(i => i.tipo !== 'texto'));
     });
   });
@@ -292,38 +464,45 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
 ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(capa.midia)}">` : ''}
 <meta property="og:type" content="article">
 <style>${CSS}</style>
-</head><body><div class="folha">
+</head><body data-n="${rel._n || 1}" data-fz="${esc(rel.fazenda || '')}"><div class="folha">
 <header class="capa">
   <div class="marca">${logo
       ? `<img class="logo" src="${esc(logo)}" alt="">`
       : '<div class="logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
   <h1>${esc(rel.fazenda || 'Relatório de visita')}</h1>
-  <p class="sub">${esc(rel.servico || 'Relatório de visita técnica')}</p>
+  <p class="sub"${rel.servico ? ' data-tr' : ' data-i="sub_padrao"'}>${esc(rel.servico || 'Relatório de visita técnica')}</p>
 </header>
+<div class="barra-idioma" id="idiomas">
+  <span aria-hidden="true">🌐</span>
+  <button type="button" data-l="pt">Português</button>
+  <button type="button" data-l="en">English</button>
+  <button type="button" data-l="es">Español</button>
+  <span class="aviso-trad" id="avisoTrad"></span>
+</div>
 <div class="painel">
-  <div><span>Produtor</span><b>${esc(rel.produtor || '—')}</b></div>
-  <div><span>Safra</span><b>${esc(rel.safra || '—')}</b></div>
-  <div><span>Período</span><b>${fmtData(rel.data_inicio)} – ${fmtData(rel.data_fim)}</b></div>
-  <div><span>Responsável</span><b>${esc(rel.responsavel || '—')}</b></div>
+  <div><span data-i="produtor">Produtor</span><b>${esc(rel.produtor || '—')}</b></div>
+  <div><span data-i="safra">Safra</span><b>${esc(rel.safra || '—')}</b></div>
+  <div><span data-i="periodo">Período</span><b>${dataSpan(rel.data_inicio)} – ${dataSpan(rel.data_fim)}</b></div>
+  <div><span data-i="responsavel">Responsável</span><b>${esc(rel.responsavel || '—')}</b></div>
 </div>
 <div class="corpo">
   <div class="resumo">
-    ${rel._n > 1 ? `<div><b>${rel._n}</b><span>visitas</span></div>` : ''}
-    <div><b>${fotos}</b><span>fotos</span></div>
-    <div><b>${videos}</b><span>vídeos</span></div>
-    <div><b>${talhoesVisitados}</b><span>talhões registrados</span></div>
-    <div><b>${areaTotal ? areaTotal.toFixed(0) : '—'}</b><span>hectares mapeados</span></div>
+    ${rel._n > 1 ? `<div><b>${rel._n}</b><span data-i="visitas">visitas</span></div>` : ''}
+    <div><b>${fotos}</b><span data-i="fotos">fotos</span></div>
+    <div><b>${videos}</b><span data-i="videos">vídeos</span></div>
+    <div><b>${talhoesVisitados}</b><span data-i="talhoes_reg">talhões registrados</span></div>
+    <div><b>${areaTotal ? areaTotal.toFixed(0) : '—'}</b><span data-i="ha_map">hectares mapeados</span></div>
   </div>
   ${mapaSVG(talhoes, itens)}
   ${obsGerais}
   ${corpo}
-  <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600">Serviço concluído ✔️</div>
+  <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>
-<span style="font-size:11.5px">${rel.publicado_em ? 'Publicado em ' + fmtData(rel.publicado_em) : ''}</span></footer>
+<span style="font-size:11.5px"${rel.publicado_em ? ` data-i="publicado" data-d="${esc(String(rel.publicado_em).slice(0, 10))}"` : ''}>${rel.publicado_em ? 'Publicado em ' + fmtData(rel.publicado_em) : ''}</span></footer>
 <div class="barra">
-  <button class="sec" onclick="window.print()">Baixar PDF</button>
-  <button onclick="if(navigator.share){navigator.share({title:document.title,url:location.href})}else{navigator.clipboard.writeText(location.href);alert('Link copiado')}">Compartilhar</button>
+  <button class="sec" onclick="window.print()" data-i="pdf">Baixar PDF</button>
+  <button data-i="compartilhar" onclick="if(navigator.share){navigator.share({title:document.title,url:location.href})}else{navigator.clipboard.writeText(location.href);alert(window.__t?window.__t('link_copiado'):'Link copiado')}">Compartilhar</button>
 </div>
 <script>
 (function(){
@@ -381,6 +560,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   });
 })();
 </script>
+<script>${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
 </div></body></html>`;
 }
 
