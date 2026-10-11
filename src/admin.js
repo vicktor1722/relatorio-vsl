@@ -215,6 +215,53 @@ export async function promover(env, id, valor) {
   return { ok: true };
 }
 
+// apaga a conta e tudo que é dela: relatórios, fotos/vídeos (R2), cadastros, responsáveis, prazo.
+// Só o administrador chama; não apaga a si mesmo nem outra conta de administrador, e exige o e-mail digitado para confirmar.
+export async function excluirConta(env, me, id, emailConfirma) {
+  const u = await env.DB.prepare('SELECT id, email, COALESCE(admin,0) AS admin FROM usuarios WHERE id = ?').bind(id).first();
+  if (!u) throw new Error('conta não encontrada');
+  if (u.id === me.id) throw new Error('não dá para excluir a sua própria conta');
+  if (Number(u.admin) === 1) throw new Error('essa conta é de administrador: tire o acesso de admin antes de excluir');
+  if (String(emailConfirma || '').trim().toLowerCase() !== String(u.email).toLowerCase()) {
+    throw new Error('o e-mail digitado não confere com o da conta');
+  }
+
+  const { results: itens } = await env.DB.prepare(
+    'SELECT i.midia, i.thumb FROM itens i JOIN relatorios r ON r.id = i.relatorio_id WHERE r.usuario_id = ?').bind(id).all();
+  const chaves = new Set();
+  (itens || []).forEach((i) => [i.midia, i.thumb].forEach((k) => {
+    if (k && typeof k === 'string' && !k.startsWith('drive:') && !k.startsWith('data:') && !/^https?:/.test(k)) chaves.add(k);
+  }));
+  const nRel = await env.DB.prepare('SELECT COUNT(*) AS n FROM relatorios WHERE usuario_id = ?').bind(id).first();
+
+  // tabelas criadas sozinhas (podem ainda não existir): erro aqui não impede a exclusão
+  const opcionais = [
+    'DELETE FROM acessos WHERE relatorio_id IN (SELECT id FROM relatorios WHERE usuario_id = ?)',
+    'DELETE FROM responsaveis WHERE usuario_id = ?',
+    'DELETE FROM prazos_conta WHERE usuario_id = ?'
+  ];
+  for (const q of opcionais) { try { await env.DB.prepare(q).bind(id).run(); } catch (e) { /* tabela ainda não existe */ } }
+
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM itens WHERE relatorio_id IN (SELECT id FROM relatorios WHERE usuario_id = ?)').bind(id),
+    env.DB.prepare('DELETE FROM relatorios WHERE usuario_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM fazendas WHERE usuario_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM produtores WHERE usuario_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM safras WHERE usuario_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM perfis WHERE usuario_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM usuarios WHERE id = ?').bind(id)
+  ]);
+
+  let midias = 0;
+  if (env.MIDIA && chaves.size) {
+    const lista = [...chaves];
+    for (let i = 0; i < lista.length; i += 500) {
+      try { await env.MIDIA.delete(lista.slice(i, i + 500)); midias += Math.min(500, lista.length - i); } catch (e) { /* sobra no armazenamento, sem prejuízo */ }
+    }
+  }
+  return { ok: true, email: u.email, relatorios: Number(nRel && nRel.n || 0), midias };
+}
+
 export async function trocarSenha(env, id, senha) {
   const nova = String(senha || '');
   if (nova.length < 6) throw new Error('a senha precisa de pelo menos 6 caracteres');
@@ -532,6 +579,8 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
           (Number(c.admin) === 1 ? 'tirar admin' : 'tornar admin') + '</button>' +
+          (Number(c.admin) === 1 || (dados.eu && c.id === dados.eu.id) ? '' :
+            ' <button class="selo venc" data-excluir="' + esc(c.id) + '" data-email="' + esc(c.email) + '" data-rel="' + c.relatorios + '">excluir conta</button>') +
         '</td></tr>';
     }).join('');
     $('#tContas').innerHTML =
@@ -546,7 +595,44 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     document.querySelectorAll('[data-senha]').forEach(function (b) {
       b.onclick = function () { abrirTrocaSenha(b.dataset.senha, b.dataset.email); };
     });
+    document.querySelectorAll('[data-excluir]').forEach(function (b) {
+      b.onclick = function () { abrirExcluir(b.dataset.excluir, b.dataset.email, b.dataset.rel); };
+    });
     ligarPrazos();
+  }
+
+  /* ---------- excluir uma conta (definitivo) ---------- */
+  function abrirExcluir(id, email, nRel) {
+    var veu = document.createElement('div'); veu.className = 'veu';
+    var cx = document.createElement('div'); cx.className = 'modal';
+    cx.innerHTML =
+      '<h2 style="margin:0 0 4px">Excluir conta</h2>' +
+      '<p style="margin:0 0 10px;font-size:13px"><b>' + esc(email) + '</b></p>' +
+      '<div class="aviso ruim" style="margin:0 0 12px">Isso apaga para sempre a conta, ' + esc(nRel) +
+        ' relatório(s), fotos, vídeos, cadastros e responsáveis dela. Não tem como desfazer, e os links que o cliente recebeu deixam de abrir.</div>' +
+      '<div class="campo"><label>Para confirmar, digite o e-mail da conta</label>' +
+      '<input id="exEmail" type="text" autocomplete="off" autocapitalize="off" placeholder="' + esc(email) + '"></div>' +
+      '<div id="exMsg"></div>' +
+      '<button class="btn" id="exOk" style="background:#b3261e">Excluir definitivamente</button>' +
+      '<button class="btn sec" id="exCancel" style="margin-top:8px">Cancelar</button>';
+    veu.appendChild(cx); document.body.appendChild(veu);
+    var sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    cx.querySelector('#exCancel').onclick = sair;
+    cx.querySelector('#exOk').onclick = async function () {
+      var msg = cx.querySelector('#exMsg');
+      var digitado = cx.querySelector('#exEmail').value.trim().toLowerCase();
+      if (digitado !== String(email).toLowerCase()) { aviso(msg, 'Digite o e-mail exatamente como aparece acima.', true); return; }
+      aviso(msg, 'Excluindo…');
+      this.disabled = true;
+      try {
+        var r = await api('/api/admin/excluir', { id: id, email: digitado });
+        sair();
+        await abrirPainel();
+        alert('Conta excluída: ' + r.email + ' (' + r.relatorios + ' relatório(s) apagado(s)).');
+      } catch (e) { aviso(msg, e.message, true); this.disabled = false; }
+    };
+    setTimeout(function () { cx.querySelector('#exEmail').focus(); }, 120);
   }
 
   /* ---------- tempo de uso e prazo de cada conta ---------- */
