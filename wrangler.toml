@@ -18,6 +18,11 @@ bucket_name = "relatorio-vsl"
 EMPRESA = "VSL CONSULTORIA E TREINAMENTO NA AGRICULTURA LTDA"
 CIDADE = "Pontes e Lacerda · MT"
 
+# ---------- tradução automática do relatório do cliente (português → inglês/espanhol) ----------
+# Workers AI: sem chave nem cadastro extra
+[ai]
+binding = "AI"
+
 # SEGREDO e CONVITE ficam como SEGREDOS no painel da Cloudflare,
 # nunca neste arquivo (ele é público no GitHub).
 
