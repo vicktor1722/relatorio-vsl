@@ -259,10 +259,13 @@
 
     st.itens = [];
     let html = '';
+    let numVisita = 0;
     for (let vi = 0; vi < st.visitas.length; vi++) {
       const v = st.visitas[vi];
       const itens = await DB.itensDoRelatorio(v.id);
-      html += divisorVisita(v, vi + 1);
+      // visita antiga, vazia e nunca enviada: não aparece
+      if (!itens.length && v.status !== 'publicado' && !v.na_fila && v.id !== st.rel.id && vi !== st.visitas.length - 1) continue;
+      html += divisorVisita(v, ++numVisita);
       if (!itens.length) {
         html += '<div class="aviso">Visita sem registros ainda. Toque na câmera.</div>';
         continue;
@@ -701,15 +704,22 @@
       (grupos[k] = grupos[k] || []).push(r);
     });
     const chaves = Object.keys(grupos);
+    const cont = {};   // registros de cada visita
+    for (const r of rels) cont[r.id] = (await DB.itensDoRelatorio(r.id)).length;
     chaves.forEach(function (k) {
       grupos[k].sort(function (a, b) { return String(a.criado_em || '').localeCompare(String(b.criado_em || '')); });
+      // visita sem nenhum registro e que não foi enviada some da tela (não há o que sincronizar);
+      // se a conversa só tem visitas assim, fica a última, para dar para começar a registrar
+      const uteis = grupos[k].filter(function (v) { return cont[v.id] > 0 || v.status === 'publicado' || v.na_fila; });
+      grupos[k] = uteis.length ? uteis : [grupos[k][grupos[k].length - 1]];
     });
     chaves.sort(function (a, b) {
       const ua = grupos[a][grupos[a].length - 1].criado_em || '';
       const ub = grupos[b][grupos[b].length - 1].criado_em || '';
       return ub.localeCompare(ua);
     });
-    $('#subLista').textContent = chaves.length + ' conversa(s) · ' + rels.length + ' visita(s)';
+    const totalVisitas = chaves.reduce(function (s, k) { return s + grupos[k].length; }, 0);
+    $('#subLista').textContent = chaves.length + ' conversa(s) · ' + totalVisitas + ' visita(s)';
 
     const partes = [];
     for (const k of chaves) {
