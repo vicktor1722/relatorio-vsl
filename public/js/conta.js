@@ -61,11 +61,13 @@
       if (outraConta) await Sync.limparDadosLocais();
       try {
         const perfil = await Sync.baixarPerfil();
-        if (perfil && (perfil.empresa || perfil.cidade || perfil.logo)) {
+        if (perfil && (perfil.empresa || perfil.cidade || perfil.logo || perfil.telefone || perfil.email)) {
           const c = (await DB.cfg('servidor')) || {};
           await DB.cfg('servidor', Object.assign(c, {
             empresa: perfil.empresa || c.empresa || '',
             cidade: perfil.cidade || c.cidade || '',
+            telefone: perfil.telefone || c.telefone || '',
+            email: perfil.email || c.email || '',
             logo: perfil.logo || c.logo || ''
           }));
         }
