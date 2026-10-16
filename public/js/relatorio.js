@@ -68,7 +68,7 @@
 
     const mapa = {};
     itens.forEach(function (i) {
-      const chave = i.talhao ? i.talhao : (i.tipo === 'texto' ? '\u0000notas' : '\u0000fora');
+      const chave = i.tipo === 'texto' ? '\u0000notas' : (i.talhao ? i.talhao : '\u0000fora');   // todo texto vai para as observações gerais, no início
       (mapa[chave] = mapa[chave] || []).push(i);
     });
 
@@ -136,6 +136,7 @@
     const empresa = o.empresa || 'VSL Consultoria e Treinamento na Agricultura';
     const cidade = o.cidade || 'Pontes e Lacerda · MT';
     const logo = o.logo || '';
+    const contato = [o.telefone, o.email].map(function (x) { return String(x || '').trim(); }).filter(Boolean).map(esc).join(' · ');
     const fotos = itens.filter(i => i.tipo === 'foto').length;
     const videos = itens.filter(i => i.tipo === 'video').length;
     const nTalhoes = new Set(itens.filter(i => i.talhao).map(i => i.talhao)).size;
@@ -174,7 +175,7 @@
 
     return `<div class="rp-folha">
   <header class="rp-capa">
-    <div class="rp-marca">${logo ? '<img class="rp-logo-img" src="' + esc(logo) + '" alt="">' : '<div class="rp-logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
+    <div class="rp-marca">${logo ? '<img class="rp-logo-img" src="' + esc(logo) + '" alt="">' : '<div class="rp-logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span>${contato ? '<small style="display:block;font-size:11.5px;opacity:.9;margin-top:2px">' + contato + '</small>' : ''}</div></div>
     <h1>${esc(rel.fazenda || 'Relatório de visita')}</h1>
     <p>${esc(rel.servico || 'Relatório de visita técnica')}</p>
   </header>
@@ -196,7 +197,7 @@
     ${corpo || '<div class="aviso">Nenhum registro neste relatório.</div>'}
     <div class="rp-fim">Serviço concluído ✔️</div>
   </div>
-  <footer class="rp-rodape"><b>${esc(empresa)}</b><br>${esc(cidade)}
+  <footer class="rp-rodape"><b>${esc(empresa)}</b><br>${esc(cidade)}${contato ? '<br><small>' + contato + '</small>' : ''}
     ${rel.publicado_em ? '<br><span>Publicado em ' + fmtData(rel.publicado_em) + '</span>' : ''}</footer>
 </div>`;
   }
