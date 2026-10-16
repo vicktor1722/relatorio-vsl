@@ -1153,6 +1153,8 @@
     if (c) st.cfg = Object.assign(st.cfg, c);
     $('#cfgEmpresa').value = st.cfg.empresa || '';
     $('#cfgCidade').value = st.cfg.cidade || '';
+    $('#cfgTelefone').value = st.cfg.telefone || '';
+    $('#cfgEmail').value = st.cfg.email || '';
     mostrarLogo();
     $('#cfgQualidade').value = String(st.cfg.qualidade || 0.82);
     $('#cfgVideo').value = String(st.cfg.video || 720);
@@ -1168,12 +1170,14 @@
     st.cfg = Object.assign({}, atual, {
       empresa: $('#cfgEmpresa').value.trim(),
       cidade: $('#cfgCidade').value.trim(),
+      telefone: $('#cfgTelefone').value.trim(),
+      email: $('#cfgEmail').value.trim(),
       qualidade: parseFloat($('#cfgQualidade').value),
       video: parseInt($('#cfgVideo').value, 10)
     });
     await DB.cfg('servidor', st.cfg);
     toast('Ajustes salvos');
-    Sync.salvarPerfil({ empresa: st.cfg.empresa, cidade: st.cfg.cidade, logo: st.cfg.logo || '' })
+    Sync.salvarPerfil({ empresa: st.cfg.empresa, cidade: st.cfg.cidade, telefone: st.cfg.telefone || '', email: st.cfg.email || '', logo: st.cfg.logo || '' })
       .catch(function (e) { toast('Salvo no aparelho; servidor: ' + e.message, 4000); });
   }
 
@@ -1381,7 +1385,7 @@
     }
 
     tela.innerHTML = '<button class="rp-voltar" id="rpVoltar">✕</button>' +
-      Relatorio.montar(rel, itens, { empresa: st.cfg.empresa, cidade: st.cfg.cidade, logo: st.cfg.logo }) +
+      Relatorio.montar(rel, itens, { empresa: st.cfg.empresa, cidade: st.cfg.cidade, telefone: st.cfg.telefone, email: st.cfg.email, logo: st.cfg.logo }) +
       '<div class="rp-barra">' +
       '<button class="sec" id="rpPdf">Baixar PDF</button>' +
       '<button id="rpCompartilhar">Compartilhar</button></div>';
