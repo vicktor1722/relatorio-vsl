@@ -32,6 +32,27 @@ function garantirResponsaveis(env) {
   return respPronta;
 }
 
+// telefone e e-mail de contato da empresa (aparecem abaixo do nome no relatório do cliente); tabela criada sozinha
+let contatoPronto = null;
+function garantirContatos(env) {
+  if (!contatoPronto) {
+    contatoPronto = env.DB.prepare(`CREATE TABLE IF NOT EXISTS contatos (
+      usuario_id TEXT PRIMARY KEY,
+      telefone   TEXT DEFAULT '',
+      email      TEXT DEFAULT '',
+      atualizado_em TEXT DEFAULT (datetime('now'))
+    )`).run().catch((e) => { contatoPronto = null; throw e; });
+  }
+  return contatoPronto;
+}
+async function lerContato(env, uid) {
+  try {
+    await garantirContatos(env);
+    const r = uid ? await env.DB.prepare('SELECT telefone, email FROM contatos WHERE usuario_id = ?').bind(uid).first() : null;
+    return { telefone: (r && r.telefone) || '', email: (r && r.email) || '' };
+  } catch (e) { return { telefone: '', email: '' }; }
+}
+
 const json = (dados, status = 200) => new Response(JSON.stringify(dados), {
   status, headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, CORS)
 });
@@ -108,6 +129,7 @@ export default {
             perfilJ = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
               .bind(rels[0].usuario_id).first();
           }
+          perfilJ = Object.assign({}, perfilJ || {}, await lerContato(env, rels[0].usuario_id));
           if (req.method === 'GET' && url.searchParams.get('sc') !== '1') {
             ids.forEach((i) => ctx.waitUntil(registrarAcesso(env, req, i)));
           }
@@ -127,6 +149,7 @@ export default {
           perfil = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
             .bind(rel.usuario_id).first();
         }
+        perfil = Object.assign({}, perfil || {}, await lerContato(env, rel.usuario_id));
         // conta a visualização (o admin abre com ?sc=1 para não se contar)
         if (req.method === 'GET' && url.searchParams.get('sc') !== '1') ctx.waitUntil(registrarAcesso(env, req, id));
         return html(paginaRelatorio(rel, results || [], env, origem, perfil));
@@ -217,7 +240,7 @@ export default {
 
       if (rota === '/api/perfil' && req.method === 'GET') {
         const r = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?').bind(me.id).first();
-        return json({ ok: true, perfil: r || { empresa: '', cidade: '', logo: '' } });
+        return json({ ok: true, perfil: Object.assign({ empresa: '', cidade: '', logo: '' }, r || {}, await lerContato(env, me.id)) });
       }
 
       if (rota === '/api/perfil' && req.method === 'POST') {
@@ -231,6 +254,15 @@ export default {
             empresa=excluded.empresa, cidade=excluded.cidade, logo=excluded.logo,
             atualizado_em=datetime('now')
         `).bind(me.id, String(b.empresa || ''), String(b.cidade || ''), logo).run();
+        if (b.telefone !== undefined || b.email !== undefined) {
+          try {
+            await garantirContatos(env);
+            await env.DB.prepare(`
+              INSERT INTO contatos (usuario_id, telefone, email, atualizado_em) VALUES (?,?,?,datetime('now'))
+              ON CONFLICT(usuario_id) DO UPDATE SET telefone=excluded.telefone, email=excluded.email, atualizado_em=datetime('now')
+            `).bind(me.id, String(b.telefone || '').trim().slice(0, 40), String(b.email || '').trim().slice(0, 120)).run();
+          } catch (e) { /* o resto do perfil já foi salvo */ }
+        }
         return json({ ok: true });
       }
 
