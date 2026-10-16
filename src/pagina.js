@@ -17,6 +17,8 @@ header.capa .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,
 header.capa img.logo{width:auto;max-width:120px;height:46px;object-fit:contain;background:#fff;padding:4px;border-radius:8px;display:block}
 header.capa .marca b{display:block;font-size:14.5px}
 header.capa .marca span{font-size:11.5px;opacity:.85}
+header.capa .marca small{display:block;font-size:11.5px;opacity:.9;margin-top:2px}
+header.capa .marca small a,footer small a{color:inherit;text-decoration:none}
 header.capa h1{margin:16px 0 2px;font-size:25px;line-height:1.2}
 header.capa p.sub{margin:0;font-size:13.5px;opacity:.9}
 .painel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--linha)}
@@ -151,7 +153,7 @@ function agruparPorTalhao(itens, talhoes) {
 
   const mapa = {};
   itens.forEach(i => {
-    const chave = i.talhao ? i.talhao : (i.tipo === 'texto' ? '\u0000notas' : '\u0000fora');
+    const chave = i.tipo === 'texto' ? '\u0000notas' : (i.talhao ? i.talhao : '\u0000fora');   // todo texto vai para as observações gerais, no início
     (mapa[chave] = mapa[chave] || []).push(i);
   });
 
@@ -409,6 +411,12 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
   const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
   const cidade = p.cidade || env.CIDADE || '';
   const logo = p.logo || '';
+  const tel = String(p.telefone || '').trim();
+  const mail = String(p.email || '').trim();
+  const contato = [
+    tel ? `<a href="tel:${esc(tel.replace(/[^0-9+]/g, ''))}">${esc(tel)}</a>` : '',
+    mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : ''
+  ].filter(Boolean).join(' · ');
   let talhoes = null;
   try { talhoes = rel.talhoes ? JSON.parse(rel.talhoes) : null; } catch (e) {}
 
@@ -468,7 +476,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 <header class="capa">
   <div class="marca">${logo
       ? `<img class="logo" src="${esc(logo)}" alt="">`
-      : '<div class="logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
+      : '<div class="logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span>${contato ? `<small>${contato}</small>` : ''}</div></div>
   <h1>${esc(rel.fazenda || 'Relatório de visita')}</h1>
   <p class="sub"${rel.servico ? ' data-tr' : ' data-i="sub_padrao"'}>${esc(rel.servico || 'Relatório de visita técnica')}</p>
 </header>
@@ -498,7 +506,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   ${corpo}
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
-<footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>
+<footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
 <span style="font-size:11.5px"${rel.publicado_em ? ` data-i="publicado" data-d="${esc(String(rel.publicado_em).slice(0, 10))}"` : ''}>${rel.publicado_em ? 'Publicado em ' + fmtData(rel.publicado_em) : ''}</span></footer>
 <div class="barra">
   <button class="sec" onclick="window.print()" data-i="pdf">Baixar PDF</button>
