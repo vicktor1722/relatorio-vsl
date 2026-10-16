@@ -799,7 +799,7 @@
     const veu = document.createElement('div'); veu.className = 'veu';
     const folha = document.createElement('div'); folha.className = 'folha';
     const linhas = [];
-    for (let i = 0; i < ord.length; i++) {
+    for (let i = ord.length - 1; i >= 0; i--) {   // mais recente em cima
       const v = ord[i];
       const itens = await DB.itensDoRelatorio(v.id);
       const ok = v.status === 'publicado';
@@ -849,7 +849,7 @@
     const veu = document.createElement('div'); veu.className = 'veu';
     const folha = document.createElement('div'); folha.className = 'folha';
     const linhas = [];
-    for (let i = 0; i < visitas.length; i++) {
+    for (let i = visitas.length - 1; i >= 0; i--) {   // mais recente em cima
       const v = visitas[i];
       const itens = await DB.itensDoRelatorio(v.id);
       const estado = v.status === 'publicado' ? 'já enviada · ver link'
