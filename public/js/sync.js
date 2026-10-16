@@ -108,7 +108,7 @@
   async function limparDadosLocais() {
     for (const loja of ['relatorios', 'itens', 'midias']) await DB.limpar(loja);
     const c = await conf();
-    delete c.empresa; delete c.cidade; delete c.logo;
+    delete c.empresa; delete c.cidade; delete c.telefone; delete c.email; delete c.logo;
     await DB.cfg('servidor', c);
     await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
     await DB.cfg('ultimo', null);
