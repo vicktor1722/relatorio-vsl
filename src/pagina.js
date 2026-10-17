@@ -3,6 +3,8 @@
    (link abre sem JS, com prévia no WhatsApp e impressão em PDF)
    ============================================================ */
 
+import { AGRO_REL_CSS, AGRO_REL_JS, blocosAgro } from './agrorel.js';
+
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const CSS = `
@@ -415,7 +417,8 @@ const SCRIPT_IDIOMA = String.raw`
 })();
 `;
 
-export function paginaRelatorio(rel, itens, env, origem, perfil) {
+export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
+  const ag = blocosAgro(agro);   // plantio e recomendações (null quando não há)
   const p = perfil || {};
   const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
   const cidade = p.cidade || env.CIDADE || '';
@@ -449,6 +452,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
     if (g.area) extra.push(g.area.toFixed(1).replace('.', ',') + ' ha');
     const tituloG = g.chave === '\u0000fora' ? '<span data-i="fora">Fora dos talhões</span>' : esc(g.titulo);
     corpo += `<h2 class="talhao">${tituloG}<small>${extra.join(' · ')}</small></h2>`;
+    if (ag && g.chave.charCodeAt(0) !== 0) corpo += ag.talhao(g.chave);
 
     // separa por dia quando o talhão foi visitado em mais de um dia
     const segmentos = [];
@@ -480,7 +484,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil) {
 <meta property="og:description" content="${esc(descricao)}">
 ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(capa.midia)}">` : ''}
 <meta property="og:type" content="article">
-<style>${CSS}</style>
+<style>${CSS}${ag ? AGRO_REL_CSS : ''}</style>
 </head><body data-n="${rel._n || 1}" data-fz="${esc(rel.fazenda || '')}"><div class="folha">
 <header class="capa">
   <div class="marca">${logo
@@ -512,7 +516,9 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   </div>
   ${mapaSVG(talhoes, itens)}
   ${obsGerais}
+  ${ag ? ag.topo : ''}
   ${corpo}
+  ${ag ? ag.fim : ''}
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
@@ -599,6 +605,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   });
 })();
 </script>
+${ag ? '<script>' + AGRO_REL_JS + '</script>' : ''}
 <script>${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
 </div></body></html>`;
 }
