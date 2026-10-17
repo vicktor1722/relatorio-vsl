@@ -36,8 +36,8 @@ h3.dia{margin:16px 0 10px;padding:0 0 4px;font-size:13px;font-weight:600;color:v
 .grade{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .grade.n1{grid-template-columns:1fr}
 .grade .item{margin:0;min-width:0}
-.grade img,.grade video{aspect-ratio:4/3;object-fit:cover;max-height:none}
-.grade.n1 img,.grade.n1 video{aspect-ratio:auto;object-fit:contain;max-height:70vh}
+.grade .item img,.grade .item video{aspect-ratio:4/3;object-fit:cover;object-position:center;max-height:none}
+.grade.n1 .item img,.grade.n1 .item video{aspect-ratio:auto;object-fit:contain;max-height:70vh}
 .grade .tag{font-size:10.5px;padding:2px 7px}
 @media(min-width:700px){.grade.n2{grid-template-columns:1fr 1fr}.grade.n3{grid-template-columns:1fr 1fr 1fr}}
 .item{margin:0 0 22px}
