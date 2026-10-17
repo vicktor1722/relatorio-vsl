@@ -60,6 +60,20 @@ const html = (txt, status = 200) => new Response(txt, {
   status, headers: { 'Content-Type': 'text/html; charset=utf-8' }
 });
 
+// devolve a mesma mídia como arquivo para baixar (Content-Disposition: attachment); o nome vem de ?n=
+function comoDownload(resp, nome) {
+  const mime = (resp.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic',
+    'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' }[mime] || 'bin';
+  let base = String(nome || 'midia').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+|[._]+$/g, '').slice(0, 60) || 'midia';
+  if (!new RegExp('\\.' + ext + '$', 'i').test(base)) base += '.' + ext;
+  const h = new Headers(resp.headers);
+  h.set('Content-Disposition', 'attachment; filename="' + base + '"');
+  h.set('Cache-Control', 'no-store');
+  return new Response(resp.body, { status: resp.status, headers: h });
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
@@ -80,8 +94,9 @@ export default {
         const chave = decodeURIComponent(rota.slice(5));
         const cache = caches.default;
         const chaveCache = new Request(origem + '/img/' + encodeURIComponent(chave));
+        const baixar = url.searchParams.get('baixar') === '1';
         const guardado = await cache.match(chaveCache);
-        if (guardado) return guardado;
+        if (guardado) return baixar ? comoDownload(guardado, url.searchParams.get('n')) : guardado;
 
         const m = await lerMidia(env, chave);
         if (!m) return new Response('não encontrado', { status: 404 });
@@ -93,7 +108,7 @@ export default {
           }
         });
         ctx.waitUntil(cache.put(chaveCache, resp.clone()));
-        return resp;
+        return baixar ? comoDownload(resp, url.searchParams.get('n')) : resp;
       }
 
       // a página do painel é aberta; quem valida é o /api/admin/* com o token
