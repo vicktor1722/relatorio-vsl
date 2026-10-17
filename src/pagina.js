@@ -73,14 +73,17 @@ footer b{color:var(--verde-escuro)}
  background:rgba(255,255,255,.18);color:#fff;font-size:22px;line-height:44px;text-align:center;border:0;cursor:pointer}
 .visor .leg{position:absolute;left:0;right:0;bottom:0;padding:28px 16px calc(18px + env(safe-area-inset-bottom));color:#fff;
  font-size:15px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.7));pointer-events:none}
-.visor .cont{position:absolute;top:calc(22px + env(safe-area-inset-top));right:14px;z-index:2;color:#fff;font-size:14px;font-weight:600;
+.visor .dl{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;z-index:2;width:44px;height:44px;border-radius:50%;
+ background:rgba(255,255,255,.18);color:#fff;font-size:20px;line-height:44px;text-align:center;border:0;cursor:pointer;padding:0}
+.visor .cont{position:absolute;top:calc(22px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:2;color:#fff;font-size:14px;font-weight:600;
  background:rgba(255,255,255,.18);border-radius:14px;padding:4px 12px;pointer-events:none}
 .visor .cont:empty{display:none}
 .visor .nav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:46px;height:64px;border:0;background:rgba(255,255,255,.18);
  color:#fff;font-size:34px;line-height:60px;text-align:center;padding:0;cursor:pointer}
 .visor .nav.ant{left:0;border-radius:0 12px 12px 0}
 .visor .nav.prox{right:0;border-radius:12px 0 0 12px}
-@media print{.visor{display:none}}
+a.tag.baixar{background:var(--verde);color:#fff;text-decoration:none;cursor:pointer}
+@media print{.visor{display:none}a.tag.baixar{display:none}}
 @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.barra{display:none}
  h2.talhao{position:static;break-after:avoid}.item,.grupo{break-inside:avoid}video{display:none}}
 `;
@@ -193,15 +196,18 @@ function gruposDeLegenda(lista) {
 
 function celulaMidia(i) {
   const src = '/img/' + encodeURIComponent(i.midia);
+  const nomeArq = (i.tipo === 'foto' ? 'foto' : 'video') + '-' + String(i.capturado_em || '').replace(/[^0-9]/g, '').slice(0, 12);
+  const dl = src + '?baixar=1&n=' + encodeURIComponent(nomeArq);
   return `<div class="item"><figure>` +
     (i.tipo === 'foto'
-      ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
+      ? `<img loading="lazy" src="${src}" data-dl="${esc(dl)}" alt="${esc(i.legenda || '')}">`
       : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
     `</figure><div class="meta">` +
     `<span class="tag cinza">${hora(i.capturado_em)}</span>` +
     (i.lat != null ? `<span class="tag cinza">${i.lat.toFixed(5)}, ${i.lon.toFixed(5)}</span>` : '') +
     (i.precisao_m ? `<span class="tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
     (i.tipo === 'video' && i.duracao_s ? `<span class="tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
+    (i.tipo === 'video' ? `<a class="tag baixar" href="${esc(dl)}" download onclick="return window.baixarMidia(this.href)">⬇ <span data-i="baixar_midia">Baixar</span></a>` : '') +
     `</div></div>`;
 }
 
@@ -256,7 +262,7 @@ const DICT = {
     visitas: 'visitas', fotos: 'fotos', videos: 'vídeos', talhoes_reg: 'talhões registrados', ha_map: 'hectares mapeados',
     legenda_mapa: '🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda',
     obs_gerais: 'Observações gerais', fora: 'Fora dos talhões', reg: '{n} registro(s)',
-    concluido: 'Serviço concluído ✔️', pdf: 'Baixar PDF', compartilhar: 'Compartilhar', link_copiado: 'Link copiado',
+    concluido: 'Serviço concluído ✔️', baixar_midia: 'Baixar', pdf: 'Baixar PDF', compartilhar: 'Compartilhar', link_copiado: 'Link copiado',
     publicado: 'Publicado em {d}',
     traduzindo: 'Traduzindo…', auto: 'Tradução automática', ver_original: 'ver original', indisp: 'Tradução indisponível no momento'
   },
@@ -267,7 +273,7 @@ const DICT = {
     visitas: 'visits', fotos: 'photos', videos: 'videos', talhoes_reg: 'fields recorded', ha_map: 'hectares mapped',
     legenda_mapa: '🟢 photos · 🔴 videos · farm KML polygons',
     obs_gerais: 'General notes', fora: 'Outside the fields', reg: '{n} record(s)',
-    concluido: 'Service completed ✔️', pdf: 'Download PDF', compartilhar: 'Share', link_copiado: 'Link copied',
+    concluido: 'Service completed ✔️', baixar_midia: 'Download', pdf: 'Download PDF', compartilhar: 'Share', link_copiado: 'Link copied',
     publicado: 'Published on {d}',
     traduzindo: 'Translating…', auto: 'Automatic translation', ver_original: 'view original', indisp: 'Translation unavailable right now'
   },
@@ -278,7 +284,7 @@ const DICT = {
     visitas: 'visitas', fotos: 'fotos', videos: 'videos', talhoes_reg: 'lotes registrados', ha_map: 'hectáreas mapeadas',
     legenda_mapa: '🟢 fotos · 🔴 videos · polígonos del KML de la finca',
     obs_gerais: 'Observaciones generales', fora: 'Fuera de los lotes', reg: '{n} registro(s)',
-    concluido: 'Servicio concluido ✔️', pdf: 'Descargar PDF', compartilhar: 'Compartir', link_copiado: 'Enlace copiado',
+    concluido: 'Servicio concluido ✔️', baixar_midia: 'Descargar', pdf: 'Descargar PDF', compartilhar: 'Compartir', link_copiado: 'Enlace copiado',
     publicado: 'Publicado el {d}',
     traduzindo: 'Traduciendo…', auto: 'Traducción automática', ver_original: 'ver original', indisp: 'Traducción no disponible por ahora'
   }
@@ -514,6 +520,22 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 </div>
 <script>
 (function(){
+  // baixar: no celular abre a folha de compartilhar com o arquivo (dá "Salvar na galeria"); senão, baixa direto
+  window.baixarMidia = function(href){
+    var plano = href.split('?')[0], nome = (href.match(/[?&]n=([^&]*)/) || [])[1] || 'midia';
+    var toque = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+    if (toque && navigator.canShare && window.fetch && window.File) {
+      fetch(plano).then(function(r){ return r.blob(); }).then(function(bl){
+        var ext = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4','video/quicktime':'mov','video/webm':'webm'}[bl.type] || 'bin';
+        var f = new File([bl], decodeURIComponent(nome) + '.' + ext, {type: bl.type});
+        if (navigator.canShare({files:[f]})) return navigator.share({files:[f]});
+        throw new Error('sem share');
+      }).catch(function(e){ if (e && e.name === 'AbortError') return; direto(href); });
+      return false;
+    }
+    return true;
+  };
+  function direto(href){ var a=document.createElement('a'); a.href=href; a.download=''; document.body.appendChild(a); a.click(); a.remove(); }
   function fechar(v){ v.remove(); document.removeEventListener('keydown', tecla); }
   function tecla(e){
     var v=document.querySelector('.visor'); if(!v) return;
@@ -530,11 +552,13 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     function mk(tag, cls, txt){ var n=document.createElement(tag); if(cls) n.className=cls; if(txt) n.textContent=txt; return n; }
     var b = mk('button','x','✕'); b.type='button'; b.setAttribute('aria-label','Fechar');
     var ct = mk('div','cont');
+    var bx = mk('button','dl','⬇'); bx.type='button';
+    var rot = (window.__t ? window.__t('baixar_midia') : 'Baixar'); bx.setAttribute('aria-label',rot); bx.title=rot;
     var ant = mk('button','nav ant','‹'); ant.type='button'; ant.setAttribute('aria-label','Foto anterior');
     var prox = mk('button','nav prox','›'); prox.type='button'; prox.setAttribute('aria-label','Próxima foto');
     var im = document.createElement('img'); im.alt = '';
     var l = mk('div','leg');
-    v.appendChild(b); v.appendChild(ct); v.appendChild(ant); v.appendChild(prox); v.appendChild(im); v.appendChild(l);
+    v.appendChild(b); v.appendChild(bx); v.appendChild(ct); v.appendChild(ant); v.appendChild(prox); v.appendChild(im); v.appendChild(l);
     function mostrar(){
       var f = todas[i];
       im.src = f.currentSrc || f.src;
@@ -548,6 +572,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     v._ir = function(d){ var n=i+d; if(n<0||n>=todas.length) return; i=n; mostrar(); };
     v.addEventListener('click', function(ev){
       var t = ev.target;
+      if(t.closest && t.closest('.dl')){ var u=todas[i].getAttribute('data-dl'); if(u && window.baixarMidia(u)) direto(u); return; }
       if(t.closest && t.closest('.ant')){ v._ir(-1); return; }
       if(t.closest && t.closest('.prox')){ v._ir(1); return; }
       if(t.tagName !== 'IMG') fechar(v);
