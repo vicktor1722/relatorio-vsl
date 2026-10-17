@@ -300,7 +300,7 @@ export const AGRO_JS = String.raw`
       var c = tudo[0] || {};
       CAD = { fazendas: (c.fazendas || []).map(function (f) {
         if (typeof f.talhoes === 'string' && f.talhoes) { try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; } }
-        return f; }), safras: c.safras || [], responsaveis: c.responsaveis || [] };
+        return f; }), safras: c.safras || [], responsaveis: c.responsaveis || [], produtores: c.produtores || [] };
       if (tudo[1]) ST.plantio = tudo[1].plantio || [];
       if (tudo[2]) ST.recs = tudo[2].recs || [];
       if (tudo[3]) ST.produtos = tudo[3].produtos || [];
