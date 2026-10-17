@@ -652,16 +652,15 @@
       segurou = false;
       timer = setTimeout(async function () {
         segurou = true;
-        if (st.semCameraInterna) { $('#inpVideo').click(); return; }
-        await abrirCamera();
-        setTimeout(iniciarVideo, 350);
+        $('#inpVideo').click();  // segurar = câmera nativa do telefone (vídeo)
       }, 450);
     };
     const fim = function (e) {
       if (st.modoEnvio) { e.preventDefault(); enviarTexto(); return; }
       clearTimeout(timer);
-      if (segurou) { pararVideo(); return; }
-      abrirCamera();
+      if (e && e.type === 'touchend' && e.cancelable) e.preventDefault();  // evita o clique "fantasma" do iPhone
+      if (segurou) return;
+      $('#inpFoto').click();  // toque = câmera nativa do telefone (foto)
     };
     btn.addEventListener('touchstart', inicio, { passive: true });
     btn.addEventListener('touchend', fim);
