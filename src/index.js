@@ -8,6 +8,7 @@ import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
+import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
 import { areasAdmin, criarConta, definirPrazo, ehAdmin, excluirConta, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
 
 const CORS = {
@@ -148,7 +149,8 @@ export default {
           if (req.method === 'GET' && url.searchParams.get('sc') !== '1') {
             ids.forEach((i) => ctx.waitUntil(registrarAcesso(env, req, i)));
           }
-          return html(paginaRelatorio(juntarRelatorios(rels), todos || [], env, origem, perfilJ));
+          const agroJ = await dadosParaRelatorio(env, rels[0]);
+          return html(paginaRelatorio(juntarRelatorios(rels), todos || [], env, origem, perfilJ, agroJ));
         }
 
         const id = ids[0] || '';
@@ -167,7 +169,8 @@ export default {
         perfil = Object.assign({}, perfil || {}, await lerContato(env, rel.usuario_id));
         // conta a visualização (o admin abre com ?sc=1 para não se contar)
         if (req.method === 'GET' && url.searchParams.get('sc') !== '1') ctx.waitUntil(registrarAcesso(env, req, id));
-        return html(paginaRelatorio(rel, results || [], env, origem, perfil));
+        const agro = await dadosParaRelatorio(env, rel);
+        return html(paginaRelatorio(rel, results || [], env, origem, perfil, agro));
       }
 
       /* ================= conta ================= */
@@ -217,6 +220,9 @@ export default {
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
 
+      // plantio dos talhões e recomendações (módulos novos; liberados por conta)
+      if (rota === '/api/modulos' || rota.startsWith('/api/agro/')) return await rotasAgro(env, req, me, rota, url);
+
       /* ---------- administração ---------- */
       if (rota.startsWith('/api/admin/')) {
         const adm = await ehAdmin(env, me);
@@ -247,6 +253,10 @@ export default {
           const b = await req.json();
           try { return json(await trocarSenha(env, b.id, b.senha)); }
           catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/modulos') {
+          if (req.method === 'POST') return json(await salvarModulos(env, await req.json()));
+          return json(await modulosAdmin(env));
         }
         return json({ erro: 'rota não encontrada' }, 404);
       }
