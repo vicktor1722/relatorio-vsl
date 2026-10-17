@@ -83,6 +83,8 @@ footer b{color:var(--verde-escuro)}
 .visor .nav.ant{left:0;border-radius:0 12px 12px 0}
 .visor .nav.prox{right:0;border-radius:12px 0 0 12px}
 a.tag.baixar{background:#F0F2F1;color:var(--fraco);font-weight:500;text-decoration:none;cursor:pointer;border:0;outline:0;box-shadow:none;-webkit-tap-highlight-color:transparent}
+a.tag.baixar svg{width:12px;height:12px;vertical-align:-1px;margin-right:4px}
+.visor .dl svg{width:20px;height:20px;vertical-align:middle;margin-top:-2px}
 a.tag.baixar:visited,a.tag.baixar:hover,a.tag.baixar:focus,a.tag.baixar:active{color:var(--fraco);outline:0;text-decoration:none}
 @media print{.visor{display:none}a.tag.baixar{display:none}}
 @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.barra{display:none}
@@ -208,7 +210,7 @@ function celulaMidia(i) {
     (i.lat != null ? `<span class="tag cinza">${i.lat.toFixed(5)}, ${i.lon.toFixed(5)}</span>` : '') +
     (i.precisao_m ? `<span class="tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
     (i.tipo === 'video' && i.duracao_s ? `<span class="tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
-    (i.tipo === 'video' ? `<a class="tag baixar" href="${esc(dl)}" download onclick="return window.baixarMidia(this.href)">⬇ <span data-i="baixar_midia">Baixar</span></a>` : '') +
+    (i.tipo === 'video' ? `<a class="tag baixar" href="${esc(dl)}" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg><span data-i="baixar_midia">Baixar</span></a>` : '') +
     `</div></div>`;
 }
 
@@ -521,22 +523,8 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 </div>
 <script>
 (function(){
-  // baixar: no celular abre a folha de compartilhar com o arquivo (dá "Salvar na galeria"); senão, baixa direto
-  window.baixarMidia = function(href){
-    var plano = href.split('?')[0], nome = (href.match(/[?&]n=([^&]*)/) || [])[1] || 'midia';
-    var toque = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
-    if (toque && navigator.canShare && window.fetch && window.File) {
-      fetch(plano).then(function(r){ return r.blob(); }).then(function(bl){
-        var ext = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4','video/quicktime':'mov','video/webm':'webm'}[bl.type] || 'bin';
-        var f = new File([bl], decodeURIComponent(nome) + '.' + ext, {type: bl.type});
-        if (navigator.canShare({files:[f]})) return navigator.share({files:[f]});
-        throw new Error('sem share');
-      }).catch(function(e){ if (e && e.name === 'AbortError') return; direto(href); });
-      return false;
-    }
-    return true;
-  };
-  function direto(href){ var a=document.createElement('a'); a.href=href; a.download=''; document.body.appendChild(a); a.click(); a.remove(); }
+  // baixar: o servidor devolve o arquivo como anexo; navegar até ele faz o navegador baixar (a página continua aberta)
+  function direto(href){ location.href = href; }
   function fechar(v){ v.remove(); document.removeEventListener('keydown', tecla); }
   function tecla(e){
     var v=document.querySelector('.visor'); if(!v) return;
@@ -553,7 +541,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     function mk(tag, cls, txt){ var n=document.createElement(tag); if(cls) n.className=cls; if(txt) n.textContent=txt; return n; }
     var b = mk('button','x','✕'); b.type='button'; b.setAttribute('aria-label','Fechar');
     var ct = mk('div','cont');
-    var bx = mk('button','dl','⬇'); bx.type='button';
+    var bx = mk('button','dl'); bx.type='button'; bx.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg>';
     var rot = (window.__t ? window.__t('baixar_midia') : 'Baixar'); bx.setAttribute('aria-label',rot); bx.title=rot;
     var ant = mk('button','nav ant','‹'); ant.type='button'; ant.setAttribute('aria-label','Foto anterior');
     var prox = mk('button','nav prox','›'); prox.type='button'; prox.setAttribute('aria-label','Próxima foto');
@@ -562,6 +550,16 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     v.appendChild(b); v.appendChild(bx); v.appendChild(ct); v.appendChild(ant); v.appendChild(prox); v.appendChild(im); v.appendChild(l);
     function mostrar(){
       var f = todas[i];
+      v._file = null;
+      var du = f.getAttribute('data-dl');
+      if(du && window.fetch && window.File){
+        fetch(du.split('?')[0]).then(function(r){ return r.blob(); }).then(function(bl){
+          if(todas[i] !== f) return;
+          var ext = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[bl.type] || 'jpg';
+          var nm = decodeURIComponent((du.match(/[?&]n=([^&]*)/) || [])[1] || 'foto');
+          v._file = {u: du, f: new File([bl], nm + '.' + ext, {type: bl.type})};
+        }).catch(function(){});
+      }
       im.src = f.currentSrc || f.src;
       var leg = f.getAttribute('alt') || '';
       l.textContent = leg; l.style.display = leg ? '' : 'none';
@@ -573,7 +571,14 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     v._ir = function(d){ var n=i+d; if(n<0||n>=todas.length) return; i=n; mostrar(); };
     v.addEventListener('click', function(ev){
       var t = ev.target;
-      if(t.closest && t.closest('.dl')){ var u=todas[i].getAttribute('data-dl'); if(u && window.baixarMidia(u)) direto(u); return; }
+      if(t.closest && t.closest('.dl')){
+        var u=todas[i].getAttribute('data-dl'); if(!u) return;
+        var pf=v._file, toque=window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+        if(toque && pf && pf.u===u && navigator.canShare && navigator.canShare({files:[pf.f]})){
+          navigator.share({files:[pf.f]}).catch(function(e){ if(!e || e.name!=='AbortError') direto(u); });
+        } else direto(u);
+        return;
+      }
       if(t.closest && t.closest('.ant')){ v._ir(-1); return; }
       if(t.closest && t.closest('.prox')){ v._ir(1); return; }
       if(t.tagName !== 'IMG') fechar(v);
