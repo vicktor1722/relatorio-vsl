@@ -318,8 +318,25 @@ export const AGRO_JS = String.raw`
     return f.talhoes.features.map(function (ft) { var p = ft.properties || {}; return { nome: String(p.nome || ''), ha: Number(p.area_ha) || 0, f: ft }; }).filter(function (t) { return t.nome; });
   }
   function haDe(f, nomes) { var h = 0; talhoesDe(f).forEach(function (t) { if (nomes.indexOf(t.nome) >= 0) h += t.ha; }); return Math.round(h * 10) / 10; }
-  function opcoesFaz(sel) {
-    return fazendas().map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('');
+  function produtorDe(f) { return f ? (f.produtor_id || '') : ''; }
+  function nomeProd(id) { var p = (cad().produtores || []).filter(function (x) { return x.id === id; })[0]; return p ? p.nome : ''; }
+  function fazDoProd(prod) { return fazendas().filter(function (f) { return !prod || produtorDe(f) === prod; }); }
+  function opcoesProd(sel) {
+    var ids = {}; fazendas().forEach(function (f) { ids[produtorDe(f)] = 1; });
+    var l = (cad().produtores || []).filter(function (p) { return ids[p.id]; });
+    return '<option value="">Todos os produtores</option>' + l.map(function (p) { return '<option value="' + esc(p.id) + '"' + (p.id === sel ? ' selected' : '') + '>' + esc(p.nome) + '</option>'; }).join('');
+  }
+  function opcoesFaz(sel, prod) {
+    return fazDoProd(prod).map(function (f) {
+      var np = !prod ? nomeProd(produtorDe(f)) : '';
+      return '<option value="' + esc(f.id) + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.nome) + (np ? ' · ' + esc(np) : '') + '</option>';
+    }).join('');
+  }
+  function campoProd(S) { return '<div class="campo"><label>Produtor</label><select data-c="prod">' + opcoesProd(S.prod) + '</select></div>'; }
+  function trocaProd(S, v) {
+    S.prod = v; var l = fazDoProd(v);
+    if (!l.some(function (f) { return f.id === S.faz; })) S.faz = l.length ? l[0].id : '';
+    ST.ult.prod = v; ST.ult.faz = S.faz; gravar();
   }
   function opcoesSafra(sel) {
     var l = safras(); if (sel && l.indexOf(sel) < 0) l.unshift(sel);
@@ -362,7 +379,7 @@ export const AGRO_JS = String.raw`
         '<span>' + esc(l2 || 'toque para informar o plantio') + '</span></div></div>';
     }).join('');
     pintar(tP, 'Plantio dos talhões', tl.length ? feitos + ' de ' + tl.length + ' talhões informados' : 'sem talhões',
-      '', '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz) + '</select></div>' +
+      '', campoProd(P) + '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz, P.prod) + '</select></div>' +
       '<div class="campo"><label>Safra</label><select data-c="safra">' + opcoesSafra(P.safra) + '</select></div></div>' +
       (tl.length ? cards : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
       '<div class="ag-nota">Cultura, variedade, datas e sementes alimentam o mapa por variedade e a evolução do plantio no relatório do cliente.</div>');
@@ -428,7 +445,7 @@ export const AGRO_JS = String.raw`
 
   function abrirPlantio() {
     if (!ST.mod.plantio) return;
-    P.faz = fazPadrao(); P.safra = safraPadrao(); P.ed = null; P.outros = [];
+    P.faz = fazPadrao(); P.prod = produtorDe(fazDe(P.faz)); P.safra = safraPadrao(); P.ed = null; P.outros = [];
     pintarPlantio();
     baixar().then(function (ok) { if (ok && !P.ed) pintarPlantio(); });
   }
@@ -451,7 +468,8 @@ export const AGRO_JS = String.raw`
     if (a === 'limparplantio') { if (confirm('Limpar o plantio de ' + P.nome + '?')) gravarPlantio(true); }
   }
   function mudancaPlantio(sel) {
-    if (sel.dataset.c === 'faz') { P.faz = sel.value; ST.ult.faz = P.faz; gravar(); pintarPlantio(); }
+    if (sel.dataset.c === 'prod') { trocaProd(P, sel.value); pintarPlantio(); }
+    else if (sel.dataset.c === 'faz') { P.faz = sel.value; ST.ult.faz = P.faz; gravar(); pintarPlantio(); }
     else if (sel.dataset.c === 'safra') { P.safra = sel.value; ST.ult.safra = P.safra; gravar(); pintarPlantio(); }
     else if (sel.dataset.k) entradaPlantio(sel);
   }
@@ -519,7 +537,7 @@ export const AGRO_JS = String.raw`
     var filtros = [['todas', 'Todas'], ['pend', 'Pendentes'], ['and', 'Em andamento'], ['apl', 'Aplicadas']].map(function (x) {
       return '<button class="ag-chip' + (R.filtro === x[0] ? ' on' : '') + '" data-a="filtro" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('');
     pintar(tR, 'Recomendações', f ? f.nome : '—', '<button class="btn-mini" data-a="catalogo">🧪 Produtos</button>',
-      abasRec('lista') + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
+      abasRec('lista') + campoProd(R) + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz, R.prod) + '</select></div>' +
       '<button class="btn" data-a="nova">+ Nova recomendação</button>' +
       (al ? '<h2>Próximas aplicações</h2>' + al : '') +
       '<div class="ag-chips" style="margin-top:14px">' + filtros + '</div>' +
@@ -529,7 +547,7 @@ export const AGRO_JS = String.raw`
 
   function abrirRecs() {
     if (!ST.mod.recomendacoes) return;
-    R.faz = fazPadrao(); R.view = 'lista'; R.filtro = 'todas'; R.W = null;
+    R.faz = fazPadrao(); R.prod = produtorDe(fazDe(R.faz)); R.view = 'lista'; R.filtro = 'todas'; R.W = null;
     pintarRecs();
     baixar().then(function (ok) { if (ok && R.view === 'lista') pintarRecs(); });
   }
@@ -566,7 +584,7 @@ export const AGRO_JS = String.raw`
       g += '<button class="ag-dia' + (iso === hoje() ? ' hoje' : '') + (iso === R.sel ? ' sel' : '') + '" data-a="calsel" data-v="' + iso + '"><span>' + d + '</span><i>' +
         es.slice(0, 4).map(function (e) { return '<u class="c-' + corEv(e) + '"></u>'; }).join('') + '</i></button>';
     }
-    h += '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
+    h += campoProd(R) + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz, R.prod) + '</select></div>' +
       '<div class="ag-calhead"><button data-a="calmes" data-v="-1">‹</button><b>' + MESES[R.cm].charAt(0).toUpperCase() + MESES[R.cm].slice(1) + ' de ' + R.cy + '</b><button data-a="calmes" data-v="1">›</button></div>' +
       '<div class="ag-grade">' + g + '</div>' +
       '<div class="ag-leg"><span><u class="c-prev"></u>prevista</span><span><u class="c-apl"></u>aplicada</span><span><u class="c-perto"></u>próxima (perto)</span><span><u class="c-venc"></u>vencida</span><span><u class="c-ok"></u>próxima</span></div>';
@@ -916,6 +934,7 @@ export const AGRO_JS = String.raw`
   }
   function mudancaRecs(el) {
     if (R.view === 'wiz' && el.dataset.w) { entradaWiz(el); return; }
+    if (el.dataset.c === 'prod') { trocaProd(R, el.value); pintarRecs(); return; }
     if (el.dataset.c === 'faz') { R.faz = el.value; ST.ult.faz = R.faz; gravar(); pintarRecs(); return; }
     if (el.dataset.a === 'mostrar') { var r = recDe(R.id); r.mostrar = el.checked; salvarRecLocal(r); toast(el.checked ? 'Vai aparecer no relatório do cliente' : 'Escondida do relatório do cliente'); }
   }
