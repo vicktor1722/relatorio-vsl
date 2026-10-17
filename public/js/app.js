@@ -1474,9 +1474,19 @@
       txt.style.height = 'auto'; txt.style.height = Math.min(110, txt.scrollHeight) + 'px';
       atualizarBotaoEnvio();
     });
-    txt.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarTexto(); }
-    });
+    // Enter/retorno do teclado = nova linha (padrão do campo de texto); só o botão verde envia.
+    // O botão ↵ também insere uma quebra de linha na posição do cursor.
+    const btnLinha = $('#btnLinha');
+    if (btnLinha) {
+      btnLinha.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      btnLinha.addEventListener('click', function () {
+        const a = txt.selectionStart, b = txt.selectionEnd;
+        txt.value = txt.value.slice(0, a) + '\n' + txt.value.slice(b);
+        txt.selectionStart = txt.selectionEnd = a + 1;
+        txt.dispatchEvent(new Event('input'));
+        txt.focus();
+      });
+    }
 
     // arquivos (galeria / câmera nativa)
     $('#inpArquivo').onchange = async function (e) {
