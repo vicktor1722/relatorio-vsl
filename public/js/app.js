@@ -1422,7 +1422,7 @@
 
     $('#btnMenuLista').onclick = async function () { await listarRelatorios(); abrir('telaLista'); };
     $('#btnMais').onclick = menuMais;
-    $('#btnMapa').onclick = function () { desenharMapa(); abrir('telaMapa'); };
+    $('#btnMapa').onclick = function () { window.relAtualMapa = st.rel; desenharMapa(); abrir('telaMapa'); };
     $('#btnAjustes').onclick = async function () { await carregarCfg(); abrir('telaAjustes'); };
     $('#btnNovoRel').onclick = function () { relEdicao = {}; preencherFormulario({}); abrir('telaRel'); };
     $('#btnSalvarRel').onclick = salvarRelatorio;
