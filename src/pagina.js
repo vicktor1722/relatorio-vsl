@@ -74,7 +74,7 @@ footer b{color:var(--verde-escuro)}
 .visor .leg{position:absolute;left:0;right:0;bottom:0;padding:28px 16px calc(18px + env(safe-area-inset-bottom));color:#fff;
  font-size:15px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.7));pointer-events:none}
 .visor .dl{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;z-index:2;width:44px;height:44px;border-radius:50%;
- background:rgba(255,255,255,.18);color:#fff;font-size:20px;line-height:44px;text-align:center;border:0;cursor:pointer;padding:0}
+ background:rgba(255,255,255,.12);color:#fff;font-size:18px;line-height:44px;text-align:center;border:0;outline:0;cursor:pointer;padding:0;opacity:.85;-webkit-tap-highlight-color:transparent}
 .visor .cont{position:absolute;top:calc(22px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:2;color:#fff;font-size:14px;font-weight:600;
  background:rgba(255,255,255,.18);border-radius:14px;padding:4px 12px;pointer-events:none}
 .visor .cont:empty{display:none}
@@ -82,7 +82,8 @@ footer b{color:var(--verde-escuro)}
  color:#fff;font-size:34px;line-height:60px;text-align:center;padding:0;cursor:pointer}
 .visor .nav.ant{left:0;border-radius:0 12px 12px 0}
 .visor .nav.prox{right:0;border-radius:12px 0 0 12px}
-a.tag.baixar{background:var(--verde);color:#fff;text-decoration:none;cursor:pointer}
+a.tag.baixar{background:#F0F2F1;color:var(--fraco);font-weight:500;text-decoration:none;cursor:pointer;border:0;outline:0;box-shadow:none;-webkit-tap-highlight-color:transparent}
+a.tag.baixar:visited,a.tag.baixar:hover,a.tag.baixar:focus,a.tag.baixar:active{color:var(--fraco);outline:0;text-decoration:none}
 @media print{.visor{display:none}a.tag.baixar{display:none}}
 @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.barra{display:none}
  h2.talhao{position:static;break-after:avoid}.item,.grupo{break-inside:avoid}video{display:none}}
