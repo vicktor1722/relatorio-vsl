@@ -8,6 +8,7 @@
 
 import { hashSenha, novoId } from './auth.js';
 import { contagemAcessos } from './acessos.js';
+import { AGRO_ABAS, AGRO_CSS, AGRO_JS, AGRO_PAINEIS } from './agroadmin.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -367,6 +368,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 .marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;margin:2px 0 12px}
 .marcar input{width:18px;height:18px;accent-color:var(--verde)}
 @media(max-width:560px){ .linha2{grid-template-columns:1fr} #mapa{height:300px} }
+${AGRO_CSS}
 </style>
 </head><body>
 
@@ -389,6 +391,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     <button class="on" data-aba="dash">Dashboard</button>
     <button data-aba="contas" id="abaContas">Contas</button>
     <button data-aba="rels">Relatórios</button>
+    ${AGRO_ABAS}
   </div>
   <main>
     <div id="avisoPrazos"></div>
@@ -448,6 +451,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
         <div class="rolagem"><table id="tRels"></table></div>
       </div>
     </section>
+    ${AGRO_PAINEIS}
   </main>
 </div>
 
@@ -549,6 +553,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
     desenharBarras();
     desenharResp();
     desenharMapa();
+    agroAposPainel(adm);
   }
 
   function desenharKpis() {
@@ -1005,6 +1010,8 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
       document.querySelector('.abas button[data-aba="contas"]').click();
     } catch (e) { aviso(msg, e.message, true); }
   };
+
+  ${AGRO_JS}
 
   if (token) abrirPainel();
 })();
