@@ -461,3 +461,13 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-mapa-acoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .ag-mapa-acoes .btn{margin:0;font-size:14px;padding:12px 6px}
 .ag-mapa-acoes .oculto{display:none}
+#btnMapa.ag-ponto{position:relative}
+#btnMapa.ag-ponto::after{content:"";position:absolute;top:4px;right:4px;width:11px;height:11px;border-radius:50%;background:#E53935;border:2px solid #fff;animation:agpulso 1.8s infinite}
+@keyframes agpulso{0%{box-shadow:0 0 0 0 rgba(229,57,53,.6)}70%{box-shadow:0 0 0 8px rgba(229,57,53,0)}100%{box-shadow:0 0 0 0 rgba(229,57,53,0)}}
+.ag-mapa-acoes .btn{position:relative}
+.ag-mapa-acoes .btn.novo::after{content:"NOVO";position:absolute;top:-7px;right:8px;background:#E53935;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;letter-spacing:.4px}
+.ag-novo{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.ag-novo-card{background:#fff;border-radius:16px;padding:22px 20px;max-width:360px;width:100%;text-align:center}
+.ag-novo-ic{font-size:40px}.ag-novo-card h3{margin:6px 0 8px;font-size:19px;color:#146034}
+.ag-novo-card p{font-size:14.5px;line-height:1.45;color:#333;margin:0 0 10px}.ag-novo-como{background:#EEF6F0;border-radius:10px;padding:8px 10px}
+.ag-novo-card .btn{width:100%;margin:6px 0 0}
