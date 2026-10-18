@@ -12,7 +12,7 @@
   var CULTURAS = [['soja', 'Soja'], ['milho', 'Milho'], ['algodao', 'Algodão'], ['feijao', 'Feijão'], ['sorgo', 'Sorgo'],
     ['pastagem', 'Pastagem'], ['pousio', 'Pousio'], ['outra', 'Outra cultura']];
   var NOME_CULT = {}; CULTURAS.forEach(function (c) { NOME_CULT[c[0]] = c[1]; });
-  var OPS = ['Dessecação', 'Adubação de base', 'Adubação de cobertura', 'Plantio', 'Fungicida', 'Inseticida', 'Herbicida pós', 'Outra'];
+  var OPS = ['Dessecação', 'Adubação de base', 'Adubação de cobertura', 'Plantio', 'Fungicida', 'Inseticida', 'Herbicida pós'];
   var TIPOS = ['Herbicida', 'Fungicida', 'Inseticida', 'Fertilizante', 'Corretivo', 'Adjuvante', 'Semente', 'Outro'];
   var UNIDADES = ['L/ha', 'mL/ha', 'kg/ha', 'g/ha', 't/ha'];
   var MODELOS = {
@@ -555,9 +555,10 @@
           W.prods.filter(function (p) { return liquido(p[2]) && p[0]; }).map(function (p, i) { return '<div class="ag-mix"><span>' + (i + 1) + '. ' + esc(p[0]) + '</span><em>' + fmt(p[1] * hat, p[1] * hat < 10 ? 2 : 1) + ' ' + esc(unid(p[2])) + '</em></div>'; }).join('') + '</div>';
       }
     } else {
+      var livre = !!W.opLivre || (!!W.op && OPS.indexOf(W.op) < 0);
       var op = W.op || 'Dessecação', resps = (cad().responsaveis || []).map(function (x) { return x.nome; });
       if (W.resp && resps.indexOf(W.resp) < 0) resps.unshift(W.resp);
-      h += '<div class="linha2"><div class="campo"><label>Operação</label><select data-w="op">' + OPS.map(function (o) { return '<option' + (o === op ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>' +
+      h += '<div class="linha2"><div class="campo"><label>Operação</label><select data-w="op">' + OPS.map(function (o) { return '<option' + (!livre && o === op ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '<option value="__outra"' + (livre ? ' selected' : '') + '>✏️ Escrever outra…</option></select>' + (livre ? '<input data-w="oplivre" placeholder="Digite a operação (ex.: Dessecação pré-plantio)" value="' + esc(W.op) + '" style="margin-top:6px">' : '') + '</div>' +
         '<div class="campo"><label>Data prevista</label><input type="date" data-w="data" value="' + esc(W.data) + '"></div></div>' +
         '<div class="linha2"><div class="campo"><label>Quem aplica</label><select data-w="resp"><option value="">—</option>' + resps.map(function (n) { return '<option' + (n === W.resp ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' +
         '<div class="campo"><label>Safra</label><select data-w="safra">' + opcoesSafra(W.safra) + '</select></div></div>' +
@@ -622,7 +623,8 @@
     if (w === 'un') { W.prods[i][2] = el.value; pintarWiz(); return; }
     if (w === 'calda') { W.calda = numBR(el.value) || 100; pintarWiz(); return; }
     if (w === 'tanque') { W.tanque = numBR(el.value) || 3000; pintarWiz(); return; }
-    if (w === 'op') { W.op = el.value; return; }
+    if (w === 'op') { if (el.value === '__outra') { W.opLivre = true; W.op = ''; pintarWiz(); var xo = document.querySelector('[data-w="oplivre"]'); if (xo) xo.focus(); return; } W.opLivre = false; W.op = el.value; return; }
+    if (w === 'oplivre') { W.op = el.value; return; }
     if (w === 'data') { W.data = el.value; if (W.rep > 0) pintarWiz(); return; }
     if (w === 'resp') { W.resp = el.value; return; }
     if (w === 'safra') { W.safra = el.value; return; }
@@ -644,7 +646,7 @@
       var nomes = ST.plantio.filter(function (r) { return r.fazenda_id === W.faz && (r.safra || '') === (W.safra || '') && r.cultura === v; }).map(function (r) { return r.talhao; });
       W.tal = talhoesDe(fazDe(W.faz)).map(function (t) { return t.nome; }).filter(function (n) { return nomes.indexOf(n) >= 0; }); pintarWiz(); return true;
     }
-    if (a === 'wmodelo') { var m = MODELOS[v]; W.modelo = v; W.op = m[0]; W.prods = cp(m[1]); pintarWiz(); return true; }
+    if (a === 'wmodelo') { var m = MODELOS[v]; W.modelo = v; W.opLivre = false; W.op = m[0]; W.prods = cp(m[1]); pintarWiz(); return true; }
     if (a === 'wbranco') { W.modelo = ''; W.prods = []; pintarWiz(); return true; }
     if (a === 'waddprod') { W.prods.push(['', 1, 'L/ha']); pintarWiz(); return true; }
     if (a === 'wdel') { W.prods.splice(Number(v), 1); pintarWiz(); return true; }
@@ -795,7 +797,7 @@
     tP = criarTela('telaPlantio'); tR = criarTela('telaRecs');
     ligarTela(tP, cliquePlantio, mudancaPlantio); ligarTela(tR, cliqueRecs, mudancaRecs);
     // plantio: digitar nos campos de texto atualiza na hora, sem redesenhar a tela
-    tR.addEventListener('input', function (ev) { var n = ev.target; if (R.W && n.dataset && n.dataset.w === 'obs') R.W.obs = n.value; });
+    tR.addEventListener('input', function (ev) { var n = ev.target; if (R.W && n.dataset && n.dataset.w === 'obs') R.W.obs = n.value; if (R.W && n.dataset && n.dataset.w === 'oplivre') R.W.op = n.value; });
     tP.addEventListener('input', function (ev) { var n = ev.target; if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n); });
     botoes();
     var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { botoes(); atualizarModulos(); });
