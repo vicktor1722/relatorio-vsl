@@ -44,7 +44,7 @@ if (!/apple-mobile-web-app-capable/.test(html)) {
   html = html.replace('<link rel="manifest"',
     '<meta name="apple-mobile-web-app-capable" content="yes">\n' +
     '<meta name="apple-mobile-web-app-title" content="Relatorio VSL">\n' +
-    '<link rel="apple-touch-icon" href="icon-192.png">\n<link rel="manifest"');
+    '<link rel="apple-touch-icon" sizes="180x180" href="/api/icone/app.png">\n<link rel="manifest"');
 }
 
 /* 4. grava */
