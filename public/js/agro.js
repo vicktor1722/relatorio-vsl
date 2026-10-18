@@ -117,6 +117,7 @@
       var m = await chamar('/api/modulos');
       ST.mod = { plantio: !!m.plantio, recomendacoes: !!m.recomendacoes, admin: !!m.admin };
       ST.erroMod = '';
+      ST.checado = true;
       gravar();
     } catch (e) {
       // mantém o que já sabia, mas guarda o motivo para mostrar na tela do mapa
@@ -936,16 +937,24 @@
     document.getElementById('btnAbrirRecs').classList.toggle('novo', !!ST.mod.recomendacoes && !nv().recs);
     // se a conta tem módulo marcado mas o app não conseguiu liberar, mostra o motivo (em vez de ficar mudo)
     var er = document.getElementById('agErro');
-    var msg = !temModulo() && ST.erroMod && ST.erroMod !== 'sem conexão' ? ST.erroMod : '';
+    var msg = '';
+    if (!temModulo()) {
+      if (ST.erroMod && ST.erroMod !== 'sem conexão') msg = 'Não consegui verificar os módulos desta conta (' + ST.erroMod + '). ' + (/401|sess/i.test(ST.erroMod) ? 'Saia da conta e entre de novo, em Ajustes.' : 'Feche e abra o app com internet.');
+      else if (ST.erroMod === 'sem conexão') msg = 'Sem conexão com o servidor para liberar Plantio e Recomendações. Abra o app com internet.';
+      else if (ST.checado) msg = 'Plantio e Recomendações não estão liberados para a conta ' + (ST.email || '?') + '. Se deveria ter acesso, saia e entre de novo em Ajustes.';
+    }
     if (msg) {
       if (!er) { er = document.createElement('div'); er.id = 'agErro'; er.className = 'ag-dica'; c.insertBefore(er, c.firstChild); }
-      er.textContent = 'Não consegui verificar os módulos desta conta (' + msg + '). ' + (/401|sess/i.test(msg) ? 'Saia da conta e entre de novo, em Ajustes.' : 'Feche e abra o app com internet.');
+      er.textContent = msg;
     } else if (er) { er.remove(); }
+    var vr = document.getElementById('agVer');
+    if (!vr) { vr = document.createElement('div'); vr.id = 'agVer'; vr.style.cssText = 'font-size:11px;color:#9aa5a0;text-align:center;padding:14px 0 4px'; c.appendChild(vr); }
+    vr.textContent = 'Módulos ' + BUILD.slice(9, -1) + ' · Plantio ' + (ST.mod && ST.mod.plantio ? 'sim' : 'não') + ' · Recomendações ' + (ST.mod && ST.mod.recomendacoes ? 'sim' : 'não');
     pontoNovo(); avisoNovo();
   }
 
   /* ---------------- aviso de versão nova (o iPhone deixa o app aberto por dias) ---------------- */
-  var BUILD = 'BUILD_ID=2026-10-18a;';
+  var BUILD = 'BUILD_ID=2026-10-18b;';
   var vVerif = 0;
   function verificarVersao() {
     if (!navigator.onLine || document.getElementById('agAtualiza') || Date.now() - vVerif < 60000) return;
@@ -989,6 +998,16 @@
     setTimeout(verificarVersao, 4000);
   }
 
+  // se algo impedir os módulos de iniciar, mostra o motivo na tela do mapa (em vez de ficar mudo)
+  function falhaLigar(e) {
+    try {
+      var c = $('#telaMapa .conteudo'); if (!c) return;
+      var er = document.getElementById('agErro');
+      if (!er) { er = document.createElement('div'); er.id = 'agErro'; er.className = 'ag-dica'; c.insertBefore(er, c.firstChild); }
+      er.textContent = 'Plantio e Recomendações não iniciaram neste aparelho (' + ((e && e.message) || e || 'erro') + '). Feche e abra o app; se continuar, me mande esta mensagem.';
+    } catch (x) { /* nada a fazer */ }
+  }
+
   global.Agro = { ligar: ligar, atualizarModulos: atualizarModulos };
-  document.addEventListener('DOMContentLoaded', function () { setTimeout(function () { ligar().catch(function () { /* módulos novos nunca derrubam o app */ }); }, 400); });
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(function () { ligar().catch(function (e) { falhaLigar(e); }); }, 400); });
 })(window);
