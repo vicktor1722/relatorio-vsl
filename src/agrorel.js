@@ -187,6 +187,7 @@ function mapaVariedade(mapa, plantio, hoje) {
 
   let sv = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Mapa da fazenda colorido por variedade">' +
     '<rect width="' + W + '" height="' + H + '" fill="#F1F4F2"/>';
+  const rot = [];
   feats.forEach((f) => {
     const nome = (f.properties && f.properties.nome) || '';
     const p = porTal[nome] || {};
@@ -198,11 +199,39 @@ function mapaVariedade(mapa, plantio, hoje) {
     let d = '';
     each(f, (rings) => { d += rings.map((r) => 'M' + r.map((q) => px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1)).join('L') + 'Z').join(' '); });
     sv += '<path class="mv" data-info="' + esc(info) + '" d="' + d + '" fill="' + cor(p.variedade) + '"/>';
-    let sx = 0, sy = 0, n = 0;
-    each(f, (rings) => rings[0].forEach((q) => { sx += q[0]; sy += q[1]; n++; }));
-    const cx = px(sx / n).toFixed(1), cy = py(sy / n);
-    sv += '<text x="' + cx + '" y="' + (cy - (p.variedade ? 2 : -8)).toFixed(1) + '" text-anchor="middle" class="m1">' + esc(nome) + '</text>';
-    if (p.variedade) sv += '<text x="' + cx + '" y="' + (cy + 28).toFixed(1) + '" text-anchor="middle" class="m2">' + esc(codVar(p.variedade)) + '</text>';
+    // centro do talhão pela área (o centro por vértices desloca o rótulo para o lado mais recortado)
+    let ar = 0, gx = 0, gy = 0, sx = 0, sy = 0, n = 0;
+    each(f, (rings) => {
+      const r = rings[0];
+      for (let i = 0; i < r.length; i++) {
+        const q = r[i], w = r[(i + 1) % r.length];
+        const cr = q[0] * w[1] - w[0] * q[1];
+        ar += cr; gx += (q[0] + w[0]) * cr; gy += (q[1] + w[1]) * cr;
+        sx += q[0]; sy += q[1]; n++;
+      }
+    });
+    const ok = Math.abs(ar) > 1e-14;
+    const vr = p.variedade ? codVar(p.variedade) : '';
+    rot.push({ nome, vr, x: px(ok ? gx / (3 * ar) : sx / n), y: py(ok ? gy / (3 * ar) : sy / n),
+      w: Math.max(nome.length * 16, vr.length * 12.5) + 8, h: vr ? 56 : 30 });
+  });
+  // separa rótulos que se sobrepõem (talhões vizinhos com nome/variedade encostando)
+  for (let it = 0; it < 60; it++) {
+    let mexeu = false;
+    for (let i = 0; i < rot.length; i++) for (let j = i + 1; j < rot.length; j++) {
+      const A = rot[i], B = rot[j];
+      const ox = (A.w + B.w) / 2 - Math.abs(A.x - B.x), oy = (A.h + B.h) / 2 - Math.abs(A.y - B.y);
+      if (ox <= 0 || oy <= 0) continue;
+      mexeu = true;
+      if (oy <= ox) { const d = (oy / 2 + 1) * (A.y <= B.y ? 1 : -1); A.y -= d; B.y += d; }
+      else { const d = (ox / 2 + 1) * (A.x <= B.x ? 1 : -1); A.x -= d; B.x += d; }
+    }
+    if (!mexeu) break;
+  }
+  rot.forEach((L) => {
+    const y0 = L.y - L.h / 2, x = L.x.toFixed(1);
+    sv += '<text x="' + x + '" y="' + (y0 + 24).toFixed(1) + '" text-anchor="middle" class="m1">' + esc(L.nome) + '</text>';
+    if (L.vr) sv += '<text x="' + x + '" y="' + (y0 + 50).toFixed(1) + '" text-anchor="middle" class="m2">' + esc(L.vr) + '</text>';
   });
   sv += '</svg>';
 
