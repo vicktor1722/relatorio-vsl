@@ -236,6 +236,37 @@
       '</div>';
   }
 
+  /* Fotos já enviadas que ficaram sem miniatura neste aparelho (app reinstalado ou restaurado da nuvem):
+     com internet, baixa cada foto uma vez e guarda uma miniatura para ela aparecer também offline. */
+  let recMinis = false;
+  async function recuperarMinis() {
+    if (recMinis || !navigator.onLine) return;
+    recMinis = true;
+    let feitos = 0;
+    try {
+      for (const it of (st.itens || []).slice()) {
+        if (!navigator.onLine) break;
+        if (it.tipo !== 'foto' || !it.midia || it.sync_state !== 'ok') continue;
+        if ((await DB.temOriginal(it.id)) || (await DB.lerMini(it.id))) continue;
+        try {
+          const r = await fetch(await Sync.urlMidia(it));
+          if (!r.ok) continue;
+          const bmp = await createImageBitmap(await r.blob());
+          const e = Math.min(1, 720 / (Math.max(bmp.width, bmp.height) || 1));
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(bmp.width * e)); cv.height = Math.max(1, Math.round(bmp.height * e));
+          cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+          if (bmp.close) bmp.close();
+          const mb = await new Promise(function (res) { cv.toBlob(res, 'image/jpeg', 0.8); });
+          if (!mb) continue;
+          await DB.liberarMidia(it.id, { bytes: await mb.arrayBuffer(), tipo: 'image/jpeg' });
+          feitos++;
+        } catch (err) { /* tenta de novo na próxima vez */ }
+      }
+    } finally { recMinis = false; }
+    if (feitos) await renderChat();
+  }
+
   /* ---------------- chat ---------------- */
   async function renderChat() {
     const chat = $('#chat');
@@ -315,6 +346,7 @@
       }
     }
     chat.scrollTop = chat.scrollHeight;
+    recuperarMinis();
   }
 
   function bolhaHTML(it) {
