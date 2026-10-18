@@ -282,6 +282,9 @@ export function paginaAdmin(empresa) {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#1B7A43">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ADM Relatório">
+<link rel="apple-touch-icon" href="/api/icone/adm.png">
 <title>Painel · ${esc(empresa || 'Relatório VSL')}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
