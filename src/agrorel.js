@@ -226,7 +226,7 @@ function mapaVariedade(mapa, plantio, hoje) {
     leg += '<div class="lv-g"><span class="lv-c">Outros</span><span class="lv"><i style="background:' + SEM_VAR +
       '"></i>Sem variedade / pousio' + (ha ? ' <em>' + fmt(ha) + ' ha</em>' : '') + '</span></div>';
   }
-  return '<details class="mv-det"><summary><h2 class="talhao">Mapa por variedade<small>toque para abrir</small></h2></summary>' +
+  return '<details class="mv-det" open><summary><h2 class="talhao">Mapa por variedade<small>toque no talhão</small></h2></summary>' +
     '<div class="mapa-cli">' + sv + '</div><div class="map-cap" id="mapCap">Toque em um talhão para ver os detalhes.</div>' +
     '<div class="leg-var">' + leg + '</div></details>';
 }
@@ -341,6 +341,9 @@ export const AGRO_REL_CSS = `
 .ap-prod.q4>div{grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px}.ap-prod .tq{color:var(--verde-escuro);font-weight:600}
 .ap-prox{margin-top:7px;font-size:12px;background:#EEF6F6;color:#1F5F5F;border-radius:8px;padding:5px 8px}
 .mv-det>summary{list-style:none;cursor:pointer}.mv-det>summary::-webkit-details-marker{display:none}
+.mapa-geral>summary{list-style:none;cursor:pointer;font-weight:700;font-size:15px;color:var(--verde-escuro);padding:8px 0}.mapa-geral>summary::-webkit-details-marker{display:none}
+.mapa-geral>summary small{float:right;font-weight:400;color:var(--fraco);font-size:12px}.mapa-geral>summary small::after{content:" ▾"}.mapa-geral[open]>summary small::after{content:" ▴"}
+.mapa-geral .mapa{margin-top:2px}
 .mv-det>summary h2.talhao small::after{content:" ▾"}.mv-det[open]>summary h2.talhao small::after{content:" ▴"}
 .mapa-cli{border-radius:12px;overflow:hidden;border:1px solid var(--linha)}.mapa-cli svg{display:block;width:100%;height:auto}
 .mapa-cli .mv{stroke:#fff;stroke-width:3;stroke-linejoin:round;cursor:pointer}.mapa-cli .mv.on{stroke:#10331F;stroke-width:5}
@@ -372,8 +375,8 @@ export const AGRO_REL_JS = `
 (function(){
   var cap=document.getElementById('mapCap');
   var abertos=[];
-  window.addEventListener('beforeprint',function(){abertos=[];document.querySelectorAll('.mv-det').forEach(function(d){abertos.push(d.open);d.open=true})});
-  window.addEventListener('afterprint',function(){document.querySelectorAll('.mv-det').forEach(function(d,i){d.open=abertos[i]})});
+  window.addEventListener('beforeprint',function(){abertos=[];document.querySelectorAll('.mv-det,.mapa-geral').forEach(function(d){abertos.push(d.open);d.open=true})});
+  window.addEventListener('afterprint',function(){document.querySelectorAll('.mv-det,.mapa-geral').forEach(function(d,i){d.open=abertos[i]})});
   document.addEventListener('click',function(e){
     var p=e.target.closest&&e.target.closest('.mapa-cli .mv');
     if(p&&cap){
