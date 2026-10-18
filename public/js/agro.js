@@ -115,8 +115,13 @@
       if ((c0.email || '') !== (ST.email || '')) { ST = { email: c0.email || '', mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], fila: [], ult: {} }; gravar(); }
       var m = await chamar('/api/modulos');
       ST.mod = { plantio: !!m.plantio, recomendacoes: !!m.recomendacoes, admin: !!m.admin };
+      ST.erroMod = '';
       gravar();
-    } catch (e) { /* mantém o que já sabia */ }
+    } catch (e) {
+      // mantém o que já sabia, mas guarda o motivo para mostrar na tela do mapa
+      ST.erroMod = e && e.rede ? 'sem conexão' : ((e && e.status ? e.status + ' ' : '') + ((e && e.message) || 'erro'));
+      try { gravar(); } catch (e2) { /* sem espaço */ }
+    }
     botoes();
   }
 
@@ -839,7 +844,31 @@
     box.classList.toggle('oculto', !ST.mod.plantio && !ST.mod.recomendacoes);
     document.getElementById('btnAbrirPlantio').classList.toggle('novo', !!ST.mod.plantio && !nv().plantio);
     document.getElementById('btnAbrirRecs').classList.toggle('novo', !!ST.mod.recomendacoes && !nv().recs);
+    // se a conta tem módulo marcado mas o app não conseguiu liberar, mostra o motivo (em vez de ficar mudo)
+    var er = document.getElementById('agErro');
+    var msg = !temModulo() && ST.erroMod && ST.erroMod !== 'sem conexão' ? ST.erroMod : '';
+    if (msg) {
+      if (!er) { er = document.createElement('div'); er.id = 'agErro'; er.className = 'ag-dica'; c.insertBefore(er, c.firstChild); }
+      er.textContent = 'Não consegui verificar os módulos desta conta (' + msg + '). ' + (/401|sess/i.test(msg) ? 'Saia da conta e entre de novo, em Ajustes.' : 'Feche e abra o app com internet.');
+    } else if (er) { er.remove(); }
     pontoNovo(); avisoNovo();
+  }
+
+  /* ---------------- aviso de versão nova (o iPhone deixa o app aberto por dias) ---------------- */
+  var BUILD = 'BUILD_ID=2026-10-18a;';
+  var vVerif = 0;
+  function verificarVersao() {
+    if (!navigator.onLine || document.getElementById('agAtualiza') || Date.now() - vVerif < 60000) return;
+    vVerif = Date.now();
+    fetch('/?_=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+      var m = /BUILD_ID=([0-9a-z-]+);/.exec(t || '');
+      if (!m || ('BUILD_ID=' + m[1] + ';') === BUILD || document.getElementById('agAtualiza')) return;
+      var d = document.createElement('div'); d.id = 'agAtualiza';
+      d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:9998;background:#146034;color:#fff;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+      d.innerHTML = '<span style="flex:1">🔄 Tem uma versão nova do app.</span><button style="background:#fff;color:#146034;border:0;border-radius:8px;padding:8px 12px;font-weight:700">Atualizar</button>';
+      d.querySelector('button').onclick = function () { location.reload(); };
+      document.body.appendChild(d);
+    }).catch(function () { /* sem rede: tenta depois */ });
   }
 
   function ligarTela(el, clique, muda) {
@@ -862,8 +891,10 @@
     tP.addEventListener('input', function (ev) { var n = ev.target; if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n); });
     botoes();
     var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { marcaVisto('mapa'); atualizarModulos(); });
-    window.addEventListener('online', function () { atualizarModulos().then(descarregar); });
+    window.addEventListener('online', function () { atualizarModulos().then(descarregar); verificarVersao(); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { atualizarModulos().then(descarregar); verificarVersao(); } });
     atualizarModulos().then(descarregar);
+    setTimeout(verificarVersao, 4000);
   }
 
   global.Agro = { ligar: ligar, atualizarModulos: atualizarModulos };
