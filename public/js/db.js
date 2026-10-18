@@ -7,6 +7,11 @@
   const NOME = 'krigify-relatorio';
   const VERSAO = 1;
   let _db = null;
+  // Cada relatório/registro pertence a uma conta (campo "dono" = id do usuário).
+  // Conta nenhuma enxerga, sincroniza ou conta como pendente o que é de outra conta no mesmo aparelho.
+  let _dono = null;
+  const COM_DONO = { relatorios: 1, itens: 1 };
+  function meu(v) { return !v || v.dono === undefined || v.dono === null || v.dono === _dono; }
 
   function abrir() {
     if (_db) return Promise.resolve(_db);
@@ -48,16 +53,23 @@
   }
 
   const DB = {
-    async put(store, valor) { const s = await tx(store, 'readwrite'); return pedido(s.put(valor)); },
+    setDono(id) { _dono = id || null; },
+    dono() { return _dono; },
+    async putRaw(store, valor) { const s = await tx(store, 'readwrite'); return pedido(s.put(valor)); },
+    async todos(store) { const s = await tx(store); return pedido(s.getAll()); },
+    async put(store, valor) {
+      if (COM_DONO[store] && valor && (valor.dono === undefined || valor.dono === null) && _dono) valor.dono = _dono;
+      const s = await tx(store, 'readwrite'); return pedido(s.put(valor));
+    },
     async get(store, id) { const s = await tx(store); return pedido(s.get(id)); },
     async del(store, id) { const s = await tx(store, 'readwrite'); return pedido(s.delete(id)); },
-    async all(store) { const s = await tx(store); return pedido(s.getAll()); },
+    async all(store) { const s = await tx(store); const l = await pedido(s.getAll()); return COM_DONO[store] ? l.filter(meu) : l; },
     async limpar(store) { const s = await tx(store, 'readwrite'); return pedido(s.clear()); },
 
     async itensDoRelatorio(relId) {
       const s = await tx('itens');
       const idx = s.index('relatorio');
-      const lista = await pedido(idx.getAll(relId));
+      const lista = (await pedido(idx.getAll(relId))).filter(meu);
       return lista.sort(function (a, b) { return a.capturado_em.localeCompare(b.capturado_em); });
     },
 
