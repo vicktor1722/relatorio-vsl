@@ -26,6 +26,12 @@ export const AGRO_CSS = `
 .ck.fixo{color:var(--fraco);cursor:default}
 .nota{font-size:12.5px;color:var(--fraco);line-height:1.4;margin:6px 0 0}
 /* ---------- Plantio e Recomendações (módulos novos) ---------- */
+.ag-nova-aba::after{content:"novo";margin-left:6px;background:#E53935;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;text-transform:uppercase;vertical-align:middle}
+.ag-novo{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.ag-novo-card{background:#fff;border-radius:16px;padding:22px 20px;max-width:380px;width:100%;text-align:center}
+.ag-novo-ic{font-size:40px}.ag-novo-card h3{margin:6px 0 8px;font-size:19px;color:#146034}
+.ag-novo-card p{font-size:14.5px;line-height:1.45;color:#333;margin:0 0 10px}.ag-novo-como{background:#EEF6F0;border-radius:10px;padding:8px 10px}
+.ag-novo-card .btn{width:100%;margin:6px 0 0}
 .ag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;align-items:center}
 .ag-chips>span{font-size:12.5px;color:var(--texto-fraco)}
 .ag-chip{padding:7px 12px;border-radius:16px;background:#fff;border:1px solid var(--linha);font-size:13px}
@@ -700,7 +706,7 @@ export const AGRO_JS = String.raw`
       each(ft, function (rings) {
         d += rings.map(function (rg, ri) { if (ri === 0) rg.forEach(function (q) { cx += px(q[0]); cy += py(q[1]); n++; }); return 'M' + rg.map(function (q) { return px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1); }).join('L') + 'Z'; }).join(' ');
       });
-      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v=""' + esc(nome) + '" d="' + d + '"/>';
+      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v="' + esc(nome) + '" d="' + d + '"/>';
       if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
     });
     return s + txt + '</svg>';
@@ -973,6 +979,27 @@ export const AGRO_JS = String.raw`
   }
 
 
+  /* ---------------- aviso de novidade no painel ---------------- */
+  function nvA() { var o = {}; try { o = JSON.parse(localStorage.getItem('agro_novo_adm') || '{}'); } catch (e) { o = {}; } return o; }
+  function tagsNovo() {
+    var o = nvA();
+    [['abaPlantio', 'plantio'], ['abaRecs', 'recs'], ['abaModulos', 'modulos']].forEach(function (x) {
+      var b = document.getElementById(x[0]); if (b) b.classList.toggle('ag-nova-aba', !o[x[1]]);
+    });
+  }
+  function marcaNvA(k) { var o = nvA(); if (!o[k]) { o[k] = true; try { localStorage.setItem('agro_novo_adm', JSON.stringify(o)); } catch (e) { /* sem espaço */ } } tagsNovo(); }
+  function avisoNovoAdm() {
+    tagsNovo();
+    var o = nvA(); if (o.aviso || document.getElementById('agNovo')) return;
+    var d = document.createElement('div'); d.id = 'agNovo'; d.className = 'ag-novo';
+    d.innerHTML = '<div class="ag-novo-card"><div class="ag-novo-ic">🌱</div><h3>Novidade no painel!</h3>' +
+      '<p>Duas abas novas: <b>Plantio</b> (cultura, variedade, datas e sementes de cada talhão) e <b>Recomendações</b> (lista, calendário e catálogo de produtos).</p>' +
+      '<p class="ag-novo-como">Em <b>Módulos</b> você escolhe quais contas enxergam cada uma. No app de campo elas aparecem em <b>🗺️ Mapa</b>.</p>' +
+      '<button class="btn" id="agNovoOk">Entendi</button></div>';
+    document.body.appendChild(d);
+    document.getElementById('agNovoOk').onclick = function () { o.aviso = true; try { localStorage.setItem('agro_novo_adm', JSON.stringify(o)); } catch (e) { /* sem espaço */ } d.remove(); };
+  }
+
   var iniciado = false;
   window.agroIniciar = async function () {
     if (!iniciado) {
@@ -982,11 +1009,12 @@ export const AGRO_JS = String.raw`
       tP.addEventListener('input', function (ev) { var n = ev.target; if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n); });
       tR.addEventListener('input', function (ev) { var n = ev.target; if (R.W && n.dataset && n.dataset.w === 'obs') R.W.obs = n.value; if (R.W && n.dataset && n.dataset.w === 'oplivre') R.W.op = n.value; });
       var ap = document.getElementById('abaPlantio'), ar = document.getElementById('abaRecs');
-      if (ap) ap.addEventListener('click', abrirPlantio);
-      if (ar) ar.addEventListener('click', abrirRecs);
+      if (ap) ap.addEventListener('click', function () { marcaNvA('plantio'); abrirPlantio(); });
+      var am = document.getElementById('abaModulos'); if (am) am.addEventListener('click', function () { marcaNvA('modulos'); });
+      if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
     }
     await atualizarModulos();
-    if (ST.mod.plantio || ST.mod.recomendacoes) await baixar();
+    if (ST.mod.plantio || ST.mod.recomendacoes) { avisoNovoAdm(); await baixar(); }
   };
 
   function ligarTela(el, clique, muda) {
