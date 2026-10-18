@@ -99,8 +99,64 @@
 
   async function sair() {
     try { localStorage.removeItem(CHAVE_LOCAL); } catch (e) {}
+    DB.setDono(null);
     await salvarConf({ token: null });
     await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
+  }
+
+  /* ---------------- de quem são os dados deste aparelho ---------------- */
+  // id da conta que está logada (vem de dentro do token)
+  async function meuId() {
+    const c = await conf();
+    if (!c || !c.token) return null;
+    try {
+      const corpo = String(c.token).split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+      const m = /"id":"([^"]+)"/.exec(atob(corpo + '==='.slice((corpo.length + 3) % 4)));
+      return m ? m[1] : null;
+    } catch (e) { return null; }
+  }
+
+  // Define o dono dos dados que aparecem agora e separa o que é de outra conta.
+  // Relatórios antigos (sem dono) ficam com quem tem a fazenda/produtor deles no cadastro; os outros
+  // ficam escondidos (não são apagados) e voltam quando a conta certa entrar.
+  async function fixarDono() {
+    const id = await meuId();
+    DB.setDono(id);
+    if (!id) return { id: null, mudou: false };
+    const antes = await DB.cfg('ultimoDono');
+    const mudou = !!antes && antes !== id;
+    await DB.cfg('ultimoDono', id);
+    const cad = mudou ? { fazendas: [], produtores: [] } : await cadastroLocal();   // na troca de conta o cadastro guardado ainda é o da outra
+    const fz = new Set((cad.fazendas || []).map(function (f) { return f.id; }));
+    const pr = new Set((cad.produtores || []).map(function (p) { return p.id; }));
+    const temCad = fz.size > 0 || pr.size > 0;
+    const mapa = {};
+    for (const r of await DB.todos('relatorios')) {
+      let d;
+      if (r.dono && r.dono !== '?' && r.dono !== id) d = r.dono;                       // já é de outra conta
+      else if (r.dono === id) d = id;
+      else if ((r.fazenda_id && fz.has(r.fazenda_id)) || (r.produtor_id && pr.has(r.produtor_id))) d = id;
+      else if (!r.fazenda_id && !r.produtor_id) d = temCad || !mudou ? id : '?';       // sem vínculo: fica com quem usa
+      else if (temCad || mudou) d = '?';                                               // é de outra conta: esconde
+      else d = r.dono;                                                                  // sem cadastro para julgar: não mexe
+      mapa[r.id] = d;
+      if (d !== undefined && d !== r.dono) { r.dono = d; await DB.putRaw('relatorios', r); }
+    }
+    for (const i of await DB.todos('itens')) {
+      const d = mapa[i.relatorio_id];
+      if (d !== undefined && i.dono !== d) { i.dono = d; await DB.putRaw('itens', i); }
+    }
+    return { id: id, mudou: mudou };
+  }
+
+  // Troca de conta: limpa só a identidade (empresa, logo, cadastro). Os relatórios ficam guardados no aparelho,
+  // escondidos, até a conta deles entrar de novo.
+  async function limparIdentidadeLocal() {
+    const c = await conf();
+    delete c.empresa; delete c.cidade; delete c.telefone; delete c.email; delete c.logo;
+    await DB.cfg('servidor', c);
+    await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
+    await DB.cfg('ultimo', null);
   }
 
   // Outra conta entrou neste aparelho: zera tudo que era da conta anterior
@@ -494,7 +550,7 @@
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
     salvarPerfil, baixarPerfil,
-    limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
+    meuId, fixarDono, limparIdentidadeLocal, limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };
 })(window);
