@@ -278,6 +278,7 @@
 
   function abrirPlantio() {
     if (!ST.mod.plantio) return;
+    marcaVisto('plantio');
     var dr = doRelatorio(); ESC = dr.prod;
     P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.outros = []; P.sel = [];
     tP.classList.remove('oculto'); pintarPlantio(); topoRolagem(tP);
@@ -384,6 +385,7 @@
 
   function abrirRecs() {
     if (!ST.mod.recomendacoes) return;
+    marcaVisto('recs');
     var dr = doRelatorio(); ESC = dr.prod;
     R.faz = dr.faz || fazPadrao(); R.view = 'lista'; R.filtro = 'todas'; R.W = null;
     tR.classList.remove('oculto'); pintarRecs(); topoRolagem(tR);
@@ -524,7 +526,7 @@
       each(ft, function (rings) {
         d += rings.map(function (rg, ri) { if (ri === 0) rg.forEach(function (q) { cx += px(q[0]); cy += py(q[1]); n++; }); return 'M' + rg.map(function (q) { return px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1); }).join('L') + 'Z'; }).join(' ');
       });
-      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v=""' + esc(nome) + '" d="' + d + '"/>';
+      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v="' + esc(nome) + '" d="' + d + '"/>';
       if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
     });
     return s + txt + '</svg>';
@@ -795,6 +797,32 @@
     if (el.dataset.a === 'mostrar') { var r = recDe(R.id); r.mostrar = el.checked; salvarRecLocal(r); toast(el.checked ? 'Vai aparecer no relatório do cliente' : 'Escondida do relatório do cliente'); }
   }
 
+  /* ---------------- aviso de novidade (módulos liberados) ---------------- */
+  function nv() { ST.novo = ST.novo || {}; return ST.novo; }
+  function temModulo() { return !!(ST.mod && (ST.mod.plantio || ST.mod.recomendacoes)); }
+  function marcaVisto(k) { if (!nv()[k]) { nv()[k] = true; gravar(); } botoes(); }
+  function pontoNovo() { var b = $('#btnMapa'); if (b) b.classList.toggle('ag-ponto', temModulo() && !nv().mapa); }
+  var avisoTimer = null;
+  function avisoNovo() {
+    if (avisoTimer || !temModulo() || nv().aviso) return;
+    avisoTimer = setInterval(function () {
+      if (!temModulo() || nv().aviso) { clearInterval(avisoTimer); avisoTimer = null; return; }
+      var b = $('#btnMapa');
+      // só aparece quando a pessoa está dentro do relatório da fazenda (nenhuma outra tela por cima)
+      if (!b || !b.offsetParent || document.getElementById('agNovo') || document.querySelector('.tela:not(.oculto)')) return;
+      var l = []; if (ST.mod.plantio) l.push('<b>Plantio dos talhões</b>'); if (ST.mod.recomendacoes) l.push('<b>Recomendações</b>');
+      var d = document.createElement('div'); d.id = 'agNovo'; d.className = 'ag-novo';
+      d.innerHTML = '<div class="ag-novo-card"><div class="ag-novo-ic">🌱</div><h3>Novidade no app!</h3>' +
+        '<p>Agora você pode usar ' + l.join(' e ') + ', tudo pelo mapa da fazenda.</p>' +
+        '<p class="ag-novo-como">Como acessar: toque em <b>🗺️ Mapa</b> no topo da tela e escolha ' + (ST.mod.plantio ? '<b>🌱 Plantio</b>' : '') + (ST.mod.plantio && ST.mod.recomendacoes ? ' ou ' : '') + (ST.mod.recomendacoes ? '<b>📋 Recomendações</b>' : '') + '.</p>' +
+        '<button class="btn" id="agNovoVer">Abrir o mapa</button><button class="btn secundario" id="agNovoOk">Entendi</button></div>';
+      document.body.appendChild(d);
+      var fecha = function () { nv().aviso = true; gravar(); d.remove(); clearInterval(avisoTimer); avisoTimer = null; };
+      document.getElementById('agNovoOk').onclick = fecha;
+      document.getElementById('agNovoVer').onclick = function () { fecha(); var m = $('#btnMapa'); if (m) m.click(); };
+    }, 1500);
+  }
+
   /* ---------------- botões dentro da tela "Mapa da visita" ---------------- */
   function botoes() {
     var c = $('#telaMapa .conteudo'); if (!c) return;
@@ -809,6 +837,9 @@
     document.getElementById('btnAbrirPlantio').classList.toggle('oculto', !ST.mod.plantio);
     document.getElementById('btnAbrirRecs').classList.toggle('oculto', !ST.mod.recomendacoes);
     box.classList.toggle('oculto', !ST.mod.plantio && !ST.mod.recomendacoes);
+    document.getElementById('btnAbrirPlantio').classList.toggle('novo', !!ST.mod.plantio && !nv().plantio);
+    document.getElementById('btnAbrirRecs').classList.toggle('novo', !!ST.mod.recomendacoes && !nv().recs);
+    pontoNovo(); avisoNovo();
   }
 
   function ligarTela(el, clique, muda) {
@@ -830,7 +861,7 @@
     tR.addEventListener('input', function (ev) { var n = ev.target; if (R.W && n.dataset && n.dataset.w === 'obs') R.W.obs = n.value; if (R.W && n.dataset && n.dataset.w === 'oplivre') R.W.op = n.value; });
     tP.addEventListener('input', function (ev) { var n = ev.target; if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n); });
     botoes();
-    var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { botoes(); atualizarModulos(); });
+    var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { marcaVisto('mapa'); atualizarModulos(); });
     window.addEventListener('online', function () { atualizarModulos().then(descarregar); });
     atualizarModulos().then(descarregar);
   }
