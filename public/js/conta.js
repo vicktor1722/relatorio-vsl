@@ -36,13 +36,8 @@
     const msg = $('#loginMsg');
     if (!email || !senha) { aviso(msg, 'Preencha e-mail e senha.'); return; }
     // se o aparelho era de outra conta, os dados dela não podem aparecer para a nova
-    const dono = String((await Sync.conf()).email || '').toLowerCase();
-    const outraConta = !!dono && dono !== email.toLowerCase();
-    if (outraConta) {
-      const pend = (await DB.pendentes()).length;
-      if (pend && !confirm('Há ' + pend + ' registro(s) de ' + dono + ' que ainda não foram enviados. ' +
-        'Entrar com outra conta apaga os dados deste aparelho e esses registros se perdem. Continuar?')) return;
-    }
+    // (os relatórios de cada conta ficam separados no aparelho: nada é apagado nem misturado)
+    let outraConta = false;
     $('#btnEntrar').disabled = true;
     aviso(msg, modoCriar ? 'Criando conta…' : 'Entrando…');
     try {
@@ -58,7 +53,8 @@
       $('#loginSenha').value = '';
       aviso(msg, '');
       fechar('telaLogin');
-      if (outraConta) await Sync.limparDadosLocais();
+      outraConta = (await Sync.fixarDono()).mudou;
+      if (outraConta) await Sync.limparIdentidadeLocal();
       try {
         const perfil = await Sync.baixarPerfil();
         if (perfil && (perfil.empresa || perfil.cidade || perfil.logo || perfil.telefone || perfil.email)) {
@@ -73,6 +69,7 @@
         }
       } catch (e) { /* segue sem perfil */ }
       await atualizarCadastro(true);
+      await Sync.fixarDono();
       if (outraConta) { location.reload(); return; }   // recarrega para limpar o que estava na tela
       if (global.App && App.aoEntrar) await App.aoEntrar();
     } catch (e) {
