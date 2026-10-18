@@ -1606,6 +1606,7 @@
         history.replaceState(null, '', location.pathname);
       }
     } catch (e) {}
+    await Sync.fixarDono();   // separa os dados de cada conta antes de listar ou sincronizar
     iniciarGPS();
     ligarToqueGps();
     Sync.autoSync();
@@ -1625,6 +1626,7 @@
       await Conta.mostrarLogin();
     } else {
       await Conta.atualizarCadastro(navigator.onLine);
+      await Sync.fixarDono();   // com o cadastro atualizado, confere de quem é cada relatório
       await recuperarSeSolicitado();
     }
     if (!st.rel) { await renderChat(); await listarRelatorios(); abrir('telaLista'); }
