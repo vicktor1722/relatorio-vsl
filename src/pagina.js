@@ -143,6 +143,8 @@ function mapaSVG(talhoes, itens) {
     let sx = 0, sy = 0, n = 0;
     each(f, rings => rings[0].forEach(p => { sx += p[0]; sy += p[1]; n++; }));
     s += `<text x="${px(sx / n).toFixed(1)}" y="${py(sy / n).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${esc(f.properties && f.properties.nome || '')}</text>`;
+    const haT = Number(f.properties && f.properties.area_ha) || 0;
+    if (haT) s += `<text x="${px(sx / n).toFixed(1)}" y="${(py(sy / n) + 21).toFixed(1)}" font-size="16" fill="#146034" text-anchor="middle" font-family="sans-serif">${haT.toFixed(1).replace('.', ',')} ha</text>`;
   });
   itens.filter(i => i.lat != null).forEach(i => {
     s += `<circle cx="${px(i.lon).toFixed(1)}" cy="${py(i.lat).toFixed(1)}" r="7" fill="${i.tipo === 'video' ? '#D93025' : '#1B7A43'}" stroke="#fff" stroke-width="2.5"/>`;
