@@ -150,7 +150,7 @@ function aplicacoes(recs, areas, hoje) {
       '<div class="ap-prod' + (liq ? ' q4' : '') + '"><div class="ap-th"><span>Produto</span><span>Dose/ha</span>' +
         (liq ? '<span>Por tanque</span>' : '') + (ha ? '<span>Total</span>' : '') + '</div>' +
       g.prods.map((p) => '<div><span>' + esc(p[0]) + '</span><span>' + doseTxt(Number(p[1])) + ' ' + esc(unid(p[2])) + '</span>' +
-        (liq ? '<span class="tq">' + (liquido(p[2]) ? volTotal(p[1] * hat, p[2]) : '—') + '</span>' : '') +
+        (liq ? '<span class="tq">' + volTotal(p[1] * hat, p[2]) + '</span>' : '') +
         (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>' +
       (g.prox && g.num < g.total ? '<div class="ap-prox">📅 Próxima aplicação: <b>' + (g.prox < hoje ? 'a programar' : curta(g.prox)) + '</b></div>' : '') +
       '</div>';
