@@ -226,9 +226,9 @@ function mapaVariedade(mapa, plantio, hoje) {
     leg += '<div class="lv-g"><span class="lv-c">Outros</span><span class="lv"><i style="background:' + SEM_VAR +
       '"></i>Sem variedade / pousio' + (ha ? ' <em>' + fmt(ha) + ' ha</em>' : '') + '</span></div>';
   }
-  return '<h2 class="talhao">Mapa por variedade<small>toque no talhão</small></h2>' +
+  return '<details class="mv-det"><summary><h2 class="talhao">Mapa por variedade<small>toque para abrir</small></h2></summary>' +
     '<div class="mapa-cli">' + sv + '</div><div class="map-cap" id="mapCap">Toque em um talhão para ver os detalhes.</div>' +
-    '<div class="leg-var">' + leg + '</div>';
+    '<div class="leg-var">' + leg + '</div></details>';
 }
 
 /* ---------------- evolução do plantio ---------------- */
@@ -236,7 +236,10 @@ function mapaVariedade(mapa, plantio, hoje) {
 function evolucaoPlantio(mapa, plantio, hoje) {
   const areas = areasDoMapa(mapa);
   const plantaveis = plantio.filter((p) => p.cultura && !SEM_PLANTIO[p.cultura] && areas[p.talhao]);
-  const total = plantaveis.reduce((s, p) => s + areas[p.talhao], 0);
+  // total = área de todos os talhões da fazenda (só fica de fora o que está marcado como pastagem/pousio)
+  const naoPlanta = {};
+  plantio.forEach((p) => { if (SEM_PLANTIO[p.cultura]) naoPlanta[p.talhao] = 1; });
+  const total = Object.keys(areas).filter((t) => !naoPlanta[t]).reduce((s, t) => s + areas[t], 0);
   if (!total) return '';
   const por = {};
   plantaveis.filter((p) => p.data_plantio).forEach((p) => { (por[p.data_plantio] = por[p.data_plantio] || []).push(p.talhao); });
@@ -272,7 +275,9 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   g += '</svg>';
 
   const ult = ev[ev.length - 1];
-  const falta = plantaveis.filter((p) => !p.data_plantio);
+  const plantados = {};
+  plantaveis.forEach((p) => { if (p.data_plantio) plantados[p.talhao] = 1; });
+  const falta = Object.keys(areas).filter((t) => !naoPlanta[t] && !plantados[t]).map((t) => ({ talhao: t }));
   const hf = falta.reduce((s, p) => s + areas[p.talhao], 0);
   const tb = '<table class="pl-tab"><tr><th>Data</th><th>Talhões</th><th>ha</th><th>Acumulado</th></tr>' +
     ev.map((e) => '<tr><td>' + curta(e.d) + '</td><td>' + esc(e.tal.join(', ')) + '</td><td>' + fmt(e.ha) + '</td><td>' + fmt(e.cum) + '</td></tr>').join('') + '</table>';
@@ -335,6 +340,8 @@ export const AGRO_REL_CSS = `
 .ap-calda{font-size:12.5px;background:#E6F0FA;color:#1A4E85;border-radius:8px;padding:6px 9px;margin-bottom:6px;line-height:1.45}.ap-calda span{font-size:11.5px;opacity:.85}
 .ap-prod.q4>div{grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px}.ap-prod .tq{color:var(--verde-escuro);font-weight:600}
 .ap-prox{margin-top:7px;font-size:12px;background:#EEF6F6;color:#1F5F5F;border-radius:8px;padding:5px 8px}
+.mv-det>summary{list-style:none;cursor:pointer}.mv-det>summary::-webkit-details-marker{display:none}
+.mv-det>summary h2.talhao small::after{content:" ▾"}.mv-det[open]>summary h2.talhao small::after{content:" ▴"}
 .mapa-cli{border-radius:12px;overflow:hidden;border:1px solid var(--linha)}.mapa-cli svg{display:block;width:100%;height:auto}
 .mapa-cli .mv{stroke:#fff;stroke-width:3;stroke-linejoin:round;cursor:pointer}.mapa-cli .mv.on{stroke:#10331F;stroke-width:5}
 .mapa-cli text{pointer-events:none;fill:#0b0b0b;paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round;font-family:sans-serif}
@@ -364,6 +371,9 @@ export const AGRO_REL_CSS = `
 export const AGRO_REL_JS = `
 (function(){
   var cap=document.getElementById('mapCap');
+  var abertos=[];
+  window.addEventListener('beforeprint',function(){abertos=[];document.querySelectorAll('.mv-det').forEach(function(d){abertos.push(d.open);d.open=true})});
+  window.addEventListener('afterprint',function(){document.querySelectorAll('.mv-det').forEach(function(d,i){d.open=abertos[i]})});
   document.addEventListener('click',function(e){
     var p=e.target.closest&&e.target.closest('.mapa-cli .mv');
     if(p&&cap){
