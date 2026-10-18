@@ -416,6 +416,7 @@ input,textarea,select{font:inherit}
 .ag-mapa{background:#fff;border-radius:12px;padding:6px;margin-bottom:8px}
 .ag-mapa svg{width:100%;height:auto;max-height:340px;display:block}
 .ag-poly{fill:#CFE3D5;stroke:#fff;stroke-width:3;cursor:pointer}
+.ag-poly.feito{fill:#A8D5B5}
 .ag-poly.on{fill:var(--verde-acento);stroke:var(--verde-escuro);stroke-width:4}
 .ag-mapa text{font-size:24px;font-weight:700;fill:#10331f;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:4px}
 .ag-resumo-ha{background:#fff;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:6px}
