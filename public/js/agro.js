@@ -149,8 +149,11 @@
     return f.talhoes.features.map(function (ft) { var p = ft.properties || {}; return { nome: String(p.nome || ''), ha: Number(p.area_ha) || 0, f: ft }; }).filter(function (t) { return t.nome; });
   }
   function haDe(f, nomes) { var h = 0; talhoesDe(f).forEach(function (t) { if (nomes.indexOf(t.nome) >= 0) h += t.ha; }); return Math.round(h * 10) / 10; }
+  // quando aberto pelo mapa do relatório, só as fazendas do produtor daquele relatório
+  var ESC = '';
+  function fazEscopo() { return fazendas().filter(function (f) { return !ESC || f.produtor_id === ESC; }); }
   function opcoesFaz(sel) {
-    return fazendas().map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('');
+    return fazEscopo().map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('');
   }
   function opcoesSafra(sel) {
     var l = safras(); if (sel && l.indexOf(sel) < 0) l.unshift(sel);
@@ -158,13 +161,13 @@
     return l.map(function (s) { return '<option value="' + esc(s) + '"' + (s === sel ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
   }
   function fazPadrao() {
-    var l = fazendas(); if (!l.length) return '';
+    var l = fazEscopo(); if (!l.length) return '';
     return l.some(function (f) { return f.id === ST.ult.faz; }) ? ST.ult.faz : l[0].id;
   }
   // fazenda e safra do relatório que está aberto no app (o app guarda em window.relAtualMapa ao abrir o mapa)
   function doRelatorio() {
     var r = global.relAtualMapa || {}, f = fazendas().filter(function (x) { return x.id === r.fazenda_id; })[0];
-    return { faz: f ? f.id : '', safra: r.safra && safras().indexOf(r.safra) >= 0 ? r.safra : '' };
+    return { faz: f ? f.id : '', prod: (f && f.produtor_id) || r.produtor_id || '', safra: r.safra && safras().indexOf(r.safra) >= 0 ? r.safra : '' };
   }
   function safraPadrao() { var l = safras(); return ST.ult.safra && l.indexOf(ST.ult.safra) >= 0 ? ST.ult.safra : (l[0] || ''); }
 
@@ -266,7 +269,7 @@
 
   function abrirPlantio() {
     if (!ST.mod.plantio) return;
-    var dr = doRelatorio();
+    var dr = doRelatorio(); ESC = dr.prod;
     P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.outros = [];
     tP.classList.remove('oculto'); pintarPlantio(); topoRolagem(tP);
     baixar().then(function (ok) { if (ok && !tP.classList.contains('oculto') && !P.ed) pintarPlantio(); });
@@ -368,7 +371,8 @@
 
   function abrirRecs() {
     if (!ST.mod.recomendacoes) return;
-    R.faz = doRelatorio().faz || fazPadrao(); R.view = 'lista'; R.filtro = 'todas'; R.W = null;
+    var dr = doRelatorio(); ESC = dr.prod;
+    R.faz = dr.faz || fazPadrao(); R.view = 'lista'; R.filtro = 'todas'; R.W = null;
     tR.classList.remove('oculto'); pintarRecs(); topoRolagem(tR);
     baixar().then(function (ok) { if (ok && !tR.classList.contains('oculto') && R.view === 'lista') pintarRecs(); });
   }
