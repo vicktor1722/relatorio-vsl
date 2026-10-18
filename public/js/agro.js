@@ -78,16 +78,23 @@
   /* ---------------- servidor ---------------- */
   async function chamar(rota, corpo) {
     var c = await Sync.conf();
-    if (!c.token) { var e0 = new Error('sem login'); e0.rede = true; throw e0; }
-    var corte = new AbortController(), t = setTimeout(function () { corte.abort(); }, 20000), r;
-    try {
-      r = await fetch(c.api.replace(/\/$/, '') + rota, {
-        method: corpo === undefined ? 'GET' : 'POST',
-        headers: Object.assign({ Authorization: 'Bearer ' + c.token }, corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
-        body: corpo === undefined ? undefined : JSON.stringify(corpo), signal: corte.signal
-      });
-    } catch (e) { clearTimeout(t); var er = new Error('sem conexão'); er.rede = true; throw er; }
-    clearTimeout(t);
+    if (!c.token) { var e0 = new Error('sem login'); e0.rede = true; e0.semLogin = true; throw e0; }
+    // tenta o endereço guardado e, se não alcançar, o endereço de onde o app foi aberto
+    var bases = [String(c.api || '').replace(/\/$/, '')];
+    if (/^https?:/.test(location.origin) && bases.indexOf(location.origin) < 0) bases.push(location.origin);
+    var r, falha = '';
+    for (var bi = 0; bi < bases.length && !r; bi++) {
+      var corte = new AbortController(), t = setTimeout(function () { corte.abort(); }, 20000);
+      try {
+        r = await fetch(bases[bi] + rota, {
+          method: corpo === undefined ? 'GET' : 'POST',
+          headers: Object.assign({ Authorization: 'Bearer ' + c.token }, corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
+          body: corpo === undefined ? undefined : JSON.stringify(corpo), signal: corte.signal
+        });
+      } catch (e) { falha = ((e && e.name) ? e.name + ': ' : '') + ((e && e.message) || '') + ' em ' + bases[bi].replace(/^https?:\/\//, ''); }
+      clearTimeout(t);
+    }
+    if (!r) { var er = new Error('sem conexão'); er.rede = true; er.detalhe = falha; throw er; }
     var j = null; try { j = await r.json(); } catch (e) { /* sem corpo */ }
     if (!r.ok) { var eh = new Error((j && j.erro) || ('HTTP ' + r.status)); eh.status = r.status; throw eh; }
     return j;
@@ -121,7 +128,8 @@
       gravar();
     } catch (e) {
       // mantém o que já sabia, mas guarda o motivo para mostrar na tela do mapa
-      ST.erroMod = e && e.rede ? 'sem conexão' : ((e && e.status ? e.status + ' ' : '') + ((e && e.message) || 'erro'));
+      ST.erroMod = e && e.semLogin ? 'sem login' : e && e.rede ? 'sem conexão' : ((e && e.status ? e.status + ' ' : '') + ((e && e.message) || 'erro'));
+      ST.erroDet = (e && e.detalhe) || '';
       try { gravar(); } catch (e2) { /* sem espaço */ }
     }
     botoes();
@@ -939,8 +947,9 @@
     var er = document.getElementById('agErro');
     var msg = '';
     if (!temModulo()) {
-      if (ST.erroMod && ST.erroMod !== 'sem conexão') msg = 'Não consegui verificar os módulos desta conta (' + ST.erroMod + '). ' + (/401|sess/i.test(ST.erroMod) ? 'Saia da conta e entre de novo, em Ajustes.' : 'Feche e abra o app com internet.');
-      else if (ST.erroMod === 'sem conexão') msg = 'Sem conexão com o servidor para liberar Plantio e Recomendações. Abra o app com internet.';
+      if (ST.erroMod === 'sem login') msg = 'Este aparelho está sem login ativo (não é falta de internet). Entre de novo em Ajustes com seu e-mail e senha para liberar Plantio e Recomendações.';
+      else if (ST.erroMod && ST.erroMod !== 'sem conexão') msg = 'Não consegui verificar os módulos desta conta (' + ST.erroMod + '). ' + (/401|sess/i.test(ST.erroMod) ? 'Saia da conta e entre de novo, em Ajustes.' : 'Feche e abra o app com internet.');
+      else if (ST.erroMod === 'sem conexão') msg = 'Sem conexão com o servidor para liberar Plantio e Recomendações (' + (ST.erroDet || 'sem detalhe') + '). Abra o app com internet.';
       else if (ST.checado) msg = 'Plantio e Recomendações não estão liberados para a conta ' + (ST.email || '?') + '. Se deveria ter acesso, saia e entre de novo em Ajustes.';
     }
     if (msg) {
