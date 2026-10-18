@@ -75,6 +75,66 @@ function comoDownload(resp, nome) {
   return new Response(resp.body, { status: resp.status, headers: h });
 }
 
+/* capa do app (apple-touch-icon): desenhada aqui mesmo, sem arquivo de imagem */
+function desenharIcone(tipo, S) {
+  var adm = tipo === 'adm', c1 = adm ? [58, 90, 120] : [42, 157, 92], c2 = adm ? [28, 47, 66] : [20, 92, 50];
+  var K = 512 / S, buf = new Uint8Array(S * S * 3);
+  function caixa(x, y, x0, y0, w, h, r) {
+    var cx = Math.min(Math.max(x, x0 + r), x0 + w - r), cy = Math.min(Math.max(y, y0 + r), y0 + h - r);
+    return (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
+  }
+  function elipse(x, y, cx, cy, a, b, ang) {
+    var dx = x - cx, dy = y - cy, co = Math.cos(ang), si = Math.sin(ang), u = dx * co + dy * si, v = -dx * si + dy * co;
+    return (u * u) / (a * a) + (v * v) / (b * b) <= 1;
+  }
+  function cor(x, y) {
+    var t = (x + y) / 1024, c = [c1[0] + (c2[0] - c1[0]) * t, c1[1] + (c2[1] - c1[1]) * t, c1[2] + (c2[2] - c1[2]) * t];
+    var escuro = adm ? [28, 47, 66] : [20, 85, 46];
+    if (caixa(x, y, 122, 92, 254, 340, 28) && x - y <= 208) {
+      c = [255, 255, 255];
+      if (x >= 300 && y <= 168) c = [207, 227, 214];
+      if (caixa(x, y, 164, 196, 150, 16, 8)) c = escuro;
+      if (caixa(x, y, 164, 236, 184, 12, 6) || caixa(x, y, 164, 268, 184, 12, 6) || caixa(x, y, 164, 300, 120, 12, 6)) c = [201, 216, 206];
+    }
+    var dx = x - 358, dy = y - 372;
+    if (dx * dx + dy * dy <= 92 * 92) {
+      c = [245, 181, 10];
+      if (adm) {
+        var r = Math.sqrt(dx * dx + dy * dy), a = Math.atan2(dy, dx), p = Math.PI / 4, d = Math.abs(((a % p) + p) % p - p / 2);
+        if ((r <= 44 && r >= 18) || (r > 44 && r <= 62 && d > p / 2 - 0.2)) c = escuro;
+      } else if (caixa(x, y, 352, 348, 12, 80, 6) || elipse(x, y, 329, 337, 38, 16, 0.64) || elipse(x, y, 389, 322, 40, 17, -0.66)) c = escuro;
+    }
+    return c;
+  }
+  var N = 3;
+  for (var j = 0; j < S; j++) for (var i = 0; i < S; i++) {
+    var R = 0, G = 0, B = 0;
+    for (var m = 0; m < N; m++) for (var n = 0; n < N; n++) {
+      var c = cor((i + (n + 0.5) / N) * K, (j + (m + 0.5) / N) * K); R += c[0]; G += c[1]; B += c[2];
+    }
+    var o = (j * S + i) * 3; buf[o] = R / (N * N); buf[o + 1] = G / (N * N); buf[o + 2] = B / (N * N);
+  }
+  return buf;
+}
+async function pngIcone(tipo) {
+  var S = 180, raw = desenharIcone(tipo, S), lin = new Uint8Array((S * 3 + 1) * S);
+  for (var y = 0; y < S; y++) lin.set(raw.subarray(y * S * 3, (y + 1) * S * 3), y * (S * 3 + 1) + 1);
+  var cs = new Response(new Blob([lin]).stream().pipeThrough(new CompressionStream('deflate')));
+  var z = new Uint8Array(await cs.arrayBuffer());
+  var tab = []; for (var n = 0; n < 256; n++) { var k = n; for (var b = 0; b < 8; b++) k = k & 1 ? 0xEDB88320 ^ (k >>> 1) : k >>> 1; tab[n] = k >>> 0; }
+  function crc(u) { var k = 0xFFFFFFFF; for (var i = 0; i < u.length; i++) k = tab[(k ^ u[i]) & 255] ^ (k >>> 8); return (k ^ 0xFFFFFFFF) >>> 0; }
+  function bloco(tp, dados) {
+    var o = new Uint8Array(12 + dados.length), v = new DataView(o.buffer);
+    v.setUint32(0, dados.length); for (var i = 0; i < 4; i++) o[4 + i] = tp.charCodeAt(i);
+    o.set(dados, 8); v.setUint32(8 + dados.length, crc(o.subarray(4, 8 + dados.length))); return o;
+  }
+  var ih = new Uint8Array(13), vh = new DataView(ih.buffer); vh.setUint32(0, S); vh.setUint32(4, S); ih[8] = 8; ih[9] = 2;
+  var partes = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), bloco('IHDR', ih), bloco('IDAT', z), bloco('IEND', new Uint8Array(0))];
+  var tot = 0; partes.forEach(function (p) { tot += p.length; });
+  var out = new Uint8Array(tot), pos = 0; partes.forEach(function (p) { out.set(p, pos); pos += p.length; });
+  return new Response(out, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
+}
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
@@ -85,6 +145,10 @@ export default {
 
     try {
       /* ================= público ================= */
+
+      // capa do app na tela inicial do iPhone (apple-touch-icon)
+      if (rota === '/api/icone/app.png') return pngIcone('app');
+      if (rota === '/api/icone/adm.png') return pngIcone('adm');
 
       // limpeza do app no aparelho: apaga o cache antigo e recarrega a versão nova (não mexe nos relatórios guardados)
       if (rota === '/api/limpar') {
