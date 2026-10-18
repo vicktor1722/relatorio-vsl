@@ -86,6 +86,18 @@ export default {
     try {
       /* ================= público ================= */
 
+      // limpeza do app no aparelho: apaga o cache antigo e recarrega a versão nova (não mexe nos relatórios guardados)
+      if (rota === '/api/limpar') {
+        const pagina = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atualizando</title>' +
+          '<style>body{font-family:-apple-system,sans-serif;background:#f3f6f4;color:#14532d;text-align:center;padding:64px 24px}</style></head><body>' +
+          '<h2>Atualizando o app…</h2><p id="m">Limpando a versão antiga.</p><script>' +
+          '(async function(){try{var r=await navigator.serviceWorker.getRegistrations();for(var i=0;i<r.length;i++)await r[i].unregister();}catch(e){}' +
+          'try{var k=await caches.keys();for(var j=0;j<k.length;j++)await caches.delete(k[j]);}catch(e){}' +
+          'document.getElementById("m").textContent="Pronto! Abrindo a versão nova…";setTimeout(function(){location.replace("/?v="+Date.now());},700);})();' +
+          '</script></body></html>';
+        return new Response(pagina, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+      }
+
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
         return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0 });
