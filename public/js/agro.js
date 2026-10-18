@@ -956,9 +956,6 @@
       if (!er) { er = document.createElement('div'); er.id = 'agErro'; er.className = 'ag-dica'; c.insertBefore(er, c.firstChild); }
       er.textContent = msg;
     } else if (er) { er.remove(); }
-    var vr = document.getElementById('agVer');
-    if (!vr) { vr = document.createElement('div'); vr.id = 'agVer'; vr.style.cssText = 'font-size:11px;color:#9aa5a0;text-align:center;padding:14px 0 4px'; c.appendChild(vr); }
-    vr.textContent = 'Módulos ' + BUILD.slice(9, -1) + ' · Plantio ' + (ST.mod && ST.mod.plantio ? 'sim' : 'não') + ' · Recomendações ' + (ST.mod && ST.mod.recomendacoes ? 'sim' : 'não');
     pontoNovo(); avisoNovo();
   }
 
