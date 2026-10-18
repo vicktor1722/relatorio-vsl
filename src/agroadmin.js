@@ -377,7 +377,7 @@ export const AGRO_JS = String.raw`
   function mapaPlantio(f, tl) {
     var feitos = tl.filter(function (t) { var r = linhaPlantio(P.faz, P.safra, t.nome); return r && (r.cultura || r.variedade || r.data_plantio); }).map(function (t) { return t.nome; });
     P.sel = P.sel.filter(function (n) { return tl.some(function (t) { return t.nome === n; }); });
-    return '<div class="ag-dica">👆 Toque nos talhões do mapa para marcar onde lançar o plantio (pode marcar vários). Mais claro = já informado.</div><div class="ag-mapa">' + mapaSVG(f, P.sel, 'ptog', feitos) + '</div>' +
+    return '<div class="ag-dica">👆 Toque nos talhões do mapa para marcar onde lançar o plantio (pode marcar vários). Mais claro = já informado. Para os talhões pequenos, amplie com + / − ou com dois dedos.</div><div class="ag-mapa">' + mapaSVG(f, P.sel, 'ptog', feitos) + '</div>' +
       '<div class="ag-chips"><button class="ag-chip" data-a="ptodos">Todos</button><button class="ag-chip" data-a="plimpar">Limpar</button></div>' +
       (P.sel.length ? '<button class="btn" data-a="plancar">🌱 Lançar plantio em ' + P.sel.length + ' talhão(ões) · ' + fmt(haDe(f, P.sel)) + ' ha</button>' : '') +
       '<div class="ag-dica">Ou toque num talhão da lista abaixo para lançar só nele.</div>';
@@ -692,6 +692,93 @@ export const AGRO_JS = String.raw`
   }
   function prodCat(nome) { return ST.produtos.filter(function (p) { return p.nome === nome; })[0]; }
 
+  /* ---------------- zoom nos mapas de seleção: botões + / −, pinça e arrastar ---------------- */
+  var ZW = 1000, MZ = { k: 1, x: 0, y: 0, id: '' }, zFeito = false, zGest = null, zSupr = 0;
+  function zoomDe(id) { if (MZ.id !== id) MZ = { k: 1, x: 0, y: 0, id: id }; return MZ; }
+  function zAplica(svg) {
+    var z = MZ, H = Number(svg.getAttribute('data-h')) || 600, vw = ZW / z.k, vh = H / z.k;
+    z.x = Math.max(0, Math.min(ZW - vw, z.x)); z.y = Math.max(0, Math.min(H - vh, z.y));
+    svg.setAttribute('viewBox', z.x.toFixed(1) + ' ' + z.y.toFixed(1) + ' ' + vw.toFixed(1) + ' ' + vh.toFixed(1));
+    svg.style.setProperty('--zk', z.k.toFixed(2));
+    svg.style.touchAction = z.k > 1 ? 'none' : 'pan-y';
+  }
+  // posição de um ponto da tela dentro da área visível do mapa (0 a 1) e escala em px por unidade
+  function zPonto(svg, cx, cy) {
+    var r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, s = Math.min(r.width / vb.width, r.height / vb.height) || 1;
+    var ox = (r.width - vb.width * s) / 2, oy = (r.height - vb.height * s) / 2;
+    return { fx: Math.max(0, Math.min(1, ((cx - r.left - ox) / s) / vb.width)), fy: Math.max(0, Math.min(1, ((cy - r.top - oy) / s) / vb.height)), s: s };
+  }
+  function zZoom(svg, k2, fx, fy) {
+    var z = MZ, H = Number(svg.getAttribute('data-h')) || 600, vw = ZW / z.k, vh = H / z.k;
+    k2 = Math.max(1, Math.min(10, k2));
+    var px = z.x + vw * fx, py = z.y + vh * fy;
+    z.k = k2; z.x = px - (ZW / k2) * fx; z.y = py - (H / k2) * fy;
+    zAplica(svg);
+  }
+  function zoomIniciar() {
+    if (zFeito) return; zFeito = true;
+    var st = document.createElement('style');
+    st.textContent = '.ag-zw{position:relative}.ag-zb{position:absolute;right:6px;top:6px;display:flex;flex-direction:column;gap:6px}' +
+      '.ag-zb button{width:40px;height:40px;border-radius:10px;border:1px solid #cfd8d2;background:rgba(255,255,255,.96);font-size:21px;font-weight:700;line-height:1;color:#146034;box-shadow:0 1px 4px rgba(0,0,0,.18);padding:0;cursor:pointer}' +
+      '.ag-mapa svg{touch-action:pan-y;user-select:none;-webkit-user-select:none}.ag-mapa .ag-poly{stroke-width:calc(3px / var(--zk,1))}.ag-mapa .ag-poly.on{stroke-width:calc(4px / var(--zk,1))}' +
+      '.ag-mapa text{font-size:calc(24px * (0.6 + 0.4 * var(--zk,1)) / var(--zk,1));stroke-width:calc(4px / var(--zk,1))}';
+    document.head.appendChild(st);
+    var svgDe = function (n) { return n && n.closest ? n.closest('.ag-zw') && n.closest('.ag-zw').querySelector('svg') : null; };
+    document.addEventListener('click', function (ev) {
+      if (Date.now() - zSupr < 450 && ev.target.closest && ev.target.closest('.ag-zw')) { ev.stopPropagation(); ev.preventDefault(); return; }
+      var b = ev.target.closest ? ev.target.closest('[data-z]') : null; if (!b) return;
+      var svg = svgDe(b); if (!svg) return; ev.stopPropagation(); ev.preventDefault();
+      var a = b.getAttribute('data-z');
+      if (a === 'reset') zZoom(svg, 1, 0.5, 0.5); else zZoom(svg, MZ.k * (a === 'in' ? 1.7 : 1 / 1.7), 0.5, 0.5);
+    }, true);
+    var dist = function (t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); };
+    document.addEventListener('touchstart', function (ev) {
+      var svg = ev.target.closest ? ev.target.closest('.ag-zw svg') : null; if (!svg) { zGest = null; return; }
+      var t = ev.touches;
+      if (t.length === 2) {
+        var m = zPonto(svg, (t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2), H = Number(svg.getAttribute('data-h')) || 600;
+        zGest = { svg: svg, tipo: 'pinca', d0: dist(t), k0: MZ.k, px: MZ.x + (ZW / MZ.k) * m.fx, py: MZ.y + (H / MZ.k) * m.fy, mov: true };
+      } else if (t.length === 1) {
+        zGest = { svg: svg, tipo: 'arrasta', sx: t[0].clientX, sy: t[0].clientY, x0: MZ.x, y0: MZ.y, mov: false };
+      }
+    }, { passive: true });
+    document.addEventListener('touchmove', function (ev) {
+      var g = zGest; if (!g) return; var t = ev.touches, H = Number(g.svg.getAttribute('data-h')) || 600;
+      if (g.tipo === 'pinca' && t.length === 2) {
+        ev.preventDefault();
+        var m = zPonto(g.svg, (t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2);
+        var k2 = Math.max(1, Math.min(10, g.k0 * dist(t) / (g.d0 || 1)));
+        MZ.k = k2; MZ.x = g.px - (ZW / k2) * m.fx; MZ.y = g.py - (H / k2) * m.fy; zAplica(g.svg);
+      } else if (g.tipo === 'arrasta' && t.length === 1) {
+        var dx = t[0].clientX - g.sx, dy = t[0].clientY - g.sy;
+        if (Math.abs(dx) + Math.abs(dy) > 8) g.mov = true;
+        if (MZ.k > 1 && g.mov) {
+          ev.preventDefault();
+          var s = zPonto(g.svg, 0, 0).s;
+          MZ.x = g.x0 - dx / s; MZ.y = g.y0 - dy / s; zAplica(g.svg);
+        }
+      }
+    }, { passive: false });
+    var fim = function (ev) { if (zGest && zGest.mov && MZ.k > 1) zSupr = Date.now(); if (!ev.touches || !ev.touches.length) zGest = null; };
+    document.addEventListener('touchend', fim, { passive: true }); document.addEventListener('touchcancel', fim, { passive: true });
+    // computador: roda do mouse amplia, arrastar move
+    document.addEventListener('wheel', function (ev) {
+      var svg = ev.target.closest ? ev.target.closest('.ag-zw svg') : null; if (!svg) return;
+      ev.preventDefault(); var m = zPonto(svg, ev.clientX, ev.clientY); zZoom(svg, MZ.k * (ev.deltaY < 0 ? 1.25 : 0.8), m.fx, m.fy);
+    }, { passive: false });
+    var mouse = null;
+    document.addEventListener('mousedown', function (ev) {
+      var svg = ev.target.closest ? ev.target.closest('.ag-zw svg') : null; if (!svg || MZ.k <= 1) return;
+      mouse = { svg: svg, sx: ev.clientX, sy: ev.clientY, x0: MZ.x, y0: MZ.y, mov: false };
+    });
+    document.addEventListener('mousemove', function (ev) {
+      if (!mouse) return; var dx = ev.clientX - mouse.sx, dy = ev.clientY - mouse.sy;
+      if (Math.abs(dx) + Math.abs(dy) > 5) mouse.mov = true;
+      if (mouse.mov) { var s = zPonto(mouse.svg, 0, 0).s; MZ.x = mouse.x0 - dx / s; MZ.y = mouse.y0 - dy / s; zAplica(mouse.svg); }
+    });
+    document.addEventListener('mouseup', function () { if (mouse && mouse.mov) zSupr = Date.now(); mouse = null; });
+  }
+
   function mapaSVG(f, sel, act, feitos) {
     var feats = (f && f.talhoes && f.talhoes.features) || [], minX = 180, minY = 90, maxX = -180, maxY = -90;
     var each = function (ft, cb) { var g = ft.geometry; if (!g) return; (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(cb); };
@@ -700,7 +787,9 @@ export const AGRO_JS = String.raw`
     var dx = (maxX - minX) || 0.001, dy = (maxY - minY) || 0.001; minX -= dx * 0.03; maxX += dx * 0.03; minY -= dy * 0.03; maxY += dy * 0.03;
     var Wd = 1000, H = Math.max(300, Math.round(Wd * ((maxY - minY) / (maxX - minX)) * Math.cos((minY + maxY) / 2 * Math.PI / 180)));
     var px = function (l) { return (l - minX) / (maxX - minX) * Wd; }, py = function (l) { return H - (l - minY) / (maxY - minY) * H; };
-    var s = '<svg viewBox="0 0 ' + Wd + ' ' + H + '"><rect width="' + Wd + '" height="' + H + '" fill="#F1F4F2"/>', txt = '';
+    var z = zoomDe((f && f.id) || ''), zvw = Wd / z.k, zvh = H / z.k;
+    z.x = Math.max(0, Math.min(Wd - zvw, z.x)); z.y = Math.max(0, Math.min(H - zvh, z.y));
+    var s = '<div class="ag-zw"><svg viewBox="' + z.x.toFixed(1) + ' ' + z.y.toFixed(1) + ' ' + zvw.toFixed(1) + ' ' + zvh.toFixed(1) + '" data-h="' + H + '" style="--zk:' + z.k.toFixed(2) + (z.k > 1 ? ';touch-action:none' : '') + '"><rect width="' + Wd + '" height="' + H + '" fill="#F1F4F2"/>', txt = '';
     feats.forEach(function (ft) {
       var nome = (ft.properties && ft.properties.nome) || '', on = sel.indexOf(nome) >= 0, d = '', cx = 0, cy = 0, n = 0;
       each(ft, function (rings) {
@@ -709,7 +798,7 @@ export const AGRO_JS = String.raw`
       s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v="' + esc(nome) + '" d="' + d + '"/>';
       if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
     });
-    return s + txt + '</svg>';
+    return s + txt + '</svg><div class="ag-zb"><button type="button" data-z="in" title="Ampliar">+</button><button type="button" data-z="out" title="Reduzir">−</button><button type="button" data-z="reset" title="Mapa inteiro">⤢</button></div></div>';
   }
 
   function pintarWiz() {
@@ -1013,6 +1102,7 @@ export const AGRO_JS = String.raw`
       var am = document.getElementById('abaModulos'); if (am) am.addEventListener('click', function () { marcaNvA('modulos'); });
       if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
     }
+    zoomIniciar();
     await atualizarModulos();
     if (ST.mod.plantio || ST.mod.recomendacoes) { avisoNovoAdm(); await baixar(); }
   };
