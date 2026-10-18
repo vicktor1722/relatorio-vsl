@@ -516,7 +516,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     <div><b>${talhoesVisitados}</b><span data-i="talhoes_reg">talhões registrados</span></div>
     <div><b>${areaTotal ? areaTotal.toFixed(0) : '—'}</b><span data-i="ha_map">hectares mapeados</span></div>
   </div>
-  ${ag && ag.topo.includes('class="mv-det"') ? '<details class="mapa-geral"><summary>Mapa geral da fazenda<small>fotos e vídeos</small></summary>' + mapaSVG(talhoes, itens) + '</details>' : mapaSVG(talhoes, itens)}
+  ${ag && ag.mapaVar ? '<details class="mapa-geral"><summary>Mapa geral da fazenda<small>fotos e vídeos</small></summary>' + mapaSVG(talhoes, itens) + '</details>' + ag.mapaVar : mapaSVG(talhoes, itens)}
   ${obsGerais}
   ${ag ? ag.topo : ''}
   ${corpo}
