@@ -464,7 +464,7 @@
     h += '<div class="ag-sec"><b>Ordem de mistura</b>' + prods.map(function (p, i) {
       return '<div class="ag-mix"><b class="ag-ord">' + (i + 1) + '</b><span>' + esc(p[0]) + '</span><em>' + doseTxt(p[1]) + ' ' + esc(p[2]) + '</em></div>'; }).join('') + '</div>';
     if (liq && hat) h += '<div class="ag-sec azul"><b>💧 Por tanque de ' + fmt(d.tanque, 0) + ' L (' + fmt(hat, 0) + ' ha)</b><small>Calda ' + fmt(d.calda, 0) + ' L/ha · ' + tanques(ha, hat, d.calda) + '</small>' +
-      prods.filter(function (p) { return liquido(p[2]) && p[0]; }).map(function (p) {
+      prods.filter(function (p) { return p[0]; }).map(function (p) {
         return '<div class="ag-mix"><span>' + esc(p[0]) + '</span><em>' + fmt(p[1] * hat, p[1] * hat < 10 ? 2 : 1) + ' ' + esc(unid(p[2])) + '</em></div>'; }).join('') + '</div>';
     h += '<h2>Talhões</h2>';
     var pend = 0;
@@ -671,7 +671,7 @@
           '<div class="campo"><label>Tanque do pulverizador (L)</label><input inputmode="numeric" data-w="tanque" value="' + W.tanque + '"></div></div>' +
           '<div class="ag-chips">' + [2000, 3000, 4000].map(function (v) { return '<button class="ag-chip' + (W.tanque === v ? ' on' : '') + '" data-a="wtanque" data-v="' + v + '">Jacto ' + v.toLocaleString('pt-BR') + ' L</button>'; }).join('') + '</div>' +
           '<small>Cada tanque cobre <b>' + fmt(hat, 0) + ' ha</b>' + (ha ? ' · ' + tanques(ha, hat, W.calda) : '') + '. Por tanque cheio, na ordem de mistura:</small>' +
-          W.prods.filter(function (p) { return liquido(p[2]) && p[0]; }).map(function (p, i) { return '<div class="ag-mix"><span>' + (i + 1) + '. ' + esc(p[0]) + '</span><em>' + fmt(p[1] * hat, p[1] * hat < 10 ? 2 : 1) + ' ' + esc(unid(p[2])) + '</em></div>'; }).join('') + '</div>';
+          W.prods.filter(function (p) { return p[0]; }).map(function (p, i) { return '<div class="ag-mix"><span>' + (i + 1) + '. ' + esc(p[0]) + '</span><em>' + fmt(p[1] * hat, p[1] * hat < 10 ? 2 : 1) + ' ' + esc(unid(p[2])) + '</em></div>'; }).join('') + '</div>';
       }
     } else {
       var livre = !!W.opLivre || (!!W.op && OPS.indexOf(W.op) < 0);
