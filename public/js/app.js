@@ -946,12 +946,26 @@
     return (await Sync.baseLink()) + '/r/' + rel.id;
   }
 
+  // o mapa do relatório é uma cópia da fazenda de quando ele foi criado: se o KML da fazenda mudou, atualiza os rascunhos
+  async function atualizarTalhoes(rel) {
+    try {
+      if (!rel || !rel.fazenda_id || visitaFechada(rel)) return;
+      const f = Conta.fazendaPorId(rel.fazenda_id);
+      const novo = f && f.talhoes;
+      if (!novo || !novo.features || !novo.features.length) return;
+      if (JSON.stringify(novo) === JSON.stringify(rel.talhoes)) return;
+      rel.talhoes = novo;
+      await DB.put('relatorios', rel);
+    } catch (e) { /* mantém o mapa que já está */ }
+  }
+
   async function abrirRelatorio(id) {
     st.rel = await DB.get('relatorios', id);
     if (!st.rel) return;
     await DB.cfg('ultimo', id);
     fechar('telaLista');
     await renderChat();                       // ajusta st.rel para a visita aberta
+    await atualizarTalhoes(st.rel);
     $('#tituloRel').textContent = st.rel.fazenda || 'Relatório';
     $('#subtituloRel').textContent = subtitulo();
     $('#avatarRel').textContent = visitaFechada(st.rel) ? (st.rel.na_fila ? '📤' : '✅') : '🌱';
@@ -1422,7 +1436,11 @@
 
     $('#btnMenuLista').onclick = async function () { await listarRelatorios(); abrir('telaLista'); };
     $('#btnMais').onclick = menuMais;
-    $('#btnMapa').onclick = function () { window.relAtualMapa = st.rel; desenharMapa(); abrir('telaMapa'); };
+    $('#btnMapa').onclick = async function () {
+      try { await Conta.atualizarSePrecisar(); } catch (e) {}
+      await atualizarTalhoes(st.rel);
+      window.relAtualMapa = st.rel; desenharMapa(); abrir('telaMapa');
+    };
     $('#btnAjustes').onclick = async function () { await carregarCfg(); abrir('telaAjustes'); };
     $('#btnNovoRel').onclick = function () { relEdicao = {}; preencherFormulario({}); abrir('telaRel'); };
     $('#btnSalvarRel').onclick = salvarRelatorio;
