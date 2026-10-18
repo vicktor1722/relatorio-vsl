@@ -76,6 +76,7 @@ export const AGRO_CSS = `
 .ag-mapa{background:#fff;border-radius:12px;padding:6px;margin-bottom:8px}
 .ag-mapa svg{width:100%;height:auto;max-height:340px;display:block}
 .ag-poly{fill:#CFE3D5;stroke:#fff;stroke-width:3;cursor:pointer}
+.ag-poly.feito{fill:#A8D5B5}
 .ag-poly.on{fill:var(--verde-acento);stroke:var(--verde-escuro);stroke-width:4}
 .ag-mapa text{font-size:24px;font-weight:700;fill:#10331f;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:4px}
 .ag-resumo-ha{background:#fff;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:6px}
@@ -360,12 +361,21 @@ export const AGRO_JS = String.raw`
   function topoRolagem() { window.scrollTo(0, 0); }
 
   /* =================== PLANTIO =================== */
-  var tP = null, P = { faz: '', safra: '', ed: null, nome: '', outros: [] };
+  var tP = null, P = { faz: '', safra: '', ed: null, nome: '', outros: [], sel: [] };
 
   function linhaPlantio(fid, safra, nome) {
     return ST.plantio.filter(function (r) { return r.fazenda_id === fid && (r.safra || '') === (safra || '') && r.talhao === nome; })[0] || null;
   }
   function semTxt(r) { return r.sem_ha ? fmt(r.sem_m, 1) + ' sem/m · ' + fmt(r.sem_ha, 0) + ' sem/ha' : ''; }
+
+  function mapaPlantio(f, tl) {
+    var feitos = tl.filter(function (t) { var r = linhaPlantio(P.faz, P.safra, t.nome); return r && (r.cultura || r.variedade || r.data_plantio); }).map(function (t) { return t.nome; });
+    P.sel = P.sel.filter(function (n) { return tl.some(function (t) { return t.nome === n; }); });
+    return '<div class="ag-dica">👆 Toque nos talhões do mapa para marcar onde lançar o plantio (pode marcar vários). Mais claro = já informado.</div><div class="ag-mapa">' + mapaSVG(f, P.sel, 'ptog', feitos) + '</div>' +
+      '<div class="ag-chips"><button class="ag-chip" data-a="ptodos">Todos</button><button class="ag-chip" data-a="plimpar">Limpar</button></div>' +
+      (P.sel.length ? '<button class="btn" data-a="plancar">🌱 Lançar plantio em ' + P.sel.length + ' talhão(ões) · ' + fmt(haDe(f, P.sel)) + ' ha</button>' : '') +
+      '<div class="ag-dica">Ou toque num talhão da lista abaixo para lançar só nele.</div>';
+  }
 
   function pintarPlantio() {
     if (P.ed) return pintarEditorPlantio();
@@ -381,7 +391,7 @@ export const AGRO_JS = String.raw`
     pintar(tP, 'Plantio dos talhões', tl.length ? feitos + ' de ' + tl.length + ' talhões informados' : 'sem talhões',
       '', campoProd(P) + '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz, P.prod) + '</select></div>' +
       '<div class="campo"><label>Safra</label><select data-c="safra">' + opcoesSafra(P.safra) + '</select></div></div>' +
-      (tl.length ? cards : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
+      (tl.length ? mapaPlantio(f, tl) + cards : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
       '<div class="ag-nota">Cultura, variedade, datas e sementes alimentam o mapa por variedade e a evolução do plantio no relatório do cliente.</div>');
     if (!fazendas().length) $('.conteudo', tP).innerHTML = '<div class="aviso">Nenhuma fazenda com talhões. Importe o KML em Produtores e fazendas.</div>';
   }
@@ -439,19 +449,23 @@ export const AGRO_JS = String.raw`
     });
     gravar();
     enfileirar('/api/agro/plantio', { fazenda_id: P.faz, safra: P.safra, talhoes: enviar });
-    toast(limpar ? 'Plantio limpo' : 'Plantio salvo' + (alvo.length > 1 ? ' em ' + alvo.length + ' talhões' : ''));
+    P.sel = []; toast(limpar ? 'Plantio limpo' : 'Plantio salvo' + (alvo.length > 1 ? ' em ' + alvo.length + ' talhões' : ''));
     P.ed = null; P.outros = []; pintarPlantio();
   }
 
   function abrirPlantio() {
     if (!ST.mod.plantio) return;
-    P.faz = fazPadrao(); P.prod = produtorDe(fazDe(P.faz)); P.safra = safraPadrao(); P.ed = null; P.outros = [];
+    P.faz = fazPadrao(); P.prod = produtorDe(fazDe(P.faz)); P.safra = safraPadrao(); P.ed = null; P.outros = []; P.sel = [];
     pintarPlantio();
     baixar().then(function (ok) { if (ok && !P.ed) pintarPlantio(); });
   }
 
   function cliquePlantio(a, v, alvo) {
     if (a === 'voltar') { if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } return; }
+    if (a === 'ptog') { var kp = P.sel.indexOf(v); if (kp >= 0) P.sel.splice(kp, 1); else P.sel.push(v); pintarPlantio(); return; }
+    if (a === 'ptodos') { P.sel = talhoesDe(fazDe(P.faz)).map(function (t) { return t.nome; }); pintarPlantio(); return; }
+    if (a === 'plimpar') { P.sel = []; pintarPlantio(); return; }
+    if (a === 'plancar') { if (!P.sel.length) return; var p0 = P.sel[0], resto = P.sel.slice(1); cliquePlantio('edtal', p0); P.outros = resto; pintarPlantio(); topoRolagem(tP); return; }
     if (a === 'edtal') {
       var r = linhaPlantio(P.faz, P.safra, v);
       P.nome = v; P.outros = [];
@@ -469,7 +483,7 @@ export const AGRO_JS = String.raw`
   }
   function mudancaPlantio(sel) {
     if (sel.dataset.c === 'prod') { trocaProd(P, sel.value); pintarPlantio(); }
-    else if (sel.dataset.c === 'faz') { P.faz = sel.value; ST.ult.faz = P.faz; gravar(); pintarPlantio(); }
+    else if (sel.dataset.c === 'faz') { P.sel = []; P.faz = sel.value; ST.ult.faz = P.faz; gravar(); pintarPlantio(); }
     else if (sel.dataset.c === 'safra') { P.safra = sel.value; ST.ult.safra = P.safra; gravar(); pintarPlantio(); }
     else if (sel.dataset.k) entradaPlantio(sel);
   }
@@ -672,7 +686,7 @@ export const AGRO_JS = String.raw`
   }
   function prodCat(nome) { return ST.produtos.filter(function (p) { return p.nome === nome; })[0]; }
 
-  function mapaSVG(f, sel) {
+  function mapaSVG(f, sel, act, feitos) {
     var feats = (f && f.talhoes && f.talhoes.features) || [], minX = 180, minY = 90, maxX = -180, maxY = -90;
     var each = function (ft, cb) { var g = ft.geometry; if (!g) return; (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(cb); };
     feats.forEach(function (ft) { each(ft, function (rings) { rings.forEach(function (rg) { rg.forEach(function (p) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }); }); }); });
@@ -686,7 +700,7 @@ export const AGRO_JS = String.raw`
       each(ft, function (rings) {
         d += rings.map(function (rg, ri) { if (ri === 0) rg.forEach(function (q) { cx += px(q[0]); cy += py(q[1]); n++; }); return 'M' + rg.map(function (q) { return px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1); }).join('L') + 'Z'; }).join(' ');
       });
-      s += '<path class="ag-poly' + (on ? ' on' : '') + '" data-a="wtog" data-v="' + esc(nome) + '" d="' + d + '"/>';
+      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v=""' + esc(nome) + '" d="' + d + '"/>';
       if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
     });
     return s + txt + '</svg>';
