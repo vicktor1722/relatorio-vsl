@@ -250,15 +250,28 @@
 
   /* ---------------- relatórios ---------------- */
 
-  async function enviarRelatorio(rel) {
-    await comJson('/api/relatorio', {
+  function payloadRel(rel) {
+    return {
       id: rel.id, produtor_id: rel.produtor_id || null, fazenda_id: rel.fazenda_id || null,
       produtor: rel.produtor, fazenda: rel.fazenda, safra: rel.safra, servico: rel.servico,
       responsavel: rel.responsavel, data_inicio: rel.data_inicio, data_fim: rel.data_fim,
       observacoes: rel.observacoes, talhoes: rel.talhoes,
       status: rel.status, publicado_em: rel.publicado_em
-    });
+    };
   }
+  async function enviarRelatorio(rel) {
+    await comJson('/api/relatorio', payloadRel(rel));
+  }
+
+  // Assinatura do que já foi enviado de cada relatório: se nada mudou e não há item pendente,
+  // a rodada pula o relatório em vez de refazer uma chamada de rede por relatório a cada minuto.
+  let sigs = null;
+  async function carregarSigs() {
+    if (sigs) return;
+    try { sigs = (await DB.cfg('sigRel')) || {}; } catch (e) { sigs = {}; }
+    if (!sigs._t || Date.now() - sigs._t > 6 * 3600 * 1000) sigs = { _t: Date.now() };   // a cada 6 h confere tudo de novo
+  }
+  async function salvarSigs() { try { await DB.cfg('sigRel', sigs); } catch (e) {} }
 
   async function enviarItem(item) {
     let midia = item.midia || null;
@@ -411,35 +424,50 @@
   }
 
   async function sincronizar(relIdOpcional) {
-    if (rodando) return { rodando: true };
     if (!(await logado())) { emitir({ tipo: 'sem-sessao' }); return { erro: 'sem-sessao' }; }
     if (!navigator.onLine) { emitir({ tipo: 'offline' }); return { erro: 'offline' }; }
-
+    // pedido de um relatório específico (ex.: acabou de salvar uma foto) espera a rodada em andamento
+    // terminar, em vez de ser descartado e só subir no próximo minuto
+    while (rodando) {
+      if (!relIdOpcional) return { rodando: true };
+      await new Promise(function (r) { setTimeout(r, 300); });
+    }
     rodando = true; emitir({ tipo: 'inicio' });
     let enviados = 0, falhas = 0;
     try {
+      await carregarSigs();
       const relatorios = await DB.all('relatorios');
+      // o que está na fila de publicação vai primeiro
+      relatorios.sort(function (a, b) { return (b.na_fila ? 1 : 0) - (a.na_fila ? 1 : 0); });
       for (const rel of relatorios) {
         if (relIdOpcional && rel.id !== relIdOpcional) continue;
-        try { await enviarRelatorio(rel); }
+        const itens = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
+        const sig = JSON.stringify(payloadRel(rel));
+        if (!itens.length && sigs[rel.id] === sig) continue;          // nada mudou: não gasta rede
+        try { await enviarRelatorio(rel); sigs[rel.id] = sig; }
         catch (e) { falhas++; emitir({ tipo: 'erro', msg: e.message }); continue; }
 
-        const itens = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
-        for (const item of itens) {
-          try {
-            item.sync_state = 'enviando'; await DB.put('itens', item);
-            emitir({ tipo: 'item', id: item.id, estado: 'enviando' });
-            await enviarItem(item);
-            enviados++; emitir({ tipo: 'item', id: item.id, estado: 'ok' });
-            try { await liberarItem(item); } catch (e) {}
-          } catch (e) {
-            item.sync_state = 'erro'; item.erro = e.message; await DB.put('itens', item);
-            falhas++; emitir({ tipo: 'item', id: item.id, estado: 'erro', msg: e.message });
+        let prox = 0;
+        const trabalhador = async function () {
+          while (prox < itens.length) {
+            const item = itens[prox++];
+            try {
+              item.sync_state = 'enviando'; await DB.put('itens', item);
+              emitir({ tipo: 'item', id: item.id, estado: 'enviando' });
+              await enviarItem(item);
+              enviados++; emitir({ tipo: 'item', id: item.id, estado: 'ok' });
+              try { await liberarItem(item); } catch (e) {}
+            } catch (e) {
+              item.sync_state = 'erro'; item.erro = e.message; await DB.put('itens', item);
+              falhas++; emitir({ tipo: 'item', id: item.id, estado: 'erro', msg: e.message });
+            }
           }
-        }
+        };
+        await Promise.all([trabalhador(), trabalhador(), trabalhador()]);   // até 3 itens ao mesmo tempo
       }
     } finally {
       rodando = false;
+      await salvarSigs();
       emitir({ tipo: 'fim', enviados, falhas });
     }
     return { enviados, falhas };
@@ -529,8 +557,8 @@
     if (emRodada || !navigator.onLine) return;
     emRodada = true;
     try {
+      await publicarPendentes();      // o que está na fila de publicação vai primeiro
       await sincronizar();
-      await publicarPendentes();
       await liberarSincronizados();
     } finally {
       emRodada = false;
