@@ -107,12 +107,13 @@ function aplicacoes(recs, areas, hoje) {
     if (!grupos[k]) {
       grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, prox: null,
         total: Number(d.total || 1), rep: Number(d.rep || 0), data: r.data_prevista || '',
-        calda: Number(d.calda || 0), tanque: Number(d.tanque || 0) };
+        calda: Number(d.calda || 0), tanque: Number(d.tanque || 0), ha: {} };
       ordem.push(k);
     }
     const g = grupos[k];
     talDe(r).forEach((t) => {
-      g.tal.push(t);
+      if (g.tal.indexOf(t) < 0) g.tal.push(t);
+      { const tot = areas[t] || 0, pt = Number(d.parte && d.parte[t]) || 0; g.ha[t] = Math.min(tot, (g.ha[t] || 0) + (pt > 0 && pt < tot ? pt : tot)); }
       if (feitoDe(r)[t]) g.feito[t] = feitoDe(r)[t];
       const v = venc(r, t);
       if (v && !proxDe(r)[t] && (!g.prox || v < g.prox)) g.prox = v;
@@ -123,12 +124,12 @@ function aplicacoes(recs, areas, hoje) {
   if (!lista.length) return '';
   const cont = {};
   lista.forEach((g) => { cont[g.op] = Math.max(cont[g.op] || 0, g.num); });
-  const haDe = (ids) => ids.reduce((s, t) => s + (areas[t] || 0), 0);
+  const haDe = (g) => g.tal.reduce((s, t) => s + (g.ha[t] || 0), 0);
 
   let h = '<h2 class="talhao">Aplicações<small>' + lista.length + ' no total</small></h2>' +
     '<div class="ap-sub">Dose por hectare e quantidade total para a área de cada aplicação.</div>';
   lista.forEach((g) => {
-    const feitos = g.tal.filter((t) => g.feito[t]), datas = feitos.map((t) => g.feito[t]).sort(), ha = haDe(g.tal);
+    const feitos = g.tal.filter((t) => g.feito[t]), datas = feitos.map((t) => g.feito[t]).sort(), ha = haDe(g);
     let st, sel;
     if (feitos.length && feitos.length === g.tal.length) { st = 'Aplicada'; sel = 'v'; }
     else if (feitos.length) { st = 'Em andamento'; sel = 'a'; }
