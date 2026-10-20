@@ -203,14 +203,14 @@
   function sugestaoSafra() {
     const d = new Date();
     const a = d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
-    return a + '/' + String((a + 1) % 100).padStart(2, '0');
+    return a + '/' + (a + 1);
   }
 
   async function novaSafra() {
     const nome = prompt('Nome da safra:', sugestaoSafra());
     if (!nome || !nome.trim()) return;
     try {
-      await Sync.salvarSafra({ nome: nome.trim().replace(/^(\d{4})\s*[\/-]\s*\d{2}(\d{2})$/, function (m, a, b) { return a + '/' + b; }) });
+      await Sync.salvarSafra({ nome: nome.trim().replace(/^(\d{4})\s*[\/-]\s*(\d{2}|\d{4})$/, function (m, a, b) { return a + '/' + (b.length === 2 ? a.slice(0, 2) + b : b); }) });
       await atualizarCadastro(false);
     } catch (e) { alert('Não salvou: ' + e.message); }
   }
