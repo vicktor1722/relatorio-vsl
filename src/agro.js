@@ -222,7 +222,7 @@ export async function plantioGeral(env) {
   const porSafra = {};
   ((pl && pl.results) || []).forEach((r) => {
     if (!faz[r.fazenda_id]) return;
-    const k = String(r.safra || '').trim().replace(/^(\d{4})\s*[\/-]\s*\d{2}(\d{2})$/, function (m, a, b) { return a + '/' + b; }) || '(sem safra)';
+    const k = String(r.safra || '').trim().replace(/^(\d{4})\s*[\/-]\s*(\d{2}|\d{4})$/, function (m, a, b) { return a + '/' + (b.length === 2 ? a.slice(0, 2) + b : b); }) || '(sem safra)';
     (porSafra[k] = porSafra[k] || []).push(r);
   });
 
