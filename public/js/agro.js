@@ -453,6 +453,130 @@
     pintar(tR, 'Calendário', f ? f.nome : '—', '', h);
   }
 
+  /* ----- compartilhar a ordem de campo (WhatsApp / PDF) ----- */
+  function dadosOrdem(r) {
+    var f = fazDe(r.fazenda_id), d = dd(r), nomes = talDe(r), tl = talhoesDe(f), ha = haDe(f, nomes);
+    var prods = prodsDe(r).filter(function (p) { return p[0]; });
+    var liq = prods.some(function (p) { return liquido(p[2]); }), hat = d.calda ? d.tanque / d.calda : 0;
+    return {
+      fazenda: f ? f.nome : '', titulo: Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao,
+      data: curta(r.data_prevista), ha: ha, obs: d.obs || '', resp: d.resp || '', prods: prods,
+      hat: (liq && hat) ? hat : 0, calda: d.calda, tanque: d.tanque, nTanques: (liq && hat) ? tanques(ha, hat, d.calda) : '',
+      tal: nomes.map(function (n) {
+        var t = tl.filter(function (x) { return x.nome === n; })[0] || { ha: 0 };
+        return { nome: n, ha: t.ha, ok: feitoDe(r)[n] || '' };
+      })
+    };
+  }
+  function textoOrdem(r) {
+    var o = dadosOrdem(r), t = [];
+    t.push('*ORDEM DE CAMPO - ' + o.titulo.toUpperCase() + '*');
+    t.push(o.fazenda + ' · prevista ' + o.data + ' · ' + fmt(o.ha) + ' ha');
+    if (o.resp) t.push('Quem aplica: ' + o.resp);
+    if (o.obs) t.push('⚠️ ' + o.obs);
+    t.push('', '*Ordem de mistura*');
+    o.prods.forEach(function (p, i) { t.push((i + 1) + '. ' + p[0] + ' - ' + doseTxt(p[1]) + ' ' + p[2]); });
+    if (o.hat) {
+      t.push('', '*Por tanque de ' + fmt(o.tanque, 0) + ' L (' + fmt(o.hat, 0) + ' ha)*', 'Calda ' + fmt(o.calda, 0) + ' L/ha · ' + o.nTanques);
+      o.prods.forEach(function (p) { t.push('• ' + p[0] + ': ' + fmt(p[1] * o.hat, p[1] * o.hat < 10 ? 2 : 1) + ' ' + unid(p[2])); });
+    }
+    t.push('', '*Talhões*');
+    o.tal.forEach(function (x) {
+      t.push('*' + x.nome + '* (' + fmt(x.ha) + ' ha)' + (x.ok ? ' ✅ aplicado em ' + curta(x.ok) : ' ⏳ pendente'));
+      o.prods.forEach(function (p) { t.push('   ' + p[0] + ': ' + volTotal(p[1] * x.ha, p[2])); });
+    });
+    t.push('', '*Volume total* (' + fmt(o.ha) + ' ha)');
+    o.prods.forEach(function (p) { t.push('• ' + p[0] + ': ' + volTotal(p[1] * o.ha, p[2])); });
+    if (o.hat) t.push('• Calda total: ' + fmt(o.ha * o.calda, 0) + ' L');
+    return t.join('\n');
+  }
+  // PDF simples (texto, A4) feito na hora, sem biblioteca - funciona offline
+  function pdfOrdem(r) {
+    var o = dadosOrdem(r), W = 595, H = 842, M = 40, pgs = [[]], y = 0;
+    function ch(s) {
+      var out = '';
+      String(s == null ? '' : s).replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").split('').forEach(function (c) {
+        var k = c.charCodeAt(0);
+        if (k === 8226) out += '-'; else if (k >= 32 && k < 256) out += c;
+      });
+      return out.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    }
+    function op(s) { pgs[pgs.length - 1].push(s); }
+    function txt(x, yy, size, bold, s, cor) {
+      var c = cor || [0.1, 0.1, 0.1];
+      op('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf ' + c.join(' ') + ' rg ' + x + ' ' + yy + ' Td (' + ch(s) + ') Tj ET');
+    }
+    function rect(x, yy, w, h, c) { op(c.join(' ') + ' rg ' + x + ' ' + yy + ' ' + w + ' ' + h + ' re f'); }
+    function linha(yy) { op('0.85 0.85 0.85 RG 0.6 w ' + M + ' ' + yy + ' m ' + (W - M) + ' ' + yy + ' l S'); }
+    function novaPag() { pgs.push([]); y = H - M; }
+    function cabe(h) { if (y - h < M + 20) novaPag(); }
+    var VERDE = [0.106, 0.478, 0.263], BRANCO = [1, 1, 1], CINZA = [0.4, 0.4, 0.4], LARANJA = [0.75, 0.4, 0];
+    rect(0, H - 104, W, 104, VERDE);
+    txt(M, H - 34, 10, false, 'ORDEM DE CAMPO', BRANCO);
+    txt(M, H - 62, 24, true, o.titulo, BRANCO);
+    txt(M, H - 86, 11, false, o.fazenda + '  -  prevista ' + o.data + '  -  ' + fmt(o.ha) + ' ha', BRANCO);
+    y = H - 132;
+    if (o.resp) { txt(M, y, 11, false, 'Quem aplica: ' + o.resp); y -= 18; }
+    if (o.obs) { txt(M, y, 11, true, 'Atenção: ' + o.obs, LARANJA); y -= 18; }
+    function sec(titulo) { cabe(60); y -= 10; txt(M, y, 13, true, titulo, VERDE); y -= 6; linha(y); y -= 16; }
+    function par(a, b, bold, x2) { cabe(18); txt(M, y, 11, !!bold, a); if (b) txt(x2 || 400, y, 11, true, b); y -= 16; }
+    sec('Ordem de mistura');
+    o.prods.forEach(function (p, i) { par((i + 1) + '.  ' + p[0], doseTxt(p[1]) + ' ' + p[2]); });
+    if (o.hat) {
+      sec('Por tanque de ' + fmt(o.tanque, 0) + ' L (' + fmt(o.hat, 0) + ' ha)');
+      txt(M, y, 10, false, 'Calda ' + fmt(o.calda, 0) + ' L/ha  -  ' + o.nTanques, CINZA); y -= 18;
+      o.prods.forEach(function (p) { par(p[0], fmt(p[1] * o.hat, p[1] * o.hat < 10 ? 2 : 1) + ' ' + unid(p[2])); });
+    }
+    sec('Talhões');
+    o.tal.forEach(function (x) {
+      cabe(24 + 15 * o.prods.length);
+      txt(M, y, 12, true, x.nome); txt(400, y, 11, false, fmt(x.ha) + ' ha', CINZA);
+      txt(470, y, 10, true, x.ok ? 'Aplicado ' + curta(x.ok) : 'Pendente', x.ok ? VERDE : LARANJA); y -= 15;
+      o.prods.forEach(function (p) { txt(M + 14, y, 10, false, p[0]); txt(400, y, 10, true, volTotal(p[1] * x.ha, p[2])); y -= 14; });
+      y -= 4;
+    });
+    sec('Volume total  (' + fmt(o.ha) + ' ha)');
+    o.prods.forEach(function (p) { par(p[0], volTotal(p[1] * o.ha, p[2])); });
+    if (o.hat) par('Calda total (' + fmt(o.calda, 0) + ' L/ha)', fmt(o.ha * o.calda, 0) + ' L');
+    var hojeTxt = dataBR(hoje());
+    pgs.forEach(function (ops, i) {
+      ops.push('BT /F1 8 Tf 0.5 0.5 0.5 rg ' + M + ' 24 Td (' + ch('Relatório de Campo · AMVS · gerado em ' + hojeTxt) + ') Tj ET');
+      ops.push('BT /F1 8 Tf 0.5 0.5 0.5 rg ' + (W - M - 40) + ' 24 Td (' + ch('Página ' + (i + 1) + ' de ' + pgs.length) + ') Tj ET');
+    });
+    var objs = [], n = pgs.length;
+    objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+    objs[2] = '<< /Type /Pages /Kids [' + pgs.map(function (_, i) { return (5 + i * 2) + ' 0 R'; }).join(' ') + '] /Count ' + n + ' >>';
+    objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+    objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    pgs.forEach(function (ops, i) {
+      var cont = ops.join('\n');
+      objs[5 + i * 2] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + (6 + i * 2) + ' 0 R >>';
+      objs[6 + i * 2] = '<< /Length ' + cont.length + ' >>\nstream\n' + cont + '\nendstream';
+    });
+    var pdf = '%PDF-1.4\n', offs = [];
+    for (var k = 1; k < objs.length; k++) { offs[k] = pdf.length; pdf += k + ' 0 obj\n' + objs[k] + '\nendobj\n'; }
+    var xr = pdf.length;
+    pdf += 'xref\n0 ' + objs.length + '\n0000000000 65535 f \n';
+    for (var j = 1; j < objs.length; j++) pdf += ('0000000000' + offs[j]).slice(-10) + ' 00000 n \n';
+    pdf += 'trailer\n<< /Size ' + objs.length + ' /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF';
+    var bytes = new Uint8Array(pdf.length);
+    for (var b = 0; b < pdf.length; b++) bytes[b] = pdf.charCodeAt(b) & 255;
+    return bytes;
+  }
+  function compartilharOrdem(tipo) {
+    var r = recDe(R.id); if (!r) return;
+    if (tipo === 'zap') { window.open('https://wa.me/?text=' + encodeURIComponent(textoOrdem(r)), '_blank'); return; }
+    var o = dadosOrdem(r), nome = ('ordem-' + o.fazenda + '-' + o.titulo).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pdf';
+    var blob = new Blob([pdfOrdem(r)], { type: 'application/pdf' });
+    try {
+      var arq = new File([blob], nome, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [arq] })) { navigator.share({ files: [arq], title: 'Ordem de campo - ' + o.fazenda }).catch(function () {}); return; }
+    } catch (e) { /* cai no download */ }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+    toast('PDF baixado');
+  }
+
   /* ----- ordem de campo ----- */
   function pintarOrdem() {
     var r = recDe(R.id); if (!r) { R.view = 'lista'; return pintarRecs(); }
@@ -485,6 +609,8 @@
     prox.forEach(function (e) {
       h += '<button class="btn secundario" data-a="prog" data-v="' + esc(r.id) + '|' + e.d + '">+ Programar ' + esc(ordTxt(r.operacao, (Number(d.num) || 1) + 1)) + ' (' + curta(e.d) + ' · ' + esc(e.tal.join(', ')) + ')</button>';
     });
+    h += '<h2>Compartilhar</h2><div class="ag-sec"><small>Envie para o gerente ou o operador, sem depender do relatório do cliente.</small><div style="display:flex;gap:8px;margin-top:8px">' +
+      '<button class="btn" style="flex:1" data-a="zap">📲 WhatsApp</button><button class="btn secundario" style="flex:1" data-a="pdf">📄 PDF</button></div></div>';
     h += '<label class="ag-sw"><input type="checkbox" data-a="mostrar"' + (r.mostrar ? ' checked' : '') + '> Mostrar no relatório do cliente</label>' +
       '<button class="btn secundario" data-a="editarrec">Editar recomendação</button><button class="btn perigo" data-a="excluirrec">Excluir recomendação</button>';
     pintar(tR, 'Ordem de campo', f ? f.nome : '', '', h);
@@ -880,6 +1006,7 @@
     if (a === 'desfazer') {
       var r = recDe(R.id); delete dd(r).feito[v]; salvarRecLocal(r); pintarOrdem(); return;
     }
+    if (a === 'zap' || a === 'pdf') { compartilharOrdem(a); return; }
     if (a === 'editarrec') { R.W = wDeRec(recDe(R.id)); R.view = 'wiz'; pintarRecs(); topoRolagem(tR); return; }
     if (a === 'excluirrec') {
       if (!confirm('Excluir esta recomendação? Isso também tira do relatório do cliente.')) return;
