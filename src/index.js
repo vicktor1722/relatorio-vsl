@@ -196,7 +196,7 @@ export default {
 
       // a página do painel é aberta; quem valida é o /api/admin/* com o token
       if (rota === '/admin' || rota === '/admin/') {
-        return html(paginaAdmin(env.EMPRESA || 'Relatório de Campo VSL'));
+        return html(paginaAdmin('AMVS'));
       }
 
       if (rota.startsWith('/r/')) {
