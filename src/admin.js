@@ -835,22 +835,6 @@ ${AGRO_CSS}
 
     <section class="painel" id="pContas">
       <div class="caixa">
-        <div class="cab-caixa"><h2>Prazos e renovações</h2><button class="btn-mini" id="btnPlano">Plano e cobrança</button></div>
-        <div id="avisoPrazos"></div>
-      </div>
-      <div class="caixa">
-        <div class="cab-caixa"><h2>Pix Automático: conferir pagamentos</h2></div>
-        <div id="listaAssin"></div>
-      </div>
-      <div class="caixa">
-        <h2>Contas ativas</h2>
-        <div class="rolagem"><table id="tContas"></table></div>
-      </div>
-      <div class="caixa">
-        <h2>Cobranças e pagamentos</h2>
-        <div class="rolagem" id="listaCobr"></div>
-      </div>
-      <div class="caixa">
         <h2>Criar uma conta</h2>
         <div class="linha2">
           <div class="campo"><label>Nome</label><input id="nNome" placeholder="Nome de quem vai usar"></div>
@@ -870,6 +854,22 @@ ${AGRO_CSS}
         </div>
         <button class="btn" id="btnCriar">Criar conta</button>
         <div id="nMsg"></div>
+      </div>
+      <div class="caixa">
+        <div class="cab-caixa"><h2>Prazos e renovações</h2><button class="btn-mini" id="btnPlano">Plano e cobrança</button></div>
+        <div id="avisoPrazos"></div>
+      </div>
+      <div class="caixa">
+        <div class="cab-caixa"><h2>Pix Automático: conferir pagamentos</h2></div>
+        <div id="listaAssin"></div>
+      </div>
+      <div class="caixa">
+        <h2>Contas ativas</h2>
+        <div class="rolagem"><table id="tContas"></table></div>
+      </div>
+      <div class="caixa">
+        <h2>Cobranças e pagamentos</h2>
+        <div class="rolagem" id="listaCobr"></div>
       </div>
     </section>
 
