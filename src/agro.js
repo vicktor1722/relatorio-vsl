@@ -219,6 +219,19 @@ export async function plantioGeral(env) {
       areas, total, ativa: Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
   });
 
+  // junta as grafias da mesma variedade (ex.: "Olimpo" e "BMX Olimpo IPRO"): vale o nome mais completo
+  const chaveVar = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\b(bmx|ipro)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+  const nomeVar = {};
+  ((pl && pl.results) || []).forEach((r) => {
+    const v = String(r.variedade || '').trim().replace(/\s+/g, ' ');
+    r.variedade = v;
+    if (!v) return;
+    const k = (r.cultura || '') + '|' + (chaveVar(v) || v.toLowerCase());
+    if (!nomeVar[k] || v.length > nomeVar[k].length) nomeVar[k] = v;
+  });
+  ((pl && pl.results) || []).forEach((r) => {
+    if (r.variedade) r.variedade = nomeVar[(r.cultura || '') + '|' + (chaveVar(r.variedade) || r.variedade.toLowerCase())] || r.variedade;
+  });
   const porSafra = {};
   ((pl && pl.results) || []).forEach((r) => {
     if (!faz[r.fazenda_id]) return;
