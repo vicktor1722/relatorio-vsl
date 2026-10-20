@@ -185,6 +185,99 @@ export async function dadosParaRelatorio(env, rel) {
   }
 }
 
+/* ---------------- visão geral do plantio (painel do administrador) ---------------- */
+
+const SEM_PLANTIO = { pastagem: 1, pousio: 1 };
+
+// junta o plantio de todas as contas: por safra, área plantada x área total, evolução por data,
+// variedades e andamento de cada fazenda. Só entram fazendas com KML (precisa da área de cada talhão).
+export async function plantioGeral(env) {
+  await garantir(env);
+  const [pl, fz, mu] = await Promise.all([
+    env.DB.prepare('SELECT fazenda_id, safra, talhao, cultura, variedade, data_plantio FROM plantio LIMIT 30000').all(),
+    env.DB.prepare(`SELECT f.id, f.nome, f.talhoes, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
+        FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id LEFT JOIN produtores p ON p.id = f.produtor_id
+       WHERE f.talhoes IS NOT NULL AND f.talhoes != '' LIMIT 1000`).all(),
+    env.DB.prepare('SELECT usuario_id FROM modulos_usuario WHERE plantio = 1').all()
+  ]);
+  const geral = await liberadoGeral(env);
+  const comModulo = {};
+  ((mu && mu.results) || []).forEach((m) => { if (geral) comModulo[m.usuario_id] = 1; });
+
+  const faz = {};
+  ((fz && fz.results) || []).forEach((f) => {
+    let gj = null;
+    try { gj = JSON.parse(f.talhoes); } catch (e) { return; }
+    const areas = {}; let total = 0;
+    ((gj && gj.features) || []).forEach((ft) => {
+      const pr = (ft && ft.properties) || {};
+      const nome = String(pr.nome || ''); const ha = Number(pr.area_ha) || 0;
+      if (nome) { areas[nome] = ha; total += ha; }
+    });
+    if (!total) return;
+    faz[f.id] = { id: f.id, nome: f.nome || '', produtor: f.produtor || '', conta: f.conta_nome || f.conta || '',
+      areas, total, ativa: Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
+  });
+
+  const porSafra = {};
+  ((pl && pl.results) || []).forEach((r) => {
+    if (!faz[r.fazenda_id]) return;
+    const k = r.safra || '(sem safra)';
+    (porSafra[k] = porSafra[k] || []).push(r);
+  });
+
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const safras = Object.keys(porSafra).sort().reverse().map((safra) => {
+    const rows = porSafra[safra];
+    const porFaz = {};
+    rows.forEach((r) => { (porFaz[r.fazenda_id] = porFaz[r.fazenda_id] || []).push(r); });
+
+    let total = 0, plantado = 0;
+    const cult = {}, vari = {}, linha = {}, fazendas = [];
+    Object.keys(porFaz).forEach((fid) => {
+      const F = faz[fid], rs = porFaz[fid];
+      let naoPlanta = 0, plant = 0, primeira = '', ultima = '';
+      const vs = {};
+      rs.forEach((r) => {
+        const ha = F.areas[r.talhao] || 0;
+        if (SEM_PLANTIO[r.cultura]) { naoPlanta += ha; return; }
+        if (r.cultura) {
+          const c = cult[r.cultura] = cult[r.cultura] || { cultura: r.cultura, ha: 0, plantado: 0 };
+          c.ha += ha; if (r.data_plantio) c.plantado += ha;
+        }
+        if (r.variedade) {
+          const k = (r.cultura || '') + '|' + r.variedade;
+          const v = vari[k] = vari[k] || { cultura: r.cultura || '', variedade: r.variedade, ha: 0, plantado: 0, fazs: {} };
+          v.ha += ha; if (r.data_plantio) v.plantado += ha; v.fazs[fid] = 1;
+          vs[r.variedade] = 1;
+        }
+        if (r.cultura && r.data_plantio) {
+          plant += ha;
+          linha[r.data_plantio] = (linha[r.data_plantio] || 0) + ha;
+          if (!primeira || r.data_plantio < primeira) primeira = r.data_plantio;
+          if (!ultima || r.data_plantio > ultima) ultima = r.data_plantio;
+        }
+      });
+      const tot = Math.max(0, F.total - naoPlanta);
+      total += tot; plantado += plant;
+      fazendas.push({ id: fid, nome: F.nome, produtor: F.produtor, conta: F.conta, total_ha: r1(tot), plantado_ha: r1(plant),
+        primeira, ultima, variedades: Object.keys(vs).sort() });
+    });
+    fazendas.sort((a, b) => (b.plantado_ha / (b.total_ha || 1)) - (a.plantado_ha / (a.total_ha || 1)) || a.nome.localeCompare(b.nome));
+    // fazendas de contas com o módulo que ainda não têm nada lançado nesta safra
+    const sem = Object.keys(faz).filter((id) => faz[id].ativa && !porFaz[id]).map((id) => ({ id, nome: faz[id].nome, conta: faz[id].conta, total_ha: r1(faz[id].total) }));
+    return {
+      safra, total_ha: r1(total), plantado_ha: r1(plantado),
+      culturas: Object.keys(cult).map((k) => ({ cultura: k, ha: r1(cult[k].ha), plantado: r1(cult[k].plantado) })).sort((a, b) => b.ha - a.ha),
+      variedades: Object.keys(vari).map((k) => ({ cultura: vari[k].cultura, variedade: vari[k].variedade, ha: r1(vari[k].ha),
+        plantado: r1(vari[k].plantado), fazendas: Object.keys(vari[k].fazs).length })).sort((a, b) => b.ha - a.ha),
+      linha: Object.keys(linha).sort().map((d) => ({ d, ha: r1(linha[d]) })),
+      fazendas, sem_lancamento: sem
+    };
+  });
+  return { ok: true, safras };
+}
+
 /* ---------------- rotas /api/agro/* ---------------- */
 
 export async function rotasAgro(env, req, me, rota, url) {
@@ -197,6 +290,12 @@ export async function rotasAgro(env, req, me, rota, url) {
   const precisaRec = rota.startsWith('/api/agro/rec') || rota.startsWith('/api/agro/produto');
   if (precisaPlantio && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaRec && !mod.recomendacoes) return json({ erro: 'módulo de recomendações não liberado para esta conta' }, 403);
+
+  /* ----- visão geral para o painel do administrador ----- */
+  if (rota === '/api/agro/admin/plantio' && req.method === 'GET') {
+    if (!mod.admin) return json({ erro: 'somente o administrador vê todas as contas' }, 403);
+    return json(await plantioGeral(env));
+  }
 
   /* ----- plantio ----- */
   if (rota === '/api/agro/plantio' && req.method === 'GET') {
