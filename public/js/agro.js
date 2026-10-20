@@ -277,6 +277,7 @@
   function vazioPlantio(e) { return !e.cultura && !e.variedade && !e.data_plantio && !e.data_emerg && !e.sem_m && !e.sem_ha; }
   function gravarPlantio(limpar) {
     var e = P.ed, alvo = [P.nome].concat(P.outros), enviar = [];
+    if (!limpar && !e.cultura) { toast('Escolha a cultura (Soja, Milho…) antes de salvar o plantio'); return; }
     alvo.forEach(function (nome) {
       var row = { fazenda_id: P.faz, safra: P.safra, talhao: nome, cultura: limpar ? '' : e.cultura, variedade: limpar ? '' : e.variedade,
         data_plantio: limpar ? '' : e.data_plantio, data_emerg: limpar ? '' : e.data_emerg,
