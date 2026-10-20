@@ -165,6 +165,41 @@ export async function salvarConfigPagto(env, b) {
 
 function sqlAgora(d) { return (d || new Date()).toISOString().replace('T', ' ').slice(0, 19); }
 
+// como cada conta paga (Pix Automático no app do C6, ou link PicPay), valor mensal e dia do débito
+let assinPronta = null;
+function garantirAssinaturas(env) {
+  if (!assinPronta) {
+    assinPronta = env.DB.prepare(`CREATE TABLE IF NOT EXISTS assinatura_conta (
+      usuario_id     TEXT PRIMARY KEY,
+      forma          TEXT NOT NULL,
+      valor_centavos INTEGER NOT NULL,
+      dia            INTEGER NOT NULL,
+      obs            TEXT,
+      atualizado_em  TEXT DEFAULT (datetime('now'))
+    )`).run().catch((e) => { assinPronta = null; throw e; });
+  }
+  return assinPronta;
+}
+
+export async function salvarAssinatura(env, b) {
+  const u = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ?').bind(b.id).first();
+  if (!u) throw new Error('conta não encontrada');
+  await garantirAssinaturas(env);
+  const forma = String(b.forma || '');
+  if (!forma) {
+    await env.DB.prepare('DELETE FROM assinatura_conta WHERE usuario_id = ?').bind(u.id).run();
+    return { ok: true, removida: true };
+  }
+  if (forma !== 'pix_automatico' && forma !== 'link') throw new Error('forma de cobrança inválida');
+  const valor = reaisParaCentavos(b.valor);
+  const dia = Math.floor(Number(b.dia));
+  if (!Number.isFinite(dia) || dia < 1 || dia > 31) throw new Error('o dia do débito deve ser de 1 a 31');
+  await env.DB.prepare(`INSERT INTO assinatura_conta (usuario_id, forma, valor_centavos, dia, obs, atualizado_em) VALUES (?,?,?,?,?,datetime('now'))
+    ON CONFLICT(usuario_id) DO UPDATE SET forma = excluded.forma, valor_centavos = excluded.valor_centavos, dia = excluded.dia,
+      obs = excluded.obs, atualizado_em = datetime('now')`).bind(u.id, forma, valor, dia, String(b.obs || '').trim().slice(0, 200)).run();
+  return { ok: true };
+}
+
 export async function listarPagamentos(env, origem) {
   const config = await lerConfigPagto(env);
   const { results } = await env.DB.prepare(`SELECT id, usuario_id, email, valor_centavos, dias, status, origem, link, metodo, obs,
@@ -188,7 +223,7 @@ export async function listarPagamentos(env, origem) {
 // resumo por conta: quantos pagamentos, o último, e o link em aberto (se houver)
 async function aplicarPagamentos(env, contas) {
   const vazio = () => ({ n: 0, ultimo: null, total_centavos: 0, aberta: null });
-  contas.forEach((c) => { c.pagto = vazio(); });
+  contas.forEach((c) => { c.pagto = vazio(); c.assin = null; });
   try {
     await garantirPagamentos(env);
     const mapa = new Map(contas.map((c) => [c.id, c]));
@@ -197,6 +232,12 @@ async function aplicarPagamentos(env, contas) {
     (pagos.results || []).forEach((r) => {
       const c = mapa.get(r.usuario_id);
       if (c) { c.pagto.n = Number(r.n); c.pagto.ultimo = r.ultimo; c.pagto.total_centavos = Number(r.total); }
+    });
+    await garantirAssinaturas(env);
+    const ass = await env.DB.prepare('SELECT usuario_id, forma, valor_centavos, dia, obs FROM assinatura_conta').all();
+    (ass.results || []).forEach((r) => {
+      const c = mapa.get(r.usuario_id);
+      if (c) c.assin = { forma: r.forma, valor_centavos: r.valor_centavos, dia: r.dia, obs: r.obs || '' };
     });
     const hoje = new Date().toISOString().slice(0, 10);
     const abertas = await env.DB.prepare(`SELECT id, usuario_id, link, valor_centavos, criado_em, expira_em FROM cobrancas
@@ -798,6 +839,10 @@ ${AGRO_CSS}
         <div id="avisoPrazos"></div>
       </div>
       <div class="caixa">
+        <div class="cab-caixa"><h2>Pix Automático: conferir pagamentos</h2></div>
+        <div id="listaAssin"></div>
+      </div>
+      <div class="caixa">
         <h2>Contas ativas</h2>
         <div class="rolagem"><table id="tContas"></table></div>
       </div>
@@ -989,6 +1034,7 @@ ${AGRO_CSS}
     desenharPrazos();
     desenharContas();
     desenharCobrancas();
+    desenharAssin();
     desenharRelatorios();
     desenharBarras();
     desenharResp();
@@ -1020,6 +1066,7 @@ ${AGRO_CSS}
         '<td>' + pagCel(c) + '</td>' +
         '<td>' + dataBR(c.ultima_atividade) + '</td>' +
         '<td class="acoes">' +
+          '<button class="selo" data-cobr="' + esc(c.id) + '">cobrança</button> ' +
           '<button class="selo" data-gerar="' + esc(c.id) + '">gerar link</button> ' +
           '<button class="selo" data-pago="' + esc(c.id) + '">marcar pago</button> ' +
           '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ' +
@@ -1130,6 +1177,7 @@ ${AGRO_CSS}
     else h = '<span class="selo">Em teste</span>';
     if (p.n) h += '<br><span class="peq">' + p.n + (p.n === 1 ? ' pagamento' : ' pagamentos') + ' · ' + reais(p.total_centavos) +
       '<br>último em ' + dataBR(p.ultimo) + '</span>';
+    if (c.assin) h += '<br><span class="peq">' + (c.assin.forma === 'pix_automatico' ? 'Pix Automático' : 'Link PicPay') + ' · ' + reais(c.assin.valor_centavos) + ' · dia ' + c.assin.dia + '</span>';
     if (p.aberta) h += '<br><span class="peq">🔗 link em aberto · ' + reais(p.aberta.valor_centavos) + '</span>';
     return h;
   }
@@ -1200,6 +1248,7 @@ ${AGRO_CSS}
   function ligarPagto() {
     document.querySelectorAll('[data-gerar]').forEach(function (b) { b.onclick = function () { abrirLink(b.dataset.gerar); }; });
     document.querySelectorAll('[data-pago]').forEach(function (b) { b.onclick = function () { abrirManual(b.dataset.pago); }; });
+    document.querySelectorAll('[data-cobr]').forEach(function (b) { b.onclick = function () { abrirCobranca(b.dataset.cobr); }; });
     document.querySelectorAll('[data-copiar]').forEach(function (b) { b.onclick = function () { copiar(b.dataset.copiar, b); }; });
     document.querySelectorAll('[data-cancelar]').forEach(function (b) {
       b.onclick = async function () {
@@ -1258,6 +1307,75 @@ ${AGRO_CSS}
     veu.onclick = function (e) { if (e.target === veu) fechar(); };
   }
 
+  // contas no Pix Automático: quem já pagou no mês e quem falta conferir no app do C6
+  function desenharAssin() {
+    var el = $('#listaAssin');
+    if (!el) return;
+    var adm = !!(dados.eu && dados.eu.admin);
+    if (!adm) { el.innerHTML = ''; return; }
+    var lista = (dados.contas || []).filter(function (c) { return c.assin && c.assin.forma === 'pix_automatico'; });
+    if (!lista.length) {
+      el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma conta no Pix Automático ainda. Cadastre o cliente no app do C6 Empresas e, aqui, toque em "cobrança" na conta para registrar o valor e o dia do débito.</div>';
+      return;
+    }
+    var agora = new Date(), ano = agora.getFullYear(), mes = agora.getMonth();
+    var hoje0 = new Date(ano, mes, agora.getDate()).getTime();
+    var itens = lista.map(function (c) {
+      var a = c.assin, p = c.pagto || {};
+      var venc = new Date(ano, mes, Math.min(a.dia, new Date(ano, mes + 1, 0).getDate())).getTime();
+      var ult = p.ultimo ? new Date(String(p.ultimo).replace(' ', 'T') + 'Z').getTime() : NaN;
+      var pago = !isNaN(ult) && ult >= venc - 5 * 86400000;
+      var atraso = Math.floor((hoje0 - venc) / 86400000);
+      var ordem, sel;
+      if (pago) { ordem = 3; sel = '<span class="selo pub">pago em ' + dataBR(p.ultimo) + '</span>'; }
+      else if (atraso < 0) { ordem = 2; sel = '<span class="selo">débito dia ' + a.dia + ' (em ' + diasTxt(-atraso) + ')</span>'; }
+      else if (atraso < 3) { ordem = 1; sel = '<span class="selo perto">confira no app do C6 (débito dia ' + a.dia + ')</span>'; }
+      else { ordem = 0; sel = '<span class="selo venc">sem confirmação há ' + diasTxt(atraso) + '</span>'; }
+      return { ordem: ordem, c: c, sel: sel, pago: pago };
+    }).sort(function (x, y) { return x.ordem - y.ordem; });
+    el.innerHTML = '<table><tr><th>Conta</th><th>Valor</th><th>Situação neste mês</th><th></th></tr>' + itens.map(function (i) {
+      return '<tr><td><b>' + esc(i.c.nome || i.c.email) + '</b></td><td>' + reais(i.c.assin.valor_centavos) + '</td><td>' + i.sel + '</td>' +
+        '<td class="acoes">' + (i.pago ? '' : '<button class="selo" data-pago="' + esc(i.c.id) + '">marcar pago</button>') + '</td></tr>';
+    }).join('') + '</table>';
+    ligarPagto();
+  }
+
+  // como a conta paga: Pix Automático (C6), link PicPay ou nada
+  function abrirCobranca(id) {
+    var c = contaPorId(id);
+    if (!c) return;
+    var cfg = (pg && pg.config) || {};
+    var a = c.assin || { forma: 'pix_automatico', valor_centavos: cfg.valor_centavos || 0, dia: new Date().getDate(), obs: '' };
+    var m = modalBase(false), cx = m.cx;
+    cx.innerHTML =
+      '<h2 style="margin:0 0 4px">Cobrança mensal</h2>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) + '</p>' +
+      '<div class="campo"><label>Como esta conta paga</label><select id="cbForma">' +
+        '<option value="pix_automatico">Pix Automático (app C6 Empresas)</option>' +
+        '<option value="link">Link de pagamento (PicPay)</option>' +
+        '<option value="">Nenhuma (tirar da lista)</option></select></div>' +
+      '<div class="linha2"><div class="campo"><label>Valor mensal (R$)</label><input id="cbValor" inputmode="decimal" placeholder="ex.: 99,00" value="' +
+        (a.valor_centavos ? (a.valor_centavos / 100).toFixed(2).replace('.', ',') : '') + '"></div>' +
+      '<div class="campo"><label>Dia do débito</label><input id="cbDia" type="number" min="1" max="31" inputmode="numeric" value="' + a.dia + '"></div></div>' +
+      '<div class="campo"><label>Observação (opcional)</label><input id="cbObs" placeholder="ex.: autorizou no app do C6 em 10/11" value="' + esc(a.obs || '') + '"></div>' +
+      '<div id="cbMsg"></div>' +
+      '<button class="btn" id="cbOk">Salvar</button>' +
+      '<button class="btn sec" id="cbCancel" style="margin-top:8px">Cancelar</button>';
+    cx.querySelector('#cbForma').value = c.assin ? a.forma : 'pix_automatico';
+    cx.querySelector('#cbCancel').onclick = m.sair;
+    cx.querySelector('#cbOk').onclick = async function () {
+      var msg = cx.querySelector('#cbMsg');
+      aviso(msg, 'Salvando…');
+      this.disabled = true;
+      try {
+        await api('/api/admin/assinatura', { id: id, forma: cx.querySelector('#cbForma').value, valor: cx.querySelector('#cbValor').value,
+          dia: cx.querySelector('#cbDia').value, obs: cx.querySelector('#cbObs').value });
+        m.sair();
+        await abrirPainel();
+      } catch (e) { aviso(msg, e.message, true); this.disabled = false; }
+    };
+  }
+
   // pagamento recebido fora da PicPay: registra e estende o prazo
   function abrirManual(id) {
     var c = contaPorId(id);
@@ -1275,6 +1393,10 @@ ${AGRO_CSS}
       '<button class="btn" id="mnOk">Registrar pagamento</button>' +
       '<button class="btn sec" id="mnCancel" style="margin-top:8px">Cancelar</button>';
     cx.querySelector('#mnCancel').onclick = m.sair;
+    if (c.assin && c.assin.valor_centavos) {
+      cx.querySelector('#mnValor').value = (c.assin.valor_centavos / 100).toFixed(2).replace('.', ',');
+      cx.querySelector('#mnDias').value = 31;
+    }
     cx.querySelector('#mnOk').onclick = async function () {
       var msg = cx.querySelector('#mnMsg');
       aviso(msg, 'Registrando…');
