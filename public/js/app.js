@@ -952,7 +952,7 @@
     return tentarPublicar(rel, botao, itens);
   }
 
-  async function tentarPublicar(rel, botao, itens) {
+  async function tentarPublicar(rel, botao, itens, jaPerguntou) {
     const antes = botao.textContent;
     botao.textContent = '⏳'; botao.disabled = true;
     const pend = itens.filter(function (i) { return i.sync_state !== 'ok'; }).length;
@@ -971,6 +971,25 @@
       await Sync.marcarParaEnvio(rel);
       await listarRelatorios(); atualizarSync();
       toast('Não consegui enviar agora (' + e.message + '). Ficou na fila e sobe sozinho.', 6000);
+      // algum arquivo não sobe: mostra qual é e deixa excluir só ele para publicar o resto
+      try {
+        if (jaPerguntou || !navigator.onLine) return;
+        const presos = (await DB.itensDoRelatorio(rel.id)).filter(function (i) { return i.sync_state !== 'ok'; });
+        if (!presos.length) return;
+        const nomeTipo = { foto: 'Foto', video: 'Vídeo', nota: 'Nota', audio: 'Áudio' };
+        const lista = presos.slice(0, 6).map(function (i) {
+          const hora = i.capturado_em ? new Date(i.capturado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+          return '• ' + (nomeTipo[i.tipo] || i.tipo || 'Item') + (i.talhao ? ' · ' + i.talhao : '') + (hora ? ' · ' + hora : '') +
+                 (i.legenda ? ' · "' + String(i.legenda).slice(0, 30) + '"' : '') + (i.erro ? '\n   (' + String(i.erro).slice(0, 60) + ')' : '');
+        }).join('\n');
+        if (!confirm(presos.length + ' item(ns) não sobem:\n\n' + lista + (presos.length > 6 ? '\n…' : '') +
+                     '\n\nExcluir ' + (presos.length > 1 ? 'esses itens' : 'esse item') + ' do aparelho e publicar o relatório sem ' + (presos.length > 1 ? 'eles' : 'ele') + '?')) return;
+        for (const it of presos) { await DB.del('midias', it.id); await DB.del('itens', it.id); }
+        const rel2 = await DB.get('relatorios', rel.id);
+        const itens2 = await DB.itensDoRelatorio(rel.id);
+        if (st.rel && st.rel.id === rel.id) { st.rel = rel2; await renderChat(); }
+        return tentarPublicar(rel2, botao, itens2, true);
+      } catch (e2) { toast('Não consegui excluir: ' + e2.message, 5000); }
     }
   }
 
