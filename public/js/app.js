@@ -997,17 +997,45 @@
     return (await Sync.baseLink()) + '/r/' + rel.id;
   }
 
-  // o mapa do relatório é uma cópia da fazenda de quando ele foi criado: se o KML da fazenda mudou, atualiza os rascunhos
+  // o mapa do relatório é uma cópia da fazenda de quando ele foi criado: se o KML da fazenda mudou, atualiza os rascunhos.
+  // Se um talhão foi dividido ou renomeado, os registros que apontavam para o nome antigo são refeitos pelo GPS
+  // (inclusive em visitas já fechadas) e sobem de novo para a nuvem. Devolve true se mudou alguma coisa.
   async function atualizarTalhoes(rel) {
+    let mudou = false;
     try {
-      if (!rel || !rel.fazenda_id || visitaFechada(rel)) return;
+      if (!rel || !rel.fazenda_id) return false;
       const f = Conta.fazendaPorId(rel.fazenda_id);
       const novo = f && f.talhoes;
-      if (!novo || !novo.features || !novo.features.length) return;
-      if (JSON.stringify(novo) === JSON.stringify(rel.talhoes)) return;
-      rel.talhoes = novo;
-      await DB.put('relatorios', rel);
+      if (!novo || !novo.features || !novo.features.length) return false;
+      const nomes = {};
+      novo.features.forEach(function (x) { if (x.properties && x.properties.nome) nomes[x.properties.nome] = 1; });
+      const visitas = (st.visitas && st.visitas.length ? st.visitas : [rel])
+        .filter(function (v) { return v && v.fazenda_id === rel.fazenda_id; });
+      if (visitas.indexOf(rel) < 0 && !visitas.some(function (v) { return v.id === rel.id; })) visitas.push(rel);
+      for (const v of visitas) {
+        let refeitos = 0;
+        const itens = await DB.itensDoRelatorio(v.id);
+        for (const it of itens) {
+          if (it.tipo === 'texto' || !it.talhao || nomes[it.talhao] || it.lat == null || it.lon == null) continue;
+          const t = Geo.talhaoDoPonto(it.lon, it.lat, novo);
+          it.talhao = t ? t.nome : null;
+          it.talhao_id = t ? t.id : null;
+          if (it.sync_state === 'ok') it.sync_state = 'pendente';
+          await DB.put('itens', it);
+          refeitos++;
+        }
+        const mapaNovo = JSON.stringify(novo) !== JSON.stringify(v.talhoes);
+        if (mapaNovo && (!visitaFechada(v) || refeitos)) {
+          v.talhoes = novo;
+          await DB.put('relatorios', v);
+          if (st.rel && st.rel.id === v.id) st.rel.talhoes = novo;
+          mudou = true;
+        }
+        if (refeitos) mudou = true;
+      }
+      if (mudou && navigator.onLine) Sync.sincronizar();
     } catch (e) { /* mantém o mapa que já está */ }
+    return mudou;
   }
 
   async function abrirRelatorio(id) {
@@ -1016,7 +1044,7 @@
     await DB.cfg('ultimo', id);
     fechar('telaLista');
     await renderChat();                       // ajusta st.rel para a visita aberta
-    await atualizarTalhoes(st.rel);
+    if (await atualizarTalhoes(st.rel)) await renderChat();
     $('#tituloRel').textContent = st.rel.fazenda || 'Relatório';
     $('#subtituloRel').textContent = subtitulo();
     $('#avatarRel').textContent = visitaFechada(st.rel) ? (st.rel.na_fila ? '📤' : '✅') : '🌱';
@@ -1489,7 +1517,7 @@
     $('#btnMais').onclick = menuMais;
     $('#btnMapa').onclick = async function () {
       try { await Conta.atualizarSePrecisar(); } catch (e) {}
-      await atualizarTalhoes(st.rel);
+      if (await atualizarTalhoes(st.rel)) await renderChat();
       window.relAtualMapa = st.rel; desenharMapa(); abrir('telaMapa');
     };
     $('#btnAjustes').onclick = async function () { await carregarCfg(); abrir('telaAjustes'); };
