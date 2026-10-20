@@ -91,6 +91,344 @@ export async function definirPrazo(env, id, dias) {
   return { ok: true, id, dias: n };
 }
 
+/* ---------------- pagamentos: renovação do acesso (PicPay) ---------------- */
+
+// A PicPay gera links de pagamento avulsos (Pix ou cartão) e avisa por webhook quando o cliente paga.
+// Fluxo: o administrador gera o link de uma conta → envia ao cliente → ao pagar, o prazo da conta é estendido sozinho.
+// Segredos (wrangler secret put): PICPAY_CLIENT_ID, PICPAY_CLIENT_SECRET (credenciais da integração "Link de Pagamento")
+// e PICPAY_WEBHOOK_KEY (a chave que o painel da PicPay gera ao ativar a URL de notificação).
+const PICPAY_BASE = 'https://ecommerce-api.svc.picpay.com';
+let pagtoPronto = null;
+
+function garantirPagamentos(env) {
+  if (!pagtoPronto) {
+    pagtoPronto = env.DB.batch([
+      env.DB.prepare('CREATE TABLE IF NOT EXISTS config_pagto (chave TEXT PRIMARY KEY, valor TEXT)'),
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS cobrancas (
+        id             TEXT PRIMARY KEY,
+        usuario_id     TEXT,
+        email          TEXT,
+        valor_centavos INTEGER NOT NULL,
+        dias           INTEGER NOT NULL,
+        status         TEXT NOT NULL DEFAULT 'aberta',
+        origem         TEXT NOT NULL DEFAULT 'picpay',
+        link           TEXT,
+        picpay_id      TEXT,
+        transacao_id   TEXT UNIQUE,
+        metodo         TEXT,
+        obs            TEXT,
+        prazo_aplicado INTEGER NOT NULL DEFAULT 0,
+        expira_em      TEXT,
+        criado_em      TEXT DEFAULT (datetime('now')),
+        pago_em        TEXT
+      )`),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS cobrancas_usuario ON cobrancas (usuario_id)'),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS cobrancas_picpay ON cobrancas (picpay_id)')
+    ]).catch((e) => { pagtoPronto = null; throw e; });
+  }
+  return pagtoPronto;
+}
+
+function reaisParaCentavos(v) {
+  let t = String(v == null ? '' : v).trim().replace(/[R$\s]/g, '');
+  if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+  const n = Math.round(Number(t) * 100);
+  if (!Number.isFinite(n) || n < 100 || n > 5000000) throw new Error('informe um valor entre R$ 1,00 e R$ 50.000,00');
+  return n;
+}
+
+function diasCiclo(v, padrao) {
+  if (v === undefined || v === null || String(v).trim() === '') return padrao;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n) || n < 1 || n > 3650) throw new Error('o período deve ser de 1 a 3650 dias');
+  return n;
+}
+
+async function lerConfigPagto(env) {
+  await garantirPagamentos(env);
+  const { results } = await env.DB.prepare('SELECT chave, valor FROM config_pagto').all();
+  const m = {};
+  (results || []).forEach((r) => { m[r.chave] = r.valor; });
+  return { valor_centavos: Number(m.valor_centavos) || 0, dias_ciclo: Number(m.dias_ciclo) || 30 };
+}
+
+export async function salvarConfigPagto(env, b) {
+  const valor = reaisParaCentavos(b.valor);
+  const dias = diasCiclo(b.dias, 30);
+  await garantirPagamentos(env);
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO config_pagto (chave, valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind('valor_centavos', String(valor)),
+    env.DB.prepare('INSERT INTO config_pagto (chave, valor) VALUES (?,?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind('dias_ciclo', String(dias))
+  ]);
+  return { ok: true, valor_centavos: valor, dias_ciclo: dias };
+}
+
+function sqlAgora(d) { return (d || new Date()).toISOString().replace('T', ' ').slice(0, 19); }
+
+export async function listarPagamentos(env, origem) {
+  const config = await lerConfigPagto(env);
+  const { results } = await env.DB.prepare(`SELECT id, usuario_id, email, valor_centavos, dias, status, origem, link, metodo, obs,
+      criado_em, pago_em, expira_em FROM cobrancas ORDER BY criado_em DESC, rowid DESC LIMIT 100`).all();
+  const hoje = new Date().toISOString().slice(0, 10);
+  const cobrancas = (results || []).map((c) => {
+    if (c.status === 'aberta' && c.expira_em && c.expira_em < hoje) c.status = 'expirada';
+    return c;
+  });
+  return {
+    ok: true,
+    config: Object.assign(config, {
+      picpay_credenciais: !!(env.PICPAY_CLIENT_ID && env.PICPAY_CLIENT_SECRET),
+      picpay_webhook: !!env.PICPAY_WEBHOOK_KEY,
+      webhook_url: origem + '/api/pagamentos/picpay'
+    }),
+    cobrancas
+  };
+}
+
+// resumo por conta: quantos pagamentos, o último, e o link em aberto (se houver)
+async function aplicarPagamentos(env, contas) {
+  const vazio = () => ({ n: 0, ultimo: null, total_centavos: 0, aberta: null });
+  contas.forEach((c) => { c.pagto = vazio(); });
+  try {
+    await garantirPagamentos(env);
+    const mapa = new Map(contas.map((c) => [c.id, c]));
+    const pagos = await env.DB.prepare(`SELECT usuario_id, COUNT(*) AS n, MAX(pago_em) AS ultimo, COALESCE(SUM(valor_centavos),0) AS total
+      FROM cobrancas WHERE status = 'paga' GROUP BY usuario_id`).all();
+    (pagos.results || []).forEach((r) => {
+      const c = mapa.get(r.usuario_id);
+      if (c) { c.pagto.n = Number(r.n); c.pagto.ultimo = r.ultimo; c.pagto.total_centavos = Number(r.total); }
+    });
+    const hoje = new Date().toISOString().slice(0, 10);
+    const abertas = await env.DB.prepare(`SELECT id, usuario_id, link, valor_centavos, criado_em, expira_em FROM cobrancas
+      WHERE status = 'aberta' ORDER BY criado_em ASC, rowid ASC`).all();
+    (abertas.results || []).forEach((r) => {
+      const c = mapa.get(r.usuario_id);
+      if (c && r.link && !(r.expira_em && r.expira_em < hoje)) c.pagto.aberta = { id: r.id, link: r.link, valor_centavos: r.valor_centavos, criado_em: r.criado_em };
+    });
+  } catch (e) { /* sem a tabela ainda: segue sem dados de pagamento */ }
+}
+
+/* ---- estender o prazo da conta ---- */
+
+// novo prazo (em dias desde a criação da conta) depois de somar `dias` a partir do vencimento atual
+// (ou de hoje, se já venceu). Devolve null para conta sem prazo.
+async function prazoRenovado(env, usuarioId, dias) {
+  await garantirPrazos(env);
+  const u = await env.DB.prepare('SELECT criado_em, COALESCE(admin,0) AS admin FROM usuarios WHERE id = ?').bind(usuarioId).first();
+  if (!u) return null;
+  const p = await env.DB.prepare('SELECT dias FROM prazos_conta WHERE usuario_id = ?').bind(usuarioId).first();
+  const atual = p ? Number(p.dias) : (Number(u.admin) === 1 ? 0 : PRAZO_PADRAO);
+  if (!(atual > 0)) return null;
+  const criado = criadoEm(u.criado_em);
+  if (isNaN(criado)) return null;
+  const base = Math.max(criado + atual * 86400000, Date.now());
+  return Math.ceil((base + dias * 86400000 - criado) / 86400000);
+}
+
+// aplica o prazo de uma cobrança paga; só uma vez (prazo_aplicado)
+async function aplicarPrazoDaCobranca(env, cob) {
+  const jaFoi = await env.DB.prepare('SELECT prazo_aplicado FROM cobrancas WHERE id = ?').bind(cob.id).first();
+  if (!jaFoi || Number(jaFoi.prazo_aplicado) === 1) return false;
+  const novo = cob.usuario_id ? await prazoRenovado(env, cob.usuario_id, Number(cob.dias)) : null;
+  const marca = env.DB.prepare('UPDATE cobrancas SET prazo_aplicado = 1 WHERE id = ? AND prazo_aplicado = 0').bind(cob.id);
+  if (novo == null) { await marca.run(); return false; }
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO prazos_conta (usuario_id, dias, atualizado_em) VALUES (?,?,datetime('now'))
+      ON CONFLICT(usuario_id) DO UPDATE SET dias = excluded.dias, atualizado_em = datetime('now')`).bind(cob.usuario_id, novo),
+    marca
+  ]);
+  return true;
+}
+
+/* ---- PicPay ---- */
+
+let tokenPicPay = { v: '', exp: 0 };
+
+function trecho(txt) { return String(txt || '').replace(/\s+/g, ' ').slice(0, 220); }
+
+async function picpayToken(env) {
+  if (!env.PICPAY_CLIENT_ID || !env.PICPAY_CLIENT_SECRET) {
+    throw new Error('A PicPay ainda não está ligada: faltam os segredos PICPAY_CLIENT_ID e PICPAY_CLIENT_SECRET no Worker.');
+  }
+  if (tokenPicPay.v && Date.now() < tokenPicPay.exp) return tokenPicPay.v;
+  const r = await fetch((env.PICPAY_BASE || PICPAY_BASE) + '/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ grant_type: 'client_credentials', client_id: env.PICPAY_CLIENT_ID, client_secret: env.PICPAY_CLIENT_SECRET })
+  });
+  const txt = await r.text();
+  let j = {}; try { j = JSON.parse(txt); } catch (e) { /* resposta não é JSON */ }
+  const tk = j.access_token || j.token;
+  if (!r.ok || !tk) throw new Error('A PicPay não aceitou o login (' + r.status + '). Confira PICPAY_CLIENT_ID e PICPAY_CLIENT_SECRET.');
+  const vida = Math.min(Number(j.expires_in) || 300, 300);
+  tokenPicPay = { v: tk, exp: Date.now() + Math.max(30, vida - 30) * 1000 };
+  return tk;
+}
+
+function idDoLink(link) {
+  const m = String(link || '').match(/\/p\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+
+async function picpayCriarLink(env, origem, cob, nome, descricao, expira) {
+  const token = await picpayToken(env);
+  const corpo = {
+    charge: {
+      name: nome,
+      description: descricao,
+      order_number: cob.id,
+      redirect_url: origem + '/',
+      payment: { methods: ['BRCODE', 'CREDIT_CARD'], brcode_arrangements: ['PICPAY', 'PIX'] },
+      amounts: { product: cob.valor_centavos, delivery: 0 }
+    },
+    options: { allow_create_pix_key: false, card_max_installment_number: 1, expired_at: expira }
+  };
+  const r = await fetch((env.PICPAY_BASE || PICPAY_BASE) + '/v1/paymentlink/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(corpo)
+  });
+  const txt = await r.text();
+  let j = {}; try { j = JSON.parse(txt); } catch (e) { /* resposta não é JSON */ }
+  const d = (j && j.data && typeof j.data === 'object') ? j.data : j;
+  const link = d.link || d.checkoutLink || d.checkout_link || '';
+  if (!r.ok || !link) throw new Error('A PicPay recusou a cobrança (' + r.status + '): ' + trecho(txt));
+  const id = String(d.id || d.paymentLinkId || d.payment_link_id || idDoLink(link) || '');
+  return { link, id };
+}
+
+export async function criarCobranca(env, origem, b) {
+  const u = await env.DB.prepare('SELECT id, email, nome FROM usuarios WHERE id = ?').bind(b.id).first();
+  if (!u) throw new Error('conta não encontrada');
+  const cfg = await lerConfigPagto(env);
+  const valor = (b.valor !== undefined && b.valor !== null && String(b.valor).trim() !== '') ? reaisParaCentavos(b.valor) : cfg.valor_centavos;
+  if (!valor) throw new Error('defina o valor do plano antes de gerar o link');
+  const dias = diasCiclo(b.dias, cfg.dias_ciclo);
+  const id = novoId('c');
+  const expira = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  await env.DB.prepare(`INSERT INTO cobrancas (id, usuario_id, email, valor_centavos, dias, status, origem, expira_em)
+    VALUES (?,?,?,?,?,'aberta','picpay',?)`).bind(id, u.id, u.email, valor, dias, expira).run();
+  try {
+    const nome = 'Relatório de Campo — renovação de ' + dias + ' dias';
+    const { link, id: pid } = await picpayCriarLink(env, origem, { id, valor_centavos: valor }, nome,
+      'Acesso ao Relatório de Campo VSL · ' + (u.nome || u.email), expira);
+    await env.DB.prepare('UPDATE cobrancas SET link = ?, picpay_id = ? WHERE id = ?').bind(link, pid, id).run();
+    return { ok: true, id, link, valor_centavos: valor, dias, expira_em: expira };
+  } catch (e) {
+    await env.DB.prepare('DELETE FROM cobrancas WHERE id = ?').bind(id).run();
+    throw e;
+  }
+}
+
+export async function cancelarCobranca(env, cid) {
+  await garantirPagamentos(env);
+  const c = await env.DB.prepare('SELECT id, status, picpay_id FROM cobrancas WHERE id = ?').bind(cid).first();
+  if (!c) throw new Error('cobrança não encontrada');
+  if (c.status !== 'aberta') throw new Error('só dá para cancelar um link que ainda está em aberto');
+  await env.DB.prepare("UPDATE cobrancas SET status = 'cancelada' WHERE id = ? AND status = 'aberta'").bind(cid).run();
+  if (c.picpay_id) { // melhor esforço: desativa o link na PicPay; se falhar, o cancelamento local vale
+    try {
+      const token = await picpayToken(env);
+      await fetch((env.PICPAY_BASE || PICPAY_BASE) + '/v1/paymentlink/' + encodeURIComponent(c.picpay_id) + '/inactive', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
+      });
+    } catch (e) { /* segue */ }
+  }
+  return { ok: true };
+}
+
+// pagamento recebido fora da PicPay (Pix direto, dinheiro…): o administrador registra e o prazo é estendido
+export async function pagamentoManual(env, b) {
+  const u = await env.DB.prepare('SELECT id, email FROM usuarios WHERE id = ?').bind(b.id).first();
+  if (!u) throw new Error('conta não encontrada');
+  await garantirPagamentos(env);
+  const cfg = await lerConfigPagto(env);
+  const dias = diasCiclo(b.dias, cfg.dias_ciclo);
+  const temValor = b.valor !== undefined && b.valor !== null && String(b.valor).trim() !== '';
+  const valor = temValor ? reaisParaCentavos(b.valor) : (cfg.valor_centavos || 100);
+  const id = novoId('c');
+  await env.DB.prepare(`INSERT INTO cobrancas (id, usuario_id, email, valor_centavos, dias, status, origem, obs, pago_em)
+    VALUES (?,?,?,?,?,'paga','manual',?,datetime('now'))`)
+    .bind(id, u.id, u.email, valor, dias, String(b.obs || '').trim().slice(0, 200)).run();
+  const mudou = await aplicarPrazoDaCobranca(env, { id, usuario_id: u.id, dias });
+  return { ok: true, id, prazo_estendido: mudou };
+}
+
+/* ---- webhook da PicPay (rota pública; protegida pela chave) ---- */
+
+async function iguais(a, b) {
+  const te = new TextEncoder();
+  const [x, y] = await Promise.all([crypto.subtle.digest('SHA-256', te.encode(String(a))), crypto.subtle.digest('SHA-256', te.encode(String(b)))]);
+  const u = new Uint8Array(x), v = new Uint8Array(y);
+  let dif = 0;
+  for (let i = 0; i < u.length; i++) dif |= u[i] ^ v[i];
+  return dif === 0;
+}
+
+export async function webhookPicPay(env, req) {
+  if (!env.PICPAY_WEBHOOK_KEY) return { status: 503, corpo: { erro: 'webhook não configurado' } };
+  const cab = (req.headers.get('authorization') || '').trim();
+  const chave = String(env.PICPAY_WEBHOOK_KEY);
+  const ok = (await iguais(cab, chave)) || (await iguais(cab.replace(/^Bearer\s+/i, ''), chave));
+  if (!ok) return { status: 401, corpo: { erro: 'não autorizado' } };
+
+  let ev = null;
+  try { ev = await req.json(); } catch (e) { return { status: 400, corpo: { erro: 'corpo inválido' } }; }
+  const dado = (ev && ev.data) || {};
+  const tx = dado.transaction || {};
+  const ch = dado.charge || {};
+  await garantirPagamentos(env);
+
+  const pid = String(ch.paymentLinkId || idDoLink(ch.checkoutLink) || '');
+  const transacao = String(tx.id || '');
+
+  if (ev.type === 'REFUND') {
+    const orig = String(tx.originalTransactionId || '');
+    if (orig) await env.DB.prepare("UPDATE cobrancas SET status = 'estornada' WHERE transacao_id = ?").bind(orig).run();
+    return { status: 200, corpo: { ok: true, evento: 'estorno' } };
+  }
+  if (ev.type !== 'PAYMENT' || tx.status !== 'PAYED' || !transacao) return { status: 200, corpo: { ok: true, ignorado: true } };
+
+  // a mesma notificação pode chegar mais de uma vez
+  const repetida = await env.DB.prepare('SELECT * FROM cobrancas WHERE transacao_id = ?').bind(transacao).first();
+  if (repetida) {
+    await aplicarPrazoDaCobranca(env, repetida);
+    return { status: 200, corpo: { ok: true, repetido: true } };
+  }
+
+  const cob = pid ? await env.DB.prepare('SELECT * FROM cobrancas WHERE picpay_id = ? ORDER BY criado_em DESC, rowid DESC LIMIT 1').bind(pid).first() : null;
+  if (!cob) return { status: 200, corpo: { ok: true, ignorado: 'cobrança desconhecida' } };
+
+  const metodo = String(tx.paymentType || '').toLowerCase();
+  const recebido = Number(tx.amount != null ? tx.amount : ch.amount);
+  if (Number.isFinite(recebido) && recebido < Number(cob.valor_centavos)) {
+    await env.DB.prepare("UPDATE cobrancas SET status = 'divergente', transacao_id = ?, metodo = ?, obs = ? WHERE id = ? AND status = 'aberta'")
+      .bind(transacao, metodo, 'valor recebido menor: ' + recebido + ' centavos', cob.id).run();
+    return { status: 200, corpo: { ok: true, divergente: true } };
+  }
+
+  try {
+    let alvo = cob;
+    const r = await env.DB.prepare(`UPDATE cobrancas SET status = 'paga', transacao_id = ?, metodo = ?, pago_em = datetime('now')
+      WHERE id = ? AND status IN ('aberta','cancelada')`).bind(transacao, metodo, cob.id).run();
+    if (!(r.meta && r.meta.changes > 0)) {
+      // link já pago antes (ou fechado): o dinheiro entrou de novo, então vira um novo pagamento
+      const id = novoId('c');
+      await env.DB.prepare(`INSERT INTO cobrancas (id, usuario_id, email, valor_centavos, dias, status, origem, link, picpay_id, transacao_id, metodo, pago_em)
+        VALUES (?,?,?,?,?,'paga','picpay',?,?,?,?,datetime('now'))`)
+        .bind(id, cob.usuario_id, cob.email, cob.valor_centavos, cob.dias, cob.link, cob.picpay_id, transacao, metodo).run();
+      alvo = { id, usuario_id: cob.usuario_id, dias: cob.dias };
+    }
+    await aplicarPrazoDaCobranca(env, alvo);
+  } catch (e) {
+    // transação repetida em paralelo (chave única): já foi tratada
+    const ja = await env.DB.prepare('SELECT * FROM cobrancas WHERE transacao_id = ?').bind(transacao).first();
+    if (ja) { await aplicarPrazoDaCobranca(env, ja); return { status: 200, corpo: { ok: true, repetido: true } }; }
+    return { status: 500, corpo: { erro: 'falha ao registrar' } };
+  }
+  return { status: 200, corpo: { ok: true } };
+}
+
 export async function resumoAdmin(env, me, adm) {
   // conta comum: só enxerga o que é dela; administrador enxerga tudo
   const meu = adm ? '' : ' AND r.usuario_id = ?';
@@ -107,7 +445,7 @@ export async function resumoAdmin(env, me, adm) {
      ORDER BY u.criado_em DESC
   `).bind(...(adm ? [] : [me.id])).all();
 
-  if (adm) await aplicarPrazos(env, contas.results || []);
+  if (adm) { await aplicarPrazos(env, contas.results || []); await aplicarPagamentos(env, contas.results || []); }
 
   const relatorios = await env.DB.prepare(`
     SELECT r.id, r.fazenda, r.produtor, r.safra, r.servico, r.responsavel,
@@ -297,10 +635,12 @@ header.topo{background:var(--verde);color:#fff;padding:14px 18px;display:flex;al
 header.topo h1{margin:0;font-size:17px;flex:1}
 header.topo small{opacity:.85;font-size:12px;display:block;font-weight:400}
 header.topo button{background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:13px}
-.abas{display:flex;background:#fff;border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:20;overflow-x:auto}
-.abas button{flex:1;min-width:120px;background:none;border:none;padding:13px 10px;font-size:14px;color:var(--fraco);
- border-bottom:3px solid transparent;font-weight:600;white-space:nowrap}
-.abas button.on{color:var(--verde-escuro);border-bottom-color:var(--verde)}
+.abas{display:flex;gap:8px;overflow-x:auto;padding:12px 16px 0;max-width:1100px;margin:0 auto;scrollbar-width:none}
+.abas.uma{display:none}
+.abas button{flex:none;background:#fff;border:1px solid var(--linha);border-radius:999px;padding:7px 16px;font-size:14px;
+ color:var(--texto);font-weight:600;white-space:nowrap;cursor:pointer}
+.abas button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
+.abas button.fora{display:none}
 main{padding:16px;max-width:1100px;margin:0 auto}
 .painel{display:none}.painel.on{display:block}
 .cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
@@ -371,6 +711,40 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 .marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;margin:2px 0 12px}
 .marcar input{width:18px;height:18px;accent-color:var(--verde)}
 @media(max-width:560px){ .linha2{grid-template-columns:1fr} #mapa{height:300px} }
+.caixa{border-radius:16px;padding:16px}
+.cartao{border-radius:14px}
+.cartao b{font-size:28px}
+header.topo{background:linear-gradient(135deg,#1B7A43,#146034)}
+.lado,.baixo{display:none}
+.lado h2{margin:0 12px 8px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--fraco);font-weight:600}
+.lado button,.baixo button{background:none;border:0;cursor:pointer;color:var(--fraco);font-size:15px;position:relative}
+.lado button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border-radius:10px;color:var(--texto);margin-bottom:2px}
+.lado button svg{flex:none;color:var(--fraco)}
+.lado button[aria-current="page"]{background:var(--verde-claro);color:var(--verde-escuro);font-weight:700}
+.lado button[aria-current="page"] svg,.baixo button[aria-current="page"] svg{color:var(--verde)}
+.n{background:#D93025;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:0 6px;line-height:17px;min-width:17px;text-align:center}
+.lado .n{margin-left:auto}
+.baixo button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 8px;font-size:12px;min-width:0}
+.baixo button[aria-current="page"]{color:var(--verde-escuro);font-weight:700}
+.baixo .n{position:absolute;top:4px;left:calc(50% + 8px)}
+@media(max-width:899px){
+  body{padding-bottom:calc(78px + env(safe-area-inset-bottom,0px))}
+  .baixo{display:grid;grid-template-columns:repeat(var(--n,4),1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:#fff;border-top:1px solid var(--linha);padding-bottom:env(safe-area-inset-bottom,0px)}
+}
+@media(min-width:900px){
+  #telaPainel{display:grid;grid-template-columns:230px minmax(0,1fr);grid-template-rows:auto auto 1fr;align-items:start}
+  #telaPainel header.topo{grid-column:1/-1}
+  .lado{display:block;grid-column:1;grid-row:2/4;padding:18px 10px;position:sticky;top:0}
+  #telaPainel .abas{grid-column:2;grid-row:2;width:100%;margin:0}
+  #telaPainel main{grid-column:2;grid-row:3;width:100%;margin:0}
+}
+.pg-linha{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.pg-link{width:100%;padding:10px 12px;border:1px solid var(--linha);border-radius:9px;font-size:13px;background:#f7faf8;margin:8px 0}
+.pg-passos{font-size:12.5px;color:var(--fraco);margin:8px 0 12px;padding-left:18px}
+.pg-passos li{margin-bottom:4px}
+.pg-item{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--linha)}
+.modal.larga{max-width:480px;max-height:92dvh;overflow-y:auto}
 ${AGRO_CSS}
 </style>
 </head><body>
@@ -390,14 +764,14 @@ ${AGRO_CSS}
     <button id="btnAtualizar">Atualizar</button>
     <button id="btnSair">Sair</button>
   </header>
-  <div class="abas">
-    <button class="on" data-aba="dash">Dashboard</button>
+  <nav class="lado" id="lado" aria-label="Áreas do painel"></nav>
+  <div class="abas" id="subabas">
+    <button class="on" data-aba="dash">Visão geral</button>
     <button data-aba="contas" id="abaContas">Contas</button>
     <button data-aba="rels">Relatórios</button>
     ${AGRO_ABAS}
   </div>
   <main>
-    <div id="avisoPrazos"></div>
     <section class="painel on" id="pDash">
       <div class="cartoes" id="kpis"></div>
       <div class="caixa">
@@ -420,6 +794,18 @@ ${AGRO_CSS}
 
     <section class="painel" id="pContas">
       <div class="caixa">
+        <div class="cab-caixa"><h2>Prazos e renovações</h2><button class="btn-mini" id="btnPlano">Plano e cobrança</button></div>
+        <div id="avisoPrazos"></div>
+      </div>
+      <div class="caixa">
+        <h2>Contas ativas</h2>
+        <div class="rolagem"><table id="tContas"></table></div>
+      </div>
+      <div class="caixa">
+        <h2>Cobranças e pagamentos</h2>
+        <div class="rolagem" id="listaCobr"></div>
+      </div>
+      <div class="caixa">
         <h2>Criar uma conta</h2>
         <div class="linha2">
           <div class="campo"><label>Nome</label><input id="nNome" placeholder="Nome de quem vai usar"></div>
@@ -435,14 +821,10 @@ ${AGRO_CSS}
           <input id="nPrazo" type="number" min="0" max="3650" value="365" inputmode="numeric">
         </div>
         <div style="font-size:12px;color:var(--fraco);margin:-4px 0 12px">
-          Quando a conta completar esse período, aparece um aviso aqui no painel. O acesso dela não é bloqueado.
+          Quando a conta completar esse período, ela aparece em "Prazos e renovações", aqui nesta aba. O acesso dela não é bloqueado.
         </div>
         <button class="btn" id="btnCriar">Criar conta</button>
         <div id="nMsg"></div>
-      </div>
-      <div class="caixa">
-        <h2>Contas ativas</h2>
-        <div class="rolagem"><table id="tContas"></table></div>
       </div>
     </section>
 
@@ -456,6 +838,7 @@ ${AGRO_CSS}
     </section>
     ${AGRO_PAINEIS}
   </main>
+  <nav class="baixo" id="baixo" aria-label="Áreas do painel"></nav>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -516,6 +899,55 @@ ${AGRO_CSS}
     $('#telaEntrar').style.display = '';
   };
   $('#btnAtualizar').onclick = function () { abrirPainel(); };
+  $('#btnPlano').onclick = function () { abrirPlano(); };
+
+  /* ---------- áreas do painel (menu lateral no computador, barra de baixo no celular) ---------- */
+  var SVG = function (d) { return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>'; };
+  var ICONES = {
+    visao: SVG('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
+    campo: SVG('<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'),
+    lavoura: SVG('<path d="M12 21V11"/><path d="M12 11c0-4 2.5-6 7-6 0 4-2.5 6-7 6z"/><path d="M12 14c0-3-2-5-6-5 0 3.2 2 5 6 5z"/>'),
+    gestao: SVG('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .6 3.2 2.3 3.5 5.2"/>')
+  };
+  var AREAS = [
+    { id: 'visao', nome: 'Visão geral', abas: ['dash'] },
+    { id: 'campo', nome: 'Campo', abas: ['rels'] },
+    { id: 'lavoura', nome: 'Lavoura', abas: ['plantio', 'recs'] },
+    { id: 'gestao', nome: 'Gestão', abas: ['contas', 'modulos'] }
+  ];
+  var gestaoN = 0, ultimaAba = {};
+  function abaOk(k) { var b = document.querySelector('#subabas button[data-aba="' + k + '"]'); return !!b && b.style.display !== 'none'; }
+  function areaDe(k) { for (var i = 0; i < AREAS.length; i++) if (AREAS[i].abas.indexOf(k) >= 0) return AREAS[i]; return AREAS[0]; }
+  function abaAtiva() { var b = document.querySelector('#subabas button.on'); return b ? b.dataset.aba : 'dash'; }
+  function montarNav() {
+    var area = areaDe(abaAtiva());
+    var vis = AREAS.filter(function (a) { return a.abas.some(abaOk); });
+    var item = function (a) {
+      return '<button data-area="' + a.id + '"' + (a.id === area.id ? ' aria-current="page"' : '') + '>' + ICONES[a.id] + '<span>' + a.nome + '</span>' +
+        (a.id === 'gestao' && gestaoN ? '<span class="n" title="contas com prazo vencido ou perto de vencer">' + gestaoN + '</span>' : '') + '</button>';
+    };
+    $('#lado').innerHTML = '<h2>Painel</h2>' + vis.map(item).join('');
+    $('#baixo').innerHTML = vis.map(item).join('');
+    $('#baixo').style.setProperty('--n', vis.length || 1);
+    document.querySelectorAll('[data-area]').forEach(function (b) {
+      b.onclick = function () {
+        var a = AREAS.filter(function (x) { return x.id === b.dataset.area; })[0];
+        var k = (ultimaAba[a.id] && abaOk(ultimaAba[a.id])) ? ultimaAba[a.id] : a.abas.filter(abaOk)[0];
+        var bt = k && document.querySelector('#subabas button[data-aba="' + k + '"]');
+        if (bt) bt.click();
+        window.scrollTo(0, 0);
+      };
+    });
+    var cont = 0;
+    document.querySelectorAll('#subabas button').forEach(function (b) {
+      var dentro = area.abas.indexOf(b.dataset.aba) >= 0;
+      b.classList.toggle('fora', !dentro);
+      if (dentro && b.style.display !== 'none') cont++;
+    });
+    $('#subabas').classList.toggle('uma', cont < 2);
+  }
+  // o módulo de lavoura liga/desliga abas pelo style: refaz o menu quando isso acontecer
+  try { new MutationObserver(montarNav).observe($('#subabas'), { attributes: true, attributeFilter: ['style'], subtree: true }); } catch (e) {}
 
   /* ---------- abas ---------- */
   document.querySelectorAll('.abas button').forEach(function (b) {
@@ -524,6 +956,8 @@ ${AGRO_CSS}
       document.querySelectorAll('.painel').forEach(function (x) { x.classList.remove('on'); });
       b.classList.add('on');
       $('#p' + b.dataset.aba.charAt(0).toUpperCase() + b.dataset.aba.slice(1)).classList.add('on');
+      ultimaAba[areaDe(b.dataset.aba).id] = b.dataset.aba;
+      montarNav();
       if (b.dataset.aba === 'dash' && mapa) setTimeout(function () { mapa.invalidateSize(); }, 60);
     };
   });
@@ -549,24 +983,26 @@ ${AGRO_CSS}
     $('#abaContas').style.display = adm ? '' : 'none';
     $('#hRels').textContent = adm ? 'Todos os relatórios' : 'Meus relatórios';
     if (!adm && $('#pContas').classList.contains('on')) document.querySelector('.abas button[data-aba="dash"]').click();
+    pg = null;
+    if (adm) { try { pg = await api('/api/admin/pagamentos'); } catch (e) { pg = null; } }
     desenharKpis();
     desenharPrazos();
     desenharContas();
+    desenharCobrancas();
     desenharRelatorios();
     desenharBarras();
     desenharResp();
     desenharMapa();
     agroAposPainel(adm);
+    montarNav();
   }
 
   function desenharKpis() {
     var t = dados.totais;
     var pub = dados.relatorios.filter(function (r) { return r.status === 'publicado'; }).length;
     var adm = !!(dados.eu && dados.eu.admin);
-    var vencidas = (dados.contas || []).filter(function (c) { return c.restam != null && c.restam <= 0; }).length;
     $('#kpis').innerHTML =
       (adm ? cartao(t.contas, 'contas') : '') +
-      (adm && vencidas ? cartao(vencidas, vencidas === 1 ? 'conta com prazo vencido' : 'contas com prazo vencido') : '') +
       cartao(t.relatorios, 'relatórios') +
       cartao(pub, 'já enviados ao cliente') +
       cartao(t.registros, 'fotos, vídeos e notas') +
@@ -581,8 +1017,11 @@ ${AGRO_CSS}
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
         '<td>' + c.produtores + ' / ' + c.fazendas + '</td>' +
         '<td>' + usoCel(c) + '</td>' +
+        '<td>' + pagCel(c) + '</td>' +
         '<td>' + dataBR(c.ultima_atividade) + '</td>' +
         '<td class="acoes">' +
+          '<button class="selo" data-gerar="' + esc(c.id) + '">gerar link</button> ' +
+          '<button class="selo" data-pago="' + esc(c.id) + '">marcar pago</button> ' +
           '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ' +
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
@@ -592,7 +1031,7 @@ ${AGRO_CSS}
         '</td></tr>';
     }).join('');
     $('#tContas').innerHTML =
-      '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Tempo de uso</th><th>Última atividade</th><th></th></tr>' + linhas;
+      '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Tempo de uso</th><th>Pagamento</th><th>Última atividade</th><th></th></tr>' + linhas;
     document.querySelectorAll('[data-prom]').forEach(function (b) {
       b.onclick = async function () {
         b.disabled = true;
@@ -607,6 +1046,7 @@ ${AGRO_CSS}
       b.onclick = function () { abrirExcluir(b.dataset.excluir, b.dataset.email, b.dataset.rel); };
     });
     ligarPrazos();
+    ligarPagto();
   }
 
   /* ---------- excluir uma conta (definitivo) ---------- */
@@ -657,13 +1097,55 @@ ${AGRO_CSS}
     return h + '<span class="selo pub">restam ' + diasTxt(r) + '</span><br><span class="peq">prazo de ' + diasTxt(c.prazo_dias) + '</span>';
   }
 
-  // aviso no topo do painel: contas que completaram o prazo ou estão a 30 dias de completar
+  /* ---------- prazos e pagamentos (aba Contas) ---------- */
+  var pg = null;   // { config, cobrancas } de /api/admin/pagamentos
+  function reais(c) {
+    return 'R$ ' + (Number(c || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function contaPorId(id) { return (dados.contas || []).filter(function (x) { return x.id === id; })[0]; }
+  function copiar(txt, btn) {
+    var feito = function () {
+      if (!btn) return;
+      var t = btn.textContent; btn.textContent = 'Copiado ✓';
+      setTimeout(function () { btn.textContent = t; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(feito, function () { window.prompt('Copie:', txt); });
+    else window.prompt('Copie:', txt);
+  }
+  function modalBase(larga) {
+    var veu = document.createElement('div'); veu.className = 'veu';
+    var cx = document.createElement('div'); cx.className = 'modal' + (larga ? ' larga' : '');
+    veu.appendChild(cx); document.body.appendChild(veu);
+    var sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    return { cx: cx, sair: sair };
+  }
+
+  // situação de pagamento da conta (coluna "Pagamento")
+  function pagCel(c) {
+    var p = c.pagto || {}, h;
+    if (c.prazo_dias == null && !p.n) h = '<span class="selo">sem prazo</span>';
+    else if (c.restam != null && c.restam < 0) h = '<span class="selo venc">Vencida</span>';
+    else if (p.n) h = '<span class="selo pub">Em dia</span>';
+    else h = '<span class="selo">Em teste</span>';
+    if (p.n) h += '<br><span class="peq">' + p.n + (p.n === 1 ? ' pagamento' : ' pagamentos') + ' · ' + reais(p.total_centavos) +
+      '<br>último em ' + dataBR(p.ultimo) + '</span>';
+    if (p.aberta) h += '<br><span class="peq">🔗 link em aberto · ' + reais(p.aberta.valor_centavos) + '</span>';
+    return h;
+  }
+
+  // contas que completaram o prazo ou estão a 30 dias de completar (só aparece na aba Contas)
   function desenharPrazos() {
     var el = $('#avisoPrazos');
     var adm = !!(dados.eu && dados.eu.admin);
-    if (!adm) { el.innerHTML = ''; return; }
+    if (!adm) { el.innerHTML = ''; gestaoN = 0; return; }
     var lista = (dados.contas || []).filter(function (c) { return c.prazo_dias != null && c.restam != null && c.restam <= 30; })
       .sort(function (a, b) { return a.restam - b.restam; });
+    gestaoN = lista.length;
+    if (!lista.length) {
+      el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma conta com prazo vencido ou para vencer nos próximos 30 dias.</div>';
+      return;
+    }
     el.innerHTML = lista.map(function (c) {
       var nome = '<b>' + esc(c.nome || c.email) + '</b>';
       var ref = c.prazo_dias === 365 ? '1 ano de uso' : 'o prazo de ' + diasTxt(c.prazo_dias);
@@ -676,9 +1158,173 @@ ${AGRO_CSS}
           ? ' completa 1 ano de uso em ' + diasTxt(c.restam)
           : ': o prazo de ' + diasTxt(c.prazo_dias) + ' termina em ' + diasTxt(c.restam)) + ' (' + dataBR(c.vence_em) + ').';
       }
-      return '<div class="aviso' + cls + '">' + txt + '<button class="selo" data-prazo="' + esc(c.id) + '">ajustar prazo</button></div>';
+      var p = c.pagto || {};
+      return '<div class="aviso' + cls + '">' + txt +
+        '<div class="pg-linha"><button class="selo" data-gerar="' + esc(c.id) + '">' + (p.aberta ? 'ver link de renovação' : 'gerar link de renovação') + '</button>' +
+        '<button class="selo" data-prazo="' + esc(c.id) + '">ajustar prazo</button></div></div>';
     }).join('');
     ligarPrazos();
+    ligarPagto();
+  }
+
+  var ROT_COBR = { aberta: 'link aberto', paga: 'pago', cancelada: 'cancelado', expirada: 'link expirado', estornada: 'estornado', divergente: 'valor menor que o devido' };
+  function desenharCobrancas() {
+    var el = $('#listaCobr');
+    if (!el) return;
+    var adm = !!(dados.eu && dados.eu.admin);
+    if (!adm) { el.innerHTML = ''; return; }
+    var l = (pg && pg.cobrancas) || [];
+    if (!pg) { el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Não consegui carregar os pagamentos agora. Toque em Atualizar.</div>'; return; }
+    if (!l.length) {
+      el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma cobrança ainda. Use "gerar link" numa conta, ou "marcar pago" para registrar um pagamento recebido por fora.</div>';
+      return;
+    }
+    el.innerHTML = '<table><tr><th>Data</th><th>Conta</th><th>Valor</th><th>Renova</th><th>Situação</th><th></th></tr>' + l.map(function (c) {
+      var cls = c.status === 'paga' ? 'selo pub' : (c.status === 'aberta' ? 'selo perto' : (c.status === 'cancelada' || c.status === 'expirada' ? 'selo' : 'selo venc'));
+      var acoes = '';
+      if (c.status === 'aberta' && c.link) {
+        acoes = '<button class="selo" data-copiar="' + esc(c.link) + '">copiar link</button> ' +
+          '<button class="selo venc" data-cancelar="' + esc(c.id) + '">cancelar</button>';
+      }
+      return '<tr><td>' + dataBR(c.status === 'paga' ? c.pago_em : c.criado_em) + '</td>' +
+        '<td>' + esc(c.email || '—') + '</td>' +
+        '<td><b>' + reais(c.valor_centavos) + '</b></td>' +
+        '<td>' + diasTxt(c.dias) + '</td>' +
+        '<td><span class="' + cls + '">' + esc(ROT_COBR[c.status] || c.status) + '</span>' +
+          '<br><span class="peq">' + (c.origem === 'manual' ? 'registrado por você' + (c.obs ? ' · ' + esc(c.obs) : '') : 'PicPay' + (c.metodo ? ' · ' + esc(c.metodo) : '')) + '</span></td>' +
+        '<td class="acoes">' + acoes + '</td></tr>';
+    }).join('') + '</table>';
+    ligarPagto();
+  }
+
+  function ligarPagto() {
+    document.querySelectorAll('[data-gerar]').forEach(function (b) { b.onclick = function () { abrirLink(b.dataset.gerar); }; });
+    document.querySelectorAll('[data-pago]').forEach(function (b) { b.onclick = function () { abrirManual(b.dataset.pago); }; });
+    document.querySelectorAll('[data-copiar]').forEach(function (b) { b.onclick = function () { copiar(b.dataset.copiar, b); }; });
+    document.querySelectorAll('[data-cancelar]').forEach(function (b) {
+      b.onclick = async function () {
+        if (!window.confirm('Cancelar este link de pagamento? Quem receber o link não vai conseguir pagar por ele.')) return;
+        b.disabled = true;
+        try { await api('/api/admin/cobranca/cancelar', { id: b.dataset.cancelar }); await abrirPainel(); }
+        catch (e) { window.alert(e.message); b.disabled = false; }
+      };
+    });
+  }
+
+  // gera o link de renovação (PicPay) de uma conta
+  function abrirLink(id) {
+    var c = contaPorId(id);
+    if (!c) return;
+    var cfg = (pg && pg.config) || {};
+    var m = modalBase(false), cx = m.cx, gerou = false;
+    var p = c.pagto || {};
+    var fechar = function () { m.sair(); if (gerou) abrirPainel(); };
+    cx.innerHTML =
+      '<h2 style="margin:0 0 4px">Link de renovação</h2>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) + '</p>' +
+      (cfg.picpay_credenciais ? '' : '<div class="aviso ruim" style="margin:0 0 12px">A PicPay ainda não está ligada. Toque em "Plano e cobrança" para ver o que falta.</div>') +
+      (p.aberta ? '<div class="aviso perto" style="margin:0 0 12px">Já existe um link em aberto (' + reais(p.aberta.valor_centavos) + '). ' +
+        '<a href="' + esc(p.aberta.link) + '" target="_blank" rel="noopener">abrir</a> · Gerar outro cria um link novo.</div>' : '') +
+      '<div class="linha2"><div class="campo"><label>Valor (R$)</label><input id="lkValor" inputmode="decimal" placeholder="ex.: 49,90" value="' +
+        (cfg.valor_centavos ? (cfg.valor_centavos / 100).toFixed(2).replace('.', ',') : '') + '"></div>' +
+      '<div class="campo"><label>Renova por (dias)</label><input id="lkDias" type="number" min="1" max="3650" inputmode="numeric" value="' + (cfg.dias_ciclo || 30) + '"></div></div>' +
+      '<div id="lkMsg"></div><div id="lkRes"></div>' +
+      '<button class="btn" id="lkOk"' + (cfg.picpay_credenciais ? '' : ' disabled') + '>Gerar link</button>' +
+      '<button class="btn sec" id="lkFechar" style="margin-top:8px">Fechar</button>';
+    cx.querySelector('#lkFechar').onclick = fechar;
+    m.sair = (function (orig) { return function () { orig(); }; })(m.sair);
+    cx.querySelector('#lkOk').onclick = async function () {
+      var msg = cx.querySelector('#lkMsg');
+      var btn = this;
+      aviso(msg, 'Gerando o link na PicPay…');
+      btn.disabled = true;
+      try {
+        var r = await api('/api/admin/cobranca', { id: id, valor: cx.querySelector('#lkValor').value, dias: cx.querySelector('#lkDias').value });
+        gerou = true;
+        aviso(msg, '');
+        var zap = 'Olá! Segue o link para renovar o seu acesso ao Relatório de Campo por ' + r.dias + ' dias (' + reais(r.valor_centavos) + '): ' + r.link;
+        cx.querySelector('#lkRes').innerHTML =
+          '<div class="aviso">Link criado. Vale até ' + dataBR(r.expira_em) + '. Quando o cliente pagar, o prazo da conta é estendido sozinho.</div>' +
+          '<input class="pg-link" id="lkLink" readonly value="' + esc(r.link) + '">' +
+          '<div class="pg-linha"><button class="btn-mini" id="lkCopiar">Copiar link</button>' +
+          '<a class="btn-mini" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(zap) + '">Enviar pelo WhatsApp</a></div>';
+        cx.querySelector('#lkCopiar').onclick = function () { copiar(r.link, this); };
+        btn.textContent = 'Gerar outro link';
+        btn.disabled = false;
+      } catch (e) { aviso(msg, e.message, true); btn.disabled = false; }
+    };
+    cx.querySelector('#lkFechar').onclick = fechar;
+    var veu = cx.parentNode;
+    veu.onclick = function (e) { if (e.target === veu) fechar(); };
+  }
+
+  // pagamento recebido fora da PicPay: registra e estende o prazo
+  function abrirManual(id) {
+    var c = contaPorId(id);
+    if (!c) return;
+    var cfg = (pg && pg.config) || {};
+    var m = modalBase(false), cx = m.cx;
+    cx.innerHTML =
+      '<h2 style="margin:0 0 4px">Marcar como pago</h2>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) + ' · para pagamento recebido por fora (Pix direto, dinheiro…). O prazo da conta é estendido na hora.</p>' +
+      '<div class="linha2"><div class="campo"><label>Valor recebido (R$)</label><input id="mnValor" inputmode="decimal" placeholder="ex.: 49,90" value="' +
+        (cfg.valor_centavos ? (cfg.valor_centavos / 100).toFixed(2).replace('.', ',') : '') + '"></div>' +
+      '<div class="campo"><label>Estender por (dias)</label><input id="mnDias" type="number" min="1" max="3650" inputmode="numeric" value="' + (cfg.dias_ciclo || 30) + '"></div></div>' +
+      '<div class="campo"><label>Observação (opcional)</label><input id="mnObs" placeholder="ex.: Pix direto na conta"></div>' +
+      '<div id="mnMsg"></div>' +
+      '<button class="btn" id="mnOk">Registrar pagamento</button>' +
+      '<button class="btn sec" id="mnCancel" style="margin-top:8px">Cancelar</button>';
+    cx.querySelector('#mnCancel').onclick = m.sair;
+    cx.querySelector('#mnOk').onclick = async function () {
+      var msg = cx.querySelector('#mnMsg');
+      aviso(msg, 'Registrando…');
+      this.disabled = true;
+      try {
+        await api('/api/admin/pagamento-manual', { id: id, valor: cx.querySelector('#mnValor').value, dias: cx.querySelector('#mnDias').value, obs: cx.querySelector('#mnObs').value });
+        m.sair();
+        await abrirPainel();
+      } catch (e) { aviso(msg, e.message, true); this.disabled = false; }
+    };
+  }
+
+  // valor do plano e situação da ligação com a PicPay
+  function abrirPlano() {
+    var cfg = (pg && pg.config) || {};
+    var m = modalBase(true), cx = m.cx;
+    var st = function (ok) { return ok ? '<span class="selo pub">pronto</span>' : '<span class="selo venc">falta</span>'; };
+    cx.innerHTML =
+      '<h2 style="margin:0 0 4px">Plano e cobrança</h2>' +
+      '<p style="margin:0 0 12px;font-size:13px;color:var(--fraco)">Valor e período que já vêm preenchidos ao gerar um link. Dá para trocar em cada link.</p>' +
+      '<div class="linha2"><div class="campo"><label>Valor do plano (R$)</label><input id="plValor" inputmode="decimal" placeholder="ex.: 49,90" value="' +
+        (cfg.valor_centavos ? (cfg.valor_centavos / 100).toFixed(2).replace('.', ',') : '') + '"></div>' +
+      '<div class="campo"><label>Período (dias)</label><input id="plDias" type="number" min="1" max="3650" inputmode="numeric" value="' + (cfg.dias_ciclo || 30) + '"></div></div>' +
+      '<div id="plMsg"></div>' +
+      '<button class="btn" id="plOk">Salvar plano</button>' +
+      '<h3 style="margin:18px 0 6px;font-size:14px;color:var(--verde-escuro)">Ligação com a PicPay</h3>' +
+      '<div class="pg-item"><span>Credenciais (PICPAY_CLIENT_ID e PICPAY_CLIENT_SECRET)</span>' + st(cfg.picpay_credenciais) + '</div>' +
+      '<div class="pg-item"><span>Chave do aviso de pagamento (PICPAY_WEBHOOK_KEY)</span>' + st(cfg.picpay_webhook) + '</div>' +
+      '<div class="campo" style="margin-top:10px"><label>Endereço do aviso de pagamento (cole na PicPay)</label>' +
+        '<input class="pg-link" style="margin:0" id="plUrl" readonly value="' + esc(cfg.webhook_url || '') + '"></div>' +
+      '<div class="pg-linha"><button class="btn-mini" id="plCopiar">Copiar endereço</button></div>' +
+      '<ol class="pg-passos">' +
+        '<li>No painel PicPay Empresas, em Integrações, gere o token do "Link de Pagamento" e guarde o client_id e o client_secret (o secret aparece uma vez só).</li>' +
+        '<li>Em Configurações, "Meu Checkout", ative a URL de notificação com o endereço acima. A PicPay gera uma API Key: guarde.</li>' +
+        '<li>No Cloudflare, em Workers, relatorio-vsl, Configurações, Variáveis e segredos, crie três segredos: PICPAY_CLIENT_ID, PICPAY_CLIENT_SECRET e PICPAY_WEBHOOK_KEY (a API Key do passo 2).</li>' +
+        '<li>Volte aqui e toque em Atualizar: os três itens acima devem ficar "pronto".</li>' +
+      '</ol>' +
+      '<div class="aviso perto" style="margin:0 0 12px">A PicPay não oferece cobrança recorrente automática por Pix: cada renovação é um link novo, que você envia ao cliente. Se ele pagar, o prazo estende sozinho. Se o pagamento for estornado, ajuste o prazo à mão.</div>' +
+      '<button class="btn sec" id="plFechar">Fechar</button>';
+    cx.querySelector('#plFechar').onclick = m.sair;
+    cx.querySelector('#plCopiar').onclick = function () { copiar(cfg.webhook_url || '', this); };
+    cx.querySelector('#plOk').onclick = async function () {
+      var msg = cx.querySelector('#plMsg');
+      aviso(msg, 'Salvando…');
+      try {
+        await api('/api/admin/pagamentos/config', { valor: cx.querySelector('#plValor').value, dias: cx.querySelector('#plDias').value });
+        m.sair();
+        await abrirPainel();
+      } catch (e) { aviso(msg, e.message, true); }
+    };
   }
 
   function ligarPrazos() {
