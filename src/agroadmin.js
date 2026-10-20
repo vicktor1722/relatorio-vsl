@@ -156,6 +156,39 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-abas button{background:none}
 .ag-dia{font:inherit;aspect-ratio:auto;min-height:54px}
 .ag-hd .btn-mini{margin-left:auto}
+
+/* ---------- Dashboard: plantio das áreas ---------- */
+.dp-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.dp-k{background:var(--verde-claro);border-radius:10px;padding:10px 12px;min-width:0}
+.dp-k b{display:block;font-size:22px;line-height:1.15;color:var(--verde-escuro)}
+.dp-k b small{font-size:12px;font-weight:400;color:var(--fraco)}
+.dp-k span{font-size:12px;color:var(--fraco)}
+.dp-barra{height:10px;border-radius:5px;background:var(--linha);overflow:hidden;margin-bottom:10px}
+.dp-barra i{display:block;height:100%;background:var(--verde)}
+.dp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.dp-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;border:1px solid var(--linha);border-radius:14px;padding:4px 10px;background:#fff}
+.dp-chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.dp-t{margin:16px 0 8px;font-size:13.5px;color:var(--verde-escuro)}
+.dp-t span{font-weight:400;color:var(--fraco);font-size:12px;margin-left:6px}
+.dp-graf svg{display:block;width:100%;max-width:760px;height:auto}
+.dp-gl{stroke:var(--linha);stroke-width:1}
+.dp-ax{font-size:11px;fill:var(--fraco)}
+.dp-ar{fill:var(--verde-claro);stroke:none}
+.dp-ln{fill:none;stroke:var(--verde);stroke-width:2.5}
+.dp-pt{fill:#fff;stroke:var(--verde);stroke-width:2.5}
+.dp-tot{stroke:var(--fraco);stroke-width:1;stroke-dasharray:4 4}
+.dp-vars{display:flex;flex-direction:column;gap:8px}
+.dp-v{display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(80px,2fr) minmax(86px,.8fr);gap:10px;align-items:center}
+.dp-vn{min-width:0}
+.dp-vn b{display:block;font-size:13.5px;overflow-wrap:anywhere}
+.dp-vn span,.dp-vh span{display:block;font-size:11.5px;color:var(--fraco)}
+.dp-vb{height:12px;border-radius:6px;background:var(--linha);overflow:hidden}
+.dp-vb i{display:block;height:100%;border-radius:6px}
+.dp-vh{text-align:right;font-size:13px}
+.dp-mini{height:7px;border-radius:4px;background:var(--linha);overflow:hidden;min-width:90px;margin-bottom:3px}
+.dp-mini i{display:block;height:100%;background:var(--verde)}
+.dp-tab td{vertical-align:top}
+@media (max-width:620px){.dp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dp-v{grid-template-columns:1fr 1fr}.dp-vb{grid-column:1/-1;order:3}}
 `;
 
 // String.raw: o código abaixo tem expressões regulares com barra invertida
@@ -164,7 +197,103 @@ export const AGRO_JS = String.raw`
   function agroAposPainel(adm) {
     $('#abaModulos').style.display = adm ? '' : 'none';
     if (adm) agroModulos();
+    agroDash(adm);
     if (window.agroIniciar) window.agroIniciar();
+  }
+
+  /* ---------- Dashboard: evolução do plantio e variedades de todas as contas ---------- */
+  var DP = { dados: null, safra: '' };
+  var DP_CULT = { soja: 'Soja', milho: 'Milho', algodao: 'Algodão', feijao: 'Feijão', sorgo: 'Sorgo', outra: 'Outra cultura' };
+  var DP_COR = { soja: '#1B7A43', milho: '#D9A21B', algodao: '#4A86C5', feijao: '#A5603B', sorgo: '#B5483A', outra: '#7A8A80' };
+  function dpN(n, d) { return Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+  function dpData(i) { var p = String(i || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : '—'; }
+  function dpDias(a, b) { return Math.round((new Date(a + 'T12:00:00Z') - new Date(b + 'T12:00:00Z')) / 864e5); }
+  function dpSoma(iso, n) { var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  function dpCult(c) { return DP_CULT[c] || c || '—'; }
+
+  async function agroDash(adm) {
+    var box = document.getElementById('caixaPlantio');
+    if (!adm) { if (box) box.remove(); return; }
+    if (!box) {
+      box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio';
+      $('#kpis').insertAdjacentElement('afterend', box);
+      box.innerHTML = '<h2>Plantio das áreas</h2><div class="nota">Carregando…</div>';
+    }
+    try { DP.dados = await api('/api/agro/admin/plantio'); }
+    catch (e) { box.innerHTML = '<h2>Plantio das áreas</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return; }
+    var ss = DP.dados.safras || [];
+    if (!ss.length) { box.innerHTML = '<h2>Plantio das áreas</h2><div class="nota">Nenhum plantio lançado ainda. Lance na aba Plantio.</div>'; return; }
+    if (!DP.safra || !ss.some(function (s) { return s.safra === DP.safra; })) DP.safra = ss[0].safra;
+    dpPintar(box);
+  }
+
+  function dpGrafico(S) {
+    var ev = S.linha || [];
+    if (!ev.length || !S.total_ha) return '<div class="nota">Ainda não há data de plantio lançada nesta safra.</div>';
+    var hojeIso = new Date().toISOString().slice(0, 10);
+    var W = 640, H = 230, L = 52, R = 16, T = 16, B = 28;
+    var x0 = dpSoma(ev[0].d, -1), x1 = hojeIso > ev[ev.length - 1].d ? hojeIso : ev[ev.length - 1].d;
+    var rg = Math.max(1, dpDias(x1, x0));
+    var X = function (d) { return L + dpDias(d, x0) / rg * (W - L - R); };
+    var step = Math.max(1, Math.ceil(S.total_ha / 3 / 100) * 100), ym = step * 3;
+    var Y = function (v) { return T + (1 - v / ym) * (H - T - B); };
+    var g = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Área plantada acumulada por dia">';
+    for (var k = 0; k <= 3; k++) {
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(k * step) + '" y2="' + Y(k * step) + '" class="dp-gl"/>' +
+        '<text x="' + (L - 6) + '" y="' + (Y(k * step) + 4) + '" text-anchor="end" class="dp-ax">' + dpN(k * step) + '</text>';
+    }
+    var tk = Math.max(1, Math.ceil(rg / 6));
+    for (var d = 0; d <= rg; d += tk) { var di = dpSoma(x0, d); g += '<text x="' + X(di) + '" y="' + (H - 8) + '" text-anchor="middle" class="dp-ax">' + dpData(di) + '</text>'; }
+    var cum = 0, ln = 'M' + X(x0) + ',' + Y(0), pts = '';
+    ev.forEach(function (e, i) {
+      cum += e.ha; ln += ' H' + X(e.d) + ' V' + Y(cum);
+      pts += '<circle cx="' + X(e.d) + '" cy="' + Y(cum) + '" r="' + (i === ev.length - 1 ? 5 : 3.5) + '" class="dp-pt"><title>' +
+        dpData(e.d) + ': +' + dpN(e.ha, 1) + ' ha · acumulado ' + dpN(cum) + ' ha (' + dpN(cum / S.total_ha * 100, 1) + '%)</title></circle>';
+    });
+    ln += ' H' + X(x1);
+    g += '<path d="' + ln + ' V' + Y(0) + ' Z" class="dp-ar"/><path d="' + ln + '" class="dp-ln"/>' + pts;
+    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(S.total_ha) + '" y2="' + Y(S.total_ha) + '" class="dp-tot"/>' +
+      '<text x="' + (L + 4) + '" y="' + (Y(S.total_ha) - 5) + '" class="dp-ax">área total ' + dpN(S.total_ha) + ' ha</text></svg>';
+    return g;
+  }
+
+  function dpPintar(box) {
+    var S = DP.dados.safras.filter(function (s) { return s.safra === DP.safra; })[0];
+    var pc = S.total_ha ? S.plantado_ha / S.total_ha * 100 : 0;
+    var sel = '<select id="dpSafra" aria-label="Safra">' + DP.dados.safras.map(function (s) {
+      return '<option value="' + esc(s.safra) + '"' + (s.safra === DP.safra ? ' selected' : '') + '>Safra ' + esc(s.safra) + '</option>'; }).join('') + '</select>';
+    var h = '<div class="cab-caixa"><h2>Plantio das áreas</h2>' + sel + '</div>';
+    h += '<div class="dp-kpis"><div class="dp-k"><b>' + dpN(pc, 1) + '%</b><span>plantado</span></div>' +
+      '<div class="dp-k"><b>' + dpN(S.plantado_ha) + ' <small>ha</small></b><span>de ' + dpN(S.total_ha) + ' ha</span></div>' +
+      '<div class="dp-k"><b>' + S.fazendas.length + '</b><span>' + (S.fazendas.length === 1 ? 'fazenda com plantio' : 'fazendas com plantio') + '</span></div>' +
+      '<div class="dp-k"><b>' + S.variedades.length + '</b><span>' + (S.variedades.length === 1 ? 'variedade' : 'variedades') + '</span></div></div>';
+    h += '<div class="dp-barra"><i style="width:' + Math.min(100, pc).toFixed(1) + '%"></i></div>';
+    if (S.culturas.length) {
+      h += '<div class="dp-chips">' + S.culturas.map(function (c) {
+        return '<span class="dp-chip"><i style="background:' + (DP_COR[c.cultura] || DP_COR.outra) + '"></i>' + esc(dpCult(c.cultura)) + ' <b>' + dpN(c.plantado) + '</b> de ' + dpN(c.ha) + ' ha</span>'; }).join('') + '</div>';
+    }
+    h += '<h3 class="dp-t">Evolução do plantio</h3><div class="dp-graf">' + dpGrafico(S) + '</div>';
+
+    var mx = S.variedades.reduce(function (m, v) { return Math.max(m, v.ha); }, 0) || 1;
+    h += '<h3 class="dp-t">Variedades <span>' + dpN(S.variedades.reduce(function (a, v) { return a + v.ha; }, 0)) + ' ha com variedade informada</span></h3>';
+    h += S.variedades.length ? '<div class="dp-vars">' + S.variedades.map(function (v) {
+      return '<div class="dp-v"><div class="dp-vn"><b>' + esc(v.variedade) + '</b><span>' + esc(dpCult(v.cultura)) + ' · ' + v.fazendas + (v.fazendas === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
+        '<div class="dp-vb"><i style="width:' + (v.ha / mx * 100).toFixed(1) + '%;background:' + (DP_COR[v.cultura] || DP_COR.outra) + '"></i></div>' +
+        '<div class="dp-vh"><b>' + dpN(v.ha) + ' ha</b><span>plantado ' + dpN(v.plantado) + '</span></div></div>'; }).join('') + '</div>'
+      : '<div class="nota">Nenhuma variedade informada nesta safra.</div>';
+
+    h += '<h3 class="dp-t">Por fazenda</h3><div class="rolagem"><table class="dp-tab"><tr><th>Fazenda</th><th>Andamento</th><th>Período</th><th>Variedades</th></tr>' +
+      S.fazendas.map(function (f) {
+        var p = f.total_ha ? f.plantado_ha / f.total_ha * 100 : 0;
+        return '<tr><td><b>' + esc(f.nome) + '</b><br><span class="peq">' + esc(f.produtor || f.conta) + '</span></td>' +
+          '<td><div class="dp-mini"><i style="width:' + Math.min(100, p).toFixed(0) + '%"></i></div><span class="peq">' + dpN(f.plantado_ha) + ' de ' + dpN(f.total_ha) + ' ha · ' + dpN(p) + '%</span></td>' +
+          '<td class="peq">' + (f.primeira ? dpData(f.primeira) + ' a ' + dpData(f.ultima) : '—') + '</td>' +
+          '<td class="peq">' + (f.variedades.length ? esc(f.variedades.join(', ')) : '—') + '</td></tr>'; }).join('') + '</table></div>';
+    if (S.sem_lancamento && S.sem_lancamento.length) {
+      h += '<p class="nota">Sem plantio lançado nesta safra: ' + S.sem_lancamento.map(function (f) { return esc(f.nome) + ' (' + dpN(f.total_ha) + ' ha)'; }).join(', ') + '.</p>';
+    }
+    box.innerHTML = h;
+    $('#dpSafra').onchange = function () { DP.safra = this.value; dpPintar(box); };
   }
 
   async function agroModulos() {
