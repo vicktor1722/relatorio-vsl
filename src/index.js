@@ -9,7 +9,7 @@ import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
-import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
+import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -329,6 +329,10 @@ export default {
         if (rota === '/api/admin/prazo' && req.method === 'POST') {
           const b = await req.json();
           try { return json(await definirPrazo(env, b.id, b.dias)); }
+          catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/assinatura' && req.method === 'POST') {
+          try { return json(await salvarAssinatura(env, await req.json())); }
           catch (e) { return json({ erro: e.message }, 400); }
         }
         if (rota === '/api/admin/pagamentos' && req.method === 'GET') return json(await listarPagamentos(env, origem));
