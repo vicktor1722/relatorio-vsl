@@ -9,7 +9,7 @@ import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
-import { areasAdmin, criarConta, definirPrazo, ehAdmin, excluirConta, paginaAdmin, promover, resumoAdmin, trocarSenha } from './admin.js';
+import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -149,6 +149,12 @@ export default {
       // capa do app na tela inicial do iPhone (apple-touch-icon)
       if (rota === '/api/icone/app.png') return pngIcone('app');
       if (rota === '/api/icone/adm.png') return pngIcone('adm');
+
+      // aviso de pagamento da PicPay (a chave vai no cabeçalho authorization; sem login de usuário)
+      if (rota === '/api/pagamentos/picpay' && req.method === 'POST') {
+        const w = await webhookPicPay(env, req);
+        return json(w.corpo, w.status);
+      }
 
       // limpeza do app no aparelho: apaga o cache antigo e recarrega a versão nova (não mexe nos relatórios guardados)
       if (rota === '/api/limpar') {
@@ -323,6 +329,24 @@ export default {
         if (rota === '/api/admin/prazo' && req.method === 'POST') {
           const b = await req.json();
           try { return json(await definirPrazo(env, b.id, b.dias)); }
+          catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/pagamentos' && req.method === 'GET') return json(await listarPagamentos(env, origem));
+        if (rota === '/api/admin/pagamentos/config' && req.method === 'POST') {
+          try { return json(await salvarConfigPagto(env, await req.json())); }
+          catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/cobranca' && req.method === 'POST') {
+          try { return json(await criarCobranca(env, origem, await req.json())); }
+          catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/cobranca/cancelar' && req.method === 'POST') {
+          const b = await req.json();
+          try { return json(await cancelarCobranca(env, b.id)); }
+          catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/pagamento-manual' && req.method === 'POST') {
+          try { return json(await pagamentoManual(env, await req.json())); }
           catch (e) { return json({ erro: e.message }, 400); }
         }
         if (rota === '/api/admin/senha' && req.method === 'POST') {
