@@ -262,7 +262,7 @@ export default {
       if (rota === '/api/registrar' && req.method === 'POST') {
         const quantos = await env.DB.prepare('SELECT COUNT(*) AS n FROM usuarios').first();
         if (Number(quantos && quantos.n || 0) > 0) {
-          return json({ erro: 'as contas são criadas pelo administrador. Fale com o responsável pela VSL.' }, 403);
+          return json({ erro: 'as contas são criadas pelo administrador. Fale com o responsável pela AMVS.' }, 403);
         }
         const b = await req.json();
         const email = String(b.email || '').trim().toLowerCase();
@@ -638,7 +638,7 @@ export default {
 
       /* ---------- arquivos do app, quando servidos daqui ---------- */
       if (env.ASSETS) return env.ASSETS.fetch(req);
-      return html(paginaSimples('Relatório VSL', 'Servidor no ar. O app fica em outro endereço.'));
+      return html(paginaSimples('AMVS Relatório', 'Servidor no ar. O app fica em outro endereço.'));
 
     } catch (e) {
       if (rota.startsWith('/api/')) return json({ erro: e.message }, 500);
