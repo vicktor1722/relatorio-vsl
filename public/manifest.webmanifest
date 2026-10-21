@@ -1,6 +1,6 @@
 {
-  "name": "Relatório de Campo · VSL",
-  "short_name": "Relatório",
+  "name": "AMVS Relatório",
+  "short_name": "AMVS Relatório",
   "description": "Registro fotográfico e em vídeo de visitas técnicas, com GPS e talhão automático.",
   "start_url": "./index.html",
   "scope": "./",
