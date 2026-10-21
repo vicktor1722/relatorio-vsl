@@ -133,7 +133,7 @@
 
   function montar(rel, itens, opcoes) {
     const o = opcoes || {};
-    const empresa = o.empresa || 'VSL Consultoria e Treinamento na Agricultura';
+    const empresa = o.empresa || 'AMVS';
     const cidade = o.cidade || 'Pontes e Lacerda · MT';
     const logo = o.logo || '';
     const contato = [o.telefone, o.email].map(function (x) { return String(x || '').trim(); }).filter(Boolean).map(esc).join(' · ');
