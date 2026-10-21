@@ -146,6 +146,17 @@ export default {
     try {
       /* ================= público ================= */
 
+      // site institucional: www.amvs.ia.br mostra o site; amvs.ia.br e o app
+      if (url.hostname.startsWith('www.')) {
+        const mapaSite = { '/': '/amvs/', '/planos': '/amvs/planos', '/contato': '/amvs/contato' };
+        if (mapaSite[rota] && env.ASSETS) {
+          const u2 = new URL(req.url); u2.pathname = mapaSite[rota];
+          return env.ASSETS.fetch(new Request(u2.toString(), req));
+        }
+      } else if (rota === '/amvs' || rota.startsWith('/amvs/')) {
+        return Response.redirect('https://www.' + url.hostname + '/', 302);
+      }
+
       // capa do app na tela inicial do iPhone (apple-touch-icon)
       if (rota === '/api/icone/app.png') return pngIcone('app');
       if (rota === '/api/icone/adm.png') return pngIcone('adm');
