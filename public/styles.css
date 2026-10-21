@@ -422,14 +422,15 @@ input,textarea,select{font:inherit}
 .ag-resumo-ha{background:#fff;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:6px}
 .ag-seq{background:#E6F0FA;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:12px}
 .ag-prod{background:#fff;border-radius:12px;padding:10px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
-.ag-pt{display:flex;gap:8px;align-items:center}
-.ag-pt select{flex:1;min-width:0;padding:9px;border:1px solid var(--linha);border-radius:10px;background:#fff}
-.ag-mv{display:flex;gap:2px}
-.ag-mv button{width:32px;height:32px;border-radius:8px;background:#F0F2F1;font-size:15px}
-.ag-dose{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
-.ag-dose>button{width:38px;height:38px;border-radius:10px;background:#F0F2F1;font-size:20px;flex:none}
-.ag-dose input{width:76px;padding:9px;border:1px solid var(--linha);border-radius:10px;text-align:center}
-.ag-dose select{padding:9px 4px;border:1px solid var(--linha);border-radius:10px;background:#fff}
+.ag-pt{display:flex;gap:10px;align-items:center}
+.ag-pt .ag-ord{width:30px;height:30px;font-size:15px}
+.ag-pt select{flex:1;min-width:0;min-height:50px;padding:12px 10px;border:1px solid var(--linha);border-radius:12px;background:#fff;font-size:17px}
+.ag-mv{display:flex;gap:4px}
+.ag-mv button{width:46px;height:46px;border-radius:10px;background:#F0F2F1;font-size:20px}
+.ag-dose{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.ag-dose>button{width:50px;height:50px;border-radius:12px;background:#F0F2F1;font-size:26px;flex:none}
+.ag-dose input{width:110px;min-height:50px;padding:12px;border:1px solid var(--linha);border-radius:12px;text-align:center;font-size:18px}
+.ag-dose select{min-height:50px;padding:12px 8px;border:1px solid var(--linha);border-radius:12px;background:#fff;font-size:17px}
 .ag-tot{flex-basis:100%;font-size:12.5px;color:var(--texto-fraco)}
 .ag-duas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .ag-duas .btn{margin-top:0;font-size:13.5px;padding:11px 6px}
