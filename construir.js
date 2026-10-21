@@ -54,6 +54,14 @@ fs.writeFileSync(path.join(saida, 'index.html'), html);
   fs.copyFileSync(path.join(pub, f), path.join(saida, f));
 });
 
+/* 5. site institucional (www.amvs.ia.br): copia public/amvs -> site/amvs */
+const web = path.join(pub, 'amvs');
+if (fs.existsSync(web)) {
+  const dst = path.join(saida, 'amvs');
+  fs.mkdirSync(dst, { recursive: true });
+  fs.readdirSync(web).forEach(function (f) { fs.copyFileSync(path.join(web, f), path.join(dst, f)); });
+}
+
 const kb = (fs.statSync(path.join(saida, 'index.html')).size / 1024).toFixed(1);
 console.log('index.html: ' + kb + ' KB  (' + ordem.length + ' scripts embutidos)');
 console.log('pasta: ' + saida);
