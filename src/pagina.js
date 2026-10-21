@@ -422,7 +422,7 @@ const SCRIPT_IDIOMA = String.raw`
 export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
   const ag = blocosAgro(agro);   // plantio e recomendações (null quando não há)
   const p = perfil || {};
-  const empresa = p.empresa || env.EMPRESA || 'VSL Consultoria';
+  const empresa = p.empresa || env.EMPRESA || 'AMVS';
   const cidade = p.cidade || env.CIDADE || '';
   const logo = p.logo || '';
   const tel = String(p.telefone || '').trim();
