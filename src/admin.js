@@ -352,7 +352,7 @@ export async function criarCobranca(env, origem, b) {
   try {
     const nome = 'Relatório de Campo — renovação de ' + dias + ' dias';
     const { link, id: pid } = await picpayCriarLink(env, origem, { id, valor_centavos: valor }, nome,
-      'Acesso ao Relatório de Campo VSL · ' + (u.nome || u.email), expira);
+      'Acesso ao AMVS Relatório · ' + (u.nome || u.email), expira);
     await env.DB.prepare('UPDATE cobrancas SET link = ?, picpay_id = ? WHERE id = ?').bind(link, pid, id).run();
     return { ok: true, id, link, valor_centavos: valor, dias, expira_em: expira };
   } catch (e) {
@@ -664,7 +664,7 @@ export function paginaAdmin(empresa) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ADM Relatório">
 <link rel="apple-touch-icon" href="/api/icone/adm.png">
-<title>Painel · ${esc(empresa || 'Relatório VSL')}</title>
+<title>Painel · ${esc(empresa || 'AMVS Relatório')}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#E8F4EC;--texto:#1B2B22;
@@ -792,7 +792,7 @@ ${AGRO_CSS}
 
 <div id="telaEntrar" class="entrar">
   <h1>Painel de relatórios</h1>
-  <p>${esc(empresa || 'Relatório de Campo VSL')}</p>
+  <p>${esc(empresa || 'AMVS Relatório')}</p>
   <div class="campo"><label>E-mail</label><input id="eMail" type="email" autocomplete="username"></div>
   <div class="campo"><label>Senha</label><input id="eSenha" type="password" autocomplete="current-password"></div>
   <button class="btn" id="btnEntrar">Entrar</button>
