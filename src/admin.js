@@ -1684,9 +1684,20 @@ ${AGRO_CSS}
     if (typeof L === 'undefined') { mapaSimples(pts); return; }
     if (!mapa) {
       mapa = L.map('mapa');
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // fundo de satélite (Esri, sem chave) com nomes de cidades e divisas por cima; o mapa comum fica como opção
+      var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+      var satelite = L.layerGroup([
+        L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagens © Esri, Maxar, Earthstar Geographics'
+        }),
+        L.tileLayer(esri + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19, maxNativeZoom: 18
+        })
+      ]).addTo(mapa);
+      var comum = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19, attribution: '© OpenStreetMap'
-      }).addTo(mapa);
+      });
+      L.control.layers({ 'Satélite': satelite, 'Mapa': comum }, null, { position: 'topright' }).addTo(mapa);
       mapa.setView([-15.2, -59.3], 7);
       mapa.createPane('areas').style.zIndex = 350;   // as áreas ficam por baixo dos pontos
     }
@@ -1717,7 +1728,7 @@ ${AGRO_CSS}
       (r.areas || []).forEach(function (a) {
         L.geoJSON({ type: 'FeatureCollection', features: a.features }, {
           pane: 'areas',
-          style: { color: '#146034', weight: 1.5, fillColor: '#2FA05A', fillOpacity: 0.22 },
+          style: { color: '#B9F5CC', weight: 2, fillColor: '#2FA05A', fillOpacity: 0.22 },
           onEachFeature: function (f, camadaF) {
             var p = f.properties || {};
             camadaF.bindPopup('<b>' + esc(a.fazenda || '—') + '</b>' + (a.produtor ? '<br>' + esc(a.produtor) : '') +
