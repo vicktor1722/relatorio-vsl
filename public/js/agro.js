@@ -493,11 +493,28 @@
     return t.join('\n');
   }
   // PDF simples (texto, A4) feito na hora, sem biblioteca - funciona offline
+  // logo da empresa (Ajustes) já convertido para JPEG ao abrir a ordem: na hora de compartilhar
+  // o PDF sai sem esperar nada (o iPhone só deixa compartilhar logo depois do toque)
+  var LOGO_PDF = null;
+  function prepararLogoPdf() {
+    Sync.conf().then(function (c) {
+      var src = (c && c.logo) || '';
+      if (!src) { LOGO_PDF = null; return; }
+      if (LOGO_PDF && LOGO_PDF.src === src) return;
+      var im = new Image();
+      im.onload = function () {
+        var cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+        var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+        LOGO_PDF = { src: src, w: cv.width, h: cv.height, bin: atob(cv.toDataURL('image/jpeg', 0.92).split(',')[1]) };
+      };
+      im.src = src;
+    }).catch(function () {});
+  }
   function pdfOrdem(r) {
-    var o = dadosOrdem(r), W = 595, H = 842, M = 40, pgs = [[]], y = 0;
+    var o = dadosOrdem(r), W = 595, H = 842, M = 40, pgs = [[]], y = 0, logo = LOGO_PDF;
     function ch(s) {
       var out = '';
-      String(s == null ? '' : s).replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").split('').forEach(function (c) {
+      String(s == null ? '' : s).replace(/\s+/g, ' ').replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").split('').forEach(function (c) {
         var k = c.charCodeAt(0);
         if (k === 8226) out += '-'; else if (k >= 32 && k < 256) out += c;
       });
@@ -514,9 +531,27 @@
     function cabe(h) { if (y - h < M + 20) novaPag(); }
     var VERDE = [0.106, 0.478, 0.263], BRANCO = [1, 1, 1], CINZA = [0.4, 0.4, 0.4], LARANJA = [0.75, 0.4, 0];
     rect(0, H - 104, W, 104, VERDE);
+    var lx = W - M;
+    if (logo) {
+      var lh = Math.min(60, logo.h), lw = logo.w * lh / logo.h;
+      if (lw > 150) { lw = 150; lh = logo.h * lw / logo.w; }
+      lx = W - M - lw; var ly = H - 52 - lh / 2;
+      rect(lx - 6, ly - 6, lw + 12, lh + 12, BRANCO);
+      op('q ' + lw.toFixed(2) + ' 0 0 ' + lh.toFixed(2) + ' ' + lx.toFixed(2) + ' ' + ly.toFixed(2) + ' cm /Im1 Do Q');
+    }
     txt(M, H - 34, 10, false, 'ORDEM DE CAMPO', BRANCO);
-    txt(M, H - 62, 24, true, o.titulo, BRANCO);
-    txt(M, H - 86, 11, false, o.fazenda + '  -  prevista ' + o.data + '  -  ' + fmt(o.ha) + ' ha', BRANCO);
+    // título comprido diminui e, se ainda não couber, quebra em duas linhas (Helvetica-Bold ≈ 0,6 da fonte por letra)
+    var largT = lx - 16 - M, nT = Math.max(1, ch(o.titulo).length), tamT = Math.min(24, largT / (nT * 0.6));
+    if (tamT >= 18) txt(M, H - 62, Math.floor(tamT), true, o.titulo, BRANCO);
+    else {
+      var cabeL = Math.floor(largT / (16 * 0.6)), pal = String(o.titulo).split(' '), l1 = '';
+      while (pal.length && (l1 + ' ' + pal[0]).trim().length <= cabeL) l1 = (l1 + ' ' + pal.shift()).trim();
+      var l2 = pal.join(' ');
+      if (l2.length > cabeL) l2 = l2.slice(0, cabeL - 3) + '...';
+      txt(M, H - 54, 16, true, l1 || o.titulo, BRANCO);
+      if (l2) txt(M, H - 72, 16, true, l2, BRANCO);
+    }
+    txt(M, H - 90, 11, false, o.fazenda + '  -  prevista ' + o.data + '  -  ' + fmt(o.ha) + ' ha', BRANCO);
     y = H - 132;
     if (o.resp) { txt(M, y, 11, false, 'Quem aplica: ' + o.resp); y -= 18; }
     if (o.obs) { txt(M, y, 11, true, 'Atenção: ' + o.obs, LARANJA); y -= 18; }
@@ -550,11 +585,15 @@
     objs[2] = '<< /Type /Pages /Kids [' + pgs.map(function (_, i) { return (5 + i * 2) + ' 0 R'; }).join(' ') + '] /Count ' + n + ' >>';
     objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
     objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    var nImg = logo ? 5 + n * 2 : 0;
     pgs.forEach(function (ops, i) {
       var cont = ops.join('\n');
-      objs[5 + i * 2] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' + (6 + i * 2) + ' 0 R >>';
+      objs[5 + i * 2] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>' +
+        (nImg && i === 0 ? ' /XObject << /Im1 ' + nImg + ' 0 R >>' : '') + ' >> /Contents ' + (6 + i * 2) + ' 0 R >>';
       objs[6 + i * 2] = '<< /Length ' + cont.length + ' >>\nstream\n' + cont + '\nendstream';
     });
+    if (nImg) objs[nImg] = '<< /Type /XObject /Subtype /Image /Width ' + logo.w + ' /Height ' + logo.h +
+      ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + logo.bin.length + ' >>\nstream\n' + logo.bin + '\nendstream';
     var pdf = '%PDF-1.4\n', offs = [];
     for (var k = 1; k < objs.length; k++) { offs[k] = pdf.length; pdf += k + ' 0 obj\n' + objs[k] + '\nendobj\n'; }
     var xr = pdf.length;
@@ -581,6 +620,7 @@
 
   /* ----- ordem de campo ----- */
   function pintarOrdem() {
+    prepararLogoPdf();
     var r = recDe(R.id); if (!r) { R.view = 'lista'; return pintarRecs(); }
     var f = fazDe(r.fazenda_id), d = dd(r), ha = haDe(f, talDe(r), d.parte), pf = haDe(f, talDe(r).filter(function (t) { return feitoDe(r)[t]; }), d.parte), pc = ha ? Math.round(pf / ha * 100) : 0;
     var prods = prodsDe(r), liq = prods.some(function (p) { return liquido(p[2]); }), hat = d.calda ? d.tanque / d.calda : 0;
