@@ -188,7 +188,8 @@
     const k = chaveConversa(rel);
     return (await DB.all('relatorios'))
       .filter(function (r) { return chaveConversa(r) === k; })
-      .sort(function (a, b) { return String(a.criado_em || '').localeCompare(String(b.criado_em || '')); });
+      // a nuvem grava "2026-10-21 15:00:00" e o aparelho "2026-10-21T15:00:00Z": iguala antes de comparar
+      .sort(function (a, b) { return String(a.criado_em || '').replace(' ', 'T').localeCompare(String(b.criado_em || '').replace(' ', 'T')); });
   }
 
   // data de hoje no fuso do aparelho (toISOString viraria o dia depois das 20h em Mato Grosso)
@@ -277,12 +278,10 @@
     }
 
     st.visitas = await visitasDa(st.rel);
-    // a visita corrente é a última ainda aberta
-    const abertas = st.visitas.filter(function (v) { return !visitaFechada(v); });
-    if (abertas.length) {
-      const atual = abertas[abertas.length - 1];
-      if (!st.rel || st.rel.id !== atual.id) { st.rel = atual; await DB.cfg('ultimo', atual.id); }
-    }
+    // a visita corrente é sempre a última da conversa. Se ela já foi enviada, o próximo registro abre uma nova
+    // (uma visita mais antiga que ficou em aberto não recebe os registros de hoje: eles sumiriam no meio da conversa)
+    const ultima = st.visitas[st.visitas.length - 1];
+    if (ultima && st.rel.id !== ultima.id) { st.rel = ultima; await DB.cfg('ultimo', ultima.id); }
 
     $('#dicaCamera').textContent = visitaFechada(st.rel)
       ? 'Visita fechada — o próximo registro abre uma visita nova'
