@@ -51,7 +51,9 @@ h3.dia{margin:16px 0 10px;padding:0 0 4px;font-size:13px;font-weight:600;color:v
 .legenda{margin:6px 0 0;font-size:15px;white-space:pre-wrap}
 .nota{background:var(--verde-claro);border-left:4px solid var(--verde);padding:10px 14px;border-radius:0 8px 8px 0;margin:0 0 18px;font-size:14.5px;white-space:pre-wrap}
 .mapa{border:1px solid var(--linha);border-radius:12px;padding:10px;margin:18px 0}
-.mapa svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}
+.mapa>svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}
+.mapa-sat{height:360px;border-radius:8px;background:#DDE5DF}
+.mapa-sat .leaflet-popup-content{margin:10px 12px;font-size:13px;line-height:1.4}
 .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:14px 0 4px}
 .resumo div{background:#F7F9F7;border:1px solid var(--linha);border-radius:10px;padding:10px 12px}
 .resumo b{display:block;font-size:19px;color:var(--verde-escuro)}
@@ -151,6 +153,40 @@ function mapaSVG(talhoes, itens) {
   });
   s += '</svg>';
   return `<div class="mapa">${s}<div style="font-size:11.5px;color:#6B7B72;margin-top:8px" data-i="legenda_mapa">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`;
+}
+
+// sem KML da fazenda: mapa de satélite no fim do relatório com os pontos onde cada foto e vídeo foi feito
+function mapaPontos(talhoes, itens) {
+  if (((talhoes && talhoes.features) || []).length) return '';
+  const pts = itens.filter(i => i.lat != null && i.lon != null && (i.tipo === 'foto' || i.tipo === 'video')).map(i => ({
+    la: i.lat, lo: i.lon, v: i.tipo === 'video' ? 1 : 0, h: hora(i.capturado_em),
+    l: String(i.legenda || '').slice(0, 140), m: i.tipo === 'foto' && i.midia ? '/img/' + encodeURIComponent(i.midia) : ''
+  }));
+  if (!pts.length) return '';
+  const dados = JSON.stringify(pts).replace(/</g, '\\u003c');
+  return `<h2 class="talhao"><span data-i="mapa_pontos">Onde foram feitos os registros</span></h2>
+<div class="mapa"><div id="mapaPontos" class="mapa-sat"></div>
+<div style="font-size:11.5px;color:#6B7B72;margin-top:8px" data-i="legenda_pontos">🟢 fotos · 🔴 vídeos · imagem de satélite</div></div>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+  var el = document.getElementById('mapaPontos'), P = ${dados};
+  if (!window.L) { el.parentNode.style.display = 'none'; el.parentNode.previousElementSibling.style.display = 'none'; return; }
+  var m = L.map(el, { scrollWheelZoom: false });
+  var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+  L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagens © Esri, Maxar, Earthstar Geographics' }).addTo(m);
+  L.tileLayer(esri + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18 }).addTo(m);
+  function e(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  P.forEach(function(p){
+    L.circleMarker([p.la, p.lo], { radius: 7, color: '#fff', weight: 2.5, fillColor: p.v ? '#D93025' : '#1B7A43', fillOpacity: .95 })
+      .bindPopup((p.m ? '<img src="' + p.m + '" style="display:block;width:180px;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:6px">' : '') +
+        '<b>' + e(p.h) + '</b>' + (p.l ? '<br>' + e(p.l) : '')).addTo(m);
+  });
+  if (P.length === 1) m.setView([P[0].la, P[0].lo], 16);
+  else m.fitBounds(P.map(function(p){ return [p.la, p.lo]; }), { padding: [24, 24], maxZoom: 17 });
+})();
+</script>`;
 }
 
 /* Agrupa os registros por talhão, na ordem em que os talhões vêm do KML. */
@@ -268,6 +304,7 @@ const DICT = {
     produtor: 'Produtor', safra: 'Safra', periodo: 'Período', responsavel: 'Responsável',
     visitas: 'visitas', fotos: 'fotos', videos: 'vídeos', talhoes_reg: 'talhões registrados', ha_map: 'hectares mapeados',
     legenda_mapa: '🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda',
+    mapa_pontos: 'Onde foram feitos os registros', legenda_pontos: '🟢 fotos · 🔴 vídeos · imagem de satélite',
     obs_gerais: 'Observações gerais', fora: 'Fora dos talhões', reg: '{n} registro(s)',
     concluido: 'Serviço concluído ✔️', baixar_midia: 'Baixar', pdf: 'Baixar PDF', compartilhar: 'Compartilhar', link_copiado: 'Link copiado',
     publicado: 'Publicado em {d}',
@@ -279,6 +316,7 @@ const DICT = {
     produtor: 'Producer', safra: 'Crop season', periodo: 'Period', responsavel: 'Responsible',
     visitas: 'visits', fotos: 'photos', videos: 'videos', talhoes_reg: 'fields recorded', ha_map: 'hectares mapped',
     legenda_mapa: '🟢 photos · 🔴 videos · farm KML polygons',
+    mapa_pontos: 'Where the records were taken', legenda_pontos: '🟢 photos · 🔴 videos · satellite imagery',
     obs_gerais: 'General notes', fora: 'Outside the fields', reg: '{n} record(s)',
     concluido: 'Service completed ✔️', baixar_midia: 'Download', pdf: 'Download PDF', compartilhar: 'Share', link_copiado: 'Link copied',
     publicado: 'Published on {d}',
@@ -290,6 +328,7 @@ const DICT = {
     produtor: 'Productor', safra: 'Campaña', periodo: 'Período', responsavel: 'Responsable',
     visitas: 'visitas', fotos: 'fotos', videos: 'videos', talhoes_reg: 'lotes registrados', ha_map: 'hectáreas mapeadas',
     legenda_mapa: '🟢 fotos · 🔴 videos · polígonos del KML de la finca',
+    mapa_pontos: 'Dónde se hicieron los registros', legenda_pontos: '🟢 fotos · 🔴 videos · imagen satelital',
     obs_gerais: 'Observaciones generales', fora: 'Fuera de los lotes', reg: '{n} registro(s)',
     concluido: 'Servicio concluido ✔️', baixar_midia: 'Descargar', pdf: 'Descargar PDF', compartilhar: 'Compartir', link_copiado: 'Enlace copiado',
     publicado: 'Publicado el {d}',
@@ -521,6 +560,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   ${ag ? ag.topo : ''}
   ${corpo}
   ${ag ? ag.fim : ''}
+  ${mapaPontos(talhoes, itens)}
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
