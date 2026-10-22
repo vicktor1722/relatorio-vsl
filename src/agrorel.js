@@ -346,10 +346,11 @@ export function blocosAgro(agro) {
   // talhões que saíram do KML não entram na legenda nem no gráfico
   const plantio = (agro.plantio || []).filter((p) => !temMapa || p.talhao in areas), recs = agro.recs || [];
   const mapaVar = mapaVariedade(agro.mapa, plantio, hoje);
-  const topo = proximas(recs, hoje) + evolucaoPlantio(agro.mapa, plantio, hoje);
+  const evolucao = evolucaoPlantio(agro.mapa, plantio, hoje);   // vai antes das observações gerais
+  const topo = proximas(recs, hoje);
   const fim = aplicacoes(recs, areas, hoje);
-  if (!topo && !fim && !plantio.length) return null;
-  return { topo, mapaVar, fim, talhao: (nome) => chipsDoTalhao(nome, plantio, hoje) };
+  if (!evolucao && !topo && !fim && !plantio.length) return null;
+  return { evolucao, topo, mapaVar, fim, talhao: (nome) => chipsDoTalhao(nome, plantio, hoje) };
 }
 
 export const AGRO_REL_CSS = `
