@@ -269,6 +269,7 @@ export const AGRO_JS = String.raw`
       '<div class="dp-k"><b>' + S.fazendas.length + '</b><span>' + (S.fazendas.length === 1 ? 'fazenda com plantio' : 'fazendas com plantio') + '</span></div>' +
       '<div class="dp-k"><b>' + S.variedades.length + '</b><span>' + (S.variedades.length === 1 ? 'variedade' : 'variedades') + '</span></div></div>';
     h += '<div class="dp-barra"><i style="width:' + Math.min(100, pc).toFixed(1) + '%"></i></div>';
+    if (S.fora_ha) h += '<p class="nota">Pastagem e pousio ficam fora da área de plantio: ' + dpN(S.fora_ha) + ' ha.</p>';
     if (S.culturas.length) {
       h += '<div class="dp-chips">' + S.culturas.map(function (c) {
         return '<span class="dp-chip"><i style="background:' + (DP_COR[c.cultura] || DP_COR.outra) + '"></i>' + esc(dpCult(c.cultura)) + ' <b>' + dpN(c.plantado) + '</b> de ' + dpN(c.ha) + ' ha</span>'; }).join('') + '</div>';
@@ -505,6 +506,21 @@ export const AGRO_JS = String.raw`
     return ST.plantio.filter(function (r) { return r.fazenda_id === fid && (r.safra || '') === (safra || '') && r.talhao === nome; })[0] || null;
   }
   function semTxt(r) { return r.sem_ha ? fmt(r.sem_m, 1) + ' sem/m · ' + fmt(r.sem_ha, 0) + ' sem/ha' : ''; }
+  // área de plantio da fazenda nesta safra: todos os talhões menos os marcados como pastagem/pousio,
+  // que ficam fora da conta (aparecem à parte)
+  var SEM_PLANTIO = { pastagem: 1, pousio: 1 };
+  function resumoArea(fid, safra, tl) {
+    var area = 0, nArea = 0, fora = 0, nomesFora = [], plantado = 0;
+    tl.forEach(function (t) {
+      var r = linhaPlantio(fid, safra, t.nome);
+      if (r && SEM_PLANTIO[r.cultura]) { fora += t.ha; nomesFora.push(t.nome); return; }
+      area += t.ha; nArea++;
+      if (r && r.cultura && r.data_plantio) plantado += t.ha;
+    });
+    return '<div class="ag-resumo-ha"><b>Área de plantio: ' + fmt(area) + ' ha</b> · ' + nArea + (nArea === 1 ? ' talhão' : ' talhões') +
+      (plantado ? '<br>Plantado: ' + fmt(plantado) + ' ha (' + fmt(area ? plantado / area * 100 : 0) + '%)' : '') +
+      (fora ? '<br><span style="color:#6B7B72;font-size:13px">Fora da conta (pastagem/pousio): ' + fmt(fora) + ' ha · ' + esc(nomesFora.join(', ')) + '</span>' : '') + '</div>';
+  }
 
   function mapaPlantio(f, tl) {
     var feitos = tl.filter(function (t) { var r = linhaPlantio(P.faz, P.safra, t.nome); return r && (r.cultura || r.variedade || r.data_plantio); }).map(function (t) { return t.nome; });
@@ -529,7 +545,7 @@ export const AGRO_JS = String.raw`
     pintar(tP, 'Plantio dos talhões', tl.length ? feitos + ' de ' + tl.length + ' talhões informados' : 'sem talhões',
       '', campoProd(P) + '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz, P.prod) + '</select></div>' +
       '<div class="campo"><label>Safra</label><select data-c="safra">' + opcoesSafra(P.safra) + '</select></div></div>' +
-      (tl.length ? mapaPlantio(f, tl) + cards : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
+      (tl.length ? resumoArea(P.faz, P.safra, tl) + mapaPlantio(f, tl) + cards : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
       '<div class="ag-nota">Cultura, variedade, datas e sementes alimentam o mapa por variedade e a evolução do plantio no relatório do cliente.</div>');
     if (!fazendas().length) $('.conteudo', tP).innerHTML = '<div class="aviso">Nenhuma fazenda com talhões. Importe o KML em Produtores e fazendas.</div>';
   }
