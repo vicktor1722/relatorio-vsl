@@ -153,11 +153,15 @@
     $('#subCadastro').textContent = f.length + ' fazenda(s) · ' + p.length + ' produtor(es) · ' + sa.length + ' safra(s)';
     statusCadastro();
 
-    $('#listaSafras').innerHTML = sa.length ? sa.map(function (x) {
-      return '<div class="lista-item"><div class="ic">🌱</div><div class="txt"><b>' + esc(x.nome) +
-        '</b><span>safra cadastrada</span></div>' +
-        '<button class="badge" data-safra="' + esc(x.id) + '">remover</button></div>';
-    }).join('') : '<div class="aviso">Nenhuma safra cadastrada. Toque em <b>+ Nova safra</b>.</div>';
+    // as safras já vêm prontas para escolher (2026/2027, 2027/2028…); só uma antiga fora da lista pode ser removida
+    const prontas = sa.filter(x => x.pronta).map(x => x.nome);
+    $('#listaSafras').innerHTML = (prontas.length ? '<div class="ag-nota">Prontas para escolher, sem precisar cadastrar: <b>' +
+      esc(prontas.join(' · ')) + '</b></div>' : '') +
+      sa.filter(x => !x.pronta).map(function (x) {
+        return '<div class="lista-item"><div class="ic">🌱</div><div class="txt"><b>' + esc(x.nome) +
+          '</b><span>safra cadastrada antes</span></div>' +
+          '<button class="badge" data-safra="' + esc(x.id) + '">remover</button></div>';
+      }).join('');
 
     const maxResp = cadastro.max_responsaveis || 4;
     $('#contaResp').textContent = '(' + rs.length + ' de ' + maxResp + ')';
@@ -201,19 +205,16 @@
     document.querySelectorAll('[data-produtor]').forEach(el => el.onclick = () => abrirProdutor(el.dataset.produtor));
   }
 
+  // "2026/27" → "2026/2027" (o mesmo padrão do servidor)
+  function safraPadrao(s) {
+    return String(s == null ? '' : s).trim()
+      .replace(/^(\d{4})\s*[\/-]\s*(\d{2}|\d{4})$/, function (m, a, b) { return a + '/' + (b.length === 2 ? a.slice(0, 2) + b : b); });
+  }
+
   function sugestaoSafra() {
     const d = new Date();
     const a = d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
     return a + '/' + (a + 1);
-  }
-
-  async function novaSafra() {
-    const nome = prompt('Nome da safra:', sugestaoSafra());
-    if (!nome || !nome.trim()) return;
-    try {
-      await Sync.salvarSafra({ nome: nome.trim().replace(/^(\d{4})\s*[\/-]\s*(\d{2}|\d{4})$/, function (m, a, b) { return a + '/' + (b.length === 2 ? a.slice(0, 2) + b : b); }) });
-      await atualizarCadastro(false);
-    } catch (e) { alert('Não salvou: ' + e.message); }
   }
 
   // pede o nome e cadastra o responsável (até 4 por conta). Devolve o nome salvo ou null.
@@ -250,7 +251,7 @@
 
     const selSafra = $('#fSafraSel');
     if (selSafra) {
-      const v = selSafra.value || selSafra.dataset.pendente || '';
+      const v = safraPadrao(selSafra.value || selSafra.dataset.pendente || cadastro.safra_atual || sugestaoSafra());
       let ops = sa.map(x => '<option value="' + esc(x.nome) + '">' + esc(x.nome) + '</option>');
       if (v && !sa.some(x => x.nome === v)) ops.unshift('<option value="' + esc(v) + '">' + esc(v) + '</option>');
       selSafra.innerHTML = (sa.length || v ? '' : '<option value="">— cadastre uma safra —</option>') + ops.join('');
@@ -458,7 +459,6 @@
     };
     $('#btnNovoProdutor').onclick = () => abrirProdutor(null);
     $('#btnNovaFazenda').onclick = () => abrirFazenda(null);
-    $('#btnNovaSafra').onclick = novaSafra;
     $('#btnNovoResp').onclick = async function () { await novoResponsavel(); };
     $('#fResponsavel').addEventListener('change', async function () {
       const sel = this;
@@ -499,7 +499,7 @@
 
   global.Conta = {
     ligar, mostrarLogin, atualizarCadastro, atualizarSePrecisar, fazendaPorId, produtorPorId,
-    importarKmlFazenda, preencherSelecoes,
+    importarKmlFazenda, preencherSelecoes, safraPadrao,
     telaFazendaAberta: () => !$('#telaFazenda').classList.contains('oculto'),
     dados: () => cadastro
   };

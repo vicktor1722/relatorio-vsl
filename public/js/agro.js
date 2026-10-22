@@ -186,7 +186,11 @@
     var r = global.relAtualMapa || {}, f = fazendas().filter(function (x) { return x.id === r.fazenda_id; })[0];
     return { faz: f ? f.id : '', prod: (f && f.produtor_id) || r.produtor_id || '', safra: r.safra && safras().indexOf(r.safra) >= 0 ? r.safra : '' };
   }
-  function safraPadrao() { var l = safras(); return ST.ult.safra && l.indexOf(ST.ult.safra) >= 0 ? ST.ult.safra : (l[0] || ''); }
+  // a última escolhida; senão a safra em andamento
+  function safraPadrao() {
+    var l = safras(), atual = cad().safra_atual;
+    return ST.ult.safra && l.indexOf(ST.ult.safra) >= 0 ? ST.ult.safra : (atual && l.indexOf(atual) >= 0 ? atual : (l[0] || ''));
+  }
 
   /* ---------------- telas ---------------- */
   function criarTela(id) {

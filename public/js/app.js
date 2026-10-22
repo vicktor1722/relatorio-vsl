@@ -1071,7 +1071,7 @@
     $('#fProdutorSel').value = rel.produtor_id || '';
     Conta.preencherSelecoes();
     $('#fFazendaSel').value = rel.fazenda_id || '';
-    $('#fSafraSel').dataset.pendente = rel.safra || '';
+    $('#fSafraSel').dataset.pendente = Conta.safraPadrao(rel.safra);
     // novo relatório: se a conta tem um único responsável, já vem escolhido
     const unico = ((Conta.dados() || {}).responsaveis || []);
     $('#fResponsavel').dataset.pendente = rel.responsavel || (!rel.id && unico.length === 1 ? unico[0].nome : '');
@@ -1683,6 +1683,14 @@
       }).catch(function () {});
     }
     await carregarCfg();
+
+    // visitas guardadas no aparelho com a safra no formato antigo ("2026/27") passam para "2026/2027"
+    try {
+      for (const r of await DB.all('relatorios')) {
+        const s = Conta.safraPadrao(r.safra);
+        if (r.safra && s !== r.safra) { r.safra = s; await DB.put('relatorios', r); }
+      }
+    } catch (e) { /* segue com o que tem */ }
 
     // link do relatório: #/r/<id> abre direto a tela do cliente
     const alvo = (location.hash.match(/^#\/r\/(.+)$/) || [])[1];
