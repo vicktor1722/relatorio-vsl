@@ -585,10 +585,10 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   ${ag && ag.mapaVar ? '<details class="mapa-geral"><summary>Mapa geral da fazenda<small>fotos e vídeos</small></summary>' + mapaSVG(talhoes, itens) + '</details>' + ag.mapaVar : mapaSVG(talhoes, itens)}
   ${ag ? ag.evolucao : ''}
   ${obsGerais}
-  ${ag ? ag.topo : ''}
   ${corpo}
   ${ag ? ag.fim : ''}
   ${mapaPontos(talhoes, itens)}
+  ${ag ? ag.topo : ''}
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
