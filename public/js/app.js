@@ -186,17 +186,33 @@
   async function visitasDa(rel) {
     if (!rel) return [];
     const k = chaveConversa(rel);
-    return (await DB.all('relatorios'))
-      .filter(function (r) { return chaveConversa(r) === k; })
-      // a nuvem grava "2026-10-21 15:00:00" e o aparelho "2026-10-21T15:00:00Z": iguala antes de comparar
-      .sort(function (a, b) { return String(a.criado_em || '').replace(' ', 'T').localeCompare(String(b.criado_em || '').replace(' ', 'T')); });
+    const visitas = (await DB.all('relatorios')).filter(function (r) { return chaveConversa(r) === k; });
+    // visita em aberto leva a data do primeiro registro (uma visita criada e deixada vazia não fica com a data antiga)
+    let mudou = false;
+    for (const v of visitas) {
+      if (visitaFechada(v)) continue;
+      const itens = await DB.itensDoRelatorio(v.id);
+      if (!itens.length) continue;
+      const dia = diaISO(itens[0].capturado_em);
+      if (dia && v.data_inicio !== dia) { v.data_inicio = dia; await DB.put('relatorios', v); mudou = true; }
+    }
+    if (mudou && navigator.onLine) Sync.sincronizar();
+    // ordem: data da visita e, no mesmo dia, a criação
+    // (a nuvem grava "2026-10-21 15:00:00" e o aparelho "2026-10-21T15:00:00Z": iguala antes de comparar)
+    const chave = function (r) {
+      const criado = String(r.criado_em || '').replace(' ', 'T');
+      return (r.data_inicio || criado.slice(0, 10)) + '|' + criado;
+    };
+    return visitas.sort(function (a, b) { return chave(a).localeCompare(chave(b)); });
   }
 
-  // data de hoje no fuso do aparelho (toISOString viraria o dia depois das 20h em Mato Grosso)
-  function hojeISO() {
-    const d = new Date();
+  // data no fuso do aparelho (toISOString viraria o dia depois das 20h em Mato Grosso)
+  function diaISO(quando) {
+    const d = quando ? new Date(quando) : new Date();
+    if (isNaN(d)) return '';
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
+  function hojeISO() { return diaISO(); }
 
   // a visita que recebe os registros de agora; cria uma nova se a última foi fechada
   async function visitaAberta() {
