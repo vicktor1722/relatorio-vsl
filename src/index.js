@@ -212,6 +212,7 @@ export default {
       }
 
       if (rota.startsWith('/r/')) {
+        await padronizarSafras(env);   // relatório aberto antes de alguém usar o app já sai com a safra no padrão
         let bruto = rota.slice(3).replace(/\/$/, '');
         try { bruto = decodeURIComponent(bruto); } catch (e) {}
         // /r/<id>/traduzir?lang=en devolve as legendas e textos do relatório traduzidos (pt → en/es)

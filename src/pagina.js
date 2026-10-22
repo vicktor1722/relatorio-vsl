@@ -4,6 +4,7 @@
    ============================================================ */
 
 import { AGRO_REL_CSS, AGRO_REL_JS, blocosAgro } from './agrorel.js';
+import { safraPadrao } from './safras.js';
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -502,7 +503,6 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
 
   const fotos = itens.filter(i => i.tipo === 'foto').length;
   const videos = itens.filter(i => i.tipo === 'video').length;
-  const talhoesVisitados = new Set(itens.filter(i => i.talhao).map(i => i.talhao)).size;
   const areaTotal = ((talhoes && talhoes.features) || []).reduce((s, f) => s + ((f.properties && f.properties.area_ha) || 0), 0);
   const capa = itens.find(i => i.tipo === 'foto' && i.midia);
 
@@ -570,16 +570,13 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 </div>
 <div class="painel">
   <div><span data-i="produtor">Produtor</span><b>${esc(rel.produtor || '—')}</b></div>
-  <div><span data-i="safra">Safra</span><b>${esc(rel.safra || '—')}</b></div>
+  <div><span data-i="safra">Safra</span><b>${esc(safraPadrao(rel.safra) || '—')}</b></div>
   <div><span data-i="periodo">Período</span><b>${dataSpan(rel.data_inicio)} – ${dataSpan(rel.data_fim)}</b></div>
   <div><span data-i="responsavel">Responsável</span><b>${esc(rel.responsavel || '—')}</b></div>
 </div>
 <div class="corpo">
   <div class="resumo">
     ${rel._n > 1 ? `<div><b>${rel._n}</b><span data-i="visitas">visitas</span></div>` : ''}
-    <div><b>${fotos}</b><span data-i="fotos">fotos</span></div>
-    <div><b>${videos}</b><span data-i="videos">vídeos</span></div>
-    <div><b>${talhoesVisitados}</b><span data-i="talhoes_reg">talhões registrados</span></div>
     <div><b>${areaTotal ? areaTotal.toFixed(0) : '—'}</b><span data-i="ha_map">hectares mapeados</span></div>
   </div>
   ${ag && ag.mapaVar ? '<details class="mapa-geral"><summary>Mapa geral da fazenda<small>fotos e vídeos</small></summary>' + mapaSVG(talhoes, itens) + '</details>' + ag.mapaVar : mapaSVG(talhoes, itens)}
