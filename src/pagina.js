@@ -155,36 +155,52 @@ function mapaSVG(talhoes, itens) {
   return `<div class="mapa">${s}<div style="font-size:11.5px;color:#6B7B72;margin-top:8px" data-i="legenda_mapa">🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda</div></div>`;
 }
 
-// sem KML da fazenda: mapa de satélite no fim do relatório com os pontos onde cada foto e vídeo foi feito
+// mapa de satélite no fim do relatório com os pontos onde cada foto e vídeo foi feito
+// (e os talhões do KML por cima, quando a fazenda tem)
 function mapaPontos(talhoes, itens) {
-  if (((talhoes && talhoes.features) || []).length) return '';
+  const feats = ((talhoes && talhoes.features) || []).filter(f => f && f.geometry).map(f => ({
+    type: 'Feature', geometry: f.geometry,
+    properties: { nome: (f.properties && f.properties.nome) || '', ha: Number(f.properties && f.properties.area_ha) || 0 }
+  }));
   const pts = itens.filter(i => i.lat != null && i.lon != null && (i.tipo === 'foto' || i.tipo === 'video')).map(i => ({
     la: i.lat, lo: i.lon, v: i.tipo === 'video' ? 1 : 0, h: hora(i.capturado_em),
     l: String(i.legenda || '').slice(0, 140), m: i.tipo === 'foto' && i.midia ? '/img/' + encodeURIComponent(i.midia) : ''
   }));
-  if (!pts.length) return '';
+  if (!pts.length && !feats.length) return '';
   const dados = JSON.stringify(pts).replace(/</g, '\\u003c');
+  const areas = JSON.stringify(feats).replace(/</g, '\\u003c');
   return `<h2 class="talhao"><span data-i="mapa_pontos">Onde foram feitos os registros</span></h2>
 <div class="mapa"><div id="mapaPontos" class="mapa-sat"></div>
-<div style="font-size:11.5px;color:#6B7B72;margin-top:8px" data-i="legenda_pontos">🟢 fotos · 🔴 vídeos · imagem de satélite</div></div>
+<div style="font-size:11.5px;color:#6B7B72;margin-top:8px" data-i="${feats.length ? 'legenda_pontos_kml' : 'legenda_pontos'}">${feats.length ? '🟢 fotos · 🔴 vídeos · contorno claro = talhões do KML' : '🟢 fotos · 🔴 vídeos · imagem de satélite'}</div></div>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function(){
-  var el = document.getElementById('mapaPontos'), P = ${dados};
+  var el = document.getElementById('mapaPontos'), P = ${dados}, A = ${areas};
   if (!window.L) { el.parentNode.style.display = 'none'; el.parentNode.previousElementSibling.style.display = 'none'; return; }
   var m = L.map(el, { scrollWheelZoom: false });
   var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
   L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagens © Esri, Maxar, Earthstar Geographics' }).addTo(m);
   L.tileLayer(esri + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18 }).addTo(m);
   function e(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  // enquadra antes de desenhar: o Leaflet não aceita polígonos num mapa ainda sem posição
+  var ta = A.length ? L.geoJSON({ type: 'FeatureCollection', features: A }, {
+    style: { color: '#B9F5CC', weight: 2, fillColor: '#2FA05A', fillOpacity: 0.15 },
+    onEachFeature: function(f, c){
+      var q = f.properties || {};
+      if (q.nome) c.bindPopup('<b>' + e(q.nome) + '</b>' + (q.ha ? '<br>' + q.ha.toFixed(1).replace('.', ',') + ' ha' : ''));
+    }
+  }) : null;
+  var limites = ta ? ta.getBounds() : L.latLngBounds([]);
+  P.forEach(function(p){ limites.extend([p.la, p.lo]); });
+  if (!ta && P.length === 1) m.setView([P[0].la, P[0].lo], 16);
+  else m.fitBounds(limites, { padding: [24, 24], maxZoom: 17 });
+  if (ta) ta.addTo(m);
   P.forEach(function(p){
     L.circleMarker([p.la, p.lo], { radius: 7, color: '#fff', weight: 2.5, fillColor: p.v ? '#D93025' : '#1B7A43', fillOpacity: .95 })
       .bindPopup((p.m ? '<img src="' + p.m + '" style="display:block;width:180px;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:6px">' : '') +
         '<b>' + e(p.h) + '</b>' + (p.l ? '<br>' + e(p.l) : '')).addTo(m);
   });
-  if (P.length === 1) m.setView([P[0].la, P[0].lo], 16);
-  else m.fitBounds(P.map(function(p){ return [p.la, p.lo]; }), { padding: [24, 24], maxZoom: 17 });
 })();
 </script>`;
 }
@@ -305,6 +321,7 @@ const DICT = {
     visitas: 'visitas', fotos: 'fotos', videos: 'vídeos', talhoes_reg: 'talhões registrados', ha_map: 'hectares mapeados',
     legenda_mapa: '🟢 fotos · 🔴 vídeos · polígonos do KML da fazenda',
     mapa_pontos: 'Onde foram feitos os registros', legenda_pontos: '🟢 fotos · 🔴 vídeos · imagem de satélite',
+    legenda_pontos_kml: '🟢 fotos · 🔴 vídeos · contorno claro = talhões do KML',
     obs_gerais: 'Observações gerais', fora: 'Fora dos talhões', reg: '{n} registro(s)',
     concluido: 'Serviço concluído ✔️', baixar_midia: 'Baixar', pdf: 'Baixar PDF', compartilhar: 'Compartilhar', link_copiado: 'Link copiado',
     publicado: 'Publicado em {d}',
@@ -317,6 +334,7 @@ const DICT = {
     visitas: 'visits', fotos: 'photos', videos: 'videos', talhoes_reg: 'fields recorded', ha_map: 'hectares mapped',
     legenda_mapa: '🟢 photos · 🔴 videos · farm KML polygons',
     mapa_pontos: 'Where the records were taken', legenda_pontos: '🟢 photos · 🔴 videos · satellite imagery',
+    legenda_pontos_kml: '🟢 photos · 🔴 videos · light outline = farm KML fields',
     obs_gerais: 'General notes', fora: 'Outside the fields', reg: '{n} record(s)',
     concluido: 'Service completed ✔️', baixar_midia: 'Download', pdf: 'Download PDF', compartilhar: 'Share', link_copiado: 'Link copied',
     publicado: 'Published on {d}',
@@ -329,6 +347,7 @@ const DICT = {
     visitas: 'visitas', fotos: 'fotos', videos: 'videos', talhoes_reg: 'lotes registrados', ha_map: 'hectáreas mapeadas',
     legenda_mapa: '🟢 fotos · 🔴 videos · polígonos del KML de la finca',
     mapa_pontos: 'Dónde se hicieron los registros', legenda_pontos: '🟢 fotos · 🔴 videos · imagen satelital',
+    legenda_pontos_kml: '🟢 fotos · 🔴 videos · contorno claro = lotes del KML',
     obs_gerais: 'Observaciones generales', fora: 'Fuera de los lotes', reg: '{n} registro(s)',
     concluido: 'Servicio concluido ✔️', baixar_midia: 'Descargar', pdf: 'Descargar PDF', compartilhar: 'Compartir', link_copiado: 'Enlace copiado',
     publicado: 'Publicado el {d}',
