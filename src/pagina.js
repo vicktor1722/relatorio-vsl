@@ -108,14 +108,22 @@ function dataSpan(d) {
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const DIAS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
 
-function diaLongo(iso) {
-  const d = new Date(iso);
+// datas com hora são gravadas em UTC; o relatório mostra no horário de Mato Grosso (UTC-4).
+// "2026-10-23T01:30:00Z" (ou "2026-10-23 01:30:00", da nuvem) → "2026-10-22T21:30:00.000Z": dia e hora certos com getUTC*/slice
+function noFuso(iso) {
+  const s = String(iso || '');
+  if (s.length <= 10) return s;   // só a data: não tem fuso
+  const t = Date.parse(s.replace(' ', 'T') + (/(Z|[+-]\d\d:?\d\d)$/i.test(s) ? '' : 'Z'));
+  return isNaN(t) ? s : new Date(t - 4 * 3600 * 1000).toISOString();
+}
+// dia = "AAAA-MM-DD" (já no fuso)
+function diaLongo(dia) {
+  const d = new Date(String(dia).slice(0, 10) + 'T12:00:00Z');
   return `${DIAS[d.getUTCDay()]}, ${String(d.getUTCDate()).padStart(2, '0')} de ${MESES[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
 }
 function hora(iso) {
-  const d = new Date(iso);
-  return String(d.getUTCHours() - 4 < 0 ? d.getUTCHours() + 20 : d.getUTCHours() - 4).padStart(2, '0') + ':' +
-         String(d.getUTCMinutes()).padStart(2, '0');   // UTC-4 (Mato Grosso)
+  const d = new Date(noFuso(iso));
+  return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
 }
 
 function mapaSVG(talhoes, itens) {
@@ -229,7 +237,7 @@ function agruparPorTalhao(itens, talhoes) {
       const lista = mapa[k].slice().sort((a, b) =>
         String(a.capturado_em).localeCompare(String(b.capturado_em)));
       const dias = {};
-      lista.forEach(i => { dias[String(i.capturado_em).slice(0, 10)] = 1; });
+      lista.forEach(i => { dias[noFuso(i.capturado_em).slice(0, 10)] = 1; });
       return {
         chave: k,
         titulo: k === '\u0000notas' ? 'Observações gerais' : k === '\u0000fora' ? 'Fora dos talhões' : k,
@@ -255,7 +263,7 @@ function gruposDeLegenda(lista) {
 
 function celulaMidia(i) {
   const src = '/img/' + encodeURIComponent(i.midia);
-  const nomeArq = (i.tipo === 'foto' ? 'foto' : 'video') + '-' + String(i.capturado_em || '').replace(/[^0-9]/g, '').slice(0, 12);
+  const nomeArq = (i.tipo === 'foto' ? 'foto' : 'video') + '-' + noFuso(i.capturado_em).replace(/[^0-9]/g, '').slice(0, 12);
   const dl = src + '?baixar=1&n=' + encodeURIComponent(nomeArq);
   return `<div class="item"><figure>` +
     (i.tipo === 'foto'
@@ -284,8 +292,8 @@ export function juntarRelatorios(rels) {
   const lista = rels.slice().sort((a, b) =>
     String(a.data_inicio || a.criado_em).localeCompare(String(b.data_inicio || b.criado_em)));
   const unicos = (campo, sep) => [...new Set(lista.map(r => String(r[campo] || '').trim()).filter(Boolean))].join(sep);
-  const datas = lista.map(r => String(r.data_inicio || r.criado_em || '').slice(0, 10)).filter(Boolean);
-  const fins = lista.map(r => String(r.data_fim || r.data_inicio || r.criado_em || '').slice(0, 10)).filter(Boolean);
+  const datas = lista.map(r => String(r.data_inicio || noFuso(r.criado_em)).slice(0, 10)).filter(Boolean);
+  const fins = lista.map(r => String(r.data_fim || r.data_inicio || noFuso(r.criado_em)).slice(0, 10)).filter(Boolean);
 
   // polígonos: cada talhão aparece uma vez só, mesmo que esteja em várias visitas
   const vistos = new Set(), feats = [];
@@ -503,7 +511,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
   // observações gerais (texto solto) sobem para logo depois do mapa
   const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
   const notasTopo = (rel.observacoes ? `<div class="nota"><span data-tr>${esc(rel.observacoes)}</span></div>` : '') +
-    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${dataSpan(i.capturado_em)}</b> · ` : ''}<span data-tr>${esc(i.legenda)}</span></div>`).join('') : '');
+    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${dataSpan(noFuso(i.capturado_em))}</b> · ` : ''}<span data-tr>${esc(i.legenda)}</span></div>`).join('') : '');
   const obsGerais = notasTopo ? `<h2 class="talhao"><span data-i="obs_gerais">Observações gerais</span></h2>${notasTopo}` : '';
 
   let corpo = '';
@@ -517,9 +525,9 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
     // separa por dia quando o talhão foi visitado em mais de um dia
     const segmentos = [];
     g.itens.forEach(i => {
-      const d = g.varioDia ? String(i.capturado_em).slice(0, 10) : '';
+      const d = g.varioDia ? noFuso(i.capturado_em).slice(0, 10) : '';
       let seg = segmentos[segmentos.length - 1];
-      if (!seg || seg.d !== d) { seg = { d, iso: i.capturado_em, lista: [] }; segmentos.push(seg); }
+      if (!seg || seg.d !== d) { seg = { d, iso: d, lista: [] }; segmentos.push(seg); }
       seg.lista.push(i);
     });
     segmentos.forEach(seg => {
@@ -583,7 +591,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
-<span style="font-size:11.5px"${rel.publicado_em ? ` data-i="publicado" data-d="${esc(String(rel.publicado_em).slice(0, 10))}"` : ''}>${rel.publicado_em ? 'Publicado em ' + fmtData(rel.publicado_em) : ''}</span></footer>
+<span style="font-size:11.5px"${rel.publicado_em ? ` data-i="publicado" data-d="${esc(noFuso(rel.publicado_em).slice(0, 10))}"` : ''}>${rel.publicado_em ? 'Publicado em ' + fmtData(noFuso(rel.publicado_em)) : ''}</span></footer>
 <div class="barra">
   <button class="sec" onclick="window.print()" data-i="pdf">Baixar PDF</button>
   <button data-i="compartilhar" onclick="if(navigator.share){navigator.share({title:document.title,url:location.href})}else{navigator.clipboard.writeText(location.href);alert(window.__t?window.__t('link_copiado'):'Link copiado')}">Compartilhar</button>
