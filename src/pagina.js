@@ -583,6 +583,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
     <div><b>${areaTotal ? areaTotal.toFixed(0) : '—'}</b><span data-i="ha_map">hectares mapeados</span></div>
   </div>
   ${ag && ag.mapaVar ? '<details class="mapa-geral"><summary>Mapa geral da fazenda<small>fotos e vídeos</small></summary>' + mapaSVG(talhoes, itens) + '</details>' + ag.mapaVar : mapaSVG(talhoes, itens)}
+  ${ag ? ag.evolucao : ''}
   ${obsGerais}
   ${ag ? ag.topo : ''}
   ${corpo}
