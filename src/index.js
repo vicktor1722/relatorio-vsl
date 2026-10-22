@@ -8,6 +8,7 @@ import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
+import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safras.js';
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
@@ -309,6 +310,7 @@ export default {
       const me = await usuarioDaRequisicao(req, env);
       if (rota.startsWith('/api/')) {
         if (!me) return json({ erro: 'sessão expirada, entre de novo' }, 401);
+        await padronizarSafras(env);   // dados antigos "2026/27" → "2026/2027" (uma vez por instância)
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
@@ -421,11 +423,15 @@ export default {
           resp = await env.DB.prepare('SELECT * FROM responsaveis WHERE usuario_id = ? ORDER BY criado_em, nome').bind(me.id).all();
         } catch (e) { /* sem responsáveis por enquanto */ }
         const limiteResp = (await ehAdmin(env, me)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
+        // safras: a lista pronta para escolher + alguma outra que a conta já tinha cadastrado
+        const nomesSaf = safrasProntas();
+        const extras = (saf.results || []).filter((s) => nomesSaf.indexOf(s.nome) < 0);
         return json({
           ok: true,
           produtores: prod.results || [],
           fazendas: faz.results || [],
-          safras: saf.results || [],
+          safras: nomesSaf.map((n) => ({ id: 'pronta:' + n, nome: n, pronta: true })).concat(extras),
+          safra_atual: safraAtual(),
           responsaveis: resp.results || [],
           max_responsaveis: limiteResp
         });
@@ -454,7 +460,7 @@ export default {
 
       if (rota === '/api/safra' && req.method === 'POST') {
         const b = await req.json();
-        const nome = String(b.nome || '').trim();
+        const nome = safraPadrao(b.nome);
         if (!nome) return json({ erro: 'informe o nome da safra' }, 400);
         const ja = await env.DB.prepare('SELECT id FROM safras WHERE usuario_id = ? AND nome = ?')
           .bind(me.id, nome).first();
@@ -581,7 +587,7 @@ export default {
             status=excluded.status, publicado_em=excluded.publicado_em, atualizado_em=datetime('now')
           WHERE relatorios.usuario_id = excluded.usuario_id
         `).bind(r.id, me.id, r.produtor_id || null, r.fazenda_id || null,
-                r.produtor || '', r.fazenda || '', r.safra || '', r.servico || '', r.responsavel || '',
+                r.produtor || '', r.fazenda || '', safraPadrao(r.safra), r.servico || '', r.responsavel || '',
                 r.data_inicio || null, r.data_fim || null, r.observacoes || '',
                 r.talhoes ? JSON.stringify(r.talhoes) : '', r.status || 'rascunho', r.publicado_em || null).run();
         return json({ ok: true, id: r.id });

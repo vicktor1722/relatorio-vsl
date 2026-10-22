@@ -438,7 +438,7 @@ export const AGRO_JS = String.raw`
       var c = tudo[0] || {};
       CAD = { fazendas: (c.fazendas || []).map(function (f) {
         if (typeof f.talhoes === 'string' && f.talhoes) { try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; } }
-        return f; }), safras: c.safras || [], responsaveis: c.responsaveis || [], produtores: c.produtores || [] };
+        return f; }), safras: c.safras || [], safra_atual: c.safra_atual || '', responsaveis: c.responsaveis || [], produtores: c.produtores || [] };
       if (tudo[1]) ST.plantio = tudo[1].plantio || [];
       if (tudo[2]) ST.recs = tudo[2].recs || [];
       if (tudo[3]) ST.produtos = tudo[3].produtos || [];
@@ -487,7 +487,11 @@ export const AGRO_JS = String.raw`
     var l = fazendas(); if (!l.length) return '';
     return l.some(function (f) { return f.id === ST.ult.faz; }) ? ST.ult.faz : l[0].id;
   }
-  function safraPadrao() { var l = safras(); return ST.ult.safra && l.indexOf(ST.ult.safra) >= 0 ? ST.ult.safra : (l[0] || ''); }
+  // a última escolhida; senão a safra em andamento
+  function safraPadrao() {
+    var l = safras(), atual = cad().safra_atual;
+    return ST.ult.safra && l.indexOf(ST.ult.safra) >= 0 ? ST.ult.safra : (atual && l.indexOf(atual) >= 0 ? atual : (l[0] || ''));
+  }
 
   /* ---------------- telas (dentro das abas do painel) ---------------- */
   function pintar(el, titulo, sub, acoes, corpo) {

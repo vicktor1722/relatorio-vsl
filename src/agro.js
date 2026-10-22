@@ -9,6 +9,7 @@
    ============================================================ */
 
 import { novoId } from './auth.js';
+import { safraPadrao } from './safras.js';
 
 let pronta = null;
 
@@ -167,7 +168,7 @@ export async function dadosParaRelatorio(env, rel) {
     if (mod.plantio) {
       const { results } = await env.DB.prepare(
         'SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ? AND safra = ?')
-        .bind(rel.usuario_id, rel.fazenda_id, rel.safra || '').all();
+        .bind(rel.usuario_id, rel.fazenda_id, safraPadrao(rel.safra)).all();
       out.plantio = results || [];
       const f = await fazendaDoUsuario(env, rel.usuario_id, rel.fazenda_id);
       if (f && f.talhoes) { try { out.mapa = JSON.parse(f.talhoes); } catch (e) { /* sem mapa */ } }
@@ -176,7 +177,7 @@ export async function dadosParaRelatorio(env, rel) {
       const { results } = await env.DB.prepare(
         'SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? AND mostrar = 1 ORDER BY data_prevista')
         .bind(rel.usuario_id, rel.fazenda_id).all();
-      out.recs = (results || []).filter((r) => !rel.safra || !r.safra || r.safra === rel.safra).map(linhaRec);
+      out.recs = (results || []).filter((r) => !rel.safra || !r.safra || safraPadrao(r.safra) === safraPadrao(rel.safra)).map(linhaRec);
     }
     if (!out.plantio.length && !out.recs.length) return null;
     return out;
@@ -328,7 +329,7 @@ export async function rotasAgro(env, req, me, rota, url) {
     const b = await req.json();
     const fid = txt(b.fazenda_id, 80);
     if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
-    const safra = txt(b.safra, 40);
+    const safra = safraPadrao(txt(b.safra, 40));
     const lista = Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [];
     const cmds = [];
     for (const t of lista) {
@@ -402,7 +403,7 @@ export async function rotasAgro(env, req, me, rota, url) {
           operacao = excluded.operacao, data_prevista = excluded.data_prevista, mostrar = excluded.mostrar,
           dados = excluded.dados, atualizado_em = datetime('now')
         WHERE recomendacoes.usuario_id = excluded.usuario_id`)
-      .bind(id, me.id, fid, txt(b.safra, 40), txt(b.operacao, 80), dia(b.data_prevista), b.mostrar === false ? 0 : 1, dados).run();
+      .bind(id, me.id, fid, safraPadrao(txt(b.safra, 40)), txt(b.operacao, 80), dia(b.data_prevista), b.mostrar === false ? 0 : 1, dados).run();
     return json({ ok: true, id: id });
   }
   if (rota === '/api/agro/rec/apagar' && req.method === 'POST') {

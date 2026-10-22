@@ -204,7 +204,7 @@
 
   async function baixarCadastro() {
     const r = await chamar('/api/cadastro');
-    const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], responsaveis: r.responsaveis || [], max_responsaveis: r.max_responsaveis || 4, em: new Date().toISOString() };
+    const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], safra_atual: r.safra_atual || '', responsaveis: r.responsaveis || [], max_responsaveis: r.max_responsaveis || 4, em: new Date().toISOString() };
     dados.fazendas.forEach(function (f) {
       if (typeof f.talhoes === 'string' && f.talhoes) {
         try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; }
