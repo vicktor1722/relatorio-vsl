@@ -51,6 +51,7 @@
         await Sync.entrar(email, senha);
       }
       $('#loginSenha').value = '';
+      verSenha(false);
       aviso(msg, '');
       fechar('telaLogin');
       outraConta = (await Sync.fixarDono()).mudou;
@@ -430,6 +431,15 @@
     } catch (e) { alert('Erro no KML: ' + e.message); }
   }
 
+  // "Mostrar" / "Ocultar" a senha do login (sem argumento, alterna)
+  function verSenha(mostrar) {
+    const i = $('#loginSenha'), b = $('#btnVerSenha');
+    if (mostrar === undefined) mostrar = i.type === 'password';
+    i.type = mostrar ? 'text' : 'password';
+    b.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+    b.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
+  }
+
   /* ---------------- ligações ---------------- */
 
   function ligar() {
@@ -437,6 +447,7 @@
     $('#btnAlternarConta').onclick = alternarModo;
     if ($('#btnTrocarServidor')) $('#btnTrocarServidor').onclick = trocarServidor;
     $('#loginSenha').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
+    $('#btnVerSenha').onclick = function () { verSenha(); $('#loginSenha').focus(); };
 
     $('#btnAbrirCadastro').onclick = async function () { await atualizarCadastro(true); abrir('telaCadastro'); };
     $('#btnAtualizarCadastro').onclick = async function () {

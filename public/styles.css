@@ -195,6 +195,8 @@ input,textarea,select{font:inherit}
   width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:#fff;outline:none
 }
 .campo input:focus,.campo textarea:focus{border-color:var(--verde)}
+.senha-box{position:relative}.senha-box input{padding-right:84px}
+.ver-senha{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--verde);font-weight:600;font-size:14px;padding:8px 10px;cursor:pointer}
 .linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .btn{
   display:block;width:100%;padding:13px;border-radius:10px;background:var(--verde);color:#fff;
