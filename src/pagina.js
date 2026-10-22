@@ -587,8 +587,8 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
   ${obsGerais}
   ${corpo}
   ${ag ? ag.fim : ''}
-  ${mapaPontos(talhoes, itens)}
   ${ag ? ag.topo : ''}
+  ${mapaPontos(talhoes, itens)}
   <div style="text-align:center;margin:30px 0 10px;font-size:15px;color:#146034;font-weight:600" data-i="concluido">Serviço concluído ✔️</div>
 </div>
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
