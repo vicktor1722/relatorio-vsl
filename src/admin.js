@@ -709,6 +709,8 @@ tr:last-child td{border-bottom:none}
 .campo{margin-bottom:10px}
 .campo label{display:block;font-size:12px;color:var(--fraco);margin-bottom:4px}
 .campo input,.campo select{width:100%;padding:11px 12px;border:1px solid var(--linha);border-radius:9px;font-size:15px;background:#fff}
+.senha-box{position:relative}.senha-box input{padding-right:84px}
+.ver-senha{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--verde);font-weight:600;font-size:14px;padding:8px 10px;cursor:pointer}
 .btn{width:100%;padding:12px;border:none;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:15px}
 .btn.sec{background:#fff;color:var(--verde);border:1.5px solid var(--verde)}
 .linha2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -794,7 +796,7 @@ ${AGRO_CSS}
   <h1>Painel de relatórios</h1>
   <p>${esc(empresa || 'AMVS Relatório')}</p>
   <div class="campo"><label>E-mail</label><input id="eMail" type="email" autocomplete="username"></div>
-  <div class="campo"><label>Senha</label><input id="eSenha" type="password" autocomplete="current-password"></div>
+  <div class="campo"><label>Senha</label><div class="senha-box"><input id="eSenha" type="password" autocomplete="current-password"><button type="button" class="ver-senha" id="btnVerSenha" aria-pressed="false">Mostrar</button></div></div>
   <button class="btn" id="btnEntrar">Entrar</button>
   <div id="eMsg"></div>
 </div>
@@ -937,6 +939,13 @@ ${AGRO_CSS}
     } catch (e) { aviso(msg, e.message, true); }
   };
   $('#eSenha').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#btnEntrar').click(); });
+  $('#btnVerSenha').onclick = function () {
+    var i = $('#eSenha'), mostrar = i.type === 'password';
+    i.type = mostrar ? 'text' : 'password';
+    this.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+    this.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
+    i.focus();
+  };
 
   $('#btnSair').onclick = function () {
     token = ''; try { localStorage.removeItem(CHAVE); } catch (e) {}
