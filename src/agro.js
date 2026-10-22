@@ -167,8 +167,8 @@ export async function dadosParaRelatorio(env, rel) {
     const out = { plantio: [], recs: [], mapa: null };
     if (mod.plantio) {
       const { results } = await env.DB.prepare(
-        'SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ? AND safra = ?')
-        .bind(rel.usuario_id, rel.fazenda_id, safraPadrao(rel.safra)).all();
+        'SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ? AND safra IN (?, ?)')
+        .bind(rel.usuario_id, rel.fazenda_id, safraPadrao(rel.safra), rel.safra || '').all();   // padrão ou como foi gravado
       out.plantio = results || [];
       const f = await fazendaDoUsuario(env, rel.usuario_id, rel.fazenda_id);
       if (f && f.talhoes) { try { out.mapa = JSON.parse(f.talhoes); } catch (e) { /* sem mapa */ } }
