@@ -270,6 +270,7 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   const naoPlanta = {};
   plantio.forEach((p) => { if (SEM_PLANTIO[p.cultura]) naoPlanta[p.talhao] = 1; });
   const total = Object.keys(areas).filter((t) => !naoPlanta[t]).reduce((s, t) => s + areas[t], 0);
+  const haFora = Object.keys(naoPlanta).reduce((s, t) => s + (areas[t] || 0), 0);
   if (!total) return '';
   const por = {};
   plantaveis.filter((p) => p.data_plantio).forEach((p) => { (por[p.data_plantio] = por[p.data_plantio] || []).push(p.talhao); });
@@ -315,6 +316,7 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   return '<h2 class="talhao">Evolução do plantio<small>área acumulada</small></h2>' +
     '<div class="pl-stat"><b>' + fmt(ult.cum / total * 100) + '%</b> plantado <span>' + fmt(ult.cum, 0) + ' de ' + fmt(total, 0) + ' ha</span></div>' +
     (falta.length ? '<div class="pl-falta">Falta plantar: ' + esc(falta.map((p) => p.talhao).join(', ')) + ' · ' + fmt(hf) + ' ha</div>' : '') +
+    (haFora ? '<div class="pl-falta">Fora da conta (pastagem/pousio): ' + esc(Object.keys(naoPlanta).filter((t) => areas[t]).join(', ')) + ' · ' + fmt(haFora) + ' ha</div>' : '') +
     '<div class="pl-graf">' + g + '</div><div class="map-cap" id="plCap"></div>' +
     '<details class="pl-det"><summary>Ver em tabela</summary>' + tb + '</details>' +
     '<script type="application/json" id="plDados">' + dadosJs.replace(/</g, '\\u003c') + '</script>';

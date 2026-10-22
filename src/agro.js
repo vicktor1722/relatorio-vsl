@@ -245,18 +245,19 @@ export async function plantioGeral(env) {
     const porFaz = {};
     rows.forEach((r) => { (porFaz[r.fazenda_id] = porFaz[r.fazenda_id] || []).push(r); });
 
-    let total = 0, plantado = 0;
+    let total = 0, plantado = 0, fora = 0;
     const cult = {}, vari = {}, linha = {}, fazendas = [];
     Object.keys(porFaz).forEach((fid) => {
       const F = faz[fid], rs = porFaz[fid];
-      let naoPlanta = 0, plant = 0, primeira = '', ultima = '';
-      const vs = {};
+      let naoPlanta = 0, plant = 0, primeira = '', ultima = '', comCultura = 0;
+      const vs = {}, cultsFaz = {};
       rs.forEach((r) => {
         const ha = F.areas[r.talhao] || 0;
         if (SEM_PLANTIO[r.cultura]) { naoPlanta += ha; return; }
         if (r.cultura) {
           const c = cult[r.cultura] = cult[r.cultura] || { cultura: r.cultura, ha: 0, plantado: 0 };
           c.ha += ha; if (r.data_plantio) c.plantado += ha;
+          comCultura += ha; cultsFaz[r.cultura] = 1;
         }
         if (r.variedade) {
           const k = (r.cultura || '') + '|' + r.variedade;
@@ -272,7 +273,11 @@ export async function plantioGeral(env) {
         }
       });
       const tot = Math.max(0, F.total - naoPlanta);
-      total += tot; plantado += plant;
+      // fazenda com uma cultura só (ex.: soja): os talhões ainda sem cultura entram na área dela;
+      // pastagem e pousio já ficaram fora de tot
+      const unica = Object.keys(cultsFaz);
+      if (unica.length === 1 && tot > comCultura) cult[unica[0]].ha += tot - comCultura;
+      total += tot; plantado += plant; fora += naoPlanta;
       fazendas.push({ id: fid, nome: F.nome, produtor: F.produtor, conta: F.conta, total_ha: r1(tot), plantado_ha: r1(plant),
         primeira, ultima, variedades: Object.keys(vs).sort() });
     });
@@ -280,7 +285,7 @@ export async function plantioGeral(env) {
     // fazendas de contas com o módulo que ainda não têm nada lançado nesta safra
     const sem = Object.keys(faz).filter((id) => faz[id].ativa && !porFaz[id]).map((id) => ({ id, nome: faz[id].nome, conta: faz[id].conta, total_ha: r1(faz[id].total) }));
     return {
-      safra, total_ha: r1(total), plantado_ha: r1(plantado),
+      safra, total_ha: r1(total), plantado_ha: r1(plantado), fora_ha: r1(fora),
       culturas: Object.keys(cult).map((k) => ({ cultura: k, ha: r1(cult[k].ha), plantado: r1(cult[k].plantado) })).sort((a, b) => b.ha - a.ha),
       variedades: Object.keys(vari).map((k) => ({ cultura: vari[k].cultura, variedade: vari[k].variedade, ha: r1(vari[k].ha),
         plantado: r1(vari[k].plantado), fazendas: Object.keys(vari[k].fazs).length })).sort((a, b) => b.ha - a.ha),
