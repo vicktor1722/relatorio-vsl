@@ -539,7 +539,7 @@
   // Vem de Ajustes neste aparelho; se aqui estiver vazio, do perfil da conta na nuvem (o mesmo do relatório).
   var LOGO_PDF = null;
   function prepararLogoPdf() {
-    Sync.conf().then(async function (c) {
+    Sync.identidade().then(async function (c) {
       var src = (c && c.logo) || '';
       if (!src && navigator.onLine) {
         try { var pf = await Sync.baixarPerfil(); src = (pf && pf.logo) || ''; } catch (e) { /* sem rede: fica sem logo */ }
