@@ -599,7 +599,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 <footer><b>${esc(empresa)}</b><br>${esc(cidade)}<br>${contato ? `<small>${contato}</small><br>` : ''}
 <span style="font-size:11.5px"${rel.publicado_em ? ` data-i="publicado" data-d="${esc(noFuso(rel.publicado_em).slice(0, 10))}"` : ''}>${rel.publicado_em ? 'Publicado em ' + fmtData(noFuso(rel.publicado_em)) : ''}</span>
 <div class="amvs"><span data-i="gerado_por">Gerado por</span> <b>AMVS Tecnologia</b> · Relatório de Campo<br>
-<a href="https://wa.me/5565999189847">WhatsApp (65) 99918-9847</a> · <a href="mailto:amvsdiretoria@gmail.com">amvsdiretoria@gmail.com</a> · <a href="https://amvs.ia.br">amvs.ia.br</a></div>
+<a href="https://wa.me/5565999189847">WhatsApp (65) 99918-9847</a> · <a href="mailto:amvsdiretoria@gmail.com">amvsdiretoria@gmail.com</a> · <a href="https://amvs.ia.br/amvs/">amvs.ia.br</a></div>
 ${BANDEIRA}</footer>
 <div class="barra">
   <button class="sec" onclick="window.print()" data-i="pdf">Baixar PDF</button>
