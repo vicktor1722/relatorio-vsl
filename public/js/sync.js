@@ -153,8 +153,9 @@
   // escondidos, até a conta deles entrar de novo.
   async function limparIdentidadeLocal() {
     const c = await conf();
-    delete c.empresa; delete c.cidade; delete c.telefone; delete c.email; delete c.logo;
+    delete c.empresa; delete c.cidade; delete c.telefone; delete c.logo;
     await DB.cfg('servidor', c);
+    await limparIdentidade();
     await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
     await DB.cfg('ultimo', null);
   }
@@ -164,8 +165,9 @@
   async function limparDadosLocais() {
     for (const loja of ['relatorios', 'itens', 'midias']) await DB.limpar(loja);
     const c = await conf();
-    delete c.empresa; delete c.cidade; delete c.telefone; delete c.email; delete c.logo;
+    delete c.empresa; delete c.cidade; delete c.telefone; delete c.logo;
     await DB.cfg('servidor', c);
+    await limparIdentidade();
     await DB.cfg('cadastro', { produtores: [], fazendas: [], safras: [], responsaveis: [], em: null });
     await DB.cfg('ultimo', null);
   }
@@ -180,7 +182,61 @@
     return { nome: c.nome || '', email: c.email || '', api: c.api };
   }
 
-  /* ---------------- identidade da empresa ---------------- */
+  /* ---------------- identidade da empresa (Ajustes) ----------------
+     Fica numa chave própria ("identidade"), separada do login: antes empresa, logo e e-mail
+     de contato moravam junto com a sessão e o e-mail do login sobrescrevia o de contato;
+     quando o banco do app era limpo, a sessão voltava pelo localStorage mas os Ajustes não.
+     Agora a identidade tem cópia no banco + localStorage + nuvem (/api/perfil). */
+  const CHAVE_IDENT = 'amvs-identidade';
+  const CAMPOS_IDENT = ['empresa', 'cidade', 'telefone', 'email', 'logo', 'qualidade', 'video'];
+
+  function soIdent(o) {
+    const r = {};
+    CAMPOS_IDENT.forEach(function (k) { if (o && o[k] !== undefined && o[k] !== null) r[k] = o[k]; });
+    return r;
+  }
+  function identLocal() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_IDENT) || 'null'); } catch (e) { return null; }
+  }
+  function gravarIdentLocal(i) {
+    try { localStorage.setItem(CHAVE_IDENT, JSON.stringify(i)); }
+    catch (e) {   // sem espaço: guarda ao menos o texto, sem o logo
+      try { localStorage.setItem(CHAVE_IDENT, JSON.stringify(Object.assign({}, i, { logo: '' }))); } catch (e2) {}
+    }
+  }
+
+  async function identidade() {
+    let i = null;
+    try { i = await DB.cfg('identidade'); } catch (e) { i = null; }
+    if (!i) {
+      i = identLocal();
+      if (!i) {
+        // migra do formato antigo (tudo junto com o login). O e-mail antigo pode ser o do login: não migra.
+        let c = null;
+        try { c = await DB.cfg('servidor'); } catch (e) {}
+        i = soIdent(c || {}); delete i.email;
+      }
+      if (i && Object.keys(i).length) {
+        try { await DB.cfg('identidade', i); } catch (e) {}
+        gravarIdentLocal(i);
+      }
+    } else if (!identLocal()) gravarIdentLocal(i);
+    return i || {};
+  }
+
+  async function salvarIdentidade(novo) {
+    const i = Object.assign({}, await identidade(), soIdent(novo));
+    try { await DB.cfg('identidade', i); } catch (e) {}
+    gravarIdentLocal(i);
+    return i;
+  }
+
+  async function limparIdentidade() {
+    const i = await identidade();
+    const fica = { qualidade: i.qualidade, video: i.video };   // qualidade de mídia é do aparelho, não da conta
+    try { await DB.cfg('identidade', soIdent(fica)); } catch (e) {}
+    gravarIdentLocal(soIdent(fica));
+  }
 
   async function salvarPerfil(perfil) {
     if (!(await logado())) return null;
@@ -577,7 +633,7 @@
   global.Sync = {
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
-    salvarPerfil, baixarPerfil,
+    salvarPerfil, baixarPerfil, identidade, salvarIdentidade,
     meuId, fixarDono, limparIdentidadeLocal, limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f)
   };

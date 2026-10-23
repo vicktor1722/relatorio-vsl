@@ -1266,8 +1266,31 @@
 
   /* ---------------- ajustes ---------------- */
   async function carregarCfg() {
-    const c = await DB.cfg('servidor');
-    if (c) st.cfg = Object.assign(st.cfg, c);
+    let id = await Sync.identidade();
+    st.cfg = Object.assign({ qualidade: 0.82, video: 720 }, id);
+    preencherCfg();
+    const u = await DB.uso();
+    $('#usoDisco').textContent = bytesFmt(u.usado) + (u.cota ? ' de ' + bytesFmt(u.cota) : '');
+    const q = await Sync.quemSou();
+    $('#infoConta').innerHTML = '<div class="lista-item"><div class="ic">👤</div><div class="txt"><b>' +
+      esc(q.nome || q.email || 'sem conta') + '</b><span>' + esc(q.email || '') + '</span></div></div>';
+    // aparelho sem os dados da empresa: traz da conta na nuvem (o mesmo perfil que vai no relatório)
+    if (!(id.empresa || id.logo || id.cidade || id.telefone || id.email) && navigator.onLine) (async function () {
+      try {
+        const pf = await Sync.baixarPerfil();
+        if (pf && (pf.empresa || pf.cidade || pf.logo || pf.telefone || pf.email)) {
+          id = await Sync.salvarIdentidade({
+            empresa: pf.empresa || '', cidade: pf.cidade || '', telefone: pf.telefone || '',
+            email: pf.email || '', logo: pf.logo || ''
+          });
+          st.cfg = Object.assign({ qualidade: 0.82, video: 720 }, id);
+          preencherCfg();
+        }
+      } catch (e) { /* sem rede ou sem login: fica com o que tem */ }
+    })();
+  }
+
+  function preencherCfg() {
     $('#cfgEmpresa').value = st.cfg.empresa || '';
     $('#cfgCidade').value = st.cfg.cidade || '';
     $('#cfgTelefone').value = st.cfg.telefone || '';
@@ -1275,27 +1298,42 @@
     mostrarLogo();
     $('#cfgQualidade').value = String(st.cfg.qualidade || 0.82);
     $('#cfgVideo').value = String(st.cfg.video || 720);
-    const u = await DB.uso();
-    $('#usoDisco').textContent = bytesFmt(u.usado) + (u.cota ? ' de ' + bytesFmt(u.cota) : '');
-    const q = await Sync.quemSou();
-    $('#infoConta').innerHTML = '<div class="lista-item"><div class="ic">👤</div><div class="txt"><b>' +
-      esc(q.nome || q.email || 'sem conta') + '</b><span>' + esc(q.email || '') + '</span></div></div>';
   }
 
-  async function salvarCfg() {
-    const atual = (await DB.cfg('servidor')) || {};
-    st.cfg = Object.assign({}, atual, {
+  function lerTelaCfg() {
+    return {
       empresa: $('#cfgEmpresa').value.trim(),
       cidade: $('#cfgCidade').value.trim(),
       telefone: $('#cfgTelefone').value.trim(),
       email: $('#cfgEmail').value.trim(),
+      logo: st.cfg.logo || '',
       qualidade: parseFloat($('#cfgQualidade').value),
       video: parseInt($('#cfgVideo').value, 10)
-    });
-    await DB.cfg('servidor', st.cfg);
+    };
+  }
+
+  // grava no aparelho (banco + cópia de segurança) a cada alteração, sem depender do botão
+  async function guardarCfgLocal() {
+    st.cfg = Object.assign(st.cfg, await Sync.salvarIdentidade(lerTelaCfg()));
+  }
+
+  let timerNuvem = null;
+  function enviarPerfil(avisar) {
+    clearTimeout(timerNuvem);
+    return Sync.salvarPerfil({ empresa: st.cfg.empresa || '', cidade: st.cfg.cidade || '', telefone: st.cfg.telefone || '', email: st.cfg.email || '', logo: st.cfg.logo || '' })
+      .catch(function (e) { if (avisar) toast('Salvo no aparelho; servidor: ' + e.message, 4000); });
+  }
+
+  async function salvarCfg() {
+    await guardarCfgLocal();
     toast('Ajustes salvos');
-    Sync.salvarPerfil({ empresa: st.cfg.empresa, cidade: st.cfg.cidade, telefone: st.cfg.telefone || '', email: st.cfg.email || '', logo: st.cfg.logo || '' })
-      .catch(function (e) { toast('Salvo no aparelho; servidor: ' + e.message, 4000); });
+    enviarPerfil(true);
+  }
+
+  async function aoMudarCfg() {
+    await guardarCfgLocal();
+    clearTimeout(timerNuvem);
+    timerNuvem = setTimeout(function () { enviarPerfil(false); }, 1500);
   }
 
   /* ---------------- logo da empresa ---------------- */
@@ -1526,7 +1564,10 @@
 
   /* ---------------- eventos ---------------- */
   function ligarEventos() {
-    $$('[data-fechar]').forEach(function (b) { b.onclick = function () { fechar(b.dataset.fechar); }; });
+    $$('[data-fechar]').forEach(function (b) { b.onclick = function () {
+      if (b.dataset.fechar === 'telaAjustes' && timerNuvem) enviarPerfil(false);   // saiu antes de mandar para a nuvem
+      fechar(b.dataset.fechar);
+    }; });
 
     $('#btnMenuLista').onclick = async function () { await listarRelatorios(); abrir('telaLista'); };
     $('#btnMais').onclick = menuMais;
@@ -1539,22 +1580,26 @@
     $('#btnNovoRel').onclick = function () { relEdicao = {}; preencherFormulario({}); abrir('telaRel'); };
     $('#btnSalvarRel').onclick = salvarRelatorio;
     $('#btnSalvarCfg').onclick = salvarCfg;
+    ['#cfgEmpresa', '#cfgCidade', '#cfgTelefone', '#cfgEmail'].forEach(function (q) { $(q).addEventListener('input', aoMudarCfg); });
+    ['#cfgQualidade', '#cfgVideo'].forEach(function (q) { $(q).addEventListener('change', aoMudarCfg); });
     $('#btnEscolherLogo').onclick = function () { $('#inpLogo').click(); };
     $('#inpLogo').onchange = async function (e) {
       const f = e.target.files[0]; e.target.value = '';
       if (!f) return;
       try {
         st.cfg.logo = await prepararLogo(f);
-        await DB.cfg('servidor', st.cfg);
+        await guardarCfgLocal();
         mostrarLogo();
-        toast('Logo carregado — toque em Salvar ajustes');
+        enviarPerfil(true);
+        toast('Logo salvo');
       } catch (err) { toast('Não consegui ler a imagem: ' + err.message, 4000); }
     };
     $('#btnRemoverLogo').onclick = async function () {
       st.cfg.logo = '';
-      await DB.cfg('servidor', st.cfg);
+      await guardarCfgLocal();
       mostrarLogo();
-      toast('Logo removido — toque em Salvar ajustes');
+      enviarPerfil(true);
+      toast('Logo removido');
     };
     $('#btnTestar').onclick = testarConexao;
     $('#btnSincronizarTudo').onclick = async function () { toast('Sincronizando…'); const r = await Sync.sincronizar(); toast('Enviados: ' + (r.enviados || 0)); await renderChat(); atualizarSync(); };
