@@ -510,6 +510,26 @@ export const AGRO_JS = String.raw`
     return ST.plantio.filter(function (r) { return r.fazenda_id === fid && (r.safra || '') === (safra || '') && r.talhao === nome; })[0] || null;
   }
   function semTxt(r) { return r.sem_ha ? fmt(r.sem_m, 1) + ' sem/m · ' + fmt(r.sem_ha, 0) + ' sem/ha' : ''; }
+  // DAE: cada talhão tem a sua data = emergência dele + DAE. Sem emergência informada, usa o plantio + 5 dias.
+  // Calculado na hora a partir do plantio (se a emergência mudar, a data acompanha).
+  var EMERG_APOS_PLANTIO = 5;
+  function baseDae(fid, safra, t) {
+    var p = linhaPlantio(fid, safra, t); if (!p) return '';
+    return p.data_emerg || (p.data_plantio ? addDias(p.data_plantio, EMERG_APOS_PLANTIO) : '');
+  }
+  function datasTal(r) {
+    var d = dd(r), n = Number(d.dae) || 0, out = {};
+    talDe(r).forEach(function (t) {
+      var b = n > 0 ? baseDae(r.fazenda_id, r.safra, t) : '';
+      out[t] = b ? addDias(b, n) : ((d.datas && d.datas[t]) || r.data_prevista || '');
+    });
+    return out;
+  }
+  function faixaDatas(r, so) {
+    var m = datasTal(r), v = (so || talDe(r)).map(function (t) { return m[t]; }).filter(Boolean).sort();
+    if (!v.length) return curta(r.data_prevista);
+    return v[0] === v[v.length - 1] ? curta(v[0]) : curta(v[0]) + ' a ' + curta(v[v.length - 1]);
+  }
   // área de plantio da fazenda nesta safra: todos os talhões menos os marcados como pastagem/pousio,
   // que ficam fora da conta (aparecem à parte)
   var SEM_PLANTIO = { pastagem: 1, pousio: 1 };
@@ -702,7 +722,7 @@ export const AGRO_JS = String.raw`
     var cards = lista.map(function (r) {
       var d = dd(r), ha = haDe(f, talDe(r), d.parte), pf = haDe(f, talDe(r).filter(function (t) { return feitoDe(r)[t]; }), d.parte), pc = ha ? Math.round(pf / ha * 100) : 0;
       return '<div class="lista-item ag-rec" data-a="abrirrec" data-v="' + esc(r.id) + '"><div class="ic">📋</div><div class="txt"><b>' + esc(Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao) + '</b>' +
-        '<span>' + curta(r.data_prevista) + ' · ' + talDe(r).length + ' talhão(ões) · ' + fmt(ha) + ' ha</span>' +
+        '<span>' + faixaDatas(r) + ' · ' + talDe(r).length + ' talhão(ões) · ' + fmt(ha) + ' ha</span>' +
         '<span>' + esc(prodsDe(r).map(function (p) { return p[0]; }).join(' + ') || 'sem produtos') + '</span>' +
         '<div class="ag-barra"><i style="width:' + pc + '%"></i></div></div>' + selo(stRec(r)) + '</div>';
     }).join('');
@@ -734,7 +754,9 @@ export const AGRO_JS = String.raw`
     ST.recs.forEach(function (r) {
       if (r.fazenda_id !== fid) return;
       var d = dd(r), pend = talDe(r).filter(function (t) { return !feitoDe(r)[t]; });
-      if (pend.length && r.data_prevista) ev.push({ d: r.data_prevista, k: 'prev', r: r, tal: pend, txt: r.operacao + ' prevista' });
+      var dt = datasTal(r), gp = {};
+      pend.forEach(function (t) { if (dt[t]) (gp[dt[t]] = gp[dt[t]] || []).push(t); });
+      Object.keys(gp).forEach(function (dia) { ev.push({ d: dia, k: 'prev', r: r, tal: gp[dia], txt: r.operacao + ' prevista' }); });
       var g = {}; talDe(r).forEach(function (t) { if (feitoDe(r)[t]) (g[feitoDe(r)[t]] = g[feitoDe(r)[t]] || []).push(t); });
       Object.keys(g).forEach(function (dia) { ev.push({ d: dia, k: 'apl', r: r, tal: g[dia], txt: r.operacao + ' aplicada' }); });
       if (Number(d.rep) > 0 && (Number(d.num) || 1) < (Number(d.total) || 1)) {
@@ -774,7 +796,7 @@ export const AGRO_JS = String.raw`
     var r = recDe(R.id); if (!r) { R.view = 'lista'; return pintarRecs(); }
     var f = fazDe(r.fazenda_id), d = dd(r), ha = haDe(f, talDe(r), d.parte), pf = haDe(f, talDe(r).filter(function (t) { return feitoDe(r)[t]; }), d.parte), pc = ha ? Math.round(pf / ha * 100) : 0;
     var prods = prodsDe(r), liq = prods.some(function (p) { return liquido(p[2]); }), hat = d.calda ? d.tanque / d.calda : 0;
-    var tl = talhoesDe(f), h = '<div class="ag-capa"><small>' + esc(f ? f.nome : '') + ' · prevista ' + curta(r.data_prevista) + '</small><h3>' +
+    var tl = talhoesDe(f), h = '<div class="ag-capa"><small>' + esc(f ? f.nome : '') + ' · prevista ' + faixaDatas(r) + '</small><h3>' +
       esc(Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao) + '</h3><div class="ag-barra b"><i style="width:' + pc + '%"></i></div><small>' + fmt(pf) + ' de ' + fmt(ha) + ' ha · ' + pc + '%</small></div>';
     if (d.obs) h += '<div class="ag-nota aviso-obs">⚠️ ' + esc(d.obs) + '</div>';
     if (d.resp) h += '<div class="ag-nota">Quem aplica: <b>' + esc(d.resp) + '</b></div>';
@@ -787,7 +809,8 @@ export const AGRO_JS = String.raw`
     var pend = 0;
     talDe(r).forEach(function (nome) {
       var t = tl.filter(function (x) { return x.nome === nome; })[0] || { ha: 0 }, ok = feitoDe(r)[nome], hu = haUsada(t.ha, d.parte && d.parte[nome]); if (!ok) pend++;
-      h += '<div class="ag-talc' + (ok ? ' ok' : '') + '"><div class="ag-tt"><b>' + esc(nome) + '</b><span>' + fmt(hu) + (hu < t.ha ? ' de ' + fmt(t.ha) : '') + ' ha</span></div><div class="ag-tp">' +
+      h += '<div class="ag-talc' + (ok ? ' ok' : '') + '"><div class="ag-tt"><b>' + esc(nome) + '</b><span>' + fmt(hu) + (hu < t.ha ? ' de ' + fmt(t.ha) : '') + ' ha' +
+        (!ok && Number(d.dae) > 0 && datasTal(r)[nome] ? ' · 📅 ' + curta(datasTal(r)[nome]) : '') + '</span></div><div class="ag-tp">' +
         prods.map(function (p) { return '<div><span>' + esc(p[0]) + '</span><b>' + volTotal(p[1] * hu, p[2]) + '</b></div>'; }).join('') + '</div>' +
         (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
           ' <button class="ag-link" data-a="desfazer" data-v="' + esc(nome) + '">desfazer</button></div>'
@@ -1064,6 +1087,7 @@ export const AGRO_JS = String.raw`
       var o = recDe(W.origem.id);
       if (o) { var od = dd(o); od.prox = od.prox || {}; W.origem.tal.forEach(function (t) { od.prox[t] = true; }); salvarRecLocal(o); }
     }
+    if (r.dados.dae > 0) { r.dados.datas = datasTal(r); } else delete r.dados.datas;
     salvarRecLocal(r);
     ST.ult.safra = r.safra; gravar();
     R.W = null; R.id = r.id; R.view = 'det'; pintarRecs(); topoRolagem();
@@ -1074,12 +1098,18 @@ export const AGRO_JS = String.raw`
     var W = R.W;
     if (!(n > 0)) { W.dae = 0; return; }
     W.dae = n;
-    var em = W.tal.map(function (t) { var r = linhaPlantio(W.faz, W.safra, t); return r && r.data_emerg ? [t, r.data_emerg] : null; }).filter(Boolean).sort(function (a, b) { return a[1] < b[1] ? -1 : 1; });
-    if (!em.length) { W.daeMsg = 'Nenhum talhão escolhido tem data de emergência. Informe em 🌱 Plantio.'; pintarWiz(); return; }
-    W.data = addDias(em[0][1], n);
-    var difs = em.some(function (x) { return x[1] !== em[0][1]; });
-    W.daeMsg = 'DAE ' + n + ' = ' + curta(W.data) + ' (emergência de ' + em[0][0] + ' em ' + curta(em[0][1]) + ')' +
-      (difs ? ' · emergências diferentes: ' + em.map(function (x) { return x[0] + ' ' + curta(x[1]); }).join(', ') + '. Usei a mais cedo.' : '');
+    // uma data para cada talhão, pela emergência dele (ou plantio + 5 dias)
+    var lista = W.tal.map(function (t) {
+      var p = linhaPlantio(W.faz, W.safra, t), b = baseDae(W.faz, W.safra, t);
+      return b ? { t: t, d: addDias(b, n), est: !(p && p.data_emerg) } : { t: t, d: '' };
+    });
+    var com = lista.filter(function (x) { return x.d; }).sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+    if (!com.length) { W.daeMsg = 'Nenhum talhão escolhido tem data de plantio ou emergência. Informe em 🌱 Plantio.'; pintarWiz(); return; }
+    W.data = com[0].d;   // a primeira: ordena a lista e serve para talhão sem plantio
+    var sem = lista.filter(function (x) { return !x.d; }).map(function (x) { return x.t; });
+    W.daeMsg = 'DAE ' + n + ', uma data por talhão: ' + com.map(function (x) { return x.t + ' ' + curta(x.d) + (x.est ? '*' : ''); }).join(' · ') +
+      (com.some(function (x) { return x.est; }) ? '. * sem emergência informada: plantio + ' + EMERG_APOS_PLANTIO + ' dias' : '') +
+      (sem.length ? '. Sem plantio (fica ' + curta(W.data) + '): ' + sem.join(', ') : '') + '.';
     pintarWiz();
   }
   function entradaWiz(el) {

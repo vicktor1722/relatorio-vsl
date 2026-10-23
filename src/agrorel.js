@@ -99,26 +99,40 @@ function proximas(recs, hoje) {
 
 /* ---------------- aplicações (bloco final) ---------------- */
 
-function aplicacoes(recs, areas, hoje) {
+// DAE: cada talhão tem a sua data = emergência dele + DAE (sem emergência, plantio + 5 dias), como no app
+const EMERG_APOS_PLANTIO = 5;
+function datasTal(r, porTal) {
+  const d = dadosDe(r), n = Number(d.dae) || 0, out = {};
+  talDe(r).forEach((t) => {
+    const p = porTal[t], b = n > 0 && p ? (p.data_emerg || (p.data_plantio ? addDias(p.data_plantio, EMERG_APOS_PLANTIO) : '')) : '';
+    out[t] = b ? addDias(b, n) : ((d.datas && d.datas[t]) || r.data_prevista || '');
+  });
+  return out;
+}
+
+function aplicacoes(recs, areas, hoje, plantio) {
+  const porTal = {};
+  (plantio || []).forEach((p) => { porTal[p.talhao] = p; });
   const grupos = {}, ordem = [];
   recs.forEach((r) => {
     const d = dadosDe(r), prods = prodsDe(r);
     const k = r.operacao + '|' + (d.num || 1) + '|' + prods.map((p) => p[0] + p[1]).join(',');
     if (!grupos[k]) {
-      grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, prox: null,
+      grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, prox: null, prev: {},
         total: Number(d.total || 1), rep: Number(d.rep || 0), data: r.data_prevista || '',
         calda: Number(d.calda || 0), tanque: Number(d.tanque || 0), ha: {} };
       ordem.push(k);
     }
-    const g = grupos[k];
+    const g = grupos[k], dt = datasTal(r, porTal);
     talDe(r).forEach((t) => {
+      if (dt[t] && (!g.prev[t] || dt[t] < g.prev[t])) g.prev[t] = dt[t];
       if (g.tal.indexOf(t) < 0) g.tal.push(t);
       { const tot = areas[t] || 0, pt = Number(d.parte && d.parte[t]) || 0; g.ha[t] = Math.min(tot, (g.ha[t] || 0) + (pt > 0 && pt < tot ? pt : tot)); }
       if (feitoDe(r)[t]) g.feito[t] = feitoDe(r)[t];
       const v = venc(r, t);
       if (v && !proxDe(r)[t] && (!g.prox || v < g.prox)) g.prox = v;
     });
-    if (r.data_prevista && (!g.data || r.data_prevista < g.data)) g.data = r.data_prevista;
+    Object.keys(dt).forEach((t) => { if (dt[t] && (!g.data || dt[t] < g.data)) g.data = dt[t]; });
   });
   const lista = ordem.map((k) => grupos[k]).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
   if (!lista.length) return '';
@@ -134,9 +148,12 @@ function aplicacoes(recs, areas, hoje) {
     if (feitos.length && feitos.length === g.tal.length) { st = 'Aplicada'; sel = 'v'; }
     else if (feitos.length) { st = 'Em andamento'; sel = 'a'; }
     else { st = 'Prevista'; sel = 'b'; }
+    // datas previstas dos talhões que faltam (uma por talhão quando é por DAE)
+    const prevs = g.tal.filter((t) => !g.feito[t] && g.prev[t]).map((t) => g.prev[t]).sort();
+    const varias = prevs.length > 1 && prevs[0] !== prevs[prevs.length - 1];
     const quando = feitos.length
       ? (datas[0] === datas[datas.length - 1] ? 'em ' + curta(datas[0]) : 'de ' + curta(datas[0]) + ' a ' + curta(datas[datas.length - 1]))
-      : (g.data ? 'para ' + curta(g.data) : '');
+      : (varias ? 'de ' + curta(prevs[0]) + ' a ' + curta(prevs[prevs.length - 1]) : (g.data ? 'para ' + curta(g.data) : ''));
     const liq = g.calda > 0 && g.tanque > 0 && g.prods.some((p) => liquido(p[2]));
     const hat = liq ? g.tanque / g.calda : 0;
     const titulo = (cont[g.op] > 1 || g.total > 1) ? ordTxt(g.op, g.num) : g.op;
@@ -144,7 +161,7 @@ function aplicacoes(recs, areas, hoje) {
       '<div class="ap-meta">' + (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
         (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : '') + '</div>' +
       '<div class="ap-tal">' + g.tal.map((t) => '<span class="' + (g.feito[t] ? 'ok' : '') + '">' +
-        (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + '</span>').join('') +
+        (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + (!g.feito[t] && varias && g.prev[t] ? ' · ' + curta(g.prev[t]) : '') + '</span>').join('') +
         (ha ? '<em>' + fmt(ha) + ' ha</em>' : '') + '</div>' +
       (liq ? '<div class="ap-calda">💧 Calda <b>' + g.calda + ' L/ha</b> · tanque de <b>' + fmt(g.tanque, 0) + ' L</b> cobre <b>' +
         fmt(hat, 0) + ' ha</b>' + (ha ? '<br><span>' + tanques(ha, hat, g.calda) + '</span>' : '') + '</div>' : '') +
@@ -348,7 +365,7 @@ export function blocosAgro(agro) {
   const mapaVar = mapaVariedade(agro.mapa, plantio, hoje);
   const evolucao = evolucaoPlantio(agro.mapa, plantio, hoje);   // vai antes das observações gerais
   const topo = proximas(recs, hoje);
-  const fim = aplicacoes(recs, areas, hoje);
+  const fim = aplicacoes(recs, areas, hoje, plantio);
   if (!evolucao && !topo && !fim && !plantio.length) return null;
   return { evolucao, topo, mapaVar, fim, talhao: (nome) => chipsDoTalhao(nome, plantio, hoje) };
 }
