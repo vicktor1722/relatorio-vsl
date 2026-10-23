@@ -512,19 +512,25 @@
     return t.join('\n');
   }
   // PDF simples (texto, A4) feito na hora, sem biblioteca - funciona offline
-  // logo da empresa (Ajustes) já convertido para JPEG ao abrir a ordem: na hora de compartilhar
-  // o PDF sai sem esperar nada (o iPhone só deixa compartilhar logo depois do toque)
+  // logo da empresa já convertido para JPEG antes do toque: na hora de compartilhar
+  // o PDF sai sem esperar nada (o iPhone só deixa compartilhar logo depois do toque).
+  // Vem de Ajustes neste aparelho; se aqui estiver vazio, do perfil da conta na nuvem (o mesmo do relatório).
   var LOGO_PDF = null;
   function prepararLogoPdf() {
-    Sync.conf().then(function (c) {
+    Sync.conf().then(async function (c) {
       var src = (c && c.logo) || '';
-      if (!src) { LOGO_PDF = null; return; }
+      if (!src && navigator.onLine) {
+        try { var pf = await Sync.baixarPerfil(); src = (pf && pf.logo) || ''; } catch (e) { /* sem rede: fica sem logo */ }
+      }
+      if (!src) return;
       if (LOGO_PDF && LOGO_PDF.src === src) return;
       var im = new Image();
       im.onload = function () {
-        var cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
-        var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
-        LOGO_PDF = { src: src, w: cv.width, h: cv.height, bin: atob(cv.toDataURL('image/jpeg', 0.92).split(',')[1]) };
+        try {
+          var cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+          var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+          LOGO_PDF = { src: src, w: cv.width, h: cv.height, bin: atob(cv.toDataURL('image/jpeg', 0.92).split(',')[1]) };
+        } catch (e) { /* imagem que o navegador não deixa converter: PDF sai sem logo */ }
       };
       im.src = src;
     }).catch(function () {});
@@ -547,7 +553,7 @@
     function rect(x, yy, w, h, c) { op(c.join(' ') + ' rg ' + x + ' ' + yy + ' ' + w + ' ' + h + ' re f'); }
     function linha(yy) { op('0.85 0.85 0.85 RG 0.6 w ' + M + ' ' + yy + ' m ' + (W - M) + ' ' + yy + ' l S'); }
     function novaPag() { pgs.push([]); y = H - M; }
-    function cabe(h) { if (y - h < M + 20) novaPag(); }
+    function cabe(h) { if (y - h < M + 30) novaPag(); }
     var VERDE = [0.106, 0.478, 0.263], BRANCO = [1, 1, 1], CINZA = [0.4, 0.4, 0.4], LARANJA = [0.75, 0.4, 0];
     rect(0, H - 104, W, 104, VERDE);
     var lx = W - M;
@@ -596,8 +602,11 @@
     if (o.hat) par('Calda total (' + fmt(o.calda, 0) + ' L/ha)', fmt(o.ha * o.calda, 0) + ' L');
     var hojeTxt = dataBR(hoje());
     pgs.forEach(function (ops, i) {
-      ops.push('BT /F1 8 Tf 0.5 0.5 0.5 rg ' + M + ' 24 Td (' + ch('Relatório de Campo · AMVS · gerado em ' + hojeTxt) + ') Tj ET');
-      ops.push('BT /F1 8 Tf 0.5 0.5 0.5 rg ' + (W - M - 40) + ' 24 Td (' + ch('Página ' + (i + 1) + ' de ' + pgs.length) + ') Tj ET');
+      ops.push('0.85 0.85 0.85 RG 0.6 w ' + M + ' 46 m ' + (W - M) + ' 46 l S');
+      ops.push('BT /F2 8 Tf 0.106 0.478 0.263 rg ' + M + ' 34 Td (' + ch('AMVS Relatório de Campo') + ') Tj ET');
+      ops.push('BT /F1 8 Tf 0.4 0.4 0.4 rg ' + (M + 104) + ' 34 Td (' + ch('WhatsApp (65) 99918-9847  ·  amvsdiretoria@gmail.com  ·  amvs.ia.br') + ') Tj ET');
+      ops.push('BT /F1 7 Tf 0.5 0.5 0.5 rg ' + M + ' 23 Td (' + ch('Pontes e Lacerda - MT  ·  gerado em ' + hojeTxt) + ') Tj ET');
+      ops.push('BT /F1 8 Tf 0.5 0.5 0.5 rg ' + (W - M - 40) + ' 23 Td (' + ch('Página ' + (i + 1) + ' de ' + pgs.length) + ') Tj ET');
     });
     var objs = [], n = pgs.length;
     objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
@@ -1223,6 +1232,7 @@
     window.addEventListener('online', function () { atualizarModulos().then(descarregar); verificarVersao(); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { atualizarModulos().then(descarregar); verificarVersao(); } });
     atualizarModulos().then(descarregar);
+    prepararLogoPdf();
     setTimeout(verificarVersao, 4000);
   }
 
