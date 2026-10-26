@@ -1090,6 +1090,14 @@
     const prod = Conta.produtorPorId($('#fProdutorSel').value);
     const faz = Conta.fazendaPorId($('#fFazendaSel').value);
     if (!faz) { toast('Escolha a fazenda — ou cadastre uma primeiro'); return; }
+    // o relatório sempre sai com o responsável pela visita
+    const selResp = $('#fResponsavel'), resp = (selResp.value || '').trim();
+    if (!resp || resp === '__novo__') {
+      toast('Escolha o responsável pela visita — ou cadastre um em Cadastro', 4000);
+      selResp.style.borderColor = '#D93025'; selResp.focus();
+      selResp.addEventListener('change', function () { selResp.style.borderColor = ''; }, { once: true });
+      return;
+    }
     const rel = Object.assign({}, base, {
       id: base.id || novoId('r'),
       produtor_id: prod ? prod.id : null,
@@ -1097,7 +1105,7 @@
       produtor: prod ? prod.nome : '',
       fazenda: faz.nome,
       safra: $('#fSafraSel').value.trim(),
-      responsavel: $('#fResponsavel').value.trim(),
+      responsavel: resp,
       servico: $('#fServico').value.trim(),
       // início = dia em que o relatório foi aberto; término = dia em que foi finalizado (preenchido ao finalizar)
       data_inicio: base.data_inicio || hojeISO(),
