@@ -157,10 +157,11 @@ function aplicacoes(recs, areas, hoje, plantio) {
     const liq = g.calda > 0 && g.tanque > 0 && g.prods.some((p) => liquido(p[2]));
     const hat = liq ? g.tanque / g.calda : 0;
     const titulo = (cont[g.op] > 1 || g.total > 1) ? ordTxt(g.op, g.num) : g.op;
-    h += '<div class="ap-card"><div class="ap-topo"><b>' + esc(titulo) + '</b><span class="selo ' + sel + '">' + st + '</span></div>' +
+    const topo = '<div class="ap-topo"><b>' + esc(titulo) + '</b><span class="selo ' + sel + '">' + st + '</span></div>' +
       '<div class="ap-meta">' + (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
-        (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : '') + '</div>' +
-      '<div class="ap-tal">' + g.tal.map((t) => '<span class="' + (g.feito[t] ? 'ok' : '') + '">' +
+        (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : '') + '</div>';
+    const prox = g.prox && g.num < g.total ? '<div class="ap-prox">📅 Próxima aplicação: <b>' + (g.prox < hoje ? 'a programar' : curta(g.prox)) + '</b></div>' : '';
+    const corpo = '<div class="ap-tal">' + g.tal.map((t) => '<span class="' + (g.feito[t] ? 'ok' : '') + '">' +
         (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + (!g.feito[t] && varias && g.prev[t] ? ' · ' + curta(g.prev[t]) : '') + '</span>').join('') +
         (ha ? '<em>' + fmt(ha) + ' ha</em>' : '') + '</div>' +
       (liq ? '<div class="ap-calda">💧 Calda <b>' + g.calda + ' L/ha</b> · tanque de <b>' + fmt(g.tanque, 0) + ' L</b> cobre <b>' +
@@ -169,9 +170,11 @@ function aplicacoes(recs, areas, hoje, plantio) {
         (liq ? '<span>Por tanque</span>' : '') + (ha ? '<span>Total</span>' : '') + '</div>' +
       g.prods.map((p) => '<div><span>' + esc(p[0]) + '</span><span>' + doseTxt(Number(p[1])) + ' ' + esc(unid(p[2])) + '</span>' +
         (liq ? '<span class="tq">' + volTotal(p[1] * hat, p[2]) + '</span>' : '') +
-        (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>' +
-      (g.prox && g.num < g.total ? '<div class="ap-prox">📅 Próxima aplicação: <b>' + (g.prox < hoje ? 'a programar' : curta(g.prox)) + '</b></div>' : '') +
-      '</div>';
+        (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>';
+    // já aplicada: fica recolhida (título, data e próxima aplicação à vista; talhões e produtos ao tocar)
+    h += sel === 'v'
+      ? '<details class="ap-card ap-det"><summary>' + topo + prox + '<span class="ap-ver">Ver talhões e produtos</span></summary>' + corpo + '</details>'
+      : '<div class="ap-card">' + topo + corpo + prox + '</div>';
   });
   return h;
 }
@@ -382,6 +385,9 @@ export const AGRO_REL_CSS = `
 .ap-card{border:1px solid var(--linha);border-radius:12px;padding:11px 12px;margin-bottom:10px;background:#fff}
 .ap-topo{display:flex;justify-content:space-between;align-items:center;gap:8px}.ap-topo b{font-size:15.5px}
 .ap-meta{font-size:12px;color:var(--fraco);margin:2px 0 8px}
+.ap-det>summary{list-style:none;cursor:pointer}.ap-det>summary::-webkit-details-marker{display:none}
+.ap-det:not([open]) .ap-meta{margin-bottom:4px}
+.ap-ver{display:block;font-size:12px;color:var(--verde);font-weight:600}.ap-ver::after{content:" ▾"}.ap-det[open] .ap-ver{margin-bottom:8px}.ap-det[open] .ap-ver::after{content:" ▴"}
 .ap-tal{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:8px}
 .ap-tal span{font-size:11.5px;background:#F0F3F1;border-radius:8px;padding:2px 7px;color:var(--texto)}.ap-tal span.ok{background:var(--verde-claro);color:var(--verde-escuro)}
 .ap-tal em{margin-left:auto;font-style:normal;font-size:12px;font-weight:700;color:var(--verde-escuro)}
@@ -426,8 +432,8 @@ export const AGRO_REL_JS = `
 (function(){
   var cap=document.getElementById('mapCap');
   var abertos=[];
-  window.addEventListener('beforeprint',function(){abertos=[];document.querySelectorAll('.mv-det,.mapa-geral').forEach(function(d){abertos.push(d.open);d.open=true})});
-  window.addEventListener('afterprint',function(){document.querySelectorAll('.mv-det,.mapa-geral').forEach(function(d,i){d.open=abertos[i]})});
+  window.addEventListener('beforeprint',function(){abertos=[];document.querySelectorAll('.mv-det,.mapa-geral,.ap-det').forEach(function(d){abertos.push(d.open);d.open=true})});
+  window.addEventListener('afterprint',function(){document.querySelectorAll('.mv-det,.mapa-geral,.ap-det').forEach(function(d,i){d.open=abertos[i]})});
   document.addEventListener('click',function(e){
     var p=e.target.closest&&e.target.closest('.mapa-cli .mv');
     if(p&&cap){
