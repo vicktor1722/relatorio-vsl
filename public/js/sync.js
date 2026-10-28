@@ -364,6 +364,42 @@
     });
   }
 
+  // Capa do link no WhatsApp: a primeira foto do relatório, reduzida (a prévia não carrega foto de vários MB).
+  // Usa a foto (ou a miniatura) do aparelho; se ela não estiver aqui, baixa da nuvem uma vez.
+  function reduzir(blob, lado) {
+    return new Promise(function (res) {
+      const u = URL.createObjectURL(blob), im = new Image();
+      im.onload = function () {
+        try {
+          const e = Math.min(1, lado / (Math.max(im.naturalWidth, im.naturalHeight) || 1));
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(im.naturalWidth * e)); cv.height = Math.max(1, Math.round(im.naturalHeight * e));
+          cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+          cv.toBlob(function (b) { URL.revokeObjectURL(u); res(b); }, 'image/jpeg', 0.75);
+        } catch (e) { URL.revokeObjectURL(u); res(null); }
+      };
+      im.onerror = function () { URL.revokeObjectURL(u); res(null); };
+      im.src = u;
+    });
+  }
+  async function garantirCapa(rel) {
+    const fotos = (await DB.itensDoRelatorio(rel.id)).filter(function (i) { return i.tipo === 'foto' && i.midia && i.sync_state === 'ok'; });
+    const primeira = fotos[0];
+    if (!primeira || rel.capa_ok === primeira.id) return;
+    let blob = (await DB.lerMidia(primeira.id)) || (await DB.lerMini(primeira.id));
+    if (!blob) {
+      const u = await urlMidia(primeira);
+      const r = u ? await fetch(u) : null;
+      blob = r && r.ok ? await r.blob() : null;
+    }
+    const leve = blob ? await reduzir(blob, 1000) : null;
+    if (!leve) return;
+    await chamar('/api/capa', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Item-Id': primeira.id, 'X-Rel-Id': rel.id }, body: leve, timeout: 60000 });
+    const atual = await DB.get('relatorios', rel.id);
+    if (atual) { atual.capa_ok = primeira.id; await DB.put('relatorios', atual); }
+    rel.capa_ok = primeira.id;
+  }
+
   async function liberarItem(item) {
     if (!item || item.tipo === 'texto' || item.sync_state !== 'ok' || !item.midia) return false;
     if (!(await DB.temOriginal(item.id))) return false;
@@ -443,7 +479,10 @@
         if (relIdOpcional && rel.id !== relIdOpcional) continue;
         const itens = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
         const sig = JSON.stringify(payloadRel(rel));
-        if (!itens.length && sigs[rel.id] === sig) continue;          // nada mudou: não gasta rede
+        if (!itens.length && sigs[rel.id] === sig) {                   // nada mudou: não gasta rede
+          try { await garantirCapa(rel); } catch (e) { /* tenta na próxima rodada */ }
+          continue;
+        }
         try { await enviarRelatorio(rel); sigs[rel.id] = sig; }
         catch (e) { falhas++; emitir({ tipo: 'erro', msg: e.message }); continue; }
 
@@ -464,6 +503,7 @@
           }
         };
         await Promise.all([trabalhador(), trabalhador(), trabalhador()]);   // até 3 itens ao mesmo tempo
+        try { await garantirCapa(rel); } catch (e) { /* tenta na próxima rodada */ }
       }
     } finally {
       rodando = false;

@@ -773,7 +773,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
 <title>${esc(titulo)}</title>
 <meta property="og:title" content="${esc(titulo)}">
 <meta property="og:description" content="${esc(descricao)}">
-${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(capa.midia)}">` : ''}
+${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(capa.midia)}?capa=1">` : ''}
 <meta property="og:type" content="article">
 <style>${CSS}${ag ? AGRO_REL_CSS : ''}</style>
 </head><body data-n="${rel._n || 1}" data-fz="${esc(rel.fazenda || '')}"><div class="folha">
