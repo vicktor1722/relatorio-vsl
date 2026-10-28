@@ -461,6 +461,13 @@
 
   // Folha de legenda após a captura. Devolve uma promessa:
   //   { legenda, talhao, talhao_id, repetir }  ou  null se foi descartada.
+  // O botão 📷＋ salva esta foto e já abre a câmera para outra, que vem com a mesma legenda e talhão
+  // (no relatório, fotos com a mesma legenda ficam juntas). Vale por 3 minutos.
+  function legendaSeguinte() {
+    const p = st.proxLegenda;
+    st.proxLegenda = null;
+    return p && Date.now() - p.em < 3 * 60 * 1000 ? p : null;
+  }
   // Uma folha por vez — a próxima só abre depois que esta fecha.
   function pedirLegenda(blob, tipo, posicao) {
     // garante que não fica nenhuma folha antiga aberta por baixo
@@ -471,10 +478,12 @@
       const folha = document.createElement('div'); folha.className = 'folha';
       const u = objURL(blob);
       const t = talhaoAtual();
+      const pre = tipo === 'foto' ? legendaSeguinte() : null;   // veio do 📷＋ da foto anterior
       const feats = (st.rel && st.rel.talhoes && st.rel.talhoes.features) || [];
+      const talSel = pre ? (pre.talhao || '') : (t ? t.nome : '');
       const opcoes = ['<option value="">Fora dos talhões</option>'].concat(feats.map(function (f) {
         const n = f.properties.nome;
-        return '<option value="' + esc(n) + '"' + (t && t.nome === n ? ' selected' : '') + '>' + esc(n) + '</option>';
+        return '<option value="' + esc(n) + '"' + (talSel === n ? ' selected' : '') + '>' + esc(n) + '</option>';
       })).join('');
       const varios = posicao && posicao.total > 1;
 
@@ -484,11 +493,16 @@
         (tipo === 'foto'
           ? '<img src="' + u + '" style="width:100%;border-radius:10px;max-height:34dvh;object-fit:cover">'
           : '<video src="' + u + '" controls playsinline style="width:100%;border-radius:10px;max-height:34dvh"></video>') +
-        '<div style="margin:8px 0 2px;font-size:12.5px;color:#667781">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 2px">' +
+          '<div style="flex:1;font-size:12.5px;color:#667781">' +
           (st.pos ? '📍 GPS ±' + Math.round(st.pos.acc) + ' m' + (t ? ' · detectou ' + esc(t.nome) : ' · fora dos talhões')
-                  : '📍 sem GPS neste aparelho — escolha o talhão abaixo') + '</div>' +
+                  : '📍 sem GPS neste aparelho — escolha o talhão abaixo') +
+          (pre ? '<br><b style="color:#1B7A43">📷＋ mesma legenda da foto anterior</b>' : '') + '</div>' +
+          (tipo === 'foto' && !varios ? '<button type="button" id="legMais" title="Salvar e tirar mais uma foto com a mesma legenda" ' +
+            'style="flex:none;border:1.5px solid #1B7A43;background:#E8F4EC;color:#1B7A43;border-radius:12px;padding:8px 12px;font-size:18px;font-weight:700;line-height:1">📷＋</button>' : '') +
+        '</div>' +
         (feats.length ? '<div class="campo"><label>Talhão</label><select id="legTalhao">' + opcoes + '</select></div>' : '') +
-        '<div class="campo"><textarea id="legTxt" rows="2" placeholder="Legenda (opcional)"></textarea></div>' +
+        '<div class="campo"><textarea id="legTxt" rows="2" placeholder="Legenda (opcional)">' + esc(pre ? pre.legenda : '') + '</textarea></div>' +
         (varios ? '<label class="marcar"><input type="checkbox" id="legRepetir" checked> Usar este talhão e legenda nos ' +
                   (posicao.total - posicao.n) + ' arquivo(s) seguintes</label>' : '') +
         '<button class="btn" id="legOk">Adicionar ao relatório</button>' +
@@ -505,18 +519,26 @@
       // o véu NÃO descarta a mídia: só os botões decidem (evita perder a foto num toque errado)
       veu.onclick = function (e) { if (e.target === veu) e.stopPropagation(); };
       folha.querySelector('#legCancel').onclick = function () { fechar2(null); };
-      folha.querySelector('#legOk').onclick = function () {
+      const resposta = function () {
         const leg = folha.querySelector('#legTxt').value.trim();
         const sel = folha.querySelector('#legTalhao');
         const nome = sel ? sel.value : (t ? t.nome : '');
         const f = feats.find(function (x) { return x.properties.nome === nome; });
         const rep = folha.querySelector('#legRepetir');
-        fechar2({
+        return {
           legenda: leg,
           talhao: nome || null,
           talhao_id: nome && f ? f.properties.id : null,
           repetir: !!(rep && rep.checked)
-        });
+        };
+      };
+      folha.querySelector('#legOk').onclick = function () { fechar2(resposta()); };
+      const mais = folha.querySelector('#legMais');
+      if (mais) mais.onclick = function () {
+        const r = resposta();
+        st.proxLegenda = { legenda: r.legenda, talhao: r.talhao, em: Date.now() };
+        $('#inpFoto').click();   // tem que ser aqui, no próprio toque (o iPhone só abre a câmera assim)
+        fechar2(r);
       };
       setTimeout(function () { const a = folha.querySelector('#legTxt'); if (a) a.focus(); }, 150);
     });
