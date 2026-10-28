@@ -329,7 +329,15 @@
       html += '<div class="aviso">Toque na <b>câmera</b> para o primeiro registro — a localização e o talhão entram automaticamente.</div>' +
         '<div class="aviso">Para usar como aplicativo: no navegador do celular, <b>Adicionar à tela inicial</b>.</div>';
     }
+    const lote = await lerLote();
+    if (loteDaqui(lote)) {
+      html += '<button type="button" class="lote-pend" data-lote>📷 ' + lote.fotos.length +
+        (lote.fotos.length > 1 ? ' fotos esperando' : ' foto esperando') + ' a legenda — toque para concluir</button>';
+    }
     chat.innerHTML = html;
+
+    const bl = chat.querySelector('[data-lote]');
+    if (bl) bl.onclick = function (ev) { ev.stopPropagation(); concluirLote(); };
 
     $$('#chat [data-env]').forEach(function (b) {
       b.onclick = function (ev) { ev.stopPropagation(); enviarDaLista(b); };
@@ -464,25 +472,38 @@
   }
 
   // Folha de legenda após a captura. Devolve uma promessa:
-  //   { legenda, talhao, talhao_id, repetir }  ou  null se foi descartada.
-  // O botão 📷＋ salva esta foto e já abre a câmera para outra, que vem com a mesma legenda e talhão
-  // (no relatório, fotos com a mesma legenda ficam juntas). Vale por 3 minutos.
-  function legendaSeguinte() {
-    const p = st.proxLegenda;
-    st.proxLegenda = null;
-    return p && Date.now() - p.em < 3 * 60 * 1000 ? p : null;
+  //   { legenda, talhao, talhao_id, repetir, mais }  ou  null se foi descartada.
+  // O botão 📷＋ guarda esta foto num lote e já abre a câmera para outra. As fotos do lote esperam
+  // na folha e só entram na conversa todas juntas, com a mesma legenda, no "Adicionar ao relatório".
+  // O lote fica guardado no aparelho (fotos em 'midias', dados em config 'lote'): se o iPhone fechar
+  // o app com a câmera aberta, nada se perde e o lote volta na próxima abertura.
+  async function lerLote() {
+    if (st.lote === undefined) st.lote = (await DB.cfg('lote')) || null;
+    return st.lote;
   }
+  async function gravarLote(l) {
+    st.lote = l && l.fotos.length ? l : null;
+    await DB.cfg('lote', st.lote);
+  }
+  // o lote é desta conversa? (só aparece e só entra na conversa em que as fotos foram tiradas)
+  function loteDaqui(l) {
+    return !!(l && st.rel && l.conversa === chaveConversa(st.rel));
+  }
+
   // Uma folha por vez — a próxima só abre depois que esta fecha.
-  function pedirLegenda(blob, tipo, posicao) {
+  // blob null = só o lote que estava esperando (câmera cancelada, app reaberto).
+  function pedirLegenda(blob, tipo, posicao, lote) {
     // garante que não fica nenhuma folha antiga aberta por baixo
     Array.prototype.slice.call(document.querySelectorAll('.folha, .veu')).forEach(function (e) { e.remove(); });
 
-    return new Promise(function (resolve) {
+    return new Promise(async function (resolve) {
       const veu = document.createElement('div'); veu.className = 'veu';
       const folha = document.createElement('div'); folha.className = 'folha';
-      const u = objURL(blob);
+      const urls = [];
+      const url = function (b) { const x = URL.createObjectURL(b); urls.push(x); return x; };
+      const u = blob ? url(blob) : '';
       const t = talhaoAtual();
-      const pre = tipo === 'foto' ? legendaSeguinte() : null;   // veio do 📷＋ da foto anterior
+      const pre = lote && lote.fotos.length ? lote : null;   // fotos do 📷＋ esperando com esta legenda
       const feats = (st.rel && st.rel.talhoes && st.rel.talhoes.features) || [];
       const talSel = pre ? (pre.talhao || '') : (t ? t.nome : '');
       const opcoes = ['<option value="">Fora dos talhões</option>'].concat(feats.map(function (f) {
@@ -490,27 +511,40 @@
         return '<option value="' + esc(n) + '"' + (talSel === n ? ' selected' : '') + '>' + esc(n) + '</option>';
       })).join('');
       const varios = posicao && posicao.total > 1;
+      const total = (pre ? pre.fotos.length : 0) + (blob ? 1 : 0);
+
+      // miniaturas das fotos que já estão esperando no lote
+      let tiras = '';
+      if (pre) {
+        for (const f of pre.fotos) {
+          const b = await DB.lerMidia(f.id);
+          if (b) tiras += '<img src="' + url(b) + '" style="flex:none;width:' + (blob ? 64 : 96) + 'px;height:' + (blob ? 64 : 96) +
+            'px;object-fit:cover;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25)">';
+        }
+        tiras = '<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px">' + tiras + '</div>';
+      }
 
       folha.innerHTML =
         '<div class="alca"></div>' +
         (varios ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px">Arquivo ' + posicao.n + ' de ' + posicao.total + '</div>' : '') +
-        (tipo === 'foto'
-          ? '<img src="' + u + '" style="width:100%;border-radius:10px;max-height:34dvh;object-fit:cover">'
+        (pre ? '<div style="font-size:13px;font-weight:600;color:#1B7A43;margin-bottom:4px">📷 ' +
+          (total > 1 ? total + ' fotos com esta legenda — entram juntas na conversa' : '1 foto esperando a legenda') + '</div>' + tiras : '') +
+        (!blob ? '' : tipo === 'foto'
+          ? '<img src="' + u + '" style="width:100%;border-radius:10px;max-height:' + (pre ? 28 : 34) + 'dvh;object-fit:cover">'
           : '<video src="' + u + '" controls playsinline style="width:100%;border-radius:10px;max-height:34dvh"></video>') +
         '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 2px">' +
           '<div style="flex:1;font-size:12.5px;color:#667781">' +
           (st.pos ? '📍 GPS ±' + Math.round(st.pos.acc) + ' m' + (t ? ' · detectou ' + esc(t.nome) : ' · fora dos talhões')
-                  : '📍 sem GPS neste aparelho — escolha o talhão abaixo') +
-          (pre ? '<br><b style="color:#1B7A43">📷＋ mesma legenda da foto anterior</b>' : '') + '</div>' +
-          (tipo === 'foto' && !varios ? '<button type="button" id="legMais" title="Salvar e tirar mais uma foto com a mesma legenda" ' +
+                  : '📍 sem GPS neste aparelho — escolha o talhão abaixo') + '</div>' +
+          (tipo === 'foto' && !varios ? '<button type="button" id="legMais" title="Tirar mais uma foto com a mesma legenda" ' +
             'style="flex:none;border:1.5px solid #1B7A43;background:#E8F4EC;color:#1B7A43;border-radius:12px;padding:8px 12px;font-size:18px;font-weight:700;line-height:1">📷＋</button>' : '') +
         '</div>' +
         (feats.length ? '<div class="campo"><label>Talhão</label><select id="legTalhao">' + opcoes + '</select></div>' : '') +
         '<div class="campo"><textarea id="legTxt" rows="2" placeholder="Legenda (opcional)">' + esc(pre ? pre.legenda : '') + '</textarea></div>' +
         (varios ? '<label class="marcar"><input type="checkbox" id="legRepetir" checked> Usar este talhão e legenda nos ' +
                   (posicao.total - posicao.n) + ' arquivo(s) seguintes</label>' : '') +
-        '<button class="btn" id="legOk">Adicionar ao relatório</button>' +
-        '<button class="btn secundario" id="legCancel">Descartar</button>';
+        '<button class="btn" id="legOk">' + (total > 1 ? 'Adicionar as ' + total + ' fotos ao relatório' : 'Adicionar ao relatório') + '</button>' +
+        '<button class="btn secundario" id="legCancel">' + (total > 1 ? 'Descartar as ' + total + ' fotos' : 'Descartar') + '</button>';
       veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
 
       let respondeu = false;
@@ -518,15 +552,19 @@
         if (respondeu) return;
         respondeu = true;
         veu.remove(); folha.remove();
+        setTimeout(function () { urls.forEach(URL.revokeObjectURL); }, 1000);
         resolve(valor);
       };
       // o véu NÃO descarta a mídia: só os botões decidem (evita perder a foto num toque errado)
       veu.onclick = function (e) { if (e.target === veu) e.stopPropagation(); };
-      folha.querySelector('#legCancel').onclick = function () { fechar2(null); };
+      folha.querySelector('#legCancel').onclick = function () {
+        if (total > 1 && !confirm('Descartar as ' + total + ' fotos?')) return;
+        fechar2(null);
+      };
       const resposta = function () {
         const leg = folha.querySelector('#legTxt').value.trim();
         const sel = folha.querySelector('#legTalhao');
-        const nome = sel ? sel.value : (t ? t.nome : '');
+        const nome = sel ? sel.value : (pre ? pre.talhao || '' : (t ? t.nome : ''));
         const f = feats.find(function (x) { return x.properties.nome === nome; });
         const rep = folha.querySelector('#legRepetir');
         return {
@@ -539,8 +577,8 @@
       folha.querySelector('#legOk').onclick = function () { fechar2(resposta()); };
       const mais = folha.querySelector('#legMais');
       if (mais) mais.onclick = function () {
-        const r = resposta();
-        st.proxLegenda = { legenda: r.legenda, talhao: r.talhao, em: Date.now() };
+        const r = resposta(); r.mais = true;
+        st.esperaCamera = Date.now();
         $('#inpFoto').click();   // tem que ser aqui, no próprio toque (o iPhone só abre a câmera assim)
         fechar2(r);
       };
@@ -553,9 +591,30 @@
     if (tipo === 'foto') {
       try { blob = await comprimirImagem(blob, 2048, st.cfg.qualidade); } catch (e) { /* mantém original */ }
     }
-    const r = fixo || await pedirLegenda(blob, tipo, posicao);
-    if (!r) return null;
+    // lote do 📷＋ esperando: a foto nova entra nele; vídeo ou vários da galeria esperam o lote fechar antes
+    let lote = fixo ? null : await lerLote();
+    if (lote && !loteDaqui(lote)) lote = null;
+    if (lote && (tipo !== 'foto' || (posicao && posicao.total > 1))) { await concluirLote(); lote = null; }
+    const pos = st.pos;
+    const r = fixo || await pedirLegenda(blob, tipo, posicao, lote);
+    if (!r) {
+      if (lote) await descartarLote(lote);
+      return null;
+    }
     try {
+      if (r.mais) {
+        // 📷＋: a foto fica esperando no lote; a câmera já abriu para a próxima
+        const id = novoId();
+        await DB.salvarMidia(id, blob);
+        const l = lote || { conversa: chaveConversa(st.rel), fotos: [] };
+        l.legenda = r.legenda; l.talhao = r.talhao; l.talhao_id = r.talhao_id;
+        l.fotos.push({ id: id, mime: blob.type, bytes: blob.size, capturado_em: new Date().toISOString(),
+          lat: pos ? pos.lat : null, lon: pos ? pos.lon : null, precisao_m: pos ? pos.acc : null, altitude_m: pos ? pos.alt : null });
+        await gravarLote(l);
+        await renderChat();
+        return r;
+      }
+      if (lote) await gravarFotosDoLote(lote, r);
       const item = await novoItem(tipo, blob, Object.assign(
         { legenda: r.legenda || '' }, extras || {},
         { talhao: r.talhao || null, talhao_id: r.talhao_id || null }
@@ -568,6 +627,45 @@
       // nunca falhar calado: antes a foto simplesmente sumia
       toast('Não deu para guardar este arquivo: ' + (e.message || e), 5000);
       return r;
+    }
+  }
+
+  // as fotos do lote viram registros da conversa, todas com a legenda e o talhão escolhidos
+  async function gravarFotosDoLote(lote, r) {
+    const base = Date.now() - lote.fotos.length - 1;
+    for (let i = 0; i < lote.fotos.length; i++) {
+      const f = lote.fotos[i];
+      const item = await novoItem('foto', null, Object.assign({}, f, {
+        legenda: r.legenda || '', talhao: r.talhao || null, talhao_id: r.talhao_id || null, ordem: base + i
+      }));
+      if (!item) throw new Error('não foi possível abrir a visita');
+    }
+    await gravarLote(null);
+  }
+
+  async function descartarLote(lote) {
+    for (const f of lote.fotos) await DB.del('midias', f.id);
+    await gravarLote(null);
+    await renderChat();
+  }
+
+  // abre a folha só com o lote que ficou esperando (câmera cancelada ou app reaberto)
+  async function concluirLote() {
+    const lote = await lerLote();
+    if (!loteDaqui(lote) || document.querySelector('.folha')) return;
+    const r = await pedirLegenda(null, 'foto', null, lote);
+    if (!r) { await descartarLote(lote); return; }
+    if (r.mais) {   // abriu a câmera de novo: o lote continua esperando a próxima foto
+      lote.legenda = r.legenda; lote.talhao = r.talhao; lote.talhao_id = r.talhao_id;
+      await gravarLote(lote);
+      return;
+    }
+    try {
+      await gravarFotosDoLote(lote, r);
+      await renderChat(); atualizarSync();
+      if (navigator.onLine) Sync.sincronizar(st.rel.id);
+    } catch (e) {
+      toast('Não deu para guardar as fotos: ' + (e.message || e), 5000);
     }
   }
 
@@ -1645,11 +1743,23 @@
 
     ['#inpFoto', '#inpVideo'].forEach(function (sel) {
       $(sel).onchange = async function (e) {
+        st.esperaCamera = 0;
         const f = e.target.files && e.target.files[0]; e.target.value = '';
         if (!f) return;
         await adicionarVarios([f]);
       };
     });
+
+    // 📷＋ e a câmera foi fechada sem foto: o lote volta para a folha (as fotos não ficam esquecidas)
+    const semFoto = function () {
+      if (!st.esperaCamera) return;
+      setTimeout(function () {
+        if (st.esperaCamera && Date.now() - st.esperaCamera > 1200) { st.esperaCamera = 0; concluirLote(); }
+      }, 1500);
+    };
+    $('#inpFoto').addEventListener('cancel', semFoto);
+    window.addEventListener('focus', semFoto);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) semFoto(); });
 
     // KML — entra no cadastro da fazenda
     $('#inpKml').onchange = async function (e) {
