@@ -403,7 +403,7 @@ const SCRIPT_PPT = String.raw`
     im.onerror = function(){ ok(null); }; im.src = src;
   }); }
   // mapa da página (SVG) em imagem: copia para o SVG os estilos que vêm do CSS (contorno, rótulos)
-  var ESTILOS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-linejoin', 'paint-order', 'opacity', 'font-size', 'font-weight', 'font-family', 'text-anchor'];
+  var ESTILOS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-linejoin', 'stroke-dasharray', 'paint-order', 'opacity', 'font-size', 'font-weight', 'font-family', 'text-anchor'];
   function svgImagem(svg, larg){ return new Promise(function(ok){ try {
     var vb = (svg.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number), w = vb[2] || 1000, h = vb[3] || 600;
     var cl = svg.cloneNode(true), orig = [svg].concat([].slice.call(svg.querySelectorAll('*'))), cop = [cl].concat([].slice.call(cl.querySelectorAll('*')));
@@ -472,6 +472,26 @@ const SCRIPT_PPT = String.raw`
           });
         });
         if (leg.length) sv.addText(leg, { x: 9.6, y: 1.25, w: 3.3, h: 5.6, fontFace: 'Arial', valign: 'top', paraSpaceAfter: 4 });
+      }
+    }
+    // evolução do plantio: resumo, gráfico e a tabela por data
+    var svgEvo = document.querySelector('.pl-graf svg');
+    if (svgEvo) {
+      var ge = await svgImagem(svgEvo, 1800);
+      if (ge) {
+        var se = P.addSlide(); faixa(se, 'Evolução do plantio', D.safra);
+        var st = document.querySelector('.pl-stat'), linhas = [];
+        if (st) linhas.push({ text: st.textContent.replace(/\s+/g, ' ').trim(), options: { fontSize: 18, bold: true, color: ESCURO, breakLine: true } });
+        [].slice.call(document.querySelectorAll('.pl-falta')).forEach(function(f){ linhas.push({ text: f.textContent.replace(/\s+/g, ' ').trim(), options: { fontSize: 12, color: CINZA, breakLine: true } }); });
+        if (linhas.length) se.addText(linhas, { x: 0.5, y: 1.1, w: 12.3, h: 0.95, fontFace: 'Arial', valign: 'top' });
+        var ev = []; try { ev = JSON.parse(document.getElementById('plDados').textContent); } catch (e) {}
+        var comTabela = ev.length && ev.length <= 14;
+        se.addImage(caber(ge, 0.45, 2.1, comTabela ? 7.9 : 12.4, 4.85));
+        if (comTabela) {
+          var cabE = [['Data', 'Talhões', 'ha', 'Acumulado'].map(function(t){ return { text: t, options: { bold: true, color: 'FFFFFF', fill: { color: VERDE } } }; })];
+          se.addTable(cabE.concat(ev.map(function(e){ return [e.d, e.tal, e.ha, e.cum + ' (' + e.pc + '%)']; })),
+            { x: 8.55, y: 2.1, w: 4.35, colW: [0.75, 1.5, 0.8, 1.3], fontSize: 10, fontFace: 'Arial', color: TEXTO, border: { type: 'solid', color: 'E4E9E6', pt: 1 } });
+        }
       }
     }
 
