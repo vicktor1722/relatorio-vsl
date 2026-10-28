@@ -1869,6 +1869,17 @@
     Sync.autoSync();
     // ao sair do app a câmera é desligada (o iPhone mata a trilha de qualquer jeito)
     document.addEventListener('visibilitychange', function () { if (document.hidden && !st.gravando) pararStream(); });
+    // voltou ao app depois de muito tempo fora: volta para a lista, como se tivesse aberto de novo
+    // (não mexe se a câmera, uma folha de legenda ou o relatório pronto estiverem abertos)
+    let saiuEm = 0;
+    document.addEventListener('visibilitychange', async function () {
+      if (document.hidden) { saiuEm = Date.now(); return; }
+      if (!saiuEm || Date.now() - saiuEm < 15 * 60 * 1000) return;
+      saiuEm = 0;
+      if (st.gravando || document.querySelector('.folha') || st.esperaCamera) return;
+      if (!$('#telaCamera').classList.contains('oculto') || !$('#telaRelPronto').classList.contains('oculto')) return;
+      await listarRelatorios(); abrir('telaLista');
+    });
     // cadastro (produtores, fazendas, safras) é da conta: confere a nuvem ao voltar para o app
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) Conta.atualizarSePrecisar().catch(function () {});
@@ -1886,7 +1897,9 @@
       await Sync.fixarDono();   // com o cadastro atualizado, confere de quem é cada relatório
       await recuperarSeSolicitado();
     }
-    if (!st.rel) { await renderChat(); await listarRelatorios(); abrir('telaLista'); }
+    // o app sempre abre na lista de relatórios; a última conversa fica pronta por baixo (seta ←)
+    if (!st.rel) await renderChat();
+    if (!alvo) { await listarRelatorios(); abrir('telaLista'); }
     atualizarSync();
     atualizarBotaoEnvio();
     if ('serviceWorker' in navigator) {
