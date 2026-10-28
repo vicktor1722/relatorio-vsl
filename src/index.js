@@ -65,11 +65,35 @@ const html = (txt, status = 200) => new Response(txt, {
   status, headers: { 'Content-Type': 'text/html; charset=utf-8' }
 });
 
+// Áudio pedido por pedaços (Range): o iPhone só toca <audio> se o servidor responder 206.
+// Áudio é pequeno (alguns MB), então lê inteiro e devolve só o trecho pedido.
+async function comFaixa(req, resp) {
+  const faixa = req.headers.get('Range');
+  const mime = (resp.headers.get('Content-Type') || '').toLowerCase();
+  if (!mime.startsWith('audio/')) return resp;
+  const buf = await resp.arrayBuffer();
+  const h = new Headers(resp.headers);
+  h.set('Accept-Ranges', 'bytes');
+  const m = faixa && /^bytes=(\d*)-(\d*)$/.exec(faixa.trim());
+  if (!m || (!m[1] && !m[2])) { h.set('Content-Length', String(buf.byteLength)); return new Response(buf, { status: 200, headers: h }); }
+  const tam = buf.byteLength;
+  let ini = m[1] ? Number(m[1]) : Math.max(0, tam - Number(m[2]));
+  let fim = m[1] && m[2] ? Math.min(Number(m[2]), tam - 1) : tam - 1;
+  if (ini >= tam || ini > fim) {
+    h.set('Content-Range', 'bytes */' + tam);
+    return new Response(null, { status: 416, headers: h });
+  }
+  h.set('Content-Range', 'bytes ' + ini + '-' + fim + '/' + tam);
+  h.set('Content-Length', String(fim - ini + 1));
+  return new Response(buf.slice(ini, fim + 1), { status: 206, headers: h });
+}
+
 // devolve a mesma mídia como arquivo para baixar (Content-Disposition: attachment); o nome vem de ?n=
 function comoDownload(resp, nome) {
   const mime = (resp.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
   const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic',
-    'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' }[mime] || 'bin';
+    'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm',
+    'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/ogg': 'ogg' }[mime] || 'bin';
   let base = String(nome || 'midia').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+|[._]+$/g, '').slice(0, 60) || 'midia';
   if (!new RegExp('\\.' + ext + '$', 'i').test(base)) base += '.' + ext;
@@ -208,7 +232,7 @@ export default {
         const chaveCache = new Request(origem + '/img/' + encodeURIComponent(chave));
         const baixar = url.searchParams.get('baixar') === '1';
         const guardado = await cache.match(chaveCache);
-        if (guardado) return baixar ? comoDownload(guardado, url.searchParams.get('n')) : guardado;
+        if (guardado) return baixar ? comoDownload(guardado, url.searchParams.get('n')) : comFaixa(req, guardado);
 
         const m = await lerMidia(env, chave);
         if (!m) return new Response('não encontrado', { status: 404 });
@@ -220,7 +244,7 @@ export default {
           }
         });
         ctx.waitUntil(cache.put(chaveCache, resp.clone()));
-        return baixar ? comoDownload(resp, url.searchParams.get('n')) : resp;
+        return baixar ? comoDownload(resp, url.searchParams.get('n')) : comFaixa(req, resp);
       }
 
       // a página do painel é aberta; quem valida é o /api/admin/* com o token
@@ -641,7 +665,9 @@ export default {
         if (existente && existente.midia) return json({ ok: true, midia: existente.midia, repetido: true });
 
         const dados = await req.arrayBuffer();
-        const ext = mime.includes('mp4') ? 'mp4' : mime.includes('webm') ? 'webm' : mime.includes('png') ? 'png' : 'jpg';
+        const ext = mime.startsWith('audio/')
+          ? (mime.includes('webm') ? 'webm' : mime.includes('ogg') ? 'ogg' : mime.includes('mpeg') ? 'mp3' : 'm4a')
+          : mime.includes('mp4') ? 'mp4' : mime.includes('webm') ? 'webm' : mime.includes('png') ? 'png' : 'jpg';
         const r = await salvarMidia(env, { chave: relId + '/' + itemId + '.' + ext, mime, dados });
         return json({ ok: true, midia: r.chave, bytes: r.bytes });
       }

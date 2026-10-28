@@ -349,6 +349,13 @@
       const el = chat.querySelector('[data-midia="' + it.id + '"]');
       if (!el) continue;
       const blob = await DB.lerMidia(it.id);
+      if (it.tipo === 'audio') {
+        // já subiu e saiu do aparelho: toca direto da nuvem (precisa de internet)
+        const u = blob ? objURL(blob) : (it.midia && navigator.onLine ? await Sync.urlMidia(it) : '');
+        el.innerHTML = '<span>🎤</span>' + (u ? '<audio controls preload="metadata" src="' + u + '"></audio>'
+          : '<span class="aud-nuvem">' + (it.midia ? 'áudio na nuvem — conecte para ouvir' : '⚠️ áudio não ficou guardado neste aparelho') + '</span>');
+        continue;
+      }
       if (blob) {
         const u = objURL(blob);
         if (it.tipo === 'foto') el.innerHTML = '<img src="' + u + '" alt="">';
@@ -391,6 +398,15 @@
       return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha so-texto">' +
         '<div class="legenda">' + esc(it.legenda) + '</div>' +
         '<div class="rodape">' + lapis + '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
+    }
+
+    if (it.tipo === 'audio') {
+      return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
+        '<div class="audio" data-midia="' + it.id + '"><span>🎤</span></div>' +
+        chip +
+        (it.legenda ? '<div class="legenda">' + esc(it.legenda) + '</div>' : '') +
+        '<div class="rodape">' + lapis + (it.duracao_s ? '<span>' + mmss(it.duracao_s) + '</span>' : '') +
+        '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
     }
 
     return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
@@ -531,6 +547,8 @@
           (total > 1 ? total + ' fotos com esta legenda — entram juntas na conversa' : '1 foto esperando a legenda') + '</div>' + tiras : '') +
         (!blob ? '' : tipo === 'foto'
           ? '<img src="' + u + '" style="width:100%;border-radius:10px;max-height:' + (pre ? 28 : 34) + 'dvh;object-fit:cover">'
+          : tipo === 'audio'
+          ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px">🎤 Áudio gravado</div><audio src="' + u + '" controls style="width:100%"></audio>'
           : '<video src="' + u + '" controls playsinline style="width:100%;border-radius:10px;max-height:34dvh"></video>') +
         '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 2px">' +
           '<div style="flex:1;font-size:12.5px;color:#667781">' +
@@ -680,7 +698,7 @@
         toast('Não consegui ler ' + (arquivos[i].name || 'o arquivo') + '. Tente pela câmera do app.', 5000);
         continue;
       }
-      const tipo = (b.type || '').indexOf('video') === 0 ? 'video' : 'foto';
+      const tipo = (b.type || '').indexOf('video') === 0 ? 'video' : (b.type || '').indexOf('audio') === 0 ? 'audio' : 'foto';
       const r = await adicionarMidia(b, tipo, null, { n: i + 1, total: arquivos.length }, fixo);
       if (r) ok++;
       if (!fixo && r && r.repetir) fixo = { legenda: r.legenda, talhao: r.talhao, talhao_id: r.talhao_id };
@@ -799,6 +817,73 @@
     b.textContent = temTexto ? '➤' : '📷';
     b.title = temTexto ? 'Enviar' : 'Câmera';
     $('#dicaCamera').style.visibility = temTexto ? 'hidden' : 'visible';
+    $('#btnAudio').style.display = temTexto ? 'none' : '';
+  }
+
+  /* ---------------- áudio ---------------- */
+  // 🎤 toca para começar; o botão verde (✓) para e abre a folha de legenda; 🗑 descarta.
+  // Até 10 minutos por áudio. Se o app sair da tela, o que foi gravado até ali é aproveitado.
+  const MAX_AUDIO_S = 600;
+  function tipoAudio() {
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+    return ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+      .find(function (m) { return MediaRecorder.isTypeSupported(m); }) || '';
+  }
+
+  async function iniciarAudio() {
+    if (st.audio) return;
+    if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return; }
+    if (!window.MediaRecorder || !navigator.mediaDevices) { toast('Este aparelho não permite gravar áudio pelo app', 4000); return; }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      toast('Sem acesso ao microfone. Libere o microfone para o app nos ajustes do celular.', 5000);
+      return;
+    }
+    const mime = tipoAudio();
+    let rec;
+    try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+    catch (e) { stream.getTracks().forEach(function (t) { t.stop(); }); toast('Não deu para gravar: ' + (e.message || e), 4000); return; }
+    const a = st.audio = { rec: rec, stream: stream, partes: [], inicio: Date.now(), descartar: false };
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) a.partes.push(e.data); };
+    rec.onstop = function () { terminarAudio(a); };
+    rec.start(1000);
+    if (navigator.vibrate) navigator.vibrate(20);
+    $('.composer').classList.add('gravando-audio');
+    $('#barraAudio').classList.remove('oculto');
+    $('#dicaCamera').style.visibility = 'hidden';
+    const b = $('#btnCamera'); b.classList.add('enviar'); b.textContent = '✓'; b.title = 'Parar e adicionar';
+    const tempo = function () {
+      const s = (Date.now() - a.inicio) / 1000;
+      $('#audTempo').textContent = mmss(s);
+      if (s >= MAX_AUDIO_S) pararAudio(false);
+    };
+    tempo(); a.relogio = setInterval(tempo, 250);
+  }
+
+  function pararAudio(descartar) {
+    const a = st.audio;
+    if (!a) return;
+    a.descartar = !!descartar;
+    a.dur = (Date.now() - a.inicio) / 1000;
+    clearInterval(a.relogio);
+    try { if (a.rec.state !== 'inactive') a.rec.stop(); else terminarAudio(a); } catch (e) { terminarAudio(a); }
+  }
+
+  async function terminarAudio(a) {
+    if (a.fim) return;
+    a.fim = true;
+    a.stream.getTracks().forEach(function (t) { t.stop(); });
+    st.audio = null;
+    $('.composer').classList.remove('gravando-audio');
+    $('#barraAudio').classList.add('oculto');
+    atualizarBotaoEnvio();
+    if (a.descartar) { toast('Áudio descartado'); return; }
+    const tipo = ((a.partes[0] && a.partes[0].type) || a.rec.mimeType || 'audio/mp4').split(';')[0];
+    const blob = new Blob(a.partes, { type: tipo });
+    if (!blob.size || a.dur < 1) { toast('Áudio muito curto'); return; }
+    await adicionarMidia(blob, 'audio', { duracao_s: +a.dur.toFixed(1) });
   }
 
   async function enviarTexto() {
@@ -819,7 +904,7 @@
     let timer = null, segurou = false;
 
     const inicio = function (e) {
-      if (st.modoEnvio) return;
+      if (st.modoEnvio || st.audio) return;
       segurou = false;
       timer = setTimeout(async function () {
         segurou = true;
@@ -827,6 +912,7 @@
       }, 450);
     };
     const fim = function (e) {
+      if (st.audio) { if (e.cancelable) e.preventDefault(); pararAudio(false); return; }
       if (st.modoEnvio) { e.preventDefault(); enviarTexto(); return; }
       clearTimeout(timer);
       if (e && e.type === 'touchend' && e.cancelable) e.preventDefault();  // evita o clique "fantasma" do iPhone
@@ -1712,6 +1798,10 @@
       } catch (e) { toast('Não consegui recuperar: ' + e.message, 5000); }
     };
     $('#btnAnexo').onclick = function () { $('#inpArquivo').click(); };
+    $('#btnAudio').onclick = function () { iniciarAudio(); };
+    $('#audCancelar').onclick = function () { pararAudio(true); };
+    // saiu do app no meio da gravação: o iPhone corta o microfone, então fecha o áudio com o que já tem
+    document.addEventListener('visibilitychange', function () { if (document.hidden && st.audio) pararAudio(false); });
 
     $('#btnApagarRel').onclick = async function () {
       if (!relEdicao || !relEdicao.id) return;

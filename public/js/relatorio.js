@@ -169,7 +169,14 @@
       segmentos.forEach(seg => {
         if (g.varioDia) corpo += `<h4 class="rp-dia">${esc(diaLongo(seg.iso))}</h4>`;
         seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="rp-nota">${esc(i.legenda)}</div>`; });
-        corpo += blocoGrupos(seg.lista.filter(i => i.tipo !== 'texto'));
+        seg.lista.filter(i => i.tipo === 'audio').forEach(i => {
+          const src = i.src || (i.asset_id ? '/_blob/' + i.asset_id : '');
+          corpo += `<div class="rp-grupo"><p class="rp-grupo-leg" style="margin-top:2px">🎤 ${esc(i.legenda || 'Áudio')}</p>` +
+            (src ? `<audio controls preload="metadata" src="${src}" style="width:100%"></audio>` : '') +
+            `<div class="rp-meta"><span class="rp-tag cinza">${hora(i.capturado_em)}</span>` +
+            (i.duracao_s ? `<span class="rp-tag cinza">${Math.round(i.duracao_s)}s</span>` : '') + `</div></div>`;
+        });
+        corpo += blocoGrupos(seg.lista.filter(i => i.tipo !== 'texto' && i.tipo !== 'audio'));
       });
     });
 

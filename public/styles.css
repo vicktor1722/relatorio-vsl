@@ -142,6 +142,17 @@ input,textarea,select{font:inherit}
 .btn-camera:active{transform:scale(.93)}
 .btn-camera.gravando{background:var(--erro);animation:pulsa 1s infinite}
 @keyframes pulsa{50%{opacity:.65}}
+.composer .mic{flex:none;padding:3px 4px;color:var(--texto-fraco);line-height:0}
+.composer.gravando-audio .caixa{display:none}
+.grava-audio{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border-radius:22px;padding:8px 14px;
+  box-shadow:0 1px 2px rgba(0,0,0,.12);min-height:48px;font-size:15px}
+.grava-audio .aud-lixo{font-size:20px;padding:2px 4px}
+.grava-audio .aud-ponto{width:10px;height:10px;border-radius:50%;background:var(--erro);animation:pulsa 1s infinite;flex:none}
+.grava-audio #audTempo{font-variant-numeric:tabular-nums;font-weight:600}
+.grava-audio .aud-txt{color:var(--texto-fraco);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bolha .audio{display:flex;align-items:center;gap:6px;padding:6px 4px 0;min-width:250px}
+.bolha .audio audio{flex:1;min-width:0;height:40px}
+.bolha .audio .aud-nuvem{font-size:12.5px;color:var(--texto-fraco);padding:6px 2px}
 .dica-camera{font-size:11px;color:var(--texto-fraco);text-align:center;padding:0 0 4px}
 
 /* ---------- Câmera ---------- */
