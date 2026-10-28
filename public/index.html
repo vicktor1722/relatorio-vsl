@@ -43,12 +43,17 @@
     <div class="caixa">
       <button class="anexo" id="btnAnexo" title="Anexar">📎</button>
       <textarea id="txtMsg" rows="1" placeholder="Observação…"></textarea>
+      <button class="mic" id="btnAudio" title="Gravar áudio" aria-label="Gravar áudio"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    </div>
+    <div class="grava-audio oculto" id="barraAudio">
+      <button class="aud-lixo" id="audCancelar" title="Descartar áudio">🗑</button>
+      <span class="aud-ponto"></span><span id="audTempo">0:00</span><span class="aud-txt">Gravando áudio…</span>
     </div>
     <button class="btn-camera" id="btnCamera">📷</button>
   </div>
 </div>
 
-<input type="file" id="inpArquivo" accept="image/*,video/*" multiple class="oculto">
+<input type="file" id="inpArquivo" accept="image/*,video/*,audio/*" multiple class="oculto">
 <input type="file" id="inpFoto" accept="image/*,video/*" capture="environment" class="oculto">
 <input type="file" id="inpVideo" accept="video/*" capture="environment" class="oculto">
 <input type="file" id="inpLogo" accept="image/png,image/jpeg,image/*" class="oculto">
