@@ -110,7 +110,8 @@ function datasTal(r, porTal) {
   return out;
 }
 
-function aplicacoes(recs, areas, hoje, plantio) {
+// out (opcional) recebe cada aplicação em dados simples, para a apresentação em PowerPoint
+function aplicacoes(recs, areas, hoje, plantio, out) {
   const porTal = {};
   (plantio || []).forEach((p) => { porTal[p.talhao] = p; });
   const grupos = {}, ordem = [];
@@ -171,6 +172,15 @@ function aplicacoes(recs, areas, hoje, plantio) {
       g.prods.map((p) => '<div><span>' + esc(p[0]) + '</span><span>' + doseTxt(Number(p[1])) + ' ' + esc(unid(p[2])) + '</span>' +
         (liq ? '<span class="tq">' + volTotal(p[1] * hat, p[2]) + '</span>' : '') +
         (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>';
+    if (out) out.push({
+      titulo, status: st, quando: (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
+        (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : ''),
+      talhoes: g.tal.map((t) => t + (!g.feito[t] && varias && g.prev[t] ? ' (' + curta(g.prev[t]) + ')' : '')).join(', '),
+      ha: ha ? fmt(ha) + ' ha' : '',
+      calda: liq ? 'Calda ' + g.calda + ' L/ha · tanque de ' + fmt(g.tanque, 0) + ' L cobre ' + fmt(hat, 0) + ' ha' : '',
+      prods: g.prods.map((p) => [String(p[0]), doseTxt(Number(p[1])) + ' ' + unid(p[2]), ha ? volTotal(p[1] * ha, p[2]) : '']),
+      prox: g.prox && g.num < g.total ? 'Próxima aplicação: ' + (g.prox < hoje ? 'a programar' : curta(g.prox)) : ''
+    });
     // já aplicada: fica recolhida (título, data e próxima aplicação à vista; talhões e produtos ao tocar)
     h += sel === 'v'
       ? '<details class="ap-card ap-det"><summary>' + topo + prox + '<span class="ap-ver">Ver talhões e produtos</span></summary>' + corpo + '</details>'
@@ -368,9 +378,10 @@ export function blocosAgro(agro) {
   const mapaVar = mapaVariedade(agro.mapa, plantio, hoje);
   const evolucao = evolucaoPlantio(agro.mapa, plantio, hoje);   // vai antes das observações gerais
   const topo = proximas(recs, hoje);
-  const fim = aplicacoes(recs, areas, hoje, plantio);
+  const apl = [];
+  const fim = aplicacoes(recs, areas, hoje, plantio, apl);
   if (!evolucao && !topo && !fim && !plantio.length) return null;
-  return { evolucao, topo, mapaVar, fim, talhao: (nome) => chipsDoTalhao(nome, plantio, hoje) };
+  return { evolucao, topo, mapaVar, fim, apl, talhao: (nome) => chipsDoTalhao(nome, plantio, hoje) };
 }
 
 export const AGRO_REL_CSS = `
