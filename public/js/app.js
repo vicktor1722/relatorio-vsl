@@ -301,7 +301,7 @@
 
     $('#dicaCamera').textContent = visitaFechada(st.rel)
       ? 'Visita fechada — o próximo registro abre uma visita nova'
-      : 'Toque para foto · Segure para vídeo · Segure um registro para editar';
+      : 'Toque para foto · Segure para vídeo · ✏️ edita a legenda';
 
     st.itens = [];
     let html = '';
@@ -320,7 +320,7 @@
       for (const it of itens) {
         const dia = dataExt(it.capturado_em);
         if (dia !== diaAtual) { diaAtual = dia; html += '<div class="divisor"><span>' + esc(dia) + '</span></div>'; }
-        html += bolhaHTML(it);
+        html += bolhaHTML(it, !visitaFechada(v));
         st.itens.push(it);
       }
     }
@@ -364,7 +364,9 @@
     recuperarMinis();
   }
 
-  function bolhaHTML(it) {
+  function bolhaHTML(it, editavel) {
+    // lápis para editar a legenda (só nas visitas ainda em aberto)
+    const lapis = editavel ? '<button type="button" class="lapis" data-editar="' + it.id + '" title="Editar legenda">✏️</button>' : '';
     const ticks = it.sync_state === 'ok'
       ? '<span class="ticks ok">✓✓</span>'
       : it.sync_state === 'erro'
@@ -378,14 +380,14 @@
     if (it.tipo === 'texto') {
       return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha so-texto">' +
         '<div class="legenda">' + esc(it.legenda) + '</div>' +
-        '<div class="rodape"><span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
+        '<div class="rodape">' + lapis + '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
     }
 
     return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
       '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '"></div>' +
       chip +
       (it.legenda ? '<div class="legenda">' + esc(it.legenda) + '</div>' : '') +
-      '<div class="rodape">' + (it.bytes ? '<span>' + bytesFmt(it.bytes) + '</span>' : '') +
+      '<div class="rodape">' + lapis + (it.bytes ? '<span>' + bytesFmt(it.bytes) + '</span>' : '') +
       '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
   }
 
@@ -1485,10 +1487,11 @@
       if (segurouVisita) { segurouVisita = false; e.stopPropagation(); e.preventDefault(); }
     }, true);
 
-    // toque simples numa observação de texto abre a edição direto
+    // toque simples numa observação de texto (ou no lápis) abre a edição direto
     chat.addEventListener('click', function (e) {
       if (segurou) { segurou = false; e.stopPropagation(); return; }
       const item = achaItem(e.target);
+      if (item && e.target.closest('[data-editar]')) { abrirEdicao(item); return; }
       if (item && item.tipo === 'texto') abrirEdicao(item);
     });
   }

@@ -106,6 +106,7 @@ input,textarea,select{font:inherit}
 }
 .bolha .legenda{font-size:14.5px;line-height:1.35;margin:5px 4px 0;white-space:pre-wrap;word-break:break-word}
 .bolha .rodape{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin:2px 4px 0;font-size:11px;color:var(--texto-fraco)}
+.bolha .lapis{margin-right:auto;border:0;background:none;padding:4px 6px;margin-left:-4px;font-size:15px;line-height:1;cursor:pointer;opacity:.75}
 .chip-talhao{
   display:inline-flex;align-items:center;gap:4px;margin:5px 4px 0;
   background:rgba(27,122,67,.12);color:var(--verde-escuro);
