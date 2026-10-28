@@ -9,6 +9,9 @@ import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
 import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safras.js';
+
+// onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
+const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
@@ -186,8 +189,22 @@ export default {
       }
 
       if (rota.startsWith('/img/')) {
-        const chave = decodeURIComponent(rota.slice(5));
+        let chave = decodeURIComponent(rota.slice(5));
         const cache = caches.default;
+        // ?capa=1: a versão leve da foto (a prévia do WhatsApp não carrega foto de vários MB);
+        // se ainda não foi gerada, cai na original e não guarda no cache (a leve pode chegar depois)
+        if (url.searchParams.get('capa') === '1') {
+          const kc = chaveCapa(chave);
+          const leve = kc ? await lerMidia(env, kc) : null;
+          if (leve) {
+            const chaveC = new Request(origem + '/img/' + encodeURIComponent(kc));
+            const g = await cache.match(chaveC);
+            if (g) return g;
+            const rc = new Response(leve.corpo, { headers: { 'Content-Type': leve.mime, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' } });
+            ctx.waitUntil(cache.put(chaveC, rc.clone()));
+            return rc;
+          }
+        }
         const chaveCache = new Request(origem + '/img/' + encodeURIComponent(chave));
         const baixar = url.searchParams.get('baixar') === '1';
         const guardado = await cache.match(chaveCache);
@@ -592,6 +609,23 @@ export default {
                 r.data_inicio || null, r.data_fim || null, r.observacoes || '',
                 r.talhoes ? JSON.stringify(r.talhoes) : '', r.status || 'rascunho', r.publicado_em || null).run();
         return json({ ok: true, id: r.id });
+      }
+
+      // capa leve do relatório (primeira foto reduzida), gerada no app
+      if (rota === '/api/capa' && req.method === 'POST') {
+        const itemId = req.headers.get('X-Item-Id'), relId = req.headers.get('X-Rel-Id');
+        if (!itemId || !relId) return json({ erro: 'faltam X-Item-Id / X-Rel-Id' }, 400);
+        const it = await env.DB.prepare(
+          'SELECT i.midia, r.usuario_id FROM itens i JOIN relatorios r ON r.id = i.relatorio_id WHERE i.id = ? AND i.relatorio_id = ?')
+          .bind(itemId, relId).first();
+        if (!it || !it.midia) return json({ erro: 'foto ainda não está na nuvem' }, 404);
+        if (it.usuario_id && it.usuario_id !== me.id) return json({ erro: 'relatório de outro usuário' }, 403);
+        const kc = chaveCapa(it.midia);
+        if (!kc) return json({ ok: false, motivo: 'armazenamento sem capa' });
+        const dados = await req.arrayBuffer();
+        if (dados.byteLength > 600 * 1024) return json({ erro: 'capa grande demais' }, 400);
+        await salvarMidia(env, { chave: kc, mime: 'image/jpeg', dados });
+        return json({ ok: true });
       }
 
       if (rota === '/api/upload' && req.method === 'POST') {
