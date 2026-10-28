@@ -1869,17 +1869,6 @@
     Sync.autoSync();
     // ao sair do app a câmera é desligada (o iPhone mata a trilha de qualquer jeito)
     document.addEventListener('visibilitychange', function () { if (document.hidden && !st.gravando) pararStream(); });
-    // voltou ao app depois de muito tempo fora: volta para a lista, como se tivesse aberto de novo
-    // (não mexe se a câmera, uma folha de legenda ou o relatório pronto estiverem abertos)
-    let saiuEm = 0;
-    document.addEventListener('visibilitychange', async function () {
-      if (document.hidden) { saiuEm = Date.now(); return; }
-      if (!saiuEm || Date.now() - saiuEm < 15 * 60 * 1000) return;
-      saiuEm = 0;
-      if (st.gravando || document.querySelector('.folha') || st.esperaCamera) return;
-      if (!$('#telaCamera').classList.contains('oculto') || !$('#telaRelPronto').classList.contains('oculto')) return;
-      await listarRelatorios(); abrir('telaLista');
-    });
     // cadastro (produtores, fazendas, safras) é da conta: confere a nuvem ao voltar para o app
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) Conta.atualizarSePrecisar().catch(function () {});
