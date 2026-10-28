@@ -142,8 +142,12 @@ input,textarea,select{font:inherit}
 .btn-camera:active{transform:scale(.93)}
 .btn-camera.gravando{background:var(--erro);animation:pulsa 1s infinite}
 @keyframes pulsa{50%{opacity:.65}}
-.composer .mic{flex:none;padding:3px 4px;color:var(--texto-fraco);line-height:0}
-.composer.gravando-audio .caixa{display:none}
+.composer .mais{flex:none;align-self:center;font-size:28px;line-height:1;width:34px;height:48px;color:var(--texto);font-weight:300}
+.composer .cam-icone{flex:none;width:42px;height:48px;display:grid;place-items:center;color:var(--texto)}
+.composer .cam-icone:active{opacity:.6}
+.composer .cam-icone.gravando{color:var(--erro)}
+.composer.gravando-audio .caixa,.composer.gravando-audio .mais,.composer.gravando-audio .cam-icone{display:none}
+.composer.com-texto .cam-icone{display:none}
 .grava-audio{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border-radius:22px;padding:8px 14px;
   box-shadow:0 1px 2px rgba(0,0,0,.12);min-height:48px;font-size:15px}
 .grava-audio .aud-lixo{font-size:20px;padding:2px 4px}

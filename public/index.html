@@ -38,18 +38,18 @@
   <main class="chat" id="chat"></main>
 
   <!-- ---------- Composer ---------- -->
-  <div class="dica-camera" id="dicaCamera">Toque para foto · Segure para vídeo</div>
+  <div class="dica-camera" id="dicaCamera">📷 toque = foto · segure = vídeo · 🎤 grava áudio</div>
   <div class="composer">
+    <button class="mais" id="btnAnexo" title="Anexar fotos, vídeos ou áudios da galeria" aria-label="Anexar">＋</button>
     <div class="caixa">
-      <button class="anexo" id="btnAnexo" title="Anexar">📎</button>
       <textarea id="txtMsg" rows="1" placeholder="Observação…"></textarea>
-      <button class="mic" id="btnAudio" title="Gravar áudio" aria-label="Gravar áudio"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
     </div>
     <div class="grava-audio oculto" id="barraAudio">
       <button class="aud-lixo" id="audCancelar" title="Descartar áudio">🗑</button>
       <span class="aud-ponto"></span><span id="audTempo">0:00</span><span class="aud-txt">Gravando áudio…</span>
     </div>
-    <button class="btn-camera" id="btnCamera">📷</button>
+    <button class="cam-icone" id="btnCamera" title="Toque = foto · Segure = vídeo" aria-label="Câmera"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.8"/></svg></button>
+    <button class="btn-camera" id="btnAudio" title="Gravar áudio" aria-label="Gravar áudio"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
   </div>
 </div>
 

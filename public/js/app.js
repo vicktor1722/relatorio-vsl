@@ -301,7 +301,7 @@
 
     $('#dicaCamera').textContent = visitaFechada(st.rel)
       ? 'Visita fechada — o próximo registro abre uma visita nova'
-      : 'Toque para foto · Segure para vídeo · ✎ edita a legenda';
+      : '📷 foto (segure = vídeo) · 🎤 áudio · ✎ edita a legenda';
 
     st.itens = [];
     let html = '';
@@ -812,12 +812,14 @@
   function atualizarBotaoEnvio() {
     const temTexto = $('#txtMsg').value.trim().length > 0;
     st.modoEnvio = temTexto;
-    const b = $('#btnCamera');
+    // como no WhatsApp: com texto o botão verde vira enviar e a câmera sai; sem texto ele grava áudio
+    const b = $('#btnAudio');
+    if (!st.micHTML) st.micHTML = b.innerHTML;
     b.classList.toggle('enviar', temTexto);
-    b.textContent = temTexto ? '➤' : '📷';
-    b.title = temTexto ? 'Enviar' : 'Câmera';
+    if (temTexto) b.textContent = '➤'; else b.innerHTML = st.micHTML;
+    b.title = temTexto ? 'Enviar' : 'Gravar áudio';
+    $('.composer').classList.toggle('com-texto', temTexto);
     $('#dicaCamera').style.visibility = temTexto ? 'hidden' : 'visible';
-    $('#btnAudio').style.display = temTexto ? 'none' : '';
   }
 
   /* ---------------- áudio ---------------- */
@@ -853,7 +855,8 @@
     $('.composer').classList.add('gravando-audio');
     $('#barraAudio').classList.remove('oculto');
     $('#dicaCamera').style.visibility = 'hidden';
-    const b = $('#btnCamera'); b.classList.add('enviar'); b.textContent = '✓'; b.title = 'Parar e adicionar';
+    const b = $('#btnAudio'); if (!st.micHTML) st.micHTML = b.innerHTML;
+    b.classList.add('enviar'); b.textContent = '✓'; b.title = 'Parar e adicionar';
     const tempo = function () {
       const s = (Date.now() - a.inicio) / 1000;
       $('#audTempo').textContent = mmss(s);
@@ -898,13 +901,13 @@
     if (navigator.onLine) Sync.sincronizar(st.rel.id);
   }
 
-  /* botão do composer: vira "enviar" quando há texto; senão toque = foto, segurar = vídeo */
+  /* ícone da câmera no composer: toque = foto, segurar = vídeo */
   function ligarBotaoCamera() {
     const btn = $('#btnCamera');
     let timer = null, segurou = false;
 
     const inicio = function (e) {
-      if (st.modoEnvio || st.audio) return;
+      if (st.audio) return;
       segurou = false;
       timer = setTimeout(async function () {
         segurou = true;
@@ -912,8 +915,7 @@
       }, 450);
     };
     const fim = function (e) {
-      if (st.audio) { if (e.cancelable) e.preventDefault(); pararAudio(false); return; }
-      if (st.modoEnvio) { e.preventDefault(); enviarTexto(); return; }
+      if (st.audio) return;
       clearTimeout(timer);
       if (e && e.type === 'touchend' && e.cancelable) e.preventDefault();  // evita o clique "fantasma" do iPhone
       if (segurou) return;
@@ -1798,7 +1800,20 @@
       } catch (e) { toast('Não consegui recuperar: ' + e.message, 5000); }
     };
     $('#btnAnexo').onclick = function () { $('#inpArquivo').click(); };
-    $('#btnAudio').onclick = function () { iniciarAudio(); };
+    // botão verde: grava áudio; ✓ para a gravação; ➤ envia a observação escrita
+    (function () {
+      const b = $('#btnAudio');
+      let tocou = false;
+      const acao = function () {
+        if (st.audio) pararAudio(false);
+        else if (st.modoEnvio) enviarTexto();
+        else iniciarAudio();
+      };
+      // no toque não deixa o teclado fechar ao enviar texto
+      b.addEventListener('touchend', function (e) { if (e.cancelable) e.preventDefault(); tocou = true; acao(); });
+      b.addEventListener('mousedown', function (e) { if (st.modoEnvio) e.preventDefault(); });
+      b.addEventListener('click', function () { if (tocou) { tocou = false; return; } acao(); });
+    })();
     $('#audCancelar').onclick = function () { pararAudio(true); };
     // saiu do app no meio da gravação: o iPhone corta o microfone, então fecha o áudio com o que já tem
     document.addEventListener('visibilitychange', function () { if (document.hidden && st.audio) pararAudio(false); });
