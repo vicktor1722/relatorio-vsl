@@ -65,7 +65,8 @@ footer .amvs{margin-top:14px;padding-top:12px;border-top:1px solid var(--linha);
 footer .amvs a{color:var(--verde);text-decoration:none}
 footer .bandeira{display:block;margin:12px auto 0;width:30px;height:21px;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
 .barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 16px;background:#fff;border-top:1px solid var(--linha)}
-.barra button{flex:1;padding:11px;border:none;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px}
+.barra button{flex:1;padding:11px 6px;border:none;border-radius:9px;background:var(--verde);color:#fff;font-weight:600;font-size:14px;white-space:nowrap}
+.barra button:disabled{opacity:.7}
 .barra button.sec{background:#fff;color:var(--verde);border:1px solid var(--verde)}
 .item img{cursor:zoom-in}
 .barra-idioma{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding:9px 16px;background:#fff;border-bottom:1px solid var(--linha);font-size:12.5px;color:var(--fraco)}
@@ -374,6 +375,136 @@ const DICT = {
 
 // roda no navegador do cliente: escolhe o idioma (o do aparelho, ou o que ele já tinha escolhido),
 // reescreve os rótulos e pede a tradução das legendas e observações
+// ---------- apresentação em PowerPoint (gerada no aparelho de quem abriu o relatório) ----------
+// A biblioteca só é baixada quando alguém toca no botão. No iPhone, salvar/compartilhar precisa de um
+// toque recente: o primeiro toque gera o arquivo, e o botão vira "Salvar PowerPoint" para o segundo toque.
+const SCRIPT_PPT = String.raw`
+(function(){
+  var btn = document.getElementById('btnPpt'), D = null;
+  try { D = JSON.parse(document.getElementById('pptDados').textContent); } catch (e) {}
+  if (!btn || !D) return;
+  var VERDE = '1B7A43', ESCURO = '146034', CLARO = 'E8F4EC', CINZA = '6B7B72', TEXTO = '1B2B22';
+  var arquivo = null, nome = 'relatorio-' + String(D.fazenda || 'visita').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pptx';
+  function lib(){ return new Promise(function(ok, erro){
+    if (window.PptxGenJS) return ok();
+    var sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+    sc.onload = function(){ ok(); }; sc.onerror = function(){ erro(new Error('sem conexão')); }; document.head.appendChild(sc);
+  }); }
+  // foto reduzida (até 1600 px) em JPEG; devolve também o tamanho para caber sem distorcer
+  function imagem(src, max){ return new Promise(function(ok){
+    if (!src) return ok(null);
+    var im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = function(){ try {
+      var e = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.naturalWidth * e)); c.height = Math.max(1, Math.round(im.naturalHeight * e));
+      var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+      ok({ data: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height });
+    } catch (err) { ok(null); } };
+    im.onerror = function(){ ok(null); }; im.src = src;
+  }); }
+  function caber(im, x, y, bw, bh){ var e = Math.min(bw / im.w, bh / im.h), w = im.w * e, h = im.h * e; return { data: im.data, x: x + (bw - w) / 2, y: y + (bh - h) / 2, w: w, h: h }; }
+  function faixa(sl, titulo, sub){
+    sl.background = { color: 'FFFFFF' };
+    sl.addShape('rect', { x: 0, y: 0, w: 13.333, h: 0.95, fill: { color: VERDE }, line: { color: VERDE } });
+    sl.addText(titulo, { x: 0.45, y: 0.12, w: 9.6, h: 0.72, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle' });
+    if (sub) sl.addText(sub, { x: 9.8, y: 0.12, w: 3.1, h: 0.72, fontSize: 13, color: 'FFFFFF', fontFace: 'Arial', align: 'right', valign: 'middle' });
+    sl.addText(D.empresa + '  ·  ' + D.fazenda, { x: 0.45, y: 7.08, w: 9, h: 0.3, fontSize: 9, color: CINZA, fontFace: 'Arial' });
+    sl.addText('AMVS Relatório de Campo', { x: 9.4, y: 7.08, w: 3.5, h: 0.3, fontSize: 9, color: VERDE, bold: true, fontFace: 'Arial', align: 'right' });
+  }
+  async function gerar(){
+    await lib();
+    var P = new window.PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.title = D.titulo; P.company = D.empresa;
+    var logo = await imagem(D.logo, 600);
+
+    // capa
+    var c = P.addSlide(); c.background = { color: VERDE };
+    if (logo) { var lg = caber(logo, 0.75, 0.6, 2.4, 1.1); c.addShape('roundRect', { x: lg.x - 0.12, y: lg.y - 0.12, w: lg.w + 0.24, h: lg.h + 0.24, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF' }, rectRadius: 0.08 }); c.addImage(lg); }
+    c.addText([{ text: D.empresa, options: { bold: true, fontSize: 20, breakLine: true } }, { text: [D.cidade, D.contato].filter(Boolean).join('  ·  '), options: { fontSize: 13 } }],
+      { x: logo ? 3.6 : 0.75, y: 0.55, w: 9, h: 1.2, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle' });
+    c.addText(D.fazenda, { x: 0.75, y: 2.3, w: 11.8, h: 1.2, fontSize: 48, bold: true, color: 'FFFFFF', fontFace: 'Arial' });
+    c.addText(D.servico, { x: 0.75, y: 3.45, w: 11.8, h: 0.6, fontSize: 22, color: 'D6EEDD', fontFace: 'Arial' });
+    var info = [['Produtor', D.produtor], ['Safra', D.safra], ['Período', D.periodo], ['Responsável', D.responsavel]];
+    info.forEach(function(it, i){
+      c.addText([{ text: it[0].toUpperCase(), options: { fontSize: 11, color: 'BFE3CB', breakLine: true } }, { text: it[1] || '—', options: { fontSize: 18, bold: true, color: 'FFFFFF' } }],
+        { x: 0.75 + i * 3.05, y: 4.75, w: 2.95, h: 1.0, fontFace: 'Arial', valign: 'top' });
+    });
+    if (D.publicado) c.addText('Publicado em ' + D.publicado, { x: 0.75, y: 6.6, w: 8, h: 0.4, fontSize: 12, color: 'D6EEDD', fontFace: 'Arial' });
+
+    // observações gerais (quebra em mais de um slide se for longo)
+    if (D.obs.length) {
+      var blocos = [], atual = [], tam = 0;
+      D.obs.forEach(function(o){ if (tam + o.length > 900 && atual.length) { blocos.push(atual); atual = []; tam = 0; } atual.push(o); tam += o.length; });
+      if (atual.length) blocos.push(atual);
+      blocos.forEach(function(b, i){
+        var sl = P.addSlide(); faixa(sl, 'Observações gerais', blocos.length > 1 ? (i + 1) + ' de ' + blocos.length : '');
+        sl.addText(b.map(function(t){ return { text: t, options: { bullet: true, breakLine: true, paraSpaceAfter: 10 } }; }),
+          { x: 0.6, y: 1.25, w: 12.1, h: 5.6, fontSize: 17, color: TEXTO, fontFace: 'Arial', valign: 'top' });
+      });
+    }
+
+    // um slide por foto, por talhão; observações do talhão num slide de texto
+    for (var gi = 0; gi < D.grupos.length; gi++) {
+      var g = D.grupos[gi], fotos = g.itens.filter(function(i){ return i.tipo === 'foto' && i.src; }), notas = g.itens.filter(function(i){ return i.tipo === 'texto'; });
+      if (notas.length) {
+        var sn = P.addSlide(); faixa(sn, g.titulo + ' · observações', g.area);
+        sn.addText(notas.map(function(n){ return { text: (n.quando ? n.quando + '  —  ' : '') + n.legenda, options: { bullet: true, breakLine: true, paraSpaceAfter: 10 } }; }),
+          { x: 0.6, y: 1.25, w: 12.1, h: 5.6, fontSize: 17, color: TEXTO, fontFace: 'Arial', valign: 'top' });
+      }
+      for (var fi = 0; fi < fotos.length; fi++) {
+        btn.textContent = 'Gerando… ' + g.titulo;
+        var f = fotos[fi], im = await imagem(f.src, 1600), sf = P.addSlide();
+        faixa(sf, g.titulo, (g.area ? g.area + '  ·  ' : '') + 'foto ' + (fi + 1) + ' de ' + fotos.length);
+        if (im) sf.addImage(caber(im, 0.45, 1.2, 8.4, 5.75));
+        else sf.addText('Foto indisponível', { x: 0.45, y: 1.2, w: 8.4, h: 5.75, align: 'center', color: CINZA, fontSize: 14, fill: { color: 'F2F4F2' } });
+        sf.addShape('rect', { x: 9.1, y: 1.2, w: 3.8, h: 5.75, fill: { color: CLARO }, line: { color: CLARO } });
+        sf.addText([
+          { text: f.quando || '', options: { fontSize: 13, color: CINZA, breakLine: true } },
+          { text: f.legenda || 'Sem observação', options: { fontSize: 17, color: f.legenda ? TEXTO : CINZA, breakLine: true } }
+        ], { x: 9.3, y: 1.4, w: 3.45, h: 5.4, fontFace: 'Arial', valign: 'top', paraSpaceAfter: 8 });
+      }
+    }
+
+    // aplicações
+    D.apl.forEach(function(a){
+      var sa = P.addSlide(); faixa(sa, a.titulo, a.status);
+      sa.addText([{ text: a.quando, options: { fontSize: 16, bold: true, color: ESCURO, breakLine: true } },
+        { text: 'Talhões: ' + a.talhoes + (a.ha ? '  ·  ' + a.ha : ''), options: { fontSize: 14, color: TEXTO, breakLine: true } },
+        { text: a.calda || '', options: { fontSize: 13, color: CINZA, breakLine: true } },
+        { text: a.prox || '', options: { fontSize: 13, color: VERDE, bold: true } }],
+        { x: 0.6, y: 1.2, w: 12.1, h: 1.6, fontFace: 'Arial', valign: 'top' });
+      var cab = [['Produto', 'Dose/ha', 'Total'].map(function(t){ return { text: t, options: { bold: true, color: 'FFFFFF', fill: { color: VERDE } } }; })];
+      sa.addTable(cab.concat(a.prods.map(function(p){ return [p[0], p[1], p[2] || '—']; })),
+        { x: 0.6, y: 3.0, w: 12.1, colW: [6.5, 2.8, 2.8], fontSize: 14, fontFace: 'Arial', color: TEXTO, border: { type: 'solid', color: 'E4E9E6', pt: 1 }, autoPage: true });
+    });
+
+    // encerramento
+    var fz = P.addSlide(); fz.background = { color: VERDE };
+    fz.addText('Serviço concluído', { x: 0.75, y: 1.6, w: 11.8, h: 1, fontSize: 40, bold: true, color: 'FFFFFF', fontFace: 'Arial' });
+    fz.addText([{ text: D.empresa, options: { bold: true, fontSize: 20, breakLine: true } }, { text: [D.cidade, D.contato].filter(Boolean).join('  ·  '), options: { fontSize: 14, breakLine: true } },
+      { text: 'Relatório completo, com vídeos e mapa: ' + location.href.split('?')[0], options: { fontSize: 12, color: 'D6EEDD' } }],
+      { x: 0.75, y: 2.8, w: 11.8, h: 1.8, color: 'FFFFFF', fontFace: 'Arial', valign: 'top' });
+    fz.addText([{ text: 'Gerado por ', options: { color: 'D6EEDD' } }, { text: 'AMVS Tecnologia', options: { bold: true } },
+      { text: '  ·  WhatsApp (65) 99918-9847  ·  amvsdiretoria@gmail.com  ·  amvs.ia.br', options: { color: 'D6EEDD' } }],
+      { x: 0.75, y: 6.5, w: 11.8, h: 0.5, fontSize: 12, color: 'FFFFFF', fontFace: 'Arial' });
+    return P.write({ outputType: 'blob' });
+  }
+  function salvar(blob){
+    var arq = null; try { arq = new File([blob], nome, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }); } catch (e) {}
+    if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) { navigator.share({ files: [arq], title: D.titulo }).catch(function(){}); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  }
+  var rotulo = btn.textContent, gerando = false;
+  btn.addEventListener('click', function(){
+    if (arquivo) { salvar(arquivo); return; }   // segundo toque: salva/compartilha o que já foi gerado
+    if (gerando) return; gerando = true; btn.textContent = 'Gerando…'; btn.disabled = true;
+    gerar().then(function(blob){ arquivo = blob; btn.textContent = 'Salvar PowerPoint'; }, function(e){
+      btn.textContent = rotulo; alert('Não consegui gerar a apresentação' + (e && e.message ? ': ' + e.message : '') + '. Tente de novo com internet.');
+    }).then(function(){ gerando = false; btn.disabled = false; });
+  });
+})();
+`;
+
 const SCRIPT_IDIOMA = String.raw`
 (function(){
   var D = __DICT__;
@@ -546,6 +677,24 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
   });
 
   const titulo = `${rel._n > 1 ? 'Relatório de ' + rel._n + ' visitas' : 'Relatório de visita'} — ${rel.fazenda || ''}`;
+  const quando = (iso) => { const l = noFuso(iso); return l ? fmtData(l) + ' ' + l.slice(11, 16) : ''; };
+  const pptDados = {
+    titulo, empresa, cidade, logo, contato: [tel, mail].filter(Boolean).join(' · '),
+    fazenda: rel.fazenda || 'Relatório de visita', servico: rel.servico || 'Relatório de visita técnica',
+    produtor: rel.produtor || '', safra: safraPadrao(rel.safra) || '', responsavel: rel.responsavel || '',
+    periodo: rel.data_inicio ? fmtData(rel.data_inicio) + (rel.data_fim && rel.data_fim !== rel.data_inicio ? ' a ' + fmtData(rel.data_fim) : '') : '',
+    publicado: rel.publicado_em ? fmtData(noFuso(rel.publicado_em)) : '',
+    obs: [rel.observacoes].concat(gNotas ? gNotas.itens.map(i => i.legenda) : []).map(t => String(t || '').trim()).filter(Boolean),
+    grupos: grupos.filter(g => g.chave !== '\u0000notas').map(g => ({
+      titulo: g.chave === '\u0000fora' ? 'Fora dos talhões' : g.titulo,
+      area: g.area ? g.area.toFixed(1).replace('.', ',') + ' ha' : '',
+      itens: g.itens.filter(i => i.tipo === 'foto' || i.tipo === 'texto').map(i => ({
+        tipo: i.tipo, legenda: String(i.legenda || '').trim(), quando: quando(i.capturado_em),
+        src: i.tipo === 'foto' && i.midia ? '/img/' + encodeURIComponent(i.midia) : ''
+      }))
+    })),
+    apl: (ag && ag.apl) || []
+  };
   const descricao = [rel.servico, rel.produtor, `${fotos} fotos`, videos ? `${videos} vídeos` : null]
     .filter(Boolean).join(' · ');
 
@@ -603,6 +752,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 ${BANDEIRA}</footer>
 <div class="barra">
   <button class="sec" onclick="window.print()" data-i="pdf">Baixar PDF</button>
+  <button class="sec" id="btnPpt" type="button">PowerPoint</button>
   <button data-i="compartilhar" onclick="if(navigator.share){navigator.share({title:document.title,url:location.href})}else{navigator.clipboard.writeText(location.href);alert(window.__t?window.__t('link_copiado'):'Link copiado')}">Compartilhar</button>
 </div>
 <script>
@@ -685,6 +835,8 @@ ${BANDEIRA}</footer>
 </script>
 ${ag ? '<script>' + AGRO_REL_JS + '</script>' : ''}
 <script>${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
+<script type="application/json" id="pptDados">${JSON.stringify(pptDados).replace(/</g, '\\u003c')}</script>
+<script>${SCRIPT_PPT}</script>
 </div></body></html>`;
 }
 
