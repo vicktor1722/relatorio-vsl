@@ -1050,6 +1050,14 @@
     });
   }
 
+  // Abre o WhatsApp direto com o texto pronto. No iPhone, a folha de compartilhar do sistema às vezes
+  // trava ao escolher o WhatsApp dentro do app instalado; o endereço whatsapp:// não passa por ela.
+  function abrirWhatsApp(texto) {
+    const t = encodeURIComponent(texto);
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) location.href = 'whatsapp://send?text=' + t;
+    else window.open('https://wa.me/?text=' + t, '_blank');   // computador: WhatsApp Web
+  }
+
   // Botão da lista: finaliza o relatório, sobe tudo e devolve o link do cliente.
   // Sem internet ele entra na fila e sobe sozinho quando a conexão voltar.
   async function enviarDaLista(botao) {
@@ -1375,16 +1383,18 @@
       '<p style="margin:0 0 10px;font-size:13.5px;color:var(--texto-fraco)">' +
         esc(rel.fazenda || '') + (rel.produtor ? ' · ' + esc(rel.produtor) : '') + '</p>' +
       '<div class="campo"><input id="linkOut" readonly value="' + esc(link) + '"></div>' +
-      '<button class="btn" id="btnCompart">Enviar para o cliente</button>' +
+      '<button class="btn" id="btnZap">Enviar pelo WhatsApp</button>' +
+      '<button class="btn secundario" id="btnCompart">Enviar por outro app</button>' +
       '<button class="btn secundario" id="btnCopiar">Copiar link</button>' +
       '<button class="btn secundario" id="btnAbrir">Abrir relatório</button>';
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const sair = function () { veu.remove(); };
     veu.onclick = function (e) { if (e.target === veu) sair(); };
     const texto = (rel.multi ? 'Relatório de visitas — ' : 'Relatório de visita — ') + (rel.fazenda || '') + '\n' + link;
+    folha.querySelector('#btnZap').onclick = function () { abrirWhatsApp(texto); };
     folha.querySelector('#btnCompart').onclick = function () {
-      if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto });
-      else window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+      if (navigator.share) navigator.share({ text: texto }).catch(function () {});
+      else abrirWhatsApp(texto);
     };
     folha.querySelector('#btnCopiar').onclick = function () {
       navigator.clipboard.writeText(link); toast('Link copiado');
@@ -1646,7 +1656,7 @@
       if (rel.status !== 'publicado') { toast('Finalize o relatório para gerar o link de envio', 4000); return; }
       const link = (await Sync.baseLink()) + '/r/' + id;
       const texto = 'Relatório de visita — ' + (rel.fazenda || '') + '\n' + link;
-      if (navigator.share) navigator.share({ title: 'Relatório de visita', text: texto, url: link });
+      if (navigator.share) navigator.share({ text: texto }).catch(function () {});
       else { navigator.clipboard.writeText(link); toast('Link copiado'); }
     };
   }
