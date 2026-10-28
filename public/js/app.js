@@ -301,7 +301,7 @@
 
     $('#dicaCamera').textContent = visitaFechada(st.rel)
       ? 'Visita fechada — o próximo registro abre uma visita nova'
-      : 'Toque para foto · Segure para vídeo · ✏️ edita a legenda';
+      : 'Toque para foto · Segure para vídeo · ✎ edita a legenda';
 
     st.itens = [];
     let html = '';
@@ -366,7 +366,9 @@
 
   function bolhaHTML(it, editavel) {
     // lápis para editar a legenda (só nas visitas ainda em aberto)
-    const lapis = editavel ? '<button type="button" class="lapis" data-editar="' + it.id + '" title="Editar legenda">✏️</button>' : '';
+    const lapis = editavel ? '<button type="button" class="lapis" data-editar="' + it.id + '" title="Editar legenda" aria-label="Editar legenda">' +
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' : '';
     const ticks = it.sync_state === 'ok'
       ? '<span class="ticks ok">✓✓</span>'
       : it.sync_state === 'erro'
