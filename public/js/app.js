@@ -649,7 +649,7 @@
       ));
       if (!item) return null;
       await renderChat(); atualizarSync();
-      if (grande) await prepararVideo(item, blob);
+      if (grande) { st.videoEsperando = true; processarFilaVideo(); }
       if (navigator.onLine) Sync.sincronizar(st.rel.id);
       return r;
     } catch (e) {
@@ -663,8 +663,8 @@
      O vídeo da câmera do celular sai em 1080p/4K (60–170 MB por minuto). Acima de 25 MB ele é
      regravado em 720p (~18 MB por minuto): o vídeo toca num <video> mudo, cada quadro é desenhado
      num canvas menor e o som, tirado do próprio arquivo, toca junto só para a gravação.
-     Leva o tempo do vídeo. Se algo não der certo (aparelho sem suporte, app minimizado,
-     "Enviar sem reduzir"), o original é enviado como antes — o registro nunca se perde:
+     Roda sozinho em segundo plano e leva o tempo do vídeo. Se algo não der certo (aparelho sem
+     suporte, app minimizado 3 vezes), o original é enviado como antes — o registro nunca se perde:
      ele já está guardado e só fica esperando (sync_state 'preparando'). */
   const VIDEO_REDUZIR_MB = 25;
   function podeReduzirVideo() {
@@ -700,6 +700,8 @@
     const url = URL.createObjectURL(blob);
     const v = document.createElement('video');
     v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto';
+    v.style.cssText = 'position:fixed;left:-20px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+    document.body.appendChild(v);
     let rec = null, fonte = null, faixas = [];
     try {
       await new Promise(function (ok, no) {
@@ -767,43 +769,51 @@
       try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) {}
       try { if (fonte) fonte.stop(); } catch (e) {}
       faixas.forEach(function (t) { t.stop(); });
-      v.pause(); v.removeAttribute('src'); v.load();
+      v.pause(); v.removeAttribute('src'); v.load(); v.remove();
       URL.revokeObjectURL(url);
     }
   }
 
-  async function prepararVideo(item, blob) {
-    const veu = document.createElement('div'); veu.className = 'veu';
-    const folha = document.createElement('div'); folha.className = 'folha';
-    folha.innerHTML = '<div class="alca"></div>' +
-      '<h2 style="margin:0 0 6px">🎬 Reduzindo o vídeo</h2>' +
-      '<p style="margin:0 0 12px;font-size:13.5px;color:var(--texto-fraco)">' + bytesFmt(blob.size) +
-        ' — deixando em 720p para enviar mais rápido e ocupar menos espaço. Leva mais ou menos o tempo do vídeo; mantenha o app aberto.</p>' +
-      '<div style="height:10px;border-radius:5px;background:#E3E8E5;overflow:hidden"><div id="redBarra" style="height:100%;width:0;background:var(--verde);transition:width .3s"></div></div>' +
-      '<div id="redPct" style="text-align:center;font-weight:600;margin:8px 0 12px">0%</div>' +
-      '<button class="btn secundario" id="redPular">Enviar sem reduzir</button>';
-    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
-    veu.onclick = function (e) { if (e.target === veu) e.stopPropagation(); };
-    const controle = {};
-    folha.querySelector('#redPular').onclick = function () { if (controle.parar) controle.parar(); };
-    let novo = null;
+  // Fila em segundo plano (como o WhatsApp): sem tela de espera, a pessoa segue usando o app.
+  // App minimizado no meio: o vídeo continua esperando e a redução recomeça quando voltar
+  // (até 3 tentativas; depois vai o original). Na publicação, o que ainda estiver esperando sobe original.
+  let filaVideo = false;
+  async function processarFilaVideo() {
+    if (filaVideo || document.hidden) return;
+    filaVideo = true;
     try {
-      novo = await reduzirVideo(blob, st.ctxVideo || ctxDoToque(), function (p) {
-        const pct = Math.round(p * 100) + '%';
-        folha.querySelector('#redBarra').style.width = pct; folha.querySelector('#redPct').textContent = pct;
-      }, controle);
-    } catch (e) { novo = null; }
-    veu.remove();
-    const it = await DB.get('itens', item.id);
-    if (!it) return;   // apagado enquanto isso
-    if (novo) {
-      await DB.salvarMidia(it.id, novo);
-      it.bytes = novo.size; it.mime = novo.type;
-      toast('Vídeo reduzido: ' + bytesFmt(blob.size) + ' → ' + bytesFmt(novo.size), 4000);
-    }
-    it.sync_state = 'pendente';
-    await DB.put('itens', it);
-    await renderChat(); atualizarSync();
+      for (;;) {
+        const pend = (await DB.all('itens')).filter(function (i) { return i.sync_state === 'preparando'; });
+        st.videoEsperando = pend.length > 0;
+        if (!pend.length) break;
+        const ctx = st.ctxVideo;
+        if (ctx && ctx.state !== 'running') { try { await ctx.resume(); } catch (e) {} }
+        if (!ctx || ctx.state !== 'running') break;   // o som só liga num toque: espera o próximo toque no app
+        const it = pend[0];
+        const blob = await DB.lerMidia(it.id);
+        let novo = null, erro = '';
+        if (blob) {
+          try { novo = await reduzirVideo(blob, ctx, function () {}, {}); }
+          catch (e) { erro = e.message || 'falhou'; }
+        }
+        const atual = await DB.get('itens', it.id);
+        if (!atual || atual.sync_state !== 'preparando') continue;   // apagado ou já foi para o envio
+        if (erro === 'app minimizado' && (atual.tentativas || 0) < 2) {
+          atual.tentativas = (atual.tentativas || 0) + 1;
+          await DB.put('itens', atual);
+          break;                                   // volta quando o app estiver na tela de novo
+        }
+        if (novo) {
+          await DB.salvarMidia(atual.id, novo);
+          atual.bytes = novo.size; atual.mime = novo.type;
+        }
+        atual.sync_state = 'pendente'; delete atual.tentativas;
+        await DB.put('itens', atual);
+        if (!document.querySelector('.folha')) await renderChat();
+        atualizarSync();
+        if (navigator.onLine) Sync.sincronizar(atual.relatorio_id);
+      }
+    } finally { filaVideo = false; }
   }
 
   // as fotos do lote viram registros da conversa, todas com a legenda e o talhão escolhidos
@@ -2152,11 +2162,16 @@
     // o app sempre abre na lista de relatórios; a última conversa fica pronta por baixo (seta ←)
     if (!st.rel) await renderChat();
     if (!alvo) { await listarRelatorios(); abrir('telaLista'); }
-    try {
-      for (const it of await DB.all('itens')) {
-        if (it.sync_state === 'preparando') { it.sync_state = 'pendente'; await DB.put('itens', it); }
-      }
-    } catch (e) {}
+    // vídeo que ficou esperando a redução (app fechado no meio): retoma no primeiro toque
+    try { st.videoEsperando = (await DB.all('itens')).some(function (i) { return i.sync_state === 'preparando'; }); } catch (e) {}
+    const tocouApp = function () {
+      if (!st.videoEsperando) return;
+      if (!st.ctxVideo) st.ctxVideo = ctxDoToque(); else if (st.ctxVideo.state !== 'running') st.ctxVideo.resume().catch(function () {});
+      setTimeout(processarFilaVideo, 300);
+    };
+    document.addEventListener('touchend', tocouApp, true);
+    document.addEventListener('click', tocouApp, true);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && st.videoEsperando) setTimeout(processarFilaVideo, 800); });
     window.__appPronto = true;   // avisos (ex.: novidade do mapa) só depois daqui
     atualizarSync();
     atualizarBotaoEnvio();
