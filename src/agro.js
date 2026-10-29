@@ -10,11 +10,12 @@
 
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
+import { plantioPorDia } from './plantiodia.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, regraValida } from './cultivares.js';
 
 let pronta = null;
 
-function garantir(env) {
+export function garantir(env) {
   if (!pronta) {
     pronta = env.DB.batch([
       env.DB.prepare(`CREATE TABLE IF NOT EXISTS modulos_usuario (
@@ -112,9 +113,10 @@ function garantir(env) {
 }
 
 // colunas novas da tabela ciclos: GMR informado e empresa (materiais cadastrados pelo consultor)
+// + plantio lançado por dia pelo gerente da fazenda (plantio.lanc)
 async function colunasCiclos(env) {
-  for (const c of ['gmr REAL DEFAULT 0', "empresa TEXT DEFAULT ''"]) {
-    try { await env.DB.prepare('ALTER TABLE ciclos ADD COLUMN ' + c).run(); } catch (e) { /* já existe */ }
+  for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''"]) {
+    try { await env.DB.prepare('ALTER TABLE ' + c).run(); } catch (e) { /* já existe */ }
   }
 }
 
@@ -278,7 +280,7 @@ const SEM_PLANTIO = { pastagem: 1, pousio: 1 };
 export async function plantioGeral(env) {
   await garantir(env);
   const [pl, fz, mu] = await Promise.all([
-    env.DB.prepare('SELECT fazenda_id, safra, talhao, cultura, variedade, data_plantio FROM plantio LIMIT 30000').all(),
+    env.DB.prepare('SELECT * FROM plantio LIMIT 30000').all(),
     env.DB.prepare(`SELECT f.id, f.nome, f.talhoes, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
         FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id LEFT JOIN produtores p ON p.id = f.produtor_id
        WHERE f.talhoes IS NOT NULL AND f.talhoes != '' LIMIT 1000`).all(),
@@ -338,23 +340,24 @@ export async function plantioGeral(env) {
       rs.forEach((r) => {
         const ha = F.areas[r.talhao] || 0;
         if (SEM_PLANTIO[r.cultura]) { naoPlanta += ha; return; }
+        const dias = plantioPorDia(r, ha), hp = dias.reduce((s, x) => s + x.ha, 0);
         if (r.cultura) {
           const c = cult[r.cultura] = cult[r.cultura] || { cultura: r.cultura, ha: 0, plantado: 0 };
-          c.ha += ha; if (r.data_plantio) c.plantado += ha;
+          c.ha += ha; c.plantado += hp;
           comCultura += ha; cultsFaz[r.cultura] = 1;
         }
         if (r.variedade) {
           const k = (r.cultura || '') + '|' + r.variedade;
           const v = vari[k] = vari[k] || { cultura: r.cultura || '', variedade: r.variedade, ha: 0, plantado: 0, fazs: {} };
-          v.ha += ha; if (r.data_plantio) v.plantado += ha; v.fazs[fid] = 1;
+          v.ha += ha; v.plantado += hp; v.fazs[fid] = 1;
           vs[r.variedade] = 1;
         }
-        if (r.cultura && r.data_plantio) {
-          plant += ha;
-          linha[r.data_plantio] = (linha[r.data_plantio] || 0) + ha;
-          if (!primeira || r.data_plantio < primeira) primeira = r.data_plantio;
-          if (!ultima || r.data_plantio > ultima) ultima = r.data_plantio;
-        }
+        dias.forEach((x) => {
+          plant += x.ha;
+          linha[x.d] = (linha[x.d] || 0) + x.ha;
+          if (!primeira || x.d < primeira) primeira = x.d;
+          if (!ultima || x.d > ultima) ultima = x.d;
+        });
       });
       const tot = Math.max(0, F.total - naoPlanta);
       // fazenda com uma cultura só (ex.: soja): os talhões ainda sem cultura entram na área dela;

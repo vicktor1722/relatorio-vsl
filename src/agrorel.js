@@ -7,6 +7,8 @@
    Só aparece quando há dados; o relatório antigo continua igual.
    ============================================================ */
 
+import { plantioPorDia } from './plantiodia.js';
+
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -322,12 +324,18 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   const total = Object.keys(areas).filter((t) => !naoPlanta[t]).reduce((s, t) => s + areas[t], 0);
   const haFora = Object.keys(naoPlanta).reduce((s, t) => s + (areas[t] || 0), 0);
   if (!total) return '';
-  const por = {};
-  plantaveis.filter((p) => p.data_plantio).forEach((p) => { (por[p.data_plantio] = por[p.data_plantio] || []).push(p.talhao); });
+  // hectares por dia: talhão inteiro na data de plantio, ou o que o gerente lançou dia a dia
+  const por = {}, hp = {};
+  plantaveis.forEach((p) => plantioPorDia(p, areas[p.talhao]).forEach((x) => {
+    (por[x.d] = por[x.d] || []).push({ t: p.talhao, ha: x.ha }); hp[p.talhao] = (hp[p.talhao] || 0) + x.ha;
+  }));
   const ds = Object.keys(por).sort();
   if (!ds.length) return '';
   let cum = 0;
-  const ev = ds.map((d) => { const ha = por[d].reduce((s, t) => s + areas[t], 0); cum += ha; return { d, tal: por[d], ha, cum }; });
+  const ev = ds.map((d) => {
+    const ha = por[d].reduce((s, x) => s + x.ha, 0); cum += ha;
+    return { d, tal: por[d].map((x) => (x.ha < areas[x.t] - 0.05 ? x.t + ' (' + fmt(x.ha) + ' ha)' : x.t)), ha, cum };
+  });
 
   const Wd = 360, Hd = 196, L = 40, R = 14, T = 14, B = 26;
   const x0 = addDias(ds[0], -1), x1 = hoje > ds[ds.length - 1] ? hoje : ds[ds.length - 1];
@@ -356,10 +364,10 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   g += '</svg>';
 
   const ult = ev[ev.length - 1];
-  const plantados = {};
-  plantaveis.forEach((p) => { if (p.data_plantio) plantados[p.talhao] = 1; });
-  const falta = Object.keys(areas).filter((t) => !naoPlanta[t] && !plantados[t]).map((t) => ({ talhao: t }));
-  const hf = falta.reduce((s, p) => s + areas[p.talhao], 0);
+  // o que falta: talhões sem plantio e o resto dos talhões plantados só em parte
+  const falta = Object.keys(areas).filter((t) => !naoPlanta[t] && areas[t] - (hp[t] || 0) > 0.05)
+    .map((t) => ({ talhao: hp[t] ? t + ' (' + fmt(areas[t] - hp[t]) + ' ha)' : t, ha: areas[t] - (hp[t] || 0) }));
+  const hf = falta.reduce((s, p) => s + p.ha, 0);
   const tb = '<table class="pl-tab"><tr><th>Data</th><th>Talhões</th><th>ha</th><th>Acumulado</th></tr>' +
     ev.map((e) => '<tr><td>' + curta(e.d) + '</td><td>' + esc(e.tal.join(', ')) + '</td><td>' + fmt(e.ha) + '</td><td>' + fmt(e.cum) + '</td></tr>').join('') + '</table>';
   const dadosJs = JSON.stringify(ev.map((e) => ({ d: curta(e.d), tal: e.tal.join(', '), ha: fmt(e.ha), cum: fmt(e.cum), pc: fmt(e.cum / total * 100) })));

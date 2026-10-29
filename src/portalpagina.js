@@ -91,6 +91,11 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .folha h3{margin:0 0 2px;font-size:18px}.folha .q{font-size:13px;color:var(--fraco);margin-bottom:10px}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.g3 .campo{margin-bottom:8px;min-width:0}
 .folha .campo input,.folha .campo textarea{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;font-family:inherit}
+.folha .campo select{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;background:#fff;font-family:inherit}
+.lanc{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:14px}
+.lanc .t{flex:1;min-width:0}.lanc small{display:block;color:var(--fraco);font-size:12px}
+.lanc button{border:0;background:none;color:#C0392B;font-size:13px;text-decoration:underline;padding:4px}
+.barra{height:6px;background:#E4EAE6;border-radius:3px;overflow:hidden;margin-top:3px;min-width:60px}.barra i{display:block;height:100%;background:#2E7D32}
 .folha label.l{display:block;font-size:12px;color:var(--fraco);margin-bottom:3px}
 .alerta{background:#FFF3DC;color:#7A5200;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
 .fotos{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}.fotos img{width:64px;height:64px;object-fit:cover;border-radius:8px}
@@ -275,14 +280,8 @@ ${AGRO_REL_CSS}
     mapas.forEach(function (m) { try { m.remove(); } catch (e) {} }); mapas = [];
     if (eu.papel === 'operador') return vistaOperador();
     if (aba === 'mapa') vistaMapas();
-    else if (aba === 'plantio') {
-      var lin = (D.plantio || []).slice().sort(function (a, b) { return String(a.talhao).localeCompare(b.talhao, 'pt-BR', { numeric: true }); }).map(function (p) {
-        var dae = p.data_emerg ? dif(hoje(), p.data_emerg) : null;
-        return '<tr><td><b>' + esc(p.talhao) + '</b></td><td style="text-align:left">' + esc(NC[p.cultura] || p.cultura || '—') + '</td><td style="text-align:left">' + esc(p.variedade || '—') + '</td><td>' + dataBR(p.data_plantio) + '</td><td>' + (dae !== null && dae >= 0 ? dae : '—') + '</td></tr>';
-      }).join('');
-      $('#conteudo').innerHTML = abas() + (D.blocos.evolucao || '<div class="vazio">Evolução do plantio aparece quando as datas de plantio forem lançadas.</div>') +
-        (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura</th><th style="text-align:left">Variedade</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
-    } else if (aba === 'est') vistaEstoque();
+    else if (aba === 'plantio') vistaPlantio();
+    else if (aba === 'est') vistaEstoque();
     else if (aba === 'colh') vistaColheita();
     else {
       $('#conteudo').innerHTML = abas() + ((D.blocos.proximas || '') + (D.blocos.aplicacoes || '') || '<div class="vazio">Nenhuma aplicação nesta safra ainda.</div>');
@@ -353,13 +352,8 @@ ${AGRO_REL_CSS}
     return ev;
   }
   var CAL = { y: 0, m: 0, sel: '' };
-  var MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  function vistaColheita() {
-    var pv = previsoes(), ev = eventosCal(pv);
-    if (!CAL.y) {   // abre no mês da próxima colheita prevista (ou no mês atual)
-      var prox = pv.filter(function (x) { return !x.colhido && x.data >= hoje(); })[0], base = prox ? prox.data : hoje();
-      CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
-    }
+  // grade do mês com ícones e a lista do dia escolhido
+  function calendario(ev, comColh) {
     var ini = new Date(Date.UTC(CAL.y, CAL.m, 1)).getUTCDay(), nd = new Date(Date.UTC(CAL.y, CAL.m + 1, 0)).getUTCDate(), g = '';
     ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].forEach(function (x) { g += '<div class="dw">' + x + '</div>'; });
     for (var i = 0; i < ini; i++) g += '<div></div>';
@@ -371,15 +365,27 @@ ${AGRO_REL_CSS}
         (ap.length ? '<span class="k-' + cor + '">' + ICO_PULV + '</span>' : '') + (co.length ? '<span class="k-colh">' + ICO_COLH + '</span>' : '') + '</i></button>';
     }
     var ds = ev.filter(function (e) { return e.d === CAL.sel; });
-    var h = abas() + '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' +
-      '<div class="cal-h"><button data-mes="-1" aria-label="mês anterior">‹</button><b>' + MESES[CAL.m].charAt(0).toUpperCase() + MESES[CAL.m].slice(1) + ' de ' + CAL.y + '</b><button data-mes="1" aria-label="próximo mês">›</button></div>' +
+    return '<div class="cal-h"><button data-mes="-1" aria-label="mês anterior">‹</button><b>' + MESES[CAL.m].charAt(0).toUpperCase() + MESES[CAL.m].slice(1) + ' de ' + CAL.y + '</b><button data-mes="1" aria-label="próximo mês">›</button></div>' +
       '<div class="cal">' + g + '</div>' +
-      '<div class="legc"><span class="k-prev">' + ICO_PULV + 'aplicação prevista</span><span class="k-apl">' + ICO_PULV + 'aplicada</span><span class="k-venc">' + ICO_PULV + 'atrasada</span><span class="k-colh">' + ICO_COLH + 'colheita prevista</span></div>' +
+      '<div class="legc"><span class="k-prev">' + ICO_PULV + 'aplicação prevista</span><span class="k-apl">' + ICO_PULV + 'aplicada</span><span class="k-venc">' + ICO_PULV + 'atrasada</span>' + (comColh ? '<span class="k-colh">' + ICO_COLH + 'colheita prevista</span>' : '') + '</div>' +
       '<div style="font-weight:700;margin:4px 2px 6px">' + dataBR(CAL.sel) + (CAL.sel === hoje() ? ' (hoje)' : '') + '</div>' +
       (ds.length ? ds.map(function (e) {
         return '<div class="ev"><span class="k-' + (e.k === 'colh' ? 'colh' : e.k) + '">' + (e.k === 'colh' ? ICO_COLH : ICO_PULV) + '</span><div><b>' + esc(e.txt) + '</b>' + (e.est ? ' <span class="sem">(estimado)</span>' : '') +
           '<small>' + esc(e.tal.join(', ')) + (e.k === 'colh' ? ' · janela ' + dataBR(somaDias(e.d, -5)) + ' a ' + dataBR(somaDias(e.d, 5)) : '') + '</small></div></div>';
       }).join('') : '<div class="sem" style="margin:0 2px 10px">Nada neste dia.</div>');
+  }
+  function ligarCal() {
+    document.querySelectorAll('[data-dia]').forEach(function (b) { b.onclick = function () { CAL.sel = b.dataset.dia; pintar(); }; });
+    document.querySelectorAll('[data-mes]').forEach(function (b) { b.onclick = function () { CAL.m += Number(b.dataset.mes); if (CAL.m < 0) { CAL.m = 11; CAL.y--; } if (CAL.m > 11) { CAL.m = 0; CAL.y++; } pintar(); }; });
+  }
+  var MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  function vistaColheita() {
+    var pv = previsoes(), ev = eventosCal(pv);
+    if (!CAL.y) {   // abre no mês da próxima colheita prevista (ou no mês atual)
+      var prox = pv.filter(function (x) { return !x.colhido && x.data >= hoje(); })[0], base = prox ? prox.data : hoje();
+      CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
+    }
+    var h = abas() + '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' + calendario(ev, true);
 
     if (!pv.length) {
       h += '<div class="vazio">A previsão de colheita aparece quando o consultor lançar a data de plantio dos talhões.</div>';
@@ -427,14 +433,108 @@ ${AGRO_REL_CSS}
         '<div class="sem" style="font-size:12.5px;margin:0 2px">Previsão = data de plantio + ciclo do material, com janela de ± 5 dias (clima e chuva mexem na colheita). Na soja o ciclo sai do grupo de maturação (GMR) da cultivar; "estimado" = ciclo padrão da cultura.</div>';
     }
     $('#conteudo').innerHTML = h;
-    document.querySelectorAll('[data-dia]').forEach(function (b) { b.onclick = function () { CAL.sel = b.dataset.dia; pintar(); }; });
-    document.querySelectorAll('[data-mes]').forEach(function (b) { b.onclick = function () { CAL.m += Number(b.dataset.mes); if (CAL.m < 0) { CAL.m = 11; CAL.y--; } if (CAL.m > 11) { CAL.m = 0; CAL.y++; } pintar(); }; });
+    ligarCal();
+  }
+
+  /* ---------- plantio: evolução, talhões e lançamento da área plantada no dia (gerente) ---------- */
+  function areasMapa() { var o = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) o[q.nome] = Number(q.area_ha) || 0; }); return o; }
+  function porNome(a, b) { return String(a).localeCompare(String(b), 'pt-BR', { numeric: true }); }
+  function vistaPlantio() {
+    var areas = areasMapa(), pl = {}, lanc = [];
+    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por }); }); });
+    lanc.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : porNome(a.t, b.t); });
+    var nomes = Object.keys(areas).concat(Object.keys(pl).filter(function (t) { return !(t in areas); })).sort(porNome);
+    var lin = nomes.map(function (t) {
+      var p = pl[t] || {}, ar = areas[t] || 0, hp = Number(p.ha_plantada) || 0, pc = ar ? Math.min(100, hp / ar * 100) : 0;
+      var dae = p.data_emerg ? dif(hoje(), p.data_emerg) : null;
+      return '<tr><td><b>' + esc(t) + '</b></td><td style="text-align:left">' + esc(NC[p.cultura] || p.cultura || '—') + (p.variedade ? '<br><span class="sem">' + esc(p.variedade) + '</span>' : '') + '</td>' +
+        '<td style="white-space:nowrap">' + (hp ? n(hp, 1) + ' ha · ' + pc.toFixed(0) + '%<div class="barra"><i style="width:' + pc.toFixed(0) + '%"></i></div>' : '<span class="sem">' + n(ar, 1) + ' ha</span>') + '</td>' +
+        '<td>' + dataBR(p.data_plantio) + '</td><td>' + (dae !== null && dae >= 0 ? dae : '—') + '</td></tr>';
+    }).join('');
+    var gerente = eu.papel !== 'operador';
+    var h = abas() + (gerente ? '<button class="btn" id="btnLancPl">🌱 Lançar plantio do dia</button>' : '') +
+      (D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
+      (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura / variedade</th><th>Plantado</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
+    if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
+      return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + esc(x.por || 'lançado') + '</small></div>' +
+        (gerente ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
+    }).join('');
+    $('#conteudo').innerHTML = h;
+    var bl = document.getElementById('btnLancPl'); if (bl) bl.onclick = function () { folhaPlantio(); };
+    document.querySelectorAll('[data-apl]').forEach(function (b) { b.onclick = function () {
+      var p = b.dataset.apl.split('|');
+      if (!confirm('Apagar o lançamento de ' + dataBR(p[1]) + ' em ' + p[0] + '?')) return;
+      enviarPlantio({ talhao: p[0], data: p[1], apagar: true }, 'Lançamento apagado');
+    }; });
+  }
+  var CULT = null;
+  function carregarCult() {
+    if (CULT) return Promise.resolve(CULT);
+    return api('/api/portal/cultivares').then(function (r) { CULT = r.catalogo || []; return CULT; }).catch(function () { return []; });
+  }
+  async function enviarPlantio(corpo, msg) {
+    try {
+      await api('/api/portal/plantio', Object.assign({ fazenda: $('#selFaz').value, safra: D.safra }, corpo));
+      toast(msg); await carregar(D.safra); return true;
+    } catch (e) { toast(e.message || 'Não foi possível salvar (sem internet?)'); return false; }
+  }
+  function folhaPlantio() {
+    var areas = areasMapa(), pl = {}; (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; });
+    var nomes = Object.keys(areas).sort(porNome);
+    var resta = function (t) { var p = pl[t] || {}; return Math.max(0, (areas[t] || 0) - (Number(p.ha_plantada) || 0)); };
+    var v = document.createElement('div'); v.className = 'veu';
+    v.innerHTML = '<div class="folha"><h3>Lançar plantio do dia</h3><div class="q">A área entra na evolução do plantio do relatório e no app do consultor.</div>' +
+      '<div class="campo"><label class="l">Data *</label><input type="date" id="pData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
+      '<div class="campo"><label class="l">Talhão *</label><select id="pTal"><option value="">— escolher —</option>' + nomes.map(function (t) {
+        var r = resta(t); return '<option value="' + esc(t) + '">' + esc(t) + ' · ' + (r > 0.05 ? 'faltam ' + n(r, 1) + ' ha' : 'completo') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label class="l">Hectares plantados neste dia *</label><input id="pHa" inputmode="decimal" placeholder="ex.: 45,5"></div>' +
+      '<div class="campo"><label class="l">Cultura</label><select id="pCult">' + ['soja', 'milho', 'algodao', 'feijao', 'sorgo', 'trigo', 'outra'].map(function (c) { return '<option value="' + c + '">' + NC[c] + '</option>'; }).join('') + '</select></div>' +
+      '<div id="pVarBox"></div>' +
+      '<button class="btn" id="pOk">✔ Salvar</button><button class="btn sec" id="pNao">Cancelar</button></div>';
+    document.body.appendChild(v);
+    var st = { emp: '', vari: '' };
+    function pintarVar() {
+      var t = v.querySelector('#pTal').value, p = pl[t] || {}, box = v.querySelector('#pVarBox');
+      if (p.variedade) { box.innerHTML = '<div class="campo"><label class="l">Variedade</label><div class="sem" style="padding:6px 2px">' + esc(p.variedade) + ' (já lançada neste talhão)</div></div>'; return; }
+      if (v.querySelector('#pCult').value !== 'soja' || !CULT || !CULT.length || st.emp === '*') {
+        box.innerHTML = (CULT && CULT.length && v.querySelector('#pCult').value === 'soja' ? '<div class="campo"><label class="l">Variedade: empresa</label><select id="pEmp"><option value="">— escolher —</option>' + CULT.map(function (e) { return '<option>' + esc(e[0]) + '</option>'; }).join('') + '<option value="*" selected>Outra / digitar</option></select></div>' : '') +
+          '<div class="campo"><label class="l">Variedade (opcional)</label><input id="pVarTxt" value="' + esc(st.vari) + '" placeholder="ex.: NEO 790 IPRO"></div>';
+      } else {
+        var it = st.emp ? ((CULT.filter(function (e) { return e[0] === st.emp; })[0] || [0, []])[1]).slice().sort(porNome) : [];
+        box.innerHTML = '<div class="campo"><label class="l">Variedade: empresa</label><select id="pEmp"><option value="">— escolher —</option>' + CULT.map(function (e) {
+          return '<option' + (e[0] === st.emp ? ' selected' : '') + '>' + esc(e[0]) + '</option>'; }).join('') + '<option value="*">Outra / digitar</option></select></div>' +
+          (st.emp ? '<div class="campo"><label class="l">Variedade</label><select id="pVar"><option value="">— escolher —</option>' + it.map(function (x) {
+            return '<option' + (x === st.vari ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>' : '');
+      }
+      var e = box.querySelector('#pEmp'); if (e) e.onchange = function () { st.emp = e.value; st.vari = ''; pintarVar(); };
+      var s2 = box.querySelector('#pVar'); if (s2) s2.onchange = function () { st.vari = s2.value; };
+      var tx = box.querySelector('#pVarTxt'); if (tx) tx.oninput = function () { st.vari = tx.value; };
+    }
+    v.querySelector('#pTal').onchange = function () {
+      var t = this.value, p = pl[t] || {}, r = resta(t);
+      if (p.cultura) v.querySelector('#pCult').value = p.cultura;
+      if (r > 0.05) v.querySelector('#pHa').placeholder = 'até ' + n(r, 1) + ' ha';
+      pintarVar();
+    };
+    v.querySelector('#pCult').onchange = pintarVar;
+    pintarVar(); carregarCult().then(pintarVar);
+    v.querySelector('#pNao').onclick = function () { v.remove(); };
+    v.querySelector('#pOk').onclick = async function () {
+      var t = v.querySelector('#pTal').value, d = v.querySelector('#pData').value, ha = Number(String(v.querySelector('#pHa').value || '').replace(',', '.'));
+      if (!d) { toast('Informe a data'); return; }
+      if (!t) { toast('Escolha o talhão'); return; }
+      if (!(ha > 0)) { toast('Informe os hectares plantados'); return; }
+      this.disabled = true;
+      var ok = await enviarPlantio({ talhao: t, data: d, ha: ha, cultura: v.querySelector('#pCult').value, variedade: st.vari }, '✔ Plantio lançado: ' + t + ' · ' + n(ha, 1) + ' ha');
+      if (ok) v.remove(); else this.disabled = false;
+    };
   }
 
   /* ---------- visão do operador / encarregado ---------- */
   var aberto = {};
   function vistaOperador() {
     if (opAba === 'mapa') return mapaOperador();
+    if (opAba === 'cal') return calOperador();
     var l = (D.aplicacoes || []).filter(function (a) { return filtro === 'fazer' ? a.status !== 'aplicada' : a.tal.some(function (t) { return t.feito; }); });
     l.sort(function (a, b) { return filtro === 'fazer' ? (a.data < b.data ? -1 : 1) : (a.data > b.data ? -1 : 1); });
     var nFazer = (D.aplicacoes || []).filter(function (a) { return a.status !== 'aplicada'; }).length;
@@ -505,10 +605,20 @@ ${AGRO_REL_CSS}
   }
   /* ---------- operador: aba Mapa (onde já foi aplicado) ---------- */
   function abasOp() {
-    return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapa']].map(function (x) {
+    return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapa'], ['cal', 'Calendário']].map(function (x) {
       return '<button data-opa="' + x[0] + '" class="' + (opAba === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
   }
   function ligarAbasOp() { document.querySelectorAll('[data-opa]').forEach(function (b) { b.onclick = function () { opAba = b.dataset.opa; pintar(); window.scrollTo(0, 0); }; }); }
+  function calOperador() {
+    var ev = eventosCal([]);
+    if (!CAL.y) {   // abre no mês da próxima aplicação a fazer (com atrasada, em hoje)
+      var pr = ev.filter(function (e) { return e.k !== 'apl'; }).map(function (e) { return e.d; }).sort();
+      var base = pr.some(function (d) { return d < hoje(); }) ? hoje() : (pr.filter(function (d) { return d >= hoje(); })[0] || hoje());
+      CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
+    }
+    $('#conteudo').innerHTML = abasOp() + '<h2 class="talhao">Calendário<small>aplicações a fazer e feitas</small></h2>' + calendario(ev, false);
+    ligarAbasOp(); ligarCal();
+  }
   var COR_ST = { ok: '#2E7D32', pend: '#E08A00', atr: '#C62828' };
   function stTal(a, t) { return t.feito ? 'ok' : (t.data && t.data < hoje()) ? 'atr' : 'pend'; }
   function mapaOperador() {

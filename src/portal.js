@@ -11,8 +11,9 @@
 
 import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } from './auth.js';
 import { blocosAgro } from './agrorel.js';
-import { baseUnidade, comparativo, modulosDe, regraCiclo } from './agro.js';
-import { chaveCult, cicloMaterial } from './cultivares.js';
+import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo } from './agro.js';
+import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
+import { lerLanc, haPlantada } from './plantiodia.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -192,7 +193,8 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
   const areas = areasDe(f.talhoes);
   const porTal = {}; plantio.forEach((p) => { porTal[safraPadrao(p.safra) + '|' + p.talhao] = p; });
   const base = { fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '' }, safra, safras, mapa,
-    plantio: plantio.map((p) => ({ talhao: p.talhao, cultura: p.cultura, variedade: p.variedade, data_plantio: p.data_plantio, data_emerg: p.data_emerg })) };
+    plantio: plantio.map((p) => ({ talhao: p.talhao, cultura: p.cultura, variedade: p.variedade, data_plantio: p.data_plantio, data_emerg: p.data_emerg,
+      lanc: lerLanc(p), ha_plantada: Math.round(haPlantada(p, areas[p.talhao] || 0) * 100) / 100 })) };
 
   // aplicações em formato de lista (as duas visões usam)
   const hoje = hojeMT();
@@ -300,6 +302,52 @@ export async function rotasPortal(env, req, rota, url) {
     if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
     const d = await dadosFazenda(env, a, fid, url.searchParams.get('safra'));
     return d ? json(Object.assign({ ok: true }, d)) : json({ erro: 'fazenda não encontrada' }, 404);
+  }
+
+  // gerente da fazenda lança a área plantada no dia (ou apaga um lançamento)
+  if (rota === '/api/portal/plantio' && req.method === 'POST') {
+    if (a.papel === 'operador') return json({ erro: 'o plantio por dia é lançado pelo acesso da fazenda' }, 403);
+    const b = await req.json().catch(() => ({}));
+    const fid = txt(b.fazenda, 80);
+    if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
+    const f = await env.DB.prepare('SELECT talhoes FROM fazendas WHERE id = ? AND usuario_id = ?').bind(fid, a.dono_id).first();
+    if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
+    const areas = areasDe(f.talhoes), talhao = txt(b.talhao, 80), data = dia(b.data);
+    if (!(talhao in areas)) return json({ erro: 'talhão não encontrado no mapa da fazenda' }, 400);
+    if (!data) return json({ erro: 'informe a data' }, 400);
+    if (data > somaDias(hojeMT(), 1)) return json({ erro: 'a data não pode ser no futuro' }, 400);
+    await garantirAgro(env);
+    const safra = safraPadrao(txt(b.safra, 40));
+    const ant = await env.DB.prepare('SELECT * FROM plantio WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?')
+      .bind(fid, safra, talhao, a.dono_id).first();
+    const area = areas[talhao] || 0;
+    let ha = Math.round(Number(String(b.ha || '').replace(',', '.')) * 100) / 100;
+    if (!(ha > 0) && !b.apagar) return json({ erro: 'informe os hectares plantados' }, 400);
+    // um lançamento por dia: lançar de novo no mesmo dia corrige o valor
+    let l = lerLanc(ant).filter((x) => x.d !== data);
+    if (!b.apagar) {
+      const outros = l.reduce((s, x) => s + x.ha, 0);
+      if (area && outros + ha > area + 0.05) return json({ erro: 'passa da área do talhão: faltam ' + (Math.round((area - outros) * 10) / 10).toString().replace('.', ',') + ' ha' }, 400);
+      l.push({ d: data, ha, por: (a.nome || a.login) + ' (fazenda)' });
+    }
+    l.sort((x, y) => (x.d < y.d ? -1 : 1));
+    const cultura = txt(b.cultura, 20) || (ant && ant.cultura) || 'soja';
+    const variedade = txt(b.variedade, 80) || (ant && ant.variedade) || '';
+    // data de plantio do talhão = primeiro dia lançado (é dela que sai a previsão de colheita)
+    const dp = l.length ? l[0].d : (ant ? ant.data_plantio || '' : '');
+    await env.DB.prepare(`INSERT INTO plantio (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, lanc, atualizado_em)
+        VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+        ON CONFLICT(fazenda_id, safra, talhao) DO UPDATE SET cultura = excluded.cultura, variedade = excluded.variedade,
+          data_plantio = excluded.data_plantio, lanc = excluded.lanc, atualizado_em = datetime('now')
+        WHERE plantio.usuario_id = excluded.usuario_id`)
+      .bind(fid, safra, talhao, a.dono_id, cultura, variedade, dp, JSON.stringify(l)).run();
+    return json({ ok: true });
+  }
+
+  // lista de cultivares de soja (para o gerente escolher a variedade ao lançar o plantio)
+  if (rota === '/api/portal/cultivares') {
+    return new Response(JSON.stringify({ ok: true, catalogo: CATALOGO.map((e) => [e[0], e[2].map((x) => x[0])]) }), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=86400' } });
   }
 
   // operador / encarregado marca (ou desfaz) a aplicação de talhões
