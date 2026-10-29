@@ -477,7 +477,8 @@
       relatorios.sort(function (a, b) { return (b.na_fila ? 1 : 0) - (a.na_fila ? 1 : 0); });
       for (const rel of relatorios) {
         if (relIdOpcional && rel.id !== relIdOpcional) continue;
-        const itens = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
+        // 'preparando' = vídeo sendo reduzido no aparelho: sobe quando terminar
+        const itens = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok' && i.sync_state !== 'preparando');
         const sig = JSON.stringify(payloadRel(rel));
         if (!itens.length && sigs[rel.id] === sig) {                   // nada mudou: não gasta rede
           try { await garantirCapa(rel); } catch (e) { /* tenta na próxima rodada */ }

@@ -8,6 +8,7 @@
 
 import { hashSenha, novoId } from './auth.js';
 import { contagemAcessos } from './acessos.js';
+import { espaco } from './midia.js';
 import { AGRO_ABAS, AGRO_CSS, AGRO_JS, AGRO_PAINEIS } from './agroadmin.js';
 
 const esc = (s) => String(s == null ? '' : s)
@@ -530,6 +531,27 @@ export async function resumoAdmin(env, me, adm) {
     : await env.DB.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(i.bytes),0) AS bytes FROM itens i
         JOIN relatorios r ON r.id = i.relatorio_id WHERE r.usuario_id = ?`).bind(me.id).first();
 
+  // espaço de cada conta, separado por tipo (foto, vídeo, áudio)
+  const usoTipo = await env.DB.prepare(`
+    SELECT r.usuario_id AS uid, i.tipo, COUNT(*) AS n, COALESCE(SUM(i.bytes),0) AS bytes
+      FROM itens i JOIN relatorios r ON r.id = i.relatorio_id
+     WHERE i.tipo != 'texto'${meu}
+     GROUP BY r.usuario_id, i.tipo
+  `).bind(...arg).all();
+  const porTipo = {};
+  const contaPor = new Map((contas.results || []).map((c) => [c.id, c]));
+  (usoTipo.results || []).forEach((u) => {
+    const t = porTipo[u.tipo] || (porTipo[u.tipo] = { n: 0, bytes: 0 });
+    t.n += Number(u.n || 0); t.bytes += Number(u.bytes || 0);
+    const c = contaPor.get(u.uid);
+    if (c) {
+      c.espaco = c.espaco || { bytes: 0 };
+      c.espaco[u.tipo] = { n: Number(u.n || 0), bytes: Number(u.bytes || 0) };
+      c.espaco.bytes += Number(u.bytes || 0);
+    }
+  });
+  const lim = adm ? await espaco(env).catch(() => ({})) : {};
+
   return {
     ok: true,
     eu: { admin: !!adm, id: me.id, nome: me.nome || '', email: me.email || '' },
@@ -540,7 +562,9 @@ export async function resumoAdmin(env, me, adm) {
       contas: (contas.results || []).length,
       relatorios: (relatorios.results || []).length,
       registros: Number(itens && itens.n || 0),
-      bytes: Number(itens && itens.bytes || 0)
+      bytes: Number(itens && itens.bytes || 0),
+      porTipo,
+      limite: Number(lim.limite || 0)
     }
   };
 }
@@ -1061,7 +1085,23 @@ ${AGRO_CSS}
       cartao(t.relatorios, 'relatórios') +
       cartao(pub, 'já enviados ao cliente') +
       cartao(t.registros, 'fotos, vídeos e notas') +
-      cartao(bytesFmt(t.bytes), 'de mídia guardada');
+      cartao(bytesFmt(t.bytes), 'de mídia guardada' + (t.limite ? ' de ' + bytesFmt(t.limite) + ' (' + Math.round(t.bytes / t.limite * 100) + '%)' : '')) +
+      cartao(tiposTxt(t.porTipo) || '—', 'fotos · vídeos · áudios');
+  }
+  // "📷 312 MB · 🎥 480 MB · 🎤 12 MB"
+  function tiposTxt(pt) {
+    pt = pt || {};
+    return [['foto', '📷'], ['video', '🎥'], ['audio', '🎤']].filter(function (x) { return pt[x[0]] && pt[x[0]].bytes; })
+      .map(function (x) { return x[1] + ' ' + bytesFmt(pt[x[0]].bytes); }).join(' · ');
+  }
+  function espacoCel(c) {
+    var e = c.espaco;
+    if (!e || !e.bytes) return '<span class="peq">—</span>';
+    var tot = dados.totais.bytes || 0;
+    return '<b>' + bytesFmt(e.bytes) + '</b>' + (tot ? ' <span class="peq">(' + Math.round(e.bytes / tot * 100) + '%)</span>' : '') +
+      '<br><span class="peq">' + [['foto', '📷', 'fotos'], ['video', '🎥', 'vídeos'], ['audio', '🎤', 'áudios']]
+        .filter(function (x) { return e[x[0]] && e[x[0]].n; })
+        .map(function (x) { return x[1] + ' ' + e[x[0]].n + ' · ' + bytesFmt(e[x[0]].bytes); }).join('<br>') + '</span>';
   }
   function cartao(v, t) { return '<div class="cartao"><b>' + esc(v) + '</b><span>' + esc(t) + '</span></div>'; }
 
@@ -1071,6 +1111,7 @@ ${AGRO_CSS}
         (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') + '</td>' +
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
         '<td>' + c.produtores + ' / ' + c.fazendas + '</td>' +
+        '<td>' + espacoCel(c) + '</td>' +
         '<td>' + usoCel(c) + '</td>' +
         '<td>' + pagCel(c) + '</td>' +
         '<td>' + dataBR(c.ultima_atividade) + '</td>' +
@@ -1087,7 +1128,7 @@ ${AGRO_CSS}
         '</td></tr>';
     }).join('');
     $('#tContas').innerHTML =
-      '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Tempo de uso</th><th>Pagamento</th><th>Última atividade</th><th></th></tr>' + linhas;
+      '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Espaço</th><th>Tempo de uso</th><th>Pagamento</th><th>Última atividade</th><th></th></tr>' + linhas;
     document.querySelectorAll('[data-prom]').forEach(function (b) {
       b.onclick = async function () {
         b.disabled = true;
