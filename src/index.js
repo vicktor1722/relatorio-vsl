@@ -13,6 +13,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 // onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
+import { avisarAplicacoes, rotasPush } from './push.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
@@ -356,6 +357,9 @@ export default {
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
+
+      // aviso no celular das próximas aplicações
+      if (rota.startsWith('/api/push/')) return await rotasPush(env, req, me, rota);
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
       if (rota === '/api/modulos' || rota.startsWith('/api/agro/')) return await rotasAgro(env, req, me, rota, url);
@@ -722,5 +726,10 @@ export default {
       if (rota.startsWith('/api/')) return json({ erro: e.message }, 500);
       return html(paginaSimples('Erro', e.message), 500);
     }
+  },
+
+  // cron da manhã (wrangler.toml): notificação das aplicações dos próximos dias
+  async scheduled(evento, env, ctx) {
+    ctx.waitUntil(avisarAplicacoes(env));
   }
 };

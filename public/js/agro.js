@@ -485,7 +485,7 @@
       return '<button class="ag-chip' + (R.filtro === x[0] ? ' on' : '') + '" data-a="filtro" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('');
     pintar(tR, 'Recomendações', f ? f.nome : '—', '<button data-a="catalogo" title="Produtos">🧪</button>',
       abasRec('lista') + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
-      '<button class="btn" data-a="nova">+ Nova recomendação</button>' +
+      '<button class="btn" data-a="nova">+ Nova recomendação</button>' + cartaoPush() +
       (al ? '<h2>Próximas aplicações</h2>' + al : '') +
       '<div class="ag-chips" style="margin-top:14px">' + filtros + '</div>' +
       (cards || '<div class="aviso" style="margin-top:10px">Nenhuma recomendação aqui ainda.</div>'));
@@ -1279,6 +1279,7 @@
     }
     if (a === 'aba') { R.view = v; pintarRecs(); topoRolagem(tR); return; }
     if (a === 'entrada') { modalEntrada(null, v); return; }
+    if (a === 'push') { ativarAvisos(); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
     if (a === 'calmes') { R.cm += Number(v); if (R.cm < 0) { R.cm = 11; R.cy--; } if (R.cm > 11) { R.cm = 0; R.cy++; } pintarCalendario(); return; }
@@ -1315,6 +1316,54 @@
     if (R.view === 'wiz' && el.dataset.w) { entradaWiz(el); return; }
     if (el.dataset.c === 'faz') { R.faz = el.value; ST.ult.faz = R.faz; gravar(); pintarRecs(); return; }
     if (el.dataset.a === 'mostrar') { var r = recDe(R.id); r.mostrar = el.checked; salvarRecLocal(r); toast(el.checked ? 'Vai aparecer no relatório do cliente' : 'Escondida do relatório do cliente'); }
+  }
+
+  /* ---------------- aviso no celular das próximas aplicações (Web Push) ----------------
+     No iPhone só funciona com o app instalado na Tela de Início (iOS 16.4 ou mais novo).
+     O servidor manda todo dia de manhã a lista das aplicações dos próximos dias. */
+  function pushPossivel() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function ehIphone() { return /iPhone|iPad|iPod/.test(navigator.userAgent); }
+  function instalado() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  function pushLigado() { return pushPossivel() && Notification.permission === 'granted' && !!ST.push; }
+  function chaveBytes(b) {
+    var s = String(b).replace(/-/g, '+').replace(/_/g, '/'), bin = atob(s + '==='.slice((s.length + 3) % 4)), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function assinarPush() {
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    if (!sub) { var k = await chamar('/api/push/chave'); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveBytes(k.chave) }); }
+    await chamar('/api/push/assinar', { assinatura: sub.toJSON() });
+    ST.push = true; gravar();
+  }
+  // chamado direto no toque (o iPhone só pergunta a permissão dentro de um toque)
+  function ativarAvisos() {
+    if (!pushPossivel()) {
+      toast(ehIphone() && !instalado()
+        ? 'No iPhone, os avisos só funcionam com o app na Tela de Início: no Safari toque em Compartilhar → Adicionar à Tela de Início, e abra o app por lá.'
+        : 'Este aparelho não aceita notificações do app.');
+      return;
+    }
+    Notification.requestPermission().then(async function (perm) {
+      if (perm !== 'granted') { toast('Notificações bloqueadas. Libere em Ajustes → Notificações → AMVS Relatório.'); return; }
+      try {
+        await assinarPush();
+        await chamar('/api/push/teste', {});
+        toast('🔔 Avisos ligados. Todo dia de manhã chegam as aplicações dos próximos dias.');
+        if (R.view === 'lista' && !tR.classList.contains('oculto')) pintarRecs();
+      } catch (e) { toast('Não deu para ligar os avisos: ' + (e.message || e)); }
+    });
+  }
+  // aparelho já autorizado: confirma a assinatura no servidor uma vez por abertura (troca de conta, assinatura renovada)
+  function conferirPush() {
+    if (!pushPossivel() || Notification.permission !== 'granted' || !ST.mod.recomendacoes || !navigator.onLine) return;
+    assinarPush().catch(function () { /* tenta na próxima abertura */ });
+  }
+  function cartaoPush() {
+    if (pushLigado()) return '';
+    return '<div class="ag-push"><span>🔔 Receba no celular, toda manhã, as aplicações dos próximos dias — mesmo com o app fechado.</span>' +
+      '<button class="btn" data-a="push">Ativar avisos</button></div>';
   }
 
   /* ---------------- aviso de novidade (módulos liberados) ---------------- */
@@ -1434,7 +1483,14 @@
     var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { marcaVisto('mapa'); atualizarModulos(); });
     window.addEventListener('online', function () { atualizarModulos().then(descarregar); verificarVersao(); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { atualizarModulos().then(descarregar); verificarVersao(); } });
-    atualizarModulos().then(descarregar);
+    atualizarModulos().then(function () { conferirPush(); return descarregar(); });
+    // tocou na notificação: abre direto nas recomendações
+    var abrirPeloAviso = function () { if (ST.mod.recomendacoes) { var tl = document.getElementById('telaLista'); if (tl) tl.classList.add('oculto'); abrirRecs(); } };
+    if (/[?&]abrir=recs/.test(location.search)) {
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      setTimeout(abrirPeloAviso, 1800);
+    }
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'recs') abrirPeloAviso(); });
     prepararLogoPdf();
     setTimeout(verificarVersao, 4000);
   }

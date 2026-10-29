@@ -2101,6 +2101,7 @@
 
   /* ---------------- init ---------------- */
   async function init() {
+    const pelaNotificacao = /[?&]abrir=recs/.test(location.search);   // tocou no aviso de aplicação: abre nas recomendações
     ligarMedidaDeAltura();
     ligarEventos();
     Conta.ligar();
@@ -2161,7 +2162,7 @@
     }
     // o app sempre abre na lista de relatórios; a última conversa fica pronta por baixo (seta ←)
     if (!st.rel) await renderChat();
-    if (!alvo) { await listarRelatorios(); abrir('telaLista'); }
+    if (!alvo && !pelaNotificacao) { await listarRelatorios(); abrir('telaLista'); }
     // vídeo que ficou esperando a redução (app fechado no meio): retoma no primeiro toque
     try { st.videoEsperando = (await DB.all('itens')).some(function (i) { return i.sync_state === 'preparando'; }); } catch (e) {}
     const tocouApp = function () {

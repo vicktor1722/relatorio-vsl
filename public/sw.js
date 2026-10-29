@@ -3,7 +3,7 @@
    (/r/*, /admin, /api/*, /img/*, /oauth/*) passam direto, sem cache.
    O Safari recusa resposta "redirecionada" vinda do service worker; por isso toda
    página que entra no cache (ou sai dele) é recriada limpa por limpar(). */
-const CACHE = 'relatorio-vsl-v7';
+const CACHE = 'relatorio-vsl-v8';
 const CHAVE_APP = '/__app-shell';
 const ESPERA_MS = 3500;   // se a rede não responder nisso, abre pelo cache
 const ESTATICOS = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];
@@ -85,4 +85,30 @@ self.addEventListener('fetch', e => {
       return resp;
     }))
   );
+});
+
+/* ---------- aviso das próximas aplicações (Web Push) ---------- */
+self.addEventListener('push', e => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch (err) { m = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(m.title || 'AMVS Relatório', {
+    body: m.body || '', tag: m.tag || 'aviso', renotify: true,
+    icon: './icon-192.png', badge: './icon-192.png', data: { url: m.url || '/' }
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async () => {
+    const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of abertas) {
+      if (new URL(c.url).origin === location.origin) {
+        await c.focus();
+        c.postMessage({ abrir: new URL(url, location.origin).searchParams.get('abrir') || '' });
+        return;
+      }
+    }
+    await self.clients.openWindow(url);
+  })());
 });
