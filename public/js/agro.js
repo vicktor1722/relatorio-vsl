@@ -885,7 +885,7 @@
       h += '<div class="ag-talc' + (ok ? ' ok' : '') + '"><div class="ag-tt"><b>' + esc(nome) + '</b><span>' + fmt(hu) + (hu < t.ha ? ' de ' + fmt(t.ha) : '') + ' ha' +
         (!ok && Number(d.dae) > 0 && datasTal(r)[nome] ? ' · 📅 ' + curta(datasTal(r)[nome]) : '') + '</span></div><div class="ag-tp">' +
         prods.map(function (p) { return '<div><span>' + esc(p[0]) + '</span><b>' + volTotal(p[1] * hu, p[2]) + '</b></div>'; }).join('') + '</div>' +
-        (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
+        (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (d.feitoPor && d.feitoPor[nome] ? ' por ' + esc(d.feitoPor[nome]) : '') + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
           ' <button class="ag-link" data-a="desfazer" data-v="' + esc(nome) + '">desfazer</button></div>'
           : '<button class="btn" data-a="aplicar" data-v="' + esc(nome) + '">Marcar como aplicado</button>') + '</div>';
     });
@@ -924,7 +924,11 @@
       if (m !== 'ok') return;
       var data = $('#agDataApl', ov).value; if (!data) { toast('Informe a data'); return; }
       var d = dd(r); d.feito = d.feito || {};
-      (alvo === '*' ? talDe(r).filter(function (t) { return !d.feito[t]; }) : [alvo]).forEach(function (t) { d.feito[t] = data; });
+      (alvo === '*' ? talDe(r).filter(function (t) { return !d.feito[t]; }) : [alvo]).forEach(function (t) {
+        d.feito[t] = data;
+        if (d.feitoPor) delete d.feitoPor[t];        // marcado pelo consultor
+        if (d.feitoPorId) delete d.feitoPorId[t];
+      });
       ov.remove(); salvarRecLocal(r); pintarOrdem();
       toast('✔ Aplicação registrada · ' + stRec(r));
     };
@@ -1336,7 +1340,11 @@
     if (a === 'pedit') { modalProduto(ST.produtos.filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'aplicar') { modalAplicar(v); return; }
     if (a === 'desfazer') {
-      var r = recDe(R.id); delete dd(r).feito[v]; salvarRecLocal(r); pintarOrdem(); return;
+      // aplicado pelo operador (portal): guarda qual marca foi desfeita, senão ela voltaria do servidor
+      var r = recDe(R.id), dx = dd(r);
+      if (dx.feitoPorId && dx.feitoPorId[v]) { dx.desfeitos = (dx.desfeitos && !Array.isArray(dx.desfeitos)) ? dx.desfeitos : {}; dx.desfeitos[v] = dx.feitoPorId[v]; delete dx.feitoPorId[v]; }
+      if (dx.feitoPor) delete dx.feitoPor[v];
+      delete dx.feito[v]; salvarRecLocal(r); pintarOrdem(); return;
     }
     if (a === 'zap' || a === 'pdf') { compartilharOrdem(a); return; }
     if (a === 'editarrec') { R.W = wDeRec(recDe(R.id)); R.view = 'wiz'; pintarRecs(); topoRolagem(tR); return; }

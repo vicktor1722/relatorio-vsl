@@ -74,6 +74,27 @@ export async function lerToken(env, token) {
   return payload;
 }
 
+/* ---------- token do portal (fazenda / operador) ----------
+   Assinado com outra chave: um token do portal nunca vale como login de consultor. */
+export async function criarTokenPortal(env, acesso, dias) {
+  const payload = { pid: acesso.id, papel: acesso.papel, exp: Date.now() + (dias || 180) * 86400000 };
+  const corpo = b64url(te.encode(JSON.stringify(payload)));
+  const assinatura = await crypto.subtle.sign('HMAC', await chaveHmac(env.SEGREDO + '|portal'), te.encode(corpo));
+  return corpo + '.' + b64url(assinatura);
+}
+export async function lerTokenPortal(env, token) {
+  if (!token || !token.includes('.')) return null;
+  const [corpo, assinatura] = token.split('.');
+  let ok = false;
+  try { ok = await crypto.subtle.verify('HMAC', await chaveHmac(env.SEGREDO + '|portal'), deB64url(assinatura), te.encode(corpo)); }
+  catch (e) { return null; }
+  if (!ok) return null;
+  let payload;
+  try { payload = JSON.parse(new TextDecoder().decode(deB64url(corpo))); } catch (e) { return null; }
+  if (!payload.pid || !payload.exp || payload.exp < Date.now()) return null;
+  return payload;
+}
+
 /* ---------- quem está chamando ---------- */
 
 export async function usuarioDaRequisicao(req, env) {
