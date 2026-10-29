@@ -10,6 +10,7 @@
 
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
+import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, regraValida } from './cultivares.js';
 
 let pronta = null;
 
@@ -94,13 +95,38 @@ function garantir(env) {
         atualizado_em TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (usuario_id, variedade)
       )`),
+      // regra do ciclo pelo grupo de maturação: GMR de referência = X dias, cada ponto de GMR = Y dias
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS ciclo_regra (
+        usuario_id  TEXT PRIMARY KEY,
+        gmr         REAL DEFAULT 8,
+        dias        INTEGER DEFAULT 116,
+        ponto       REAL DEFAULT 14,
+        atualizado_em TEXT DEFAULT (datetime('now'))
+      )`),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS estoque_faz ON estoque_agro (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS recs_faz ON recomendacoes (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS plantio_usr ON plantio (usuario_id, fazenda_id)')
-    ]).catch((e) => { pronta = null; throw e; });
+    ]).then(() => colunasCiclos(env)).catch((e) => { pronta = null; throw e; });
   }
   return pronta;
 }
+
+// colunas novas da tabela ciclos: GMR informado e empresa (materiais cadastrados pelo consultor)
+async function colunasCiclos(env) {
+  for (const c of ['gmr REAL DEFAULT 0', "empresa TEXT DEFAULT ''"]) {
+    try { await env.DB.prepare('ALTER TABLE ciclos ADD COLUMN ' + c).run(); } catch (e) { /* já existe */ }
+  }
+}
+
+export async function regraCiclo(env, uid) {
+  try {
+    const r = await env.DB.prepare('SELECT gmr, dias, ponto FROM ciclo_regra WHERE usuario_id = ?').bind(uid).first();
+    return regraValida(r || REGRA_PADRAO);
+  } catch (e) { return regraValida(REGRA_PADRAO); }
+}
+
+// muda quando o catálogo (src/cultivares.js) é atualizado: o app baixa de novo
+export const VERSAO_CAT = '2026-10-29';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200,
@@ -457,7 +483,7 @@ export async function rotasAgro(env, req, me, rota, url) {
 
   const precisaPlantio = rota.startsWith('/api/agro/plantio');
   const precisaRec = rota.startsWith('/api/agro/rec') || rota.startsWith('/api/agro/produto') || rota.startsWith('/api/agro/estoque');
-  if ((rota.startsWith('/api/agro/colheita') || rota.startsWith('/api/agro/ciclos')) && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
+  if ((rota.startsWith('/api/agro/colheita') || rota.startsWith('/api/agro/ciclos') || rota === '/api/agro/cultivares') && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaPlantio && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaRec && !mod.recomendacoes) return json({ erro: 'módulo de recomendações não liberado para esta conta' }, 403);
 
@@ -509,23 +535,42 @@ export async function rotasAgro(env, req, me, rota, url) {
 
   /* ----- ciclo dos materiais (previsão de colheita = plantio + ciclo) ----- */
   if (rota === '/api/agro/ciclos' && req.method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT variedade, cultura, dias FROM ciclos WHERE usuario_id = ?').bind(me.id).all();
-    return json({ ok: true, ciclos: results || [] });
+    const { results } = await env.DB.prepare('SELECT variedade, cultura, dias, gmr, empresa FROM ciclos WHERE usuario_id = ?').bind(me.id).all();
+    return json({ ok: true, ciclos: results || [], regra: await regraCiclo(env, me.id), versao_cat: VERSAO_CAT });
   }
   if (rota === '/api/agro/ciclos' && req.method === 'POST') {
     const b = await req.json();
     const cmds = [];
     for (const c of (Array.isArray(b.ciclos) ? b.ciclos.slice(0, 300) : [])) {
-      const v = txt(c.variedade, 80), dias = Math.round(num(c.dias));
+      const v = txt(c.variedade, 80);
       if (!v) continue;
-      cmds.push(dias > 0 && dias < 400
-        ? env.DB.prepare(`INSERT INTO ciclos (usuario_id, variedade, cultura, dias, atualizado_em) VALUES (?,?,?,?,datetime('now'))
-            ON CONFLICT(usuario_id, variedade) DO UPDATE SET cultura = excluded.cultura, dias = excluded.dias, atualizado_em = datetime('now')`)
-            .bind(me.id, v, txt(c.cultura, 20), dias)
+      let dias = Math.round(num(c.dias)), gmr = Math.round(num(c.gmr) * 10) / 10;
+      if (!(dias > 0 && dias < 400)) dias = 0;
+      if (!(gmr >= 3 && gmr <= 10)) gmr = 0;
+      const empresa = txt(c.empresa, 60);
+      // dias = ciclo informado à mão; gmr/empresa = material cadastrado ou GMR corrigido (o ciclo sai da regra)
+      cmds.push(dias || gmr || empresa
+        ? env.DB.prepare(`INSERT INTO ciclos (usuario_id, variedade, cultura, dias, gmr, empresa, atualizado_em) VALUES (?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(usuario_id, variedade) DO UPDATE SET cultura = excluded.cultura, dias = excluded.dias, gmr = excluded.gmr,
+              empresa = excluded.empresa, atualizado_em = datetime('now')`)
+            .bind(me.id, v, txt(c.cultura, 20), dias, gmr, empresa)
         : env.DB.prepare('DELETE FROM ciclos WHERE usuario_id = ? AND variedade = ?').bind(me.id, v));
+    }
+    if (b.regra) {
+      const r = regraValida(b.regra);
+      cmds.push(env.DB.prepare(`INSERT INTO ciclo_regra (usuario_id, gmr, dias, ponto, atualizado_em) VALUES (?,?,?,?,datetime('now'))
+        ON CONFLICT(usuario_id) DO UPDATE SET gmr = excluded.gmr, dias = excluded.dias, ponto = excluded.ponto, atualizado_em = datetime('now')`)
+        .bind(me.id, r.gmr, r.dias, r.ponto));
     }
     if (cmds.length) await env.DB.batch(cmds);
     return json({ ok: true, salvos: cmds.length });
+  }
+
+  /* ----- catálogo de cultivares de soja (empresa → materiais com GMR) ----- */
+  if (rota === '/api/agro/cultivares' && req.method === 'GET') {
+    return new Response(JSON.stringify({ ok: true, versao: VERSAO_CAT, fontes: FONTES_CULT, faixa: GMR_FAIXA, padrao: REGRA_PADRAO, catalogo: CATALOGO }), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=3600' }
+    });
   }
 
   /* ----- colheita (produtividade por talhão) ----- */

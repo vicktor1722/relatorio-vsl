@@ -154,8 +154,9 @@
       if (tudo[2]) ST.produtos = tudo[2].produtos || [];
       if (tudo[3]) ST.estoque = tudo[3].estoque || [];
       if (tudo[4]) ST.colheita = tudo[4].colheita || [];
-      if (tudo[5]) ST.ciclos = tudo[5].ciclos || [];
+      if (tudo[5]) { ST.ciclos = tudo[5].ciclos || []; if (tudo[5].regra) ST.regra = tudo[5].regra; IDX = null; }
       gravar(); atualizarSino();
+      if (tudo[5]) await baixarCat(tudo[5].versao_cat);
       return true;
     } catch (e) { return false; }
   }
@@ -262,52 +263,196 @@
       '<div class="ag-dica">Ou toque num talhão da lista abaixo para lançar só nele.</div>';
   }
 
+  /* ----- catálogo de cultivares de soja (empresa → material com GMR) -----
+     Baixado de /api/agro/cultivares e guardado no aparelho (só baixa de novo quando a versão muda).
+     Materiais cadastrados pelo consultor ficam na tabela de ciclos (com empresa e GMR). */
+  var LS_CAT = 'agro_cat', CAT = null, IDX = null;
+  var REGRA_PADRAO = { gmr: 8, dias: 116, ponto: 14 }, FAIXA_TXT = { I: '< 7,9', II: '7,9 a 8,5', III: '> 8,5' };
+  var TEC_FIM = /(ipro|i2x|rr|ce3|ce|e|xtd|tf|rsf)+$/;
+  function lerCat() {
+    if (!CAT) { try { CAT = JSON.parse(localStorage.getItem(LS_CAT) || 'null'); } catch (e) { CAT = null; } }
+    return CAT && CAT.catalogo ? CAT : null;
+  }
+  async function baixarCat(versao) {
+    var c = lerCat(); if (c && versao && c.versao === versao) return;
+    try {
+      var r = await chamar('/api/agro/cultivares');
+      CAT = { versao: r.versao, fontes: r.fontes || {}, faixa: r.faixa || {}, catalogo: r.catalogo || [] }; IDX = null;
+      try { localStorage.setItem(LS_CAT, JSON.stringify(CAT)); } catch (e) { /* sem espaço: fica só na memória */ }
+    } catch (e) { /* sem internet: usa o que tiver */ }
+  }
+  function chaveCult(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function proprios() { return (ST.ciclos || []).filter(function (c) { return c.empresa; }); }
+  // empresas com seus materiais: catálogo + cadastrados pelo consultor
+  function empresasCat() {
+    var c = lerCat(), m = {}, ordem = [];
+    (c ? c.catalogo : []).forEach(function (e) {
+      ordem.push(e[0]);
+      m[e[0]] = e[2].map(function (it) { return { nome: it[0], gmr: it[1] || 0, faixa: it[1] ? '' : it[2], dae: it[1] ? (it[2] || 0) : 0, fonte: e[1].join(',') }; });
+    });
+    proprios().forEach(function (p) {
+      if (!m[p.empresa]) { m[p.empresa] = []; ordem.push(p.empresa); }
+      var k = chaveCult(p.variedade);
+      m[p.empresa] = m[p.empresa].filter(function (x) { return chaveCult(x.nome) !== k; });
+      m[p.empresa].push({ nome: p.variedade, gmr: Number(p.gmr) || 0, faixa: '', dae: 0, meu: true });
+    });
+    return { ordem: ordem, m: m };
+  }
+  function acharCult(nome) {
+    if (!IDX) {
+      IDX = {}; var E = empresasCat();
+      var por = function (k, x) { if (k && !IDX[k]) IDX[k] = x; };
+      E.ordem.forEach(function (emp) {
+        E.m[emp].forEach(function (x) {
+          var o = { empresa: emp, nome: x.nome, gmr: x.gmr, faixa: x.faixa, dae: x.dae, meu: x.meu }, k = chaveCult(x.nome), sm = k.replace(/^bmx/, '');
+          if (x.meu) { IDX[k] = o; return; }
+          por(k, o); por(sm, o); por(k.replace(TEC_FIM, ''), o); por(sm.replace(TEC_FIM, ''), o);
+        });
+      });
+    }
+    var k = chaveCult(nome).replace(/^brasmax/, 'bmx');
+    return k ? (IDX[k] || IDX[k.replace(/^bmx/, '')] || IDX[k.replace(TEC_FIM, '')] || null) : null;
+  }
+  function regra() {
+    var r = ST.regra || {}, g = Number(r.gmr), d = Number(r.dias), p = Number(r.ponto);
+    return { gmr: g >= 3 && g <= 10 ? g : REGRA_PADRAO.gmr, dias: d >= 60 && d <= 250 ? d : REGRA_PADRAO.dias, ponto: r.ponto != null && p >= 0 && p <= 40 ? p : REGRA_PADRAO.ponto };
+  }
+  function cicloGmr(g, R) { R = R || regra(); return Math.round(R.dias + (Number(g) - R.gmr) * R.ponto); }
+  function gmrFaixa(f) { var c = lerCat(); return (c && c.faixa && c.faixa[f]) || { I: 7.5, II: 8.2, III: 8.7 }[f] || 0; }
+  function gTxt(g) { return Number(g).toFixed(1).replace('.', ','); }
+  function linhaCiclo(v) { var k = chaveCult(v); return k ? (ST.ciclos || []).filter(function (x) { return chaveCult(x.variedade) === k; })[0] : null; }
+
   /* ----- previsão de colheita: data de plantio + ciclo do material (± 5 dias) -----
-     O ciclo é informado uma vez por material; sem ele, usa o padrão da cultura (marcado "estimado"). */
+     Ciclo: dias informados à mão > GMR da cultivar pela regra (soja) > padrão da cultura (marcado "estimado"). */
   var CICLO_PADRAO = { soja: 115, milho: 135, algodao: 180, feijao: 90, sorgo: 120, outra: 120 };
   function cicloDe(r) {
     if (!r || !r.cultura || SEM_PLANTIO[r.cultura]) return null;
-    var k = chaveProd(r.variedade), c = (ST.ciclos || []).filter(function (x) { return k && chaveProd(x.variedade) === k; })[0];
-    if (c && Number(c.dias) > 0) return { dias: Number(c.dias), est: false };
-    return CICLO_PADRAO[r.cultura] ? { dias: CICLO_PADRAO[r.cultura], est: true } : null;
+    var l = linhaCiclo(r.variedade);
+    if (l && Number(l.dias) > 0) return { dias: Number(l.dias), est: false, fonte: 'informado' };
+    if (r.cultura === 'soja') {
+      var c = acharCult(r.variedade), g = (l && Number(l.gmr)) || (c && c.gmr) || 0;
+      if (g) return { dias: cicloGmr(g), est: false, fonte: 'gmr', gmr: g };
+      if (c && c.faixa) { g = gmrFaixa(c.faixa); return { dias: cicloGmr(g), est: true, fonte: 'faixa', gmr: g }; }
+    }
+    return CICLO_PADRAO[r.cultura] ? { dias: CICLO_PADRAO[r.cultura], est: true, fonte: 'padrao' } : null;
   }
   function previsaoDe(r) {
     if (!r || !r.data_plantio) return null;
     var c = cicloDe(r); if (!c) return null;
     return { data: addDias(r.data_plantio, c.dias), dias: c.dias, est: c.est };
   }
+  function cicloTxt(c) {
+    if (!c) return '';
+    return c.dias + ' dias' + (c.fonte === 'gmr' ? ' (GMR ' + gTxt(c.gmr) + ')' : c.fonte === 'faixa' ? ' (GMR ~' + gTxt(c.gmr) + ', faixa do ZARC)' :
+      c.fonte === 'informado' ? ' (informado)' : ' (padrão da cultura)');
+  }
+
+  /* ----- tela "Ciclo dos materiais": regra pelo GMR, materiais em uso, catálogo e cadastro ----- */
+  function exRegra(R) { return [7.5, 8, 8.5].map(function (g) { return 'GMR ' + gTxt(g) + ' → ' + cicloGmr(g, R) + ' dias'; }).join(' · ') + ' (cada 0,1 de GMR = ' + String(Math.round(R.ponto) / 10).replace('.', ',') + ' dia)'; }
+  function regraTela() {
+    var R = {}; tP.querySelectorAll('[data-rg]').forEach(function (i) { R[i.dataset.rg] = numBR(i.value); });
+    return { gmr: R.gmr || regra().gmr, dias: R.dias || regra().dias, ponto: R.ponto != null && !isNaN(R.ponto) ? R.ponto : regra().ponto };
+  }
   function pintarCiclos() {
-    var m = {};
+    if (P.cv === 'cat') return pintarCatCult();
+    if (P.cv === 'novo') return pintarNovoMaterial();
+    var R = regra(), m = {};
     ST.plantio.forEach(function (r) {
       if (!r.variedade || !r.cultura || SEM_PLANTIO[r.cultura]) return;
-      var k = chaveProd(r.variedade), x = m[k] || (m[k] = { variedade: r.variedade, cultura: r.cultura, fz: {} }); x.fz[r.fazenda_id] = 1;
+      var k = chaveCult(r.variedade), x = m[k] || (m[k] = { variedade: r.variedade, cultura: r.cultura, fz: {} }); x.fz[r.fazenda_id] = 1;
     });
     var l = Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return a.variedade.localeCompare(b.variedade, 'pt-BR'); });
     var linhas = l.map(function (x) {
-      var c = (ST.ciclos || []).filter(function (y) { return chaveProd(y.variedade) === chaveProd(x.variedade); })[0], nf = Object.keys(x.fz).length;
-      return '<div class="ag-colh"><div class="txt"><b>' + esc(x.variedade) + '</b><span>' + esc(NOME_CULT[x.cultura] || x.cultura) + ' · ' + nf + (nf === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
-        '<input inputmode="numeric" data-ciclo="' + esc(x.variedade) + '" data-cult="' + esc(x.cultura) + '" value="' + (c && c.dias ? c.dias : '') + '" placeholder="' + (CICLO_PADRAO[x.cultura] || '') + ' dias"></div>';
+      var c = linhaCiclo(x.variedade), cat = x.cultura === 'soja' ? acharCult(x.variedade) : null, nf = Object.keys(x.fz).length;
+      var gCat = cat && cat.gmr ? cat.gmr : 0, gUsado = (c && Number(c.gmr)) || gCat || (cat && cat.faixa ? gmrFaixa(cat.faixa) : 0);
+      var sub = esc(NOME_CULT[x.cultura] || x.cultura) + ' · ' + nf + (nf === 1 ? ' fazenda' : ' fazendas');
+      if (x.cultura === 'soja') sub += '<br>' + (cat ? esc(cat.empresa) + ' · ' + (gCat ? 'GMR ' + gTxt(gCat) : 'GMR faixa ' + FAIXA_TXT[cat.faixa] + ' (ZARC MT)') : 'fora do catálogo: informe o GMR') +
+        (gUsado ? ' → pela regra <b>' + cicloGmr(gUsado, R) + ' dias</b>' : '') + (cat && cat.dae ? ' · empresa: ~' + cat.dae + ' dias após emergir no MT' : '');
+      var ph = x.cultura === 'soja' && gUsado ? cicloGmr(gUsado, R) : (CICLO_PADRAO[x.cultura] || '');
+      return '<div class="ag-colh"><div class="txt"><b>' + esc(x.variedade) + '</b><span>' + sub + '</span></div>' +
+        (x.cultura === 'soja' ? '<label class="ag-mini">GMR<input inputmode="decimal" data-cg="' + esc(x.variedade) + '" value="' + (c && Number(c.gmr) ? gTxt(c.gmr) : '') + '" placeholder="' + (gCat ? gTxt(gCat) : '—') + '"></label>' : '') +
+        '<label class="ag-mini">Dias<input inputmode="numeric" data-ciclo="' + esc(x.variedade) + '" data-cult="' + esc(x.cultura) + '" value="' + (c && Number(c.dias) ? c.dias : '') + '" placeholder="' + ph + '"></label></div>';
     }).join('');
     pintar(tP, 'Ciclo dos materiais', 'previsão de colheita', '',
-      '<div class="ag-dica">Informe os <b>dias do plantio até a colheita</b> de cada material, uma vez só: vale para todos os talhões e fazendas. ' +
-      'A previsão de colheita = data de plantio + ciclo (janela de ± 5 dias). Em branco usa o padrão da cultura (soja 115, milho 135 dias) e aparece como estimado.</div>' +
+      '<h2>Regra pelo grupo de maturação (soja)</h2>' +
+      '<div class="ag-dica">O ciclo de cada cultivar sai do <b>GMR</b>: informe quantos dias (do plantio à colheita) leva o GMR de referência e quantos dias soma ou tira <b>a cada 1 ponto de GMR</b>.</div>' +
+      '<div class="ag-regra"><label>GMR de referência<input inputmode="decimal" data-rg="gmr" value="' + gTxt(R.gmr) + '"></label>' +
+      '<label>Dias do plantio à colheita<input inputmode="numeric" data-rg="dias" value="' + R.dias + '"></label>' +
+      '<label>Dias por ponto de GMR<input inputmode="decimal" data-rg="ponto" value="' + String(R.ponto).replace('.', ',') + '"></label></div>' +
+      '<div class="ag-dica" id="agRegraEx">' + exRegra(R) + '</div>' +
+      '<div class="linha2"><button class="btn secundario" data-a="ccat">📚 Catálogo por empresa</button><button class="btn secundario" data-a="cnovo">＋ Cadastrar material</button></div>' +
+      '<h2>Materiais em uso</h2>' +
+      '<div class="ag-dica">GMR em branco = o do catálogo. <b>Dias</b> em branco = calculado pela regra (soja) ou padrão da cultura (milho 135…). Preencha os dias só para fixar um ciclo diferente.</div>' +
       (linhas || '<div class="aviso">Lance a variedade no plantio dos talhões para ela aparecer aqui.</div>') +
-      (linhas ? '<button class="btn" data-a="salvarciclos">Salvar ciclos</button>' : ''));
+      '<button class="btn" data-a="salvarciclos">Salvar</button>');
   }
   function gravarCiclos() {
-    var enviar = [];
+    var enviar = [], R = regraTela(), Ra = regra(), mudouRegra = R.gmr !== Ra.gmr || R.dias !== Ra.dias || R.ponto !== Ra.ponto;
+    if (mudouRegra) ST.regra = { gmr: R.gmr, dias: Math.round(R.dias), ponto: R.ponto };
     tP.querySelectorAll('[data-ciclo]').forEach(function (inp) {
-      var v = inp.dataset.ciclo, d = Math.round(numBR(inp.value)), k = chaveProd(v);
-      var ant = (ST.ciclos || []).filter(function (y) { return chaveProd(y.variedade) === k; })[0];
-      if ((ant ? Number(ant.dias) : 0) === d) return;
-      ST.ciclos = (ST.ciclos || []).filter(function (y) { return chaveProd(y.variedade) !== k; });
-      if (d > 0) ST.ciclos.push({ variedade: v, cultura: inp.dataset.cult, dias: d });
-      enviar.push({ variedade: v, cultura: inp.dataset.cult, dias: d });
+      var v = inp.dataset.ciclo, d = Math.round(numBR(inp.value)) || 0, gi = tP.querySelector('[data-cg="' + v.replace(/"/g, '\\"') + '"]');
+      var g = gi ? Math.round(numBR(gi.value) * 10) / 10 || 0 : 0, ant = linhaCiclo(v) || {};
+      if (g && (g < 3 || g > 10)) g = 0;
+      if ((Number(ant.dias) || 0) === d && (Number(ant.gmr) || 0) === g) return;
+      var row = { variedade: ant.variedade || v, cultura: inp.dataset.cult, dias: d, gmr: g, empresa: ant.empresa || '' };
+      var k = chaveCult(v);
+      ST.ciclos = (ST.ciclos || []).filter(function (y) { return chaveCult(y.variedade) !== k; });
+      if (d || g || row.empresa) ST.ciclos.push(row);
+      enviar.push(row);
     });
-    gravar();
-    if (enviar.length) enfileirar('/api/agro/ciclos', { ciclos: enviar });
-    toast(enviar.length ? 'Ciclos salvos · previsão de colheita atualizada' : 'Nada mudou');
+    IDX = null; gravar();
+    if (enviar.length || mudouRegra) enfileirar('/api/agro/ciclos', mudouRegra ? { ciclos: enviar, regra: ST.regra } : { ciclos: enviar });
+    toast(enviar.length || mudouRegra ? 'Ciclos salvos · previsão de colheita atualizada' : 'Nada mudou');
     P.ciclos = false; pintarPlantio();
+  }
+  function pintarCatCult() {
+    var E = empresasCat(), c = lerCat(), R = regra();
+    if (!E.ordem.length) { pintar(tP, 'Catálogo de cultivares', 'soja', '', '<div class="aviso">O catálogo ainda não foi baixado. Conecte à internet e abra de novo.</div>'); return; }
+    if (E.ordem.indexOf(P.cemp) < 0) P.cemp = E.ordem[0];
+    var it = (E.m[P.cemp] || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true }); });
+    var fontes = {}; it.forEach(function (x) { String(x.fonte || '').split(',').forEach(function (f) { if (f && c && c.fontes[f]) fontes[c.fontes[f]] = 1; }); });
+    pintar(tP, 'Catálogo de cultivares', it.length + ' materiais · ' + P.cemp, '',
+      '<div class="campo"><label>Empresa</label><select data-c="cemp">' + E.ordem.map(function (e) { return '<option' + (e === P.cemp ? ' selected' : '') + '>' + esc(e) + '</option>'; }).join('') + '</select></div>' +
+      it.map(function (x) {
+        var g = x.gmr || (x.faixa ? gmrFaixa(x.faixa) : 0);
+        return '<div class="ag-colh"><div class="txt"><b>' + esc(x.nome) + '</b><span>' +
+          (x.gmr ? 'GMR ' + gTxt(x.gmr) : x.faixa ? 'GMR faixa ' + FAIXA_TXT[x.faixa] + ' (ZARC MT)' : 'sem GMR') +
+          (g ? ' · ' + (x.gmr ? '' : '~') + cicloGmr(g, R) + ' dias' : '') + (x.dae ? ' · empresa: ~' + x.dae + ' dias após emergir no MT' : '') +
+          (x.meu ? ' · cadastrado por você' : '') + '</span></div>' +
+          (x.meu ? '<button class="ag-chip" data-a="cdel" data-v="' + esc(x.nome) + '">Remover</button>' : '') + '</div>';
+      }).join('') +
+      '<div class="ag-nota">Fonte: ' + esc(Object.keys(fontes).join(' · ') || 'cadastro próprio') + '. Quando a empresa separa o GMR por região, vale o do Mato Grosso (macrorregião 4). ' +
+      'Materiais só com faixa vêm da lista oficial do ZARC/MAPA para o MT: informe o GMR exato em Ciclo dos materiais para afinar a previsão.</div>' +
+      '<button class="btn secundario" data-a="cnovo">＋ Cadastrar material</button>');
+  }
+  function pintarNovoMaterial() {
+    var E = empresasCat(), n = P.novo || (P.novo = { empresa: P.cemp || '', nome: '', gmr: '' });
+    pintar(tP, 'Cadastrar material', 'soja', '',
+      '<div class="campo"><label>Empresa</label><input data-n="empresa" list="agEmp" value="' + esc(n.empresa) + '" placeholder="Ex.: Brasmax" autocomplete="off">' +
+      '<datalist id="agEmp">' + E.ordem.map(function (e) { return '<option value="' + esc(e) + '">'; }).join('') + '</datalist></div>' +
+      '<div class="campo"><label>Nome da cultivar</label><input data-n="nome" value="' + esc(n.nome) + '" placeholder="Ex.: BMX Nova I2X" autocomplete="off"></div>' +
+      '<div class="campo"><label>GMR (grupo de maturação)</label><input data-n="gmr" inputmode="decimal" value="' + esc(n.gmr) + '" placeholder="Ex.: 7,8"></div>' +
+      '<div class="ag-dica" id="agNovoEx">' + exNovo(n) + '</div>' +
+      '<button class="btn" data-a="csalvarnovo">Salvar material</button>');
+  }
+  function exNovo(n) { var g = numBR(n.gmr); return g >= 3 && g <= 10 ? 'Pela regra: ' + cicloGmr(g) + ' dias do plantio à colheita.' : 'O ciclo é calculado pelo GMR com a regra da tela anterior.'; }
+  function gravarNovoMaterial() {
+    var n = P.novo || {}, emp = String(n.empresa || '').trim(), nome = String(n.nome || '').trim().replace(/\s+/g, ' '), g = Math.round(numBR(n.gmr) * 10) / 10;
+    if (!emp || !nome) { toast('Informe a empresa e o nome da cultivar'); return; }
+    if (!(g >= 3 && g <= 10)) { toast('Informe o GMR (ex.: 7,8)'); return; }
+    var k = chaveCult(nome), ant = linhaCiclo(nome) || {};
+    var row = { variedade: nome, cultura: 'soja', dias: Number(ant.dias) || 0, gmr: g, empresa: emp };
+    ST.ciclos = (ST.ciclos || []).filter(function (y) { return chaveCult(y.variedade) !== k; }); ST.ciclos.push(row);
+    IDX = null; gravar(); enfileirar('/api/agro/ciclos', { ciclos: [row] });
+    toast(nome + ' cadastrada em ' + emp); P.cemp = emp; P.novo = null; P.cv = 'cat'; pintarPlantio();
+  }
+  function removerMaterial(nome) {
+    var ant = linhaCiclo(nome); if (!ant) return;
+    if (!confirm('Remover ' + nome + ' do seu cadastro?')) return;
+    var row = { variedade: ant.variedade, cultura: ant.cultura || 'soja', dias: Number(ant.dias) || 0, gmr: 0, empresa: '' }, k = chaveCult(nome);
+    ST.ciclos = (ST.ciclos || []).filter(function (y) { return chaveCult(y.variedade) !== k; });
+    if (row.dias) ST.ciclos.push(row);
+    IDX = null; gravar(); enfileirar('/api/agro/ciclos', { ciclos: [row] }); pintarPlantio();
   }
 
   /* ----- colheita: média de sacas/ha de cada talhão (vai para o comparativo custo × produção do painel) ----- */
@@ -386,8 +531,7 @@
     pintar(tP, P.nome, (t.ha ? fmt(t.ha) + ' ha · ' : '') + P.safra, '',
       '<div class="campo"><label>Cultura</label><select data-k="cultura"><option value="">— escolher —</option>' + CULTURAS.map(function (c) {
         return '<option value="' + c[0] + '"' + (c[0] === e.cultura ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('') + '</select></div>' +
-      '<div class="campo"><label>Variedade / híbrido</label><input data-k="variedade" list="agVars" value="' + esc(e.variedade) + '" placeholder="Ex.: Cultivar A-7210" autocomplete="off">' +
-      '<datalist id="agVars">' + Object.keys(vars).map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist></div>' +
+      campoVariedade(e, vars) +
       '<div class="linha2"><div class="campo"><label>Data de plantio</label><input type="date" data-k="data_plantio" value="' + esc(e.data_plantio) + '"></div>' +
       '<div class="campo"><label>Data de emergência</label><input type="date" data-k="data_emerg" value="' + esc(e.data_emerg) + '"></div></div>' +
       '<div class="ag-chips"><span>Emergência:</span><button class="ag-chip" data-a="emerg" data-v="4">plantio + 4 dias</button><button class="ag-chip" data-a="emerg" data-v="5">plantio + 5 dias</button></div>' +
@@ -399,13 +543,50 @@
       (outros ? '<h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div>' : '') +
       '<button class="btn" data-a="salvarplantio">Salvar</button><button class="btn perigo" data-a="limparplantio">Limpar plantio deste talhão</button>');
   }
+  // soja: escolhe a empresa e depois a cultivar do catálogo (com GMR); outras culturas ou "Outra": digita o nome
+  function campoVariedade(e, vars) {
+    var livre = '<input data-k="variedade" list="agVars" value="' + esc(e.variedade) + '" placeholder="Ex.: Cultivar A-7210" autocomplete="off">' +
+      '<datalist id="agVars">' + Object.keys(vars).map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>';
+    var E = e.cultura === 'soja' ? empresasCat() : { ordem: [] };
+    if (!E.ordem.length) return '<div class="campo"><label>Variedade / híbrido</label>' + livre + '</div>' + (e.cultura ? '<div class="ag-dica" id="agCiclo">' + cicloEd(e) + '</div>' : '');
+    if (e.empresa == null) { var c0 = acharCult(e.variedade); e.empresa = c0 ? c0.empresa : (e.variedade ? '*' : ''); }
+    var h = '<div class="campo"><label>Empresa</label><select data-k="empresa"><option value="">— escolher a empresa —</option>' +
+      E.ordem.map(function (x) { return '<option value="' + esc(x) + '"' + (x === e.empresa ? ' selected' : '') + '>' + esc(x) + ' (' + E.m[x].length + ')</option>'; }).join('') +
+      '<option value="*"' + (e.empresa === '*' ? ' selected' : '') + '>Outra / digitar o nome</option></select></div>';
+    if (e.empresa === '*') h += '<div class="campo"><label>Variedade</label>' + livre + '</div>';
+    else if (e.empresa && E.m[e.empresa]) {
+      var at = acharCult(e.variedade), selNome = at && at.empresa === e.empresa ? at.nome : '';
+      var it = E.m[e.empresa].slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true }); });
+      h += '<div class="campo"><label>Variedade</label><select data-k="variedade"><option value="">— escolher a variedade —</option>' + it.map(function (x) {
+        return '<option value="' + esc(x.nome) + '"' + (x.nome === selNome ? ' selected' : '') + '>' + esc(x.nome) + ' · ' + (x.gmr ? 'GMR ' + gTxt(x.gmr) : 'GMR ' + FAIXA_TXT[x.faixa]) + '</option>';
+      }).join('') + '</select></div>';
+    }
+    return h + '<div class="ag-dica" id="agCiclo">' + cicloEd(e) + '</div>';
+  }
+  function cicloEd(e) {
+    var c = e.variedade ? cicloDe({ cultura: e.cultura, variedade: e.variedade }) : null;
+    if (!c) return e.cultura === 'soja' ? 'Escolha a variedade: o ciclo sai do grupo de maturação (GMR).' : 'Informe a variedade para a previsão de colheita.';
+    return '⏱ Ciclo ' + cicloTxt(c) + (e.data_plantio ? ' · colheita prevista ' + curta(addDias(e.data_plantio, c.dias)) : '');
+  }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }
   function semDica(e) { var esp = espDe(e.cultura, e.espac_cm); return e.sem_ha ? '= ' + fmt(e.sem_m, 1) + ' sementes/m a ' + esp + ' cm = ' + fmt(e.sem_ha, 0) + ' sementes/ha' : 'Informe sementes/m ou sementes/ha: a outra é calculada pelo espaçamento (' + (esp ? esp + ' cm' : 'informe o espaçamento') + ').'; }
 
   function entradaPlantio(inp) {
     var e = P.ed, k = inp.dataset.k; if (!e) return;
-    if (k === 'cultura' || k === 'variedade') { e[k] = inp.value; if (k === 'cultura') pintarPlantio(); return; }
-    if (k === 'data_plantio' || k === 'data_emerg') { e[k] = inp.value; var d = $('#agDae', tP); if (d) d.textContent = daeTxt(e); return; }
+    if (k === 'empresa') {
+      e.empresa = inp.value; var c = acharCult(e.variedade);
+      if (e.empresa !== '*' && !(c && c.empresa === e.empresa)) e.variedade = '';
+      pintarPlantio(); return;
+    }
+    if (k === 'cultura' || k === 'variedade') {
+      e[k] = inp.value;
+      if (k === 'cultura') { e.empresa = null; pintarPlantio(); } else { var ci = $('#agCiclo', tP); if (ci) ci.textContent = cicloEd(e); }
+      return;
+    }
+    if (k === 'data_plantio' || k === 'data_emerg') {
+      e[k] = inp.value; var d = $('#agDae', tP); if (d) d.textContent = daeTxt(e);
+      var cc = $('#agCiclo', tP); if (cc) cc.textContent = cicloEd(e); return;
+    }
     var esp = espDe(e.cultura, e.espac_cm);
     if (k === 'espac_cm') { e.espac_cm = numBR(inp.value); esp = espDe(e.cultura, e.espac_cm); if (e.sem_m && esp) e.sem_ha = Math.round(e.sem_m * 10000 / (esp / 100)); }
     if (k === 'sem_m') { e.sem_m = numBR(inp.value); e.sem_ha = (e.sem_m && esp) ? Math.round(e.sem_m * 10000 / (esp / 100)) : 0; }
@@ -438,15 +619,19 @@
     if (!ST.mod.plantio) return;
     marcaVisto('plantio');
     var dr = doRelatorio(); ESC = dr.prod;
-    P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.colh = false; P.ciclos = false; P.outros = []; P.sel = [];
+    P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.colh = false; P.ciclos = false; P.cv = ''; P.novo = null; P.outros = []; P.sel = [];
     tP.classList.remove('oculto'); pintarPlantio(); topoRolagem(tP);
     baixar().then(function (ok) { if (ok && !tP.classList.contains('oculto') && !P.ed) pintarPlantio(); });
   }
 
   function cliquePlantio(a, v, alvo) {
-    if (a === 'voltar') { if (P.ciclos) { P.ciclos = false; pintarPlantio(); } else if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
+    if (a === 'voltar') { if (P.ciclos && P.cv) { P.cv = P.cv === 'novo' && P.vemDe === 'cat' ? 'cat' : ''; P.novo = null; pintarPlantio(); } else if (P.ciclos) { P.ciclos = false; pintarPlantio(); } else if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
     if (a === 'colheita') { P.colh = true; pintarPlantio(); topoRolagem(tP); return; }
-    if (a === 'ciclos') { P.ciclos = true; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'ciclos') { P.ciclos = true; P.cv = ''; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'ccat') { P.cv = 'cat'; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'cnovo') { P.vemDe = P.cv; P.cv = 'novo'; P.novo = null; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'csalvarnovo') { gravarNovoMaterial(); return; }
+    if (a === 'cdel') { removerMaterial(v); return; }
     if (a === 'salvarciclos') { gravarCiclos(); return; }
     if (a === 'salvarcolh') { gravarColheita(); return; }
     if (a === 'ptog') { var kp = P.sel.indexOf(v); if (kp >= 0) P.sel.splice(kp, 1); else P.sel.push(v); pintarPlantio(); return; }
@@ -469,6 +654,7 @@
     if (a === 'limparplantio') { if (confirm('Limpar o plantio de ' + P.nome + '?')) gravarPlantio(true); }
   }
   function mudancaPlantio(sel) {
+    if (sel.dataset.c === 'cemp') { P.cemp = sel.value; pintarPlantio(); topoRolagem(tP); return; }
     if (sel.dataset.c === 'faz') { P.sel = []; P.faz = sel.value; ST.ult.faz = P.faz; gravar(); pintarPlantio(); }
     else if (sel.dataset.c === 'safra') { P.safra = sel.value; ST.ult.safra = P.safra; gravar(); pintarPlantio(); }
     else if (sel.dataset.k) entradaPlantio(sel);
@@ -1618,6 +1804,8 @@
     tP.addEventListener('input', function (ev) {
       var n = ev.target;
       if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n);
+      if (n.dataset && n.dataset.rg) { var ex = $('#agRegraEx', tP); if (ex) ex.textContent = exRegra(regraTela()); }
+      if (n.dataset && n.dataset.n && P.novo) { P.novo[n.dataset.n] = n.value; var en = $('#agNovoEx', tP); if (en) en.textContent = exNovo(P.novo); }
       if (n.dataset && n.dataset.colh) {   // colheita: total na hora
         var ha = 0, sc = 0, f = fazDe(P.faz);
         tP.querySelectorAll('[data-colh]').forEach(function (i) { var v = numBR(i.value), t = talhoesDe(f).filter(function (x) { return x.nome === i.dataset.colh; })[0]; if (v && t) { ha += t.ha; sc += v * t.ha; } });

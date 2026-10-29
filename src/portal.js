@@ -11,7 +11,8 @@
 
 import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } from './auth.js';
 import { blocosAgro } from './agrorel.js';
-import { baseUnidade, comparativo, modulosDe } from './agro.js';
+import { baseUnidade, comparativo, modulosDe, regraCiclo } from './agro.js';
+import { chaveCult, cicloMaterial } from './cultivares.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -155,6 +156,19 @@ function datasTal(r, plantio) {
   return out;
 }
 
+// ciclo de cada material plantado: informado pelo consultor ou calculado pelo GMR (catálogo de cultivares)
+async function ciclosDoPlantio(env, dono, plantio, linhas) {
+  const regra = await regraCiclo(env, dono), vistos = {}, out = [];
+  plantio.forEach((p) => {
+    const k = chaveCult(p.variedade);
+    if (!k || vistos[k]) return; vistos[k] = 1;
+    const linha = linhas.filter((l) => chaveCult(l.variedade) === k)[0];
+    const c = cicloMaterial(p.variedade, p.cultura, linha, regra);
+    if (c) out.push({ variedade: p.variedade, cultura: p.cultura, dias: c.dias, gmr: c.gmr || 0, fonte: c.fonte });
+  });
+  return out;
+}
+
 async function dadosFazenda(env, acesso, fid, safraPedida) {
   const f = await env.DB.prepare('SELECT f.id, f.nome, f.talhoes, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
     .bind(fid, acesso.dono_id).first();
@@ -165,7 +179,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? ORDER BY data_prevista, criado_em').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
     env.DB.prepare('SELECT * FROM colheita WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
-    env.DB.prepare('SELECT variedade, cultura, dias FROM ciclos WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] }))
+    env.DB.prepare('SELECT * FROM ciclos WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] }))
   ]);
   const recs = (rc.results || []).map((r) => ({ id: r.id, safra: r.safra || '', operacao: r.operacao || '', data_prevista: r.data_prevista || '',
     mostrar: Number(r.mostrar) !== 0, dados: lerJson(r.dados, {}) }));
@@ -213,7 +227,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     estoque: estoqueDe(es.results || [], recs, areas),
     custo: custo ? { talhoes: custo.talhoes, sem_preco: custo.sem_preco } : null,
     colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
-    ciclos: (ci.results || []).map((c) => ({ variedade: c.variedade, cultura: c.cultura, dias: c.dias }))
+    ciclos: await ciclosDoPlantio(env, dono, plantio, ci.results || [])
   });
 }
 
