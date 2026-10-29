@@ -545,3 +545,7 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 /* iPhone: campo de data não passa da coluna */
 .linha2>*{min-width:0}
 .campo input[type=date]{width:100%;min-width:0;max-width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none}
+/* colheitadeira colorida (ícone largo 72×40) */
+.ag-ico.colh{width:30px;height:17px}
+.ag-leg .ag-ico.colh{width:28px;height:16px}
+.ag-ai.c-colh .ag-ico.colh{width:44px;height:25px}
