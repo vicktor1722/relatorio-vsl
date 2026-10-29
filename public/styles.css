@@ -542,3 +542,6 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-mini{display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--texto-fraco);gap:2px}
 .ag-colh .ag-mini input{width:64px}
 .ag-colh .txt span{overflow-wrap:anywhere}
+/* iPhone: campo de data não passa da coluna */
+.linha2>*{min-width:0}
+.campo input[type=date]{width:100%;min-width:0;max-width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none}
