@@ -1389,6 +1389,7 @@
         : 'Este aparelho não aceita notificações do app.');
       return;
     }
+    try { localStorage.setItem('vsl-push-perguntado', '1'); } catch (e) {}
     Notification.requestPermission().then(async function (perm) {
       if (perm !== 'granted') { toast('Notificações bloqueadas. Libere em Ajustes → Notificações → AMVS Relatório.'); return; }
       try {
@@ -1405,7 +1406,9 @@
     assinarPush().catch(function () { /* tenta na próxima abertura */ });
   }
   function cartaoPush() {
+    // já ligado, ou já perguntado no aceite dos termos: não pergunta de novo
     if (pushLigado()) return '';
+    try { if (localStorage.getItem('vsl-push-perguntado')) return ''; } catch (e) {}
     return '<div class="ag-push"><span>🔔 Receba no celular, toda manhã, as aplicações dos próximos dias — mesmo com o app fechado.</span>' +
       '<button class="btn" data-a="push">Ativar avisos</button></div>';
   }
@@ -1550,6 +1553,6 @@
     } catch (x) { /* nada a fazer */ }
   }
 
-  global.Agro = { ligar: ligar, atualizarModulos: atualizarModulos };
+  global.Agro = { ligar: ligar, atualizarModulos: atualizarModulos, assinarPush: assinarPush };
   document.addEventListener('DOMContentLoaded', function () { setTimeout(function () { ligar().catch(function (e) { falhaLigar(e); }); }, 400); });
 })(window);

@@ -9,6 +9,7 @@
 import { hashSenha, novoId } from './auth.js';
 import { contagemAcessos } from './acessos.js';
 import { espaco } from './midia.js';
+import { TERMOS_VERSAO, garantirTermos } from './termos.js';
 import { AGRO_ABAS, AGRO_CSS, AGRO_JS, AGRO_PAINEIS } from './agroadmin.js';
 
 const esc = (s) => String(s == null ? '' : s)
@@ -475,8 +476,10 @@ export async function resumoAdmin(env, me, adm) {
   // conta comum: só enxerga o que é dela; administrador enxerga tudo
   const meu = adm ? '' : ' AND r.usuario_id = ?';
   const arg = adm ? [] : [me.id];
+  await garantirTermos(env).catch(() => {});
   const contas = await env.DB.prepare(`
     SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin,
+           (SELECT t.aceito_em FROM termos_aceite t WHERE t.usuario_id = u.id AND t.versao = '${TERMOS_VERSAO}') AS termos_em,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id) AS relatorios,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id AND r.status='publicado') AS publicados,
            (SELECT COUNT(*) FROM produtores p WHERE p.usuario_id = u.id) AS produtores,
@@ -1108,7 +1111,8 @@ ${AGRO_CSS}
   function desenharContas() {
     var linhas = dados.contas.map(function (c) {
       return '<tr><td><b>' + esc(c.nome || '—') + '</b><br><span style="color:var(--fraco);font-size:12px">' + esc(c.email) + '</span>' +
-        (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') + '</td>' +
+        (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') +
+        '<br>' + (c.termos_em ? '<span class="peq">✔ termos aceitos em ' + dataBR(c.termos_em) + '</span>' : '<span class="selo perto">termos pendentes</span>') + '</td>' +
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
         '<td>' + c.produtores + ' / ' + c.fazendas + '</td>' +
         '<td>' + espacoCel(c) + '</td>' +

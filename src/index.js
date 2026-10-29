@@ -14,6 +14,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
 import { avisarAplicacoes, rotasPush } from './push.js';
+import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
@@ -208,6 +209,14 @@ export default {
         return new Response(pagina, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
       }
 
+      // Termos de Uso e Privacidade: página pública; ?fragmento=1 devolve só o texto (a tela de aceite do app usa)
+      if (rota === '/termos' || rota === '/termos/') {
+        if (url.searchParams.get('fragmento') === '1') {
+          return new Response(TERMOS_HTML, { headers: Object.assign({ 'Content-Type': 'text/html; charset=utf-8', 'X-Termos-Versao': TERMOS_VERSAO, 'Cache-Control': 'no-store' }, CORS) });
+        }
+        return html(paginaTermos());
+      }
+
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
         return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0 });
@@ -357,6 +366,9 @@ export default {
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
+
+      // aceite dos Termos de Uso (uma vez por versão)
+      if (rota === '/api/termos' || rota === '/api/termos/aceitar') return await rotasTermos(env, req, me, rota);
 
       // aviso no celular das próximas aplicações
       if (rota.startsWith('/api/push/')) return await rotasPush(env, req, me, rota);
@@ -728,7 +740,7 @@ export default {
     }
   },
 
-  // cron da manhã (wrangler.toml): notificação das aplicações dos próximos dias
+  // cron das 5h40 de MT (wrangler.toml): notificação das aplicações dos próximos dias
   async scheduled(evento, env, ctx) {
     ctx.waitUntil(avisarAplicacoes(env));
   }

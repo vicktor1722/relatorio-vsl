@@ -507,3 +507,21 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-novo-ic{font-size:40px}.ag-novo-card h3{margin:6px 0 8px;font-size:19px;color:#146034}
 .ag-novo-card p{font-size:14.5px;line-height:1.45;color:#333;margin:0 0 10px}.ag-novo-como{background:#EEF6F0;border-radius:10px;padding:8px 10px}
 .ag-novo-card .btn{width:100%;margin:6px 0 0}
+
+/* ---------- Termos de Uso (primeiro acesso) ---------- */
+.termos-tela{position:fixed;inset:0;z-index:300;background:rgba(10,30,20,.55);display:flex;align-items:flex-end;justify-content:center}
+.termos-card{background:#fff;width:100%;max-width:560px;max-height:94dvh;display:flex;flex-direction:column;border-radius:18px 18px 0 0;
+  padding:16px 16px calc(14px + var(--safe-bottom))}
+.termos-topo{text-align:center}.termos-ic{font-size:30px}
+.termos-topo h2{margin:2px 0 4px;font-size:19px;color:var(--verde-escuro);text-transform:none;letter-spacing:0}
+.termos-topo p{margin:0 0 10px;font-size:14px;color:var(--texto-fraco)}
+.termos-texto{flex:1;min-height:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;background:#F6F8F7;border:1px solid #E1E7E3;border-radius:12px;
+  padding:4px 14px 12px;font-size:13.5px;line-height:1.5;color:#2A3A31}
+.termos-texto h2{font-size:14.5px;color:var(--verde-escuro);margin:14px 0 4px;text-transform:none;letter-spacing:0}
+.termos-texto p,.termos-texto li{font-size:13.5px;margin:4px 0}.termos-texto ul{padding-left:18px;margin:4px 0}
+.termos-texto .vig{color:var(--texto-fraco);font-size:12px}
+.termos-ck{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.35;margin:10px 2px 0;cursor:pointer}
+.termos-ck input{width:22px;height:22px;flex:none;accent-color:var(--verde);margin:0}
+.termos-card .btn{margin-top:12px}
+.termos-card .btn:disabled{opacity:.45}
+.termos-sair{display:block;margin:10px auto 0;background:none;border:0;color:var(--texto-fraco);font-size:13px;text-decoration:underline}
