@@ -592,7 +592,10 @@
           repetir: !!(rep && rep.checked)
         };
       };
-      folha.querySelector('#legOk').onclick = function () { fechar2(resposta()); };
+      folha.querySelector('#legOk').onclick = function () {
+        if (tipo === 'video' && blob && blob.size > VIDEO_REDUZIR_MB * 1048576 && !st.ctxVideo) st.ctxVideo = ctxDoToque();
+        fechar2(resposta());
+      };
       const mais = folha.querySelector('#legMais');
       if (mais) mais.onclick = function () {
         const r = resposta(); r.mais = true;
@@ -608,6 +611,12 @@
   async function adicionarMidia(blob, tipo, extras, posicao, fixo) {
     if (tipo === 'foto') {
       try { blob = await comprimirImagem(blob, 2048, st.cfg.qualidade); } catch (e) { /* mantém original */ }
+    }
+    // vídeo da câmera do celular ou da galeria: lê a duração e, se for grande, reduz depois da legenda
+    const grande = tipo === 'video' && blob.size > VIDEO_REDUZIR_MB * 1048576 && podeReduzirVideo();
+    if (tipo === 'video' && !(extras && extras.duracao_s)) {
+      const d = await duracaoVideo(blob);
+      if (d) extras = Object.assign({}, extras, { duracao_s: +d.toFixed(1) });
     }
     // lote do 📷＋ esperando: a foto nova entra nele; vídeo ou vários da galeria esperam o lote fechar antes
     let lote = fixo ? null : await lerLote();
@@ -635,10 +644,12 @@
       if (lote) await gravarFotosDoLote(lote, r);
       const item = await novoItem(tipo, blob, Object.assign(
         { legenda: r.legenda || '' }, extras || {},
-        { talhao: r.talhao || null, talhao_id: r.talhao_id || null }
+        { talhao: r.talhao || null, talhao_id: r.talhao_id || null },
+        grande ? { sync_state: 'preparando' } : {}   // não sobe enquanto está sendo reduzido
       ));
       if (!item) return null;
       await renderChat(); atualizarSync();
+      if (grande) await prepararVideo(item, blob);
       if (navigator.onLine) Sync.sincronizar(st.rel.id);
       return r;
     } catch (e) {
@@ -646,6 +657,153 @@
       toast('Não deu para guardar este arquivo: ' + (e.message || e), 5000);
       return r;
     }
+  }
+
+  /* ---------------- vídeo grande: reduz para 720p antes de enviar ----------------
+     O vídeo da câmera do celular sai em 1080p/4K (60–170 MB por minuto). Acima de 25 MB ele é
+     regravado em 720p (~18 MB por minuto): o vídeo toca num <video> mudo, cada quadro é desenhado
+     num canvas menor e o som, tirado do próprio arquivo, toca junto só para a gravação.
+     Leva o tempo do vídeo. Se algo não der certo (aparelho sem suporte, app minimizado,
+     "Enviar sem reduzir"), o original é enviado como antes — o registro nunca se perde:
+     ele já está guardado e só fica esperando (sync_state 'preparando'). */
+  const VIDEO_REDUZIR_MB = 25;
+  function podeReduzirVideo() {
+    return !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream && (window.AudioContext || window.webkitAudioContext));
+  }
+  function tipoVideoSaida() {
+    return ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      .find(function (m) { return MediaRecorder.isTypeSupported(m); }) || '';
+  }
+  // o iPhone só liga o áudio dentro de um toque: o contexto é criado no "Adicionar ao relatório"
+  function ctxDoToque() {
+    try { const C = window.AudioContext || window.webkitAudioContext; const c = new C(); c.resume(); return c; }
+    catch (e) { return null; }
+  }
+
+  function duracaoVideo(blob) {
+    return new Promise(function (res) {
+      const u = URL.createObjectURL(blob);
+      const v = document.createElement('video');
+      const fim = function (d) { URL.revokeObjectURL(u); v.removeAttribute('src'); res(isFinite(d) && d > 0 ? d : 0); };
+      v.preload = 'metadata'; v.muted = true;
+      v.onloadedmetadata = function () { fim(v.duration); };
+      v.onerror = function () { fim(0); };
+      setTimeout(function () { fim(0); }, 8000);
+      v.src = u;
+    });
+  }
+
+  async function reduzirVideo(blob, ctx, aoProgresso, controle) {
+    if (!ctx) throw new Error('sem áudio');
+    if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) {} }
+    if (ctx.state !== 'running') throw new Error('áudio bloqueado');
+    const url = URL.createObjectURL(blob);
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto';
+    let rec = null, fonte = null, faixas = [];
+    try {
+      await new Promise(function (ok, no) {
+        v.onloadeddata = ok; v.onerror = function () { no(new Error('não abriu o vídeo')); };
+        setTimeout(function () { no(new Error('demorou para abrir')); }, 20000);
+        v.src = url;
+      });
+      const dur = v.duration;
+      if (!isFinite(dur) || dur <= 0 || !v.videoWidth) throw new Error('vídeo sem duração');
+      // som do próprio arquivo (sem ele não reduz: vídeo de campo sem a fala não serve)
+      const som = await new Promise(function (ok, no) {
+        blob.arrayBuffer().then(function (b) { ctx.decodeAudioData(b, ok, no); }, no);
+      });
+
+      const esc = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(v.videoWidth * esc / 2) * 2; cv.height = Math.round(v.videoHeight * esc / 2) * 2;
+      const g = cv.getContext('2d');
+      g.drawImage(v, 0, 0, cv.width, cv.height);
+      const dest = ctx.createMediaStreamDestination();
+      fonte = ctx.createBufferSource(); fonte.buffer = som; fonte.connect(dest);
+      const imagem = cv.captureStream(30).getVideoTracks()[0];
+      faixas = [imagem].concat(dest.stream.getAudioTracks());
+      const mime = tipoVideoSaida();
+      const op = { videoBitsPerSecond: 2500000, audioBitsPerSecond: 96000 };
+      if (mime) op.mimeType = mime;
+      rec = new MediaRecorder(new MediaStream(faixas), op);
+      const partes = [];
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) partes.push(e.data); };
+      const gravado = new Promise(function (ok) { rec.onstop = ok; });
+
+      let vivo = true;
+      const desenha = function () {
+        if (!vivo) return;
+        g.drawImage(v, 0, 0, cv.width, cv.height);
+        aoProgresso(Math.min(1, v.currentTime / dur));
+        if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(desenha); else requestAnimationFrame(desenha);
+      };
+      rec.start(1000);
+      await v.play();
+      fonte.start(0, v.currentTime);
+      desenha();
+      try {
+        await new Promise(function (ok, no) {
+          v.onended = ok;
+          v.onerror = function () { no(new Error('falhou no meio')); };
+          controle.parar = function () { no(new Error('cancelado')); };
+          // minimizou: o iPhone pausa o vídeo e o som sai do compasso — melhor mandar o original
+          controle.oculto = function () { if (document.hidden) no(new Error('app minimizado')); };
+          document.addEventListener('visibilitychange', controle.oculto);
+          setTimeout(function () { no(new Error('demorou demais')); }, (dur * 1.6 + 30) * 1000);
+        });
+      } finally {
+        vivo = false;
+        document.removeEventListener('visibilitychange', controle.oculto);
+      }
+      rec.stop();
+      await gravado;
+      const tipo = (rec.mimeType || mime || 'video/webm').split(';')[0];
+      const novo = new Blob(partes, { type: tipo });
+      // só vale a pena se ficou bem menor
+      if (novo.size < 50000 || novo.size > blob.size * 0.8) return null;
+      return novo;
+    } finally {
+      try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) {}
+      try { if (fonte) fonte.stop(); } catch (e) {}
+      faixas.forEach(function (t) { t.stop(); });
+      v.pause(); v.removeAttribute('src'); v.load();
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function prepararVideo(item, blob) {
+    const veu = document.createElement('div'); veu.className = 'veu';
+    const folha = document.createElement('div'); folha.className = 'folha';
+    folha.innerHTML = '<div class="alca"></div>' +
+      '<h2 style="margin:0 0 6px">🎬 Reduzindo o vídeo</h2>' +
+      '<p style="margin:0 0 12px;font-size:13.5px;color:var(--texto-fraco)">' + bytesFmt(blob.size) +
+        ' — deixando em 720p para enviar mais rápido e ocupar menos espaço. Leva mais ou menos o tempo do vídeo; mantenha o app aberto.</p>' +
+      '<div style="height:10px;border-radius:5px;background:#E3E8E5;overflow:hidden"><div id="redBarra" style="height:100%;width:0;background:var(--verde);transition:width .3s"></div></div>' +
+      '<div id="redPct" style="text-align:center;font-weight:600;margin:8px 0 12px">0%</div>' +
+      '<button class="btn secundario" id="redPular">Enviar sem reduzir</button>';
+    veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
+    veu.onclick = function (e) { if (e.target === veu) e.stopPropagation(); };
+    const controle = {};
+    folha.querySelector('#redPular').onclick = function () { if (controle.parar) controle.parar(); };
+    let novo = null;
+    try {
+      novo = await reduzirVideo(blob, st.ctxVideo || ctxDoToque(), function (p) {
+        const pct = Math.round(p * 100) + '%';
+        folha.querySelector('#redBarra').style.width = pct; folha.querySelector('#redPct').textContent = pct;
+      }, controle);
+    } catch (e) { novo = null; }
+    veu.remove();
+    const it = await DB.get('itens', item.id);
+    if (!it) return;   // apagado enquanto isso
+    if (novo) {
+      await DB.salvarMidia(it.id, novo);
+      it.bytes = novo.size; it.mime = novo.type;
+      toast('Vídeo reduzido: ' + bytesFmt(blob.size) + ' → ' + bytesFmt(novo.size), 4000);
+    }
+    it.sync_state = 'pendente';
+    await DB.put('itens', it);
+    await renderChat(); atualizarSync();
   }
 
   // as fotos do lote viram registros da conversa, todas com a legenda e o talhão escolhidos
@@ -1994,6 +2152,11 @@
     // o app sempre abre na lista de relatórios; a última conversa fica pronta por baixo (seta ←)
     if (!st.rel) await renderChat();
     if (!alvo) { await listarRelatorios(); abrir('telaLista'); }
+    try {
+      for (const it of await DB.all('itens')) {
+        if (it.sync_state === 'preparando') { it.sync_state = 'pendente'; await DB.put('itens', it); }
+      }
+    } catch (e) {}
     window.__appPronto = true;   // avisos (ex.: novidade do mapa) só depois daqui
     atualizarSync();
     atualizarBotaoEnvio();
