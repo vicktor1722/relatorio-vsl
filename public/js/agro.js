@@ -7,7 +7,7 @@
   'use strict';
 
   var LS = 'agro_v1';
-  var ST = { email: '', mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], fila: [], ult: {} };
+  var ST = { email: '', mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], fila: [], ult: {} };
 
   var CULTURAS = [['soja', 'Soja'], ['milho', 'Milho'], ['algodao', 'Algodão'], ['feijao', 'Feijão'], ['sorgo', 'Sorgo'],
     ['pastagem', 'Pastagem'], ['pousio', 'Pousio'], ['outra', 'Outra cultura']];
@@ -119,7 +119,7 @@
   async function atualizarModulos() {
     try {
       var c0 = await Sync.conf(), uid0 = (await Sync.meuId()) || '';
-      if ((c0.email || '') !== (ST.email || '') || (uid0 && ST.uid && ST.uid !== uid0)) { ST = { email: c0.email || '', uid: uid0, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], fila: [], ult: {} }; gravar(); }
+      if ((c0.email || '') !== (ST.email || '') || (uid0 && ST.uid && ST.uid !== uid0)) { ST = { email: c0.email || '', uid: uid0, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], fila: [], ult: {} }; gravar(); }
       else if (uid0 && !ST.uid) { ST.uid = uid0; gravar(); }
       var m = await chamar('/api/modulos');
       ST.mod = { plantio: !!m.plantio, recomendacoes: !!m.recomendacoes, admin: !!m.admin };
@@ -143,12 +143,16 @@
       var tudo = await Promise.all([
         ST.mod.plantio ? chamar('/api/agro/plantio') : null,
         ST.mod.recomendacoes ? chamar('/api/agro/recs') : null,
-        ST.mod.recomendacoes ? chamar('/api/agro/produtos') : null
+        ST.mod.recomendacoes ? chamar('/api/agro/produtos') : null,
+        ST.mod.recomendacoes ? chamar('/api/agro/estoque').catch(function () { return null; }) : null,
+        ST.mod.plantio ? chamar('/api/agro/colheita').catch(function () { return null; }) : null
       ]);
       if (ST.fila.length) return false;
       if (tudo[0]) ST.plantio = tudo[0].plantio || [];
       if (tudo[1]) ST.recs = tudo[1].recs || [];
       if (tudo[2]) ST.produtos = tudo[2].produtos || [];
+      if (tudo[3]) ST.estoque = tudo[3].estoque || [];
+      if (tudo[4]) ST.colheita = tudo[4].colheita || [];
       gravar();
       return true;
     } catch (e) { return false; }
@@ -256,13 +260,55 @@
       '<div class="ag-dica">Ou toque num talhão da lista abaixo para lançar só nele.</div>';
   }
 
+  /* ----- colheita: média de sacas/ha de cada talhão (vai para o comparativo custo × produção do painel) ----- */
+  function colheitaDe(fid, safra, nome) {
+    return (ST.colheita || []).filter(function (c) { return c.fazenda_id === fid && (c.safra || '') === (safra || '') && c.talhao === nome; })[0] || null;
+  }
+  function resumoColheita(tl) {
+    var ha = 0, sc = 0;
+    tl.forEach(function (t) { var c = colheitaDe(P.faz, P.safra, t.nome); if (c && c.sc_ha) { ha += t.ha; sc += c.sc_ha * t.ha; } });
+    return ha ? '🌾 Colheita: média ' + fmt(sc / ha) + ' sc/ha · ' + fmt(sc, 0) + ' sacas em ' + fmt(ha) + ' ha' : '';
+  }
+  function pintarColheita() {
+    var f = fazDe(P.faz), tl = talhoesDe(f);
+    var linhas = tl.map(function (t) {
+      var c = colheitaDe(P.faz, P.safra, t.nome), r = linhaPlantio(P.faz, P.safra, t.nome);
+      return '<div class="ag-colh"><div class="txt"><b>' + esc(t.nome) + '</b><span>' + (t.ha ? fmt(t.ha) + ' ha' : '') +
+        (r && r.cultura ? ' · ' + esc(NOME_CULT[r.cultura] || r.cultura) + (r.variedade ? ' ' + esc(r.variedade) : '') : '') + '</span></div>' +
+        '<input inputmode="decimal" data-colh="' + esc(t.nome) + '" value="' + (c && c.sc_ha ? String(c.sc_ha).replace('.', ',') : '') + '" placeholder="sc/ha"></div>';
+    }).join('');
+    pintar(tP, 'Colheita', (f ? f.nome + ' · ' : '') + P.safra, '',
+      '<div class="ag-dica">Informe a média colhida de cada talhão em <b>sacas por hectare</b>. Deixe em branco o que ainda não colheu. ' +
+      'No painel, essa produção é comparada com o gasto em produtos aplicados.</div>' +
+      '<div class="campo"><label>Data da colheita</label><input type="date" id="agColhData" value="' + hoje() + '"></div>' +
+      linhas + '<div class="ag-resumo-ha" id="agColhTot" style="margin-top:10px">' + (resumoColheita(tl) || 'Nenhuma colheita lançada ainda.') + '</div>' +
+      '<button class="btn" data-a="salvarcolh">Salvar colheita</button>');
+  }
+  function gravarColheita() {
+    var data = ($('#agColhData', tP) || {}).value || hoje(), enviar = [];
+    tP.querySelectorAll('[data-colh]').forEach(function (inp) {
+      var nome = inp.dataset.colh, sc = Math.max(0, numBR(inp.value)), ant = colheitaDe(P.faz, P.safra, nome);
+      if ((ant ? ant.sc_ha : 0) === sc) return;
+      ST.colheita = (ST.colheita || []).filter(function (c) { return !(c.fazenda_id === P.faz && (c.safra || '') === (P.safra || '') && c.talhao === nome); });
+      if (sc) ST.colheita.push({ fazenda_id: P.faz, safra: P.safra, talhao: nome, sc_ha: sc, data: data });
+      enviar.push({ talhao: nome, sc_ha: sc, data: data });
+    });
+    gravar();
+    if (enviar.length) enfileirar('/api/agro/colheita', { fazenda_id: P.faz, safra: P.safra, talhoes: enviar });
+    toast(enviar.length ? 'Colheita salva em ' + enviar.length + ' talhão(ões)' : 'Nada mudou');
+    P.colh = false; pintarPlantio();
+  }
+
   function pintarPlantio() {
+    if (P.colh) return pintarColheita();
     if (P.ed) return pintarEditorPlantio();
     var f = fazDe(P.faz), tl = talhoesDe(f), feitos = 0;
     var cards = tl.map(function (t) {
       var r = linhaPlantio(P.faz, P.safra, t.nome); if (r && (r.cultura || r.variedade || r.data_plantio)) feitos++;
       var d = r ? daeDe(r.data_emerg) : null;
+      var ch = colheitaDe(P.faz, P.safra, t.nome);
       var l2 = r ? [r.variedade, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
+      if (ch && ch.sc_ha) l2 = (l2 ? l2 + ' · ' : '') + '🌾 ' + fmt(ch.sc_ha) + ' sc/ha';
       return '<div class="lista-item ag-tal" data-a="edtal" data-v="' + esc(t.nome) + '"><div class="ic">' + (r && r.cultura ? '🌱' : '＋') + '</div><div class="txt"><b>' + esc(t.nome) + '</b><span>' +
         (t.ha ? fmt(t.ha) + ' ha' : '') + (r && r.cultura ? ' · ' + esc(NOME_CULT[r.cultura] || r.cultura) : '') + '</span>' +
         '<span>' + esc(l2 || 'toque para informar o plantio') + '</span></div></div>';
@@ -270,7 +316,10 @@
     pintar(tP, 'Plantio dos talhões', tl.length ? feitos + ' de ' + tl.length + ' talhões informados' : 'sem talhões',
       '', '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz) + '</select></div>' +
       '<div class="campo"><label>Safra</label><select data-c="safra">' + opcoesSafra(P.safra) + '</select></div></div>' +
-      (tl.length ? resumoArea(P.faz, P.safra, tl) + mapaPlantio(f, tl) + cards : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
+      (tl.length ? resumoArea(P.faz, P.safra, tl) + mapaPlantio(f, tl) +
+        '<button class="btn secundario" data-a="colheita">🌾 Lançar colheita (sacas/ha)</button>' +
+        (resumoColheita(tl) ? '<div class="ag-dica">' + resumoColheita(tl) + '</div>' : '') + cards
+        : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
       '<div class="ag-nota">Cultura, variedade, datas e sementes alimentam o mapa por variedade e a evolução do plantio no relatório do cliente.</div>');
     if (!fazendas().length) $('.conteudo', tP).innerHTML = '<div class="aviso">Nenhuma fazenda com talhões. Importe o KML em Produtores e fazendas.</div>';
   }
@@ -337,13 +386,15 @@
     if (!ST.mod.plantio) return;
     marcaVisto('plantio');
     var dr = doRelatorio(); ESC = dr.prod;
-    P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.outros = []; P.sel = [];
+    P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.colh = false; P.outros = []; P.sel = [];
     tP.classList.remove('oculto'); pintarPlantio(); topoRolagem(tP);
     baixar().then(function (ok) { if (ok && !tP.classList.contains('oculto') && !P.ed) pintarPlantio(); });
   }
 
   function cliquePlantio(a, v, alvo) {
-    if (a === 'voltar') { if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
+    if (a === 'voltar') { if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
+    if (a === 'colheita') { P.colh = true; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'salvarcolh') { gravarColheita(); return; }
     if (a === 'ptog') { var kp = P.sel.indexOf(v); if (kp >= 0) P.sel.splice(kp, 1); else P.sel.push(v); pintarPlantio(); return; }
     if (a === 'ptodos') { P.sel = talhoesDe(fazDe(P.faz)).map(function (t) { return t.nome; }); pintarPlantio(); return; }
     if (a === 'plimpar') { P.sel = []; pintarPlantio(); return; }
@@ -411,6 +462,7 @@
     if (v === 'wiz') return pintarWiz();
     if (v === 'prods') return pintarCatalogo();
     if (v === 'cal') return pintarCalendario();
+    if (v === 'estoque') return pintarEstoque();
     var f = fazDe(R.faz);
     var lista = ST.recs.filter(function (r) { return r.fazenda_id === R.faz; }).filter(function (r) {
       var s = stRec(r);
@@ -452,7 +504,108 @@
 
   /* ----- calendário ----- */
   function abasRec(at) {
-    return '<div class="ag-abas"><button class="' + (at === 'lista' ? 'on' : '') + '" data-a="aba" data-v="lista">📋 Lista</button><button class="' + (at === 'cal' ? 'on' : '') + '" data-a="aba" data-v="cal">📅 Calendário</button></div>';
+    return '<div class="ag-abas"><button class="' + (at === 'lista' ? 'on' : '') + '" data-a="aba" data-v="lista">📋 Lista</button><button class="' + (at === 'cal' ? 'on' : '') + '" data-a="aba" data-v="cal">📅 Calendário</button>' +
+      '<button class="' + (at === 'estoque' ? 'on' : '') + '" data-a="aba" data-v="estoque">📦 Estoque</button></div>';
+  }
+
+  /* ----- estoque de produtos da fazenda -----
+     Entradas (compras) são lançadas aqui. A baixa sai sozinha das recomendações: o que foi marcado como
+     aplicado sai do estoque; o que está recomendado e ainda não aplicado aparece como "a aplicar". */
+  function baseUnidade(u) {
+    var x = String(u || '').split('/')[0].trim();
+    return x === 'mL' ? ['L', 0.001] : x === 'g' ? ['kg', 0.001] : x === 't' ? ['kg', 1000] : x === 'kg' ? ['kg', 1] : ['L', 1];
+  }
+  function chaveProd(n) { return String(n || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+  function brl(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function saldoFaz(fid) {
+    var f = fazDe(fid), tl = talhoesDe(f), m = {};
+    var item = function (nome, un) { var k = chaveProd(nome) + '|' + un; return m[k] || (m[k] = { nome: nome, un: un, ent: 0, val: 0, qv: 0, apl: 0, prev: 0 }); };
+    (ST.estoque || []).forEach(function (e) {
+      if (e.fazenda_id !== fid) return;
+      var x = item(e.produto, e.unidade || 'L'); x.ent += Number(e.qtd) || 0;
+      if (Number(e.qtd) > 0 && Number(e.valor) > 0) { x.val += Number(e.valor); x.qv += Number(e.qtd); }
+    });
+    ST.recs.forEach(function (r) {
+      if (r.fazenda_id !== fid) return;
+      var d = dd(r);
+      talDe(r).forEach(function (t) {
+        var tt = tl.filter(function (x) { return x.nome === t; })[0]; if (!tt) return;
+        var ha = haUsada(tt.ha, d.parte && d.parte[t]);
+        prodsDe(r).forEach(function (p) {
+          if (!p[0]) return;
+          var b = baseUnidade(p[2]), x = item(p[0], b[0]), q = (Number(p[1]) || 0) * ha * b[1];
+          if (feitoDe(r)[t]) x.apl += q; else x.prev += q;
+        });
+      });
+    });
+    return Object.keys(m).map(function (k) { var x = m[k]; x.custo = x.qv ? x.val / x.qv : 0; x.saldo = x.ent - x.apl; x.sobra = x.saldo - x.prev; return x; })
+      .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+  }
+  function qtdTxt(q, un) { return fmt(q, Math.abs(q) < 100 ? 1 : 0) + ' ' + un; }
+  function pintarEstoque() {
+    var f = fazDe(R.faz), l = saldoFaz(R.faz), valor = 0, gasto = 0;
+    var cards = l.map(function (x) {
+      valor += Math.max(0, x.saldo) * x.custo; gasto += x.apl * x.custo;
+      var falta = x.sobra < -0.0001;
+      return '<div class="ag-est' + (falta ? ' falta' : '') + '" data-a="entrada" data-v="' + esc(x.nome) + '|' + x.un + '">' +
+        '<div class="ag-est-top"><b>' + esc(x.nome) + '</b><em' + (x.saldo < 0 ? ' class="neg"' : '') + '>' + qtdTxt(x.saldo, x.un) + '</em></div>' +
+        '<div class="ag-est-l"><span>Entradas ' + qtdTxt(x.ent, x.un) + '</span><span>Aplicado ' + qtdTxt(x.apl, x.un) + '</span><span>A aplicar ' + qtdTxt(x.prev, x.un) + '</span></div>' +
+        '<div class="ag-est-l"><span class="' + (falta ? 'neg' : '') + '">' + (falta ? '⚠️ Faltam ' + qtdTxt(-x.sobra, x.un) + ' para as recomendações' : 'Sobra depois das recomendações: ' + qtdTxt(x.sobra, x.un)) + '</span>' +
+        '<span>' + (x.custo ? brl(x.custo) + '/' + x.un : 'sem preço') + '</span></div></div>';
+    }).join('');
+    var hist = (ST.estoque || []).filter(function (e) { return e.fazenda_id === R.faz; }).slice().sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; }).map(function (e) {
+      return '<div class="lista-item" data-a="editent" data-v="' + esc(e.id) + '"><div class="txt"><b>' + esc(e.produto) + '</b><span>' + dataBR(e.data) + (e.obs ? ' · ' + esc(e.obs) : '') + '</span></div>' +
+        '<span class="badge">' + (Number(e.qtd) < 0 ? '' : '+') + qtdTxt(Number(e.qtd) || 0, e.unidade || 'L') + (Number(e.valor) ? ' · ' + brl(e.valor) : '') + '</span></div>';
+    }).join('');
+    pintar(tR, 'Estoque', f ? f.nome : '—', '',
+      abasRec('estoque') + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
+      '<button class="btn" data-a="entrada">+ Entrada de produto</button>' +
+      (l.length ? '<div class="ag-resumo-ha">Valor em estoque: <b>' + brl(valor) + '</b><br>Gasto em produtos aplicados: <b>' + brl(gasto) + '</b></div>' + cards
+        : '<div class="aviso" style="margin-top:10px">Nenhum produto ainda. Lance as entradas (compras) desta fazenda; as recomendações aplicadas dão baixa sozinhas.</div>') +
+      (hist ? '<h2>Entradas lançadas</h2>' + hist : '') +
+      '<div class="ag-nota">A baixa é automática: ao marcar uma recomendação como aplicada, dose × área sai do estoque. Desmarcar devolve. O preço médio das entradas vira o custo usado no comparativo do painel.</div>');
+  }
+  function modalEntrada(e, pre) {
+    var novo = !e, p0 = pre ? pre.split('|') : [];
+    var cat = p0[0] ? prodCat(p0[0]) : null;
+    e = e || { id: novoId('es'), fazenda_id: R.faz, produto: p0[0] || '', unidade: p0[1] || (cat ? baseUnidade(cat.unidade)[0] : 'L'), qtd: 0, valor: 0, data: hoje(), obs: '' };
+    var nomes = {}; ST.produtos.forEach(function (x) { nomes[x.nome] = 1; }); saldoFaz(R.faz).forEach(function (x) { nomes[x.nome] = 1; });
+    var ov = document.createElement('div'); ov.className = 'ag-ov';
+    ov.innerHTML = '<div class="ag-mod"><h3>' + (novo ? 'Entrada de produto' : 'Editar entrada') + '</h3>' +
+      '<div class="campo"><label>Produto</label><input id="enProd" list="enLista" value="' + esc(e.produto) + '" placeholder="Nome igual ao da recomendação" autocomplete="off">' +
+      '<datalist id="enLista">' + Object.keys(nomes).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist></div>' +
+      '<div class="linha2"><div class="campo"><label>Quantidade</label><input id="enQtd" inputmode="decimal" value="' + (e.qtd ? String(e.qtd).replace('.', ',') : '') + '" placeholder="ex.: 200"></div>' +
+      '<div class="campo"><label>Unidade</label><select id="enUn"><option' + (e.unidade === 'L' ? ' selected' : '') + '>L</option><option' + (e.unidade === 'kg' ? ' selected' : '') + '>kg</option></select></div></div>' +
+      '<div class="linha2"><div class="campo"><label>Preço por unidade (R$)</label><input id="enPu" inputmode="decimal" value="' + (e.qtd && e.valor ? fmt(e.valor / e.qtd, 2) : '') + '"></div>' +
+      '<div class="campo"><label>Valor total (R$)</label><input id="enVal" inputmode="decimal" value="' + (e.valor ? fmt(e.valor, 2) : '') + '"></div></div>' +
+      '<div class="linha2"><div class="campo"><label>Data</label><input type="date" id="enData" value="' + esc(e.data || hoje()) + '"></div>' +
+      '<div class="campo"><label>Obs. (nota, fornecedor)</label><input id="enObs" value="' + esc(e.obs || '') + '"></div></div>' +
+      '<div class="ag-dica">Para corrigir o estoque (perda, contagem), lance quantidade negativa.</div>' +
+      '<button class="btn" data-m="ok">Salvar</button>' + (novo ? '' : '<button class="btn perigo" data-m="del">Excluir entrada</button>') + '<button class="btn secundario" data-m="no">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    var q = $('#enQtd', ov), pu = $('#enPu', ov), vt = $('#enVal', ov);
+    var liga = function () { var n = numBR(q.value), u = numBR(pu.value); if (n && u) vt.value = fmt(n * u, 2); };
+    q.addEventListener('input', liga); pu.addEventListener('input', liga);
+    vt.addEventListener('input', function () { var n = numBR(q.value), v = numBR(vt.value); if (n && v) pu.value = fmt(v / n, 2); });
+    $('#enProd', ov).addEventListener('change', function () { var c = prodCat(this.value.trim()); if (c) $('#enUn', ov).value = baseUnidade(c.unidade)[0]; });
+    ov.onclick = function (ev) {
+      var m = ev.target.dataset && ev.target.dataset.m;
+      if (m === 'no' || ev.target === ov) { ov.remove(); return; }
+      if (m === 'del') {
+        if (!confirm('Excluir esta entrada do estoque?')) return;
+        ST.estoque = ST.estoque.filter(function (x) { return x.id !== e.id; }); gravar(); enfileirar('/api/agro/estoque/apagar', { id: e.id }); ov.remove(); pintarRecs(); return;
+      }
+      if (m !== 'ok') return;
+      var nome = $('#enProd', ov).value.trim(), qtd = numBR(q.value);
+      if (!nome) { toast('Informe o produto'); return; }
+      if (!qtd) { toast('Informe a quantidade'); return; }
+      var mov = { id: e.id, fazenda_id: e.fazenda_id || R.faz, produto: nome, unidade: $('#enUn', ov).value, qtd: qtd, valor: Math.max(0, numBR(vt.value)), data: $('#enData', ov).value || hoje(), obs: $('#enObs', ov).value.trim() };
+      ST.estoque = ST.estoque || [];
+      var i = ST.estoque.findIndex(function (x) { return x.id === mov.id; });
+      if (i >= 0) ST.estoque[i] = mov; else ST.estoque.push(mov);
+      gravar(); enfileirar('/api/agro/estoque', mov); ov.remove(); pintarRecs();
+      toast(novo ? 'Entrada lançada no estoque' : 'Entrada atualizada');
+    };
   }
   function eventosDe(fid) {
     var ev = [];
@@ -1121,10 +1274,12 @@
         if (!confirm('Descartar esta recomendação?')) return;
         R.view = R.W && R.W.id ? 'det' : 'lista'; R.W = null; pintarRecs(); return;
       }
-      if (R.view === 'det' || R.view === 'prods' || R.view === 'cal') { R.view = (R.view === 'det' && R.de === 'cal') ? 'cal' : 'lista'; R.de = ''; pintarRecs(); return; }
+      if (R.view === 'det' || R.view === 'prods' || R.view === 'cal' || R.view === 'estoque') { R.view = (R.view === 'det' && R.de === 'cal') ? 'cal' : 'lista'; R.de = ''; pintarRecs(); return; }
       tR.classList.add('oculto'); return;
     }
     if (a === 'aba') { R.view = v; pintarRecs(); topoRolagem(tR); return; }
+    if (a === 'entrada') { modalEntrada(null, v); return; }
+    if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
     if (a === 'calmes') { R.cm += Number(v); if (R.cm < 0) { R.cm = 11; R.cy--; } if (R.cm > 11) { R.cm = 0; R.cy++; } pintarCalendario(); return; }
     if (a === 'filtro') { R.filtro = v; pintarRecs(); return; }
@@ -1259,13 +1414,21 @@
   async function ligar() {
     carregar();
     var c = await Sync.conf(), uid = (await Sync.meuId()) || '';
-    if ((c.email || '') !== (ST.email || '') || (uid && ST.uid && ST.uid !== uid)) { ST = { email: c.email || '', uid: uid, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], fila: [], ult: {} }; gravar(); }
+    if ((c.email || '') !== (ST.email || '') || (uid && ST.uid && ST.uid !== uid)) { ST = { email: c.email || '', uid: uid, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], fila: [], ult: {} }; gravar(); }
     else if (uid && !ST.uid) { ST.uid = uid; gravar(); }
     tP = criarTela('telaPlantio'); tR = criarTela('telaRecs');
     ligarTela(tP, cliquePlantio, mudancaPlantio); ligarTela(tR, cliqueRecs, mudancaRecs);
     // plantio: digitar nos campos de texto atualiza na hora, sem redesenhar a tela
     tR.addEventListener('input', function (ev) { var n = ev.target; if (R.W && n.dataset && n.dataset.w === 'obs') R.W.obs = n.value; if (R.W && n.dataset && n.dataset.w === 'oplivre') R.W.op = n.value; });
-    tP.addEventListener('input', function (ev) { var n = ev.target; if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n); });
+    tP.addEventListener('input', function (ev) {
+      var n = ev.target;
+      if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n);
+      if (n.dataset && n.dataset.colh) {   // colheita: total na hora
+        var ha = 0, sc = 0, f = fazDe(P.faz);
+        tP.querySelectorAll('[data-colh]').forEach(function (i) { var v = numBR(i.value), t = talhoesDe(f).filter(function (x) { return x.nome === i.dataset.colh; })[0]; if (v && t) { ha += t.ha; sc += v * t.ha; } });
+        var tot = $('#agColhTot', tP); if (tot) tot.textContent = ha ? '🌾 Média ' + fmt(sc / ha) + ' sc/ha · ' + fmt(sc, 0) + ' sacas em ' + fmt(ha) + ' ha' : 'Nenhuma colheita lançada ainda.';
+      }
+    });
     zoomIniciar();
     botoes();
     var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { marcaVisto('mapa'); atualizarModulos(); });

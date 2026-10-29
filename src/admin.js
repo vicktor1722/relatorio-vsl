@@ -990,7 +990,7 @@ ${AGRO_CSS}
   var AREAS = [
     { id: 'visao', nome: 'Visão geral', abas: ['dash'] },
     { id: 'campo', nome: 'Campo', abas: ['rels'] },
-    { id: 'lavoura', nome: 'Lavoura', abas: ['plantio', 'recs'] },
+    { id: 'lavoura', nome: 'Lavoura', abas: ['plantio', 'recs', 'custo'] },
     { id: 'gestao', nome: 'Gestão', abas: ['contas', 'modulos'] }
   ];
   var gestaoN = 0, ultimaAba = {};
