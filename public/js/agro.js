@@ -511,7 +511,7 @@
         '<span>' + esc(l2 || 'toque para informar o plantio') + '</span></div></div>';
     }).join('');
     pintar(tP, 'Plantio dos talhões', tl.length ? feitos + ' de ' + tl.length + ' talhões informados' : 'sem talhões',
-      '', '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz) + '</select></div>' +
+      '<button data-a="cultcat" title="Cultivares">📚</button>', '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz) + '</select></div>' +
       '<div class="campo"><label>Safra</label><select data-c="safra">' + opcoesSafra(P.safra) + '</select></div></div>' +
       (tl.length ? resumoArea(P.faz, P.safra, tl) + mapaPlantio(f, tl) +
         '<div class="linha2"><button class="btn secundario" data-a="ciclos">⏱ Ciclo dos materiais</button><button class="btn secundario" data-a="colheita">🌾 Lançar colheita</button></div>' +
@@ -547,13 +547,14 @@
   function campoVariedade(e, vars) {
     var livre = '<input data-k="variedade" list="agVars" value="' + esc(e.variedade) + '" placeholder="Ex.: Cultivar A-7210" autocomplete="off">' +
       '<datalist id="agVars">' + Object.keys(vars).map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>';
-    var E = e.cultura === 'soja' ? empresasCat() : { ordem: [] };
+    var E = !e.cultura || e.cultura === 'soja' ? empresasCat() : { ordem: [] };
     if (!E.ordem.length) return '<div class="campo"><label>Variedade / híbrido</label>' + livre + '</div>' + (e.cultura ? '<div class="ag-dica" id="agCiclo">' + cicloEd(e) + '</div>' : '');
+    var tit = e.cultura ? '' : ' (soja)';
     if (e.empresa == null) { var c0 = acharCult(e.variedade); e.empresa = c0 ? c0.empresa : (e.variedade ? '*' : ''); }
-    var h = '<div class="campo"><label>Empresa</label><select data-k="empresa"><option value="">— escolher a empresa —</option>' +
+    var h = '<div class="campo"><label>Variedade' + tit + ': empresa</label><select data-k="empresa"><option value="">— escolher a empresa —</option>' +
       E.ordem.map(function (x) { return '<option value="' + esc(x) + '"' + (x === e.empresa ? ' selected' : '') + '>' + esc(x) + ' (' + E.m[x].length + ')</option>'; }).join('') +
       '<option value="*"' + (e.empresa === '*' ? ' selected' : '') + '>Outra / digitar o nome</option></select></div>';
-    if (e.empresa === '*') h += '<div class="campo"><label>Variedade</label>' + livre + '</div>';
+    if (e.empresa === '*') h += '<div class="campo"><label>Variedade / híbrido</label>' + livre + '</div>';
     else if (e.empresa && E.m[e.empresa]) {
       var at = acharCult(e.variedade), selNome = at && at.empresa === e.empresa ? at.nome : '';
       var it = E.m[e.empresa].slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true }); });
@@ -565,7 +566,7 @@
   }
   function cicloEd(e) {
     var c = e.variedade ? cicloDe({ cultura: e.cultura, variedade: e.variedade }) : null;
-    if (!c) return e.cultura === 'soja' ? 'Escolha a variedade: o ciclo sai do grupo de maturação (GMR).' : 'Informe a variedade para a previsão de colheita.';
+    if (!c) return !e.cultura || e.cultura === 'soja' ? 'Escolha a empresa e a variedade: o ciclo sai do grupo de maturação (GMR).' : 'Informe a variedade para a previsão de colheita.';
     return '⏱ Ciclo ' + cicloTxt(c) + (e.data_plantio ? ' · colheita prevista ' + curta(addDias(e.data_plantio, c.dias)) : '');
   }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }
@@ -576,10 +577,12 @@
     if (k === 'empresa') {
       e.empresa = inp.value; var c = acharCult(e.variedade);
       if (e.empresa !== '*' && !(c && c.empresa === e.empresa)) e.variedade = '';
+      if (e.empresa && e.empresa !== '*' && !e.cultura) e.cultura = 'soja';
       pintarPlantio(); return;
     }
     if (k === 'cultura' || k === 'variedade') {
       e[k] = inp.value;
+      if (k === 'variedade' && inp.tagName === 'SELECT' && inp.value && !e.cultura) { e.cultura = 'soja'; pintarPlantio(); return; }
       if (k === 'cultura') { e.empresa = null; pintarPlantio(); } else { var ci = $('#agCiclo', tP); if (ci) ci.textContent = cicloEd(e); }
       return;
     }
@@ -621,14 +624,16 @@
     var dr = doRelatorio(); ESC = dr.prod;
     P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.colh = false; P.ciclos = false; P.cv = ''; P.novo = null; P.outros = []; P.sel = [];
     tP.classList.remove('oculto'); pintarPlantio(); topoRolagem(tP);
+    if (!lerCat()) baixarCat('').then(function () { IDX = null; if (!tP.classList.contains('oculto')) pintarPlantio(); });
     baixar().then(function (ok) { if (ok && !tP.classList.contains('oculto') && !P.ed) pintarPlantio(); });
   }
 
   function cliquePlantio(a, v, alvo) {
-    if (a === 'voltar') { if (P.ciclos && P.cv) { P.cv = P.cv === 'novo' && P.vemDe === 'cat' ? 'cat' : ''; P.novo = null; pintarPlantio(); } else if (P.ciclos) { P.ciclos = false; pintarPlantio(); } else if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
+    if (a === 'voltar') { if (P.ciclos && P.cv === 'cat' && P.catFora) { P.ciclos = false; P.cv = ''; P.catFora = false; pintarPlantio(); } else if (P.ciclos && P.cv) { P.cv = P.cv === 'novo' && P.vemDe === 'cat' ? 'cat' : ''; P.novo = null; pintarPlantio(); } else if (P.ciclos) { P.ciclos = false; pintarPlantio(); } else if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
     if (a === 'colheita') { P.colh = true; pintarPlantio(); topoRolagem(tP); return; }
-    if (a === 'ciclos') { P.ciclos = true; P.cv = ''; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'ciclos') { P.ciclos = true; P.cv = ''; P.catFora = false; pintarPlantio(); topoRolagem(tP); return; }
     if (a === 'ccat') { P.cv = 'cat'; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'cultcat') { P.ciclos = true; P.cv = 'cat'; P.catFora = true; pintarPlantio(); topoRolagem(tP); if (!lerCat()) baixarCat('').then(function () { if (P.cv === 'cat') pintarPlantio(); }); return; }
     if (a === 'cnovo') { P.vemDe = P.cv; P.cv = 'novo'; P.novo = null; pintarPlantio(); topoRolagem(tP); return; }
     if (a === 'csalvarnovo') { gravarNovoMaterial(); return; }
     if (a === 'cdel') { removerMaterial(v); return; }
