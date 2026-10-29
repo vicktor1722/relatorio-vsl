@@ -9,12 +9,14 @@ export const AGRO_ABAS =
   '<button data-aba="plantio" id="abaPlantio" style="display:none">Plantio</button>' +
   '<button data-aba="recs" id="abaRecs" style="display:none">Recomendações</button>' +
   '<button data-aba="custo" id="abaCusto" style="display:none">Custo × produção</button>' +
+  '<button data-aba="acessos" id="abaAcessos" style="display:none">Acessos fazenda</button>' +
   '<button data-aba="modulos" id="abaModulos" style="display:none">Módulos</button>';
 
 export const AGRO_PAINEIS = `
     <section class="painel" id="pPlantio"><div id="agPlantio" class="ag-tela"></div></section>
     <section class="painel" id="pRecs"><div id="agRecs" class="ag-tela"></div></section>
     <section class="painel" id="pCusto"><div id="agCusto"><div class="aviso">Carregando…</div></div></section>
+    <section class="painel" id="pAcessos"><div id="agAcessos"><div class="aviso">Carregando…</div></div></section>
     <section class="painel" id="pModulos">
       <div id="boxModulos"><div class="aviso">Carregando…</div></div>
     </section>
@@ -27,6 +29,17 @@ export const AGRO_CSS = `
 .ck input{width:20px;height:20px;accent-color:var(--verde)}
 .ck.fixo{color:var(--fraco);cursor:default}
 .nota{font-size:12.5px;color:var(--fraco);line-height:1.4;margin:6px 0 0}
+/* ---------- Acessos da fazenda / operador ---------- */
+.ac-topo{background:#EEF6F0;border:1px solid #CFE5D6;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;line-height:1.45}
+.ac-topo a{color:var(--verde);font-weight:700}
+.ac-lista{background:#fff;border:1px solid var(--linha);border-radius:12px;overflow-x:auto}
+.ac-lista table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:620px}
+.ac-lista th{text-align:left;font-size:11.5px;color:var(--fraco);padding:8px 10px;border-bottom:1px solid var(--linha)}
+.ac-lista td{padding:9px 10px;border-bottom:1px solid #EEF1EF;vertical-align:top}
+.ac-tipo{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#E6F0FA;color:#1A4E85}
+.ac-tipo.op{background:#FFF3DC;color:#8A5A00}
+.ac-fz{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin-bottom:12px}
+.ac-fz label{display:flex;gap:8px;align-items:center;font-size:14px}.ac-fz input{width:18px;height:18px;accent-color:var(--verde)}
 /* ---------- Custo × produção ---------- */
 .cp-topo{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
 .cp-topo label{display:block;font-size:12px;color:var(--fraco);margin-bottom:3px}
@@ -446,6 +459,7 @@ export const AGRO_JS = String.raw`
     if (a) a.style.display = ST.mod.plantio ? '' : 'none';
     if (b) b.style.display = ST.mod.recomendacoes ? '' : 'none';
     var c = document.getElementById('abaCusto'); if (c) c.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
+    var ab = document.getElementById('abaAcessos'); if (ab) ab.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
   }
 
   async function baixar() {
@@ -835,7 +849,7 @@ export const AGRO_JS = String.raw`
       h += '<div class="ag-talc' + (ok ? ' ok' : '') + '"><div class="ag-tt"><b>' + esc(nome) + '</b><span>' + fmt(hu) + (hu < t.ha ? ' de ' + fmt(t.ha) : '') + ' ha' +
         (!ok && Number(d.dae) > 0 && datasTal(r)[nome] ? ' · 📅 ' + curta(datasTal(r)[nome]) : '') + '</span></div><div class="ag-tp">' +
         prods.map(function (p) { return '<div><span>' + esc(p[0]) + '</span><b>' + volTotal(p[1] * hu, p[2]) + '</b></div>'; }).join('') + '</div>' +
-        (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
+        (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (d.feitoPor && d.feitoPor[nome] ? ' por ' + esc(d.feitoPor[nome]) : '') + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
           ' <button class="ag-link" data-a="desfazer" data-v="' + esc(nome) + '">desfazer</button></div>'
           : '<button class="btn" data-a="aplicar" data-v="' + esc(nome) + '">Marcar como aplicado</button>') + '</div>';
     });
@@ -871,7 +885,11 @@ export const AGRO_JS = String.raw`
       if (m !== 'ok') return;
       var data = $('#agDataApl', ov).value; if (!data) { toast('Informe a data'); return; }
       var d = dd(r); d.feito = d.feito || {};
-      (alvo === '*' ? talDe(r).filter(function (t) { return !d.feito[t]; }) : [alvo]).forEach(function (t) { d.feito[t] = data; });
+      (alvo === '*' ? talDe(r).filter(function (t) { return !d.feito[t]; }) : [alvo]).forEach(function (t) {
+        d.feito[t] = data;
+        if (d.feitoPor) delete d.feitoPor[t];        // marcado pelo consultor
+        if (d.feitoPorId) delete d.feitoPorId[t];
+      });
       ov.remove(); salvarRecLocal(r); pintarOrdem();
       toast('✔ Aplicação registrada · ' + stRec(r));
     };
@@ -1279,7 +1297,11 @@ export const AGRO_JS = String.raw`
     if (a === 'pedit') { modalProduto(ST.produtos.filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'aplicar') { modalAplicar(v); return; }
     if (a === 'desfazer') {
-      var r = recDe(R.id); delete dd(r).feito[v]; salvarRecLocal(r); pintarOrdem(); return;
+      // aplicado pelo operador (portal): guarda qual marca foi desfeita, senão ela voltaria do servidor
+      var r = recDe(R.id), dx = dd(r);
+      if (dx.feitoPorId && dx.feitoPorId[v]) { dx.desfeitos = (dx.desfeitos && !Array.isArray(dx.desfeitos)) ? dx.desfeitos : {}; dx.desfeitos[v] = dx.feitoPorId[v]; delete dx.feitoPorId[v]; }
+      if (dx.feitoPor) delete dx.feitoPor[v];
+      delete dx.feito[v]; salvarRecLocal(r); pintarOrdem(); return;
     }
     if (a === 'editarrec') { R.W = wDeRec(recDe(R.id)); R.view = 'wiz'; pintarRecs(); topoRolagem(); return; }
     if (a === 'excluirrec') {
@@ -1391,6 +1413,87 @@ export const AGRO_JS = String.raw`
     });
   }
 
+  /* ---------------- acessos da fazenda e do operador (amvs.ia.br/portal) ---------------- */
+  var ACS = [];
+  var TIPO_AC = { fazenda: 'Fazenda (acompanha)', operador: 'Operador / encarregado' };
+  async function agroAcessos() {
+    var box = document.getElementById('agAcessos'); if (!box) return;
+    try { ACS = (await api('/api/acessos')).acessos || []; } catch (e) { box.innerHTML = '<div class="aviso">' + esc(e.message) + '</div>'; return; }
+    if (!CAD.fazendas.length) { try { await baixar(); } catch (e) {} }
+    pintarAcessos();
+  }
+  function nomeFaz(id) { var f = CAD.fazendas.filter(function (x) { return x.id === id; })[0]; return f ? f.nome : '?'; }
+  function linkPortal() { return location.origin + '/portal'; }
+  function pintarAcessos() {
+    var box = document.getElementById('agAcessos');
+    var h = '<div class="ac-topo">Crie um login para a <b>fazenda</b> (o produtor ou gerente acompanha aplicações, mapas de área e variedade, evolução do plantio, estoque e custo por talhão) ' +
+      'ou para o <b>operador do pulverizador / encarregado</b> (vê as aplicações e marca o que aplicou — aparece na hora no app como aplicado). ' +
+      'Eles entram em <a href="' + esc(linkPortal()) + '" target="_blank">' + esc(linkPortal().replace(/^https?:\/\//, '')) + '</a>.</div>' +
+      '<button class="btn" id="acNovo" style="max-width:260px">+ Novo acesso</button><div style="height:10px"></div>';
+    if (!ACS.length) h += '<div class="aviso">Nenhum acesso criado ainda.</div>';
+    else h += '<div class="ac-lista"><table><tr><th>Nome</th><th>Login</th><th>Tipo</th><th>Fazendas</th><th>Último acesso</th><th></th></tr>' + ACS.map(function (a) {
+      return '<tr' + (a.ativo ? '' : ' style="opacity:.5"') + '><td><b>' + esc(a.nome || '—') + '</b>' + (a.ativo ? '' : '<br><span class="peq">desativado</span>') + '</td><td>' + esc(a.login) + '</td>' +
+        '<td><span class="ac-tipo' + (a.papel === 'operador' ? ' op' : '') + '">' + esc(TIPO_AC[a.papel] || a.papel) + '</span></td>' +
+        '<td>' + a.fazendas.map(function (id) { return esc(nomeFaz(id)); }).join('<br>') + '</td>' +
+        '<td>' + (a.ultimo_acesso ? esc(new Date(a.ultimo_acesso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })) : '<span class="peq">nunca entrou</span>') + '</td>' +
+        '<td style="white-space:nowrap"><button class="selo" data-acedit="' + esc(a.id) + '">editar</button> <button class="selo" data-aczap="' + esc(a.id) + '">WhatsApp</button></td></tr>';
+    }).join('') + '</table></div>';
+    box.innerHTML = h;
+    document.getElementById('acNovo').onclick = function () { modalAcesso(null); };
+    box.querySelectorAll('[data-acedit]').forEach(function (b) { b.onclick = function () { modalAcesso(ACS.filter(function (x) { return x.id === b.dataset.acedit; })[0]); }; });
+    box.querySelectorAll('[data-aczap]').forEach(function (b) { b.onclick = function () { zapAcesso(ACS.filter(function (x) { return x.id === b.dataset.aczap; })[0], ''); }; });
+  }
+  function zapAcesso(a, senha) {
+    var t = 'Olá' + (a.nome ? ', ' + a.nome : '') + '! Seu acesso ao AMVS ' + (a.papel === 'operador' ? 'para ver e marcar as aplicações' : 'para acompanhar a fazenda') + ':\n' +
+      linkPortal() + '\nLogin: ' + a.login + (senha ? '\nSenha: ' + senha : '\n(senha: a que combinamos)') + '\n\nDica: no celular, adicione à tela de início para abrir como app.';
+    window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+  }
+  function modalAcesso(a) {
+    var novo = !a; a = a || { nome: '', login: '', papel: 'fazenda', fazendas: [], ativo: true };
+    var veu = document.createElement('div'); veu.className = 'veu';
+    var cx = document.createElement('div'); cx.className = 'modal';
+    var fz = CAD.fazendas.slice().sort(function (x, y) { return x.nome.localeCompare(y.nome, 'pt-BR'); });
+    cx.innerHTML = '<h2 style="margin:0 0 12px">' + (novo ? 'Novo acesso' : 'Editar acesso') + '</h2>' +
+      '<div class="campo"><label>Tipo</label><select id="acTipo"><option value="fazenda"' + (a.papel === 'fazenda' ? ' selected' : '') + '>Fazenda — acompanha (produtor / gerente)</option>' +
+        '<option value="operador"' + (a.papel === 'operador' ? ' selected' : '') + '>Operador do pulverizador / encarregado — marca aplicações</option></select></div>' +
+      '<div class="campo"><label>Nome</label><input id="acNome" value="' + esc(a.nome) + '" placeholder="ex.: João (operador) ou Fazenda Catarinense"></div>' +
+      '<div class="campo"><label>Login</label><input id="acLogin" value="' + esc(a.login) + '" autocapitalize="none" placeholder="ex.: joao.catarinense"></div>' +
+      '<div class="campo"><label>' + (novo ? 'Senha' : 'Nova senha (deixe em branco para manter)') + '</label><input id="acSenha" type="text" autocomplete="off" placeholder="mínimo 6 caracteres"></div>' +
+      '<label class="marcar"><input type="checkbox" id="acGerar"> Gerar uma senha</label>' +
+      '<div class="campo" style="margin-top:10px"><label>Fazendas liberadas</label></div><div class="ac-fz">' + (fz.length ? fz.map(function (f) {
+        return '<label><input type="checkbox" value="' + esc(f.id) + '"' + (a.fazendas.indexOf(f.id) >= 0 ? ' checked' : '') + '> ' + esc(f.nome) + '</label>'; }).join('') : '<span class="peq">Nenhuma fazenda cadastrada.</span>') + '</div>' +
+      (novo ? '' : '<label class="marcar"><input type="checkbox" id="acAtivo"' + (a.ativo ? ' checked' : '') + '> Acesso ativo</label>') +
+      '<div id="acMsg" style="color:#C62828;font-size:13px;min-height:18px;margin:6px 0"></div>' +
+      '<button class="btn" id="acOk">Salvar</button>' + (novo ? '' : '<button class="btn sec" id="acDel" style="color:#C62828;border-color:#C62828">Excluir acesso</button>') +
+      '<button class="btn sec" id="acCancel">Cancelar</button>';
+    veu.appendChild(cx); document.body.appendChild(veu);
+    var sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    cx.querySelector('#acCancel').onclick = sair;
+    cx.querySelector('#acGerar').onchange = function () {
+      if (!this.checked) return;
+      var al = 'abcdefghjkmnpqrstuvwxyz23456789', s = '';
+      for (var i = 0; i < 8; i++) s += al[Math.floor(Math.random() * al.length)];
+      cx.querySelector('#acSenha').value = s;
+    };
+    if (!novo) cx.querySelector('#acDel').onclick = async function () {
+      if (!confirm('Excluir o acesso ' + a.login + '? A pessoa não entra mais.')) return;
+      try { await api('/api/acessos/apagar', { id: a.id }); sair(); agroAcessos(); } catch (e) { cx.querySelector('#acMsg').textContent = e.message; }
+    };
+    cx.querySelector('#acOk').onclick = async function () {
+      var b = this, senha = cx.querySelector('#acSenha').value.trim();
+      var corpo = { id: novo ? undefined : a.id, nome: cx.querySelector('#acNome').value.trim(), login: cx.querySelector('#acLogin').value.trim(),
+        senha: senha, papel: cx.querySelector('#acTipo').value,
+        fazendas: Array.prototype.slice.call(cx.querySelectorAll('.ac-fz input:checked')).map(function (i) { return i.value; }),
+        ativo: novo ? true : cx.querySelector('#acAtivo').checked };
+      b.disabled = true;
+      try {
+        await api('/api/acessos/salvar', corpo); sair(); await agroAcessos();
+        if (senha && confirm('Acesso salvo. Enviar o link, o login e a senha pelo WhatsApp?')) zapAcesso(corpo, senha);
+      } catch (e) { cx.querySelector('#acMsg').textContent = e.message; b.disabled = false; }
+    };
+  }
+
   var iniciado = false;
   window.agroIniciar = async function () {
     if (!iniciado) {
@@ -1404,6 +1507,7 @@ export const AGRO_JS = String.raw`
       var am = document.getElementById('abaModulos'); if (am) am.addEventListener('click', function () { marcaNvA('modulos'); });
       if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
       var ac = document.getElementById('abaCusto'); if (ac) ac.addEventListener('click', function () { agroCusto(); });
+      var aa = document.getElementById('abaAcessos'); if (aa) aa.addEventListener('click', function () { agroAcessos(); });
     }
     zoomIniciar();
     await atualizarModulos();

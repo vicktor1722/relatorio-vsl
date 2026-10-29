@@ -174,6 +174,24 @@ function lerDados(s) {
   try { const o = JSON.parse(s || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
 }
 
+// feitoPorId[t] = "idDoAcesso|quando": marca única de cada aplicação feita pelo portal.
+// desfeitos[t] guarda a marca que o consultor desfez — uma marca nova do operador não é afetada.
+export function mesclarOperador(ant, novo) {
+  const porId = ant.feitoPorId || {}, des = (novo.desfeitos && typeof novo.desfeitos === 'object' && !Array.isArray(novo.desfeitos)) ? novo.desfeitos : {};
+  novo.feito = novo.feito || {};
+  Object.keys(porId).forEach((t) => {
+    if (!ant.feito || !ant.feito[t] || des[t] === porId[t]) return;
+    if (!novo.feito[t]) novo.feito[t] = ant.feito[t];
+    if (novo.feito[t] === ant.feito[t]) {
+      novo.feitoPorId = Object.assign({}, novo.feitoPorId, { [t]: porId[t] });
+      novo.feitoPor = Object.assign({}, novo.feitoPor, { [t]: (ant.feitoPor || {})[t] || '' });
+    }
+  });
+  // marcas de quem aplicou só valem para talhões que continuam aplicados
+  ['feitoPor', 'feitoPorId'].forEach((k) => { if (novo[k]) Object.keys(novo[k]).forEach((t) => { if (!novo.feito[t]) delete novo[k][t]; }); });
+  return novo;
+}
+
 function linhaRec(r) {
   return {
     id: r.id, fazenda_id: r.fazenda_id, safra: r.safra || '', operacao: r.operacao || '',
@@ -570,7 +588,14 @@ export async function rotasAgro(env, req, me, rota, url) {
     const fid = txt(b.fazenda_id, 80);
     if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
     const id = b.id ? txt(b.id, 60) : novoId('rc');
-    const dados = JSON.stringify(b.dados && typeof b.dados === 'object' ? b.dados : {});
+    const novo = b.dados && typeof b.dados === 'object' ? b.dados : {};
+    // aplicação marcada pelo operador no portal não se perde quando o consultor salva com dados antigos;
+    // só sai se o consultor desfez de propósito (lista "desfeitos")
+    if (b.id) {
+      const ant = await env.DB.prepare('SELECT dados FROM recomendacoes WHERE id = ? AND usuario_id = ?').bind(id, me.id).first();
+      if (ant) mesclarOperador(lerDados(ant.dados), novo);
+    }
+    const dados = JSON.stringify(novo);
     if (dados.length > 60000) return json({ erro: 'recomendação grande demais' }, 400);
     await env.DB.prepare(`INSERT INTO recomendacoes (id, usuario_id, fazenda_id, safra, operacao, data_prevista, mostrar, dados, atualizado_em)
         VALUES (?,?,?,?,?,?,?,?,datetime('now'))

@@ -15,6 +15,8 @@ const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? ''
 import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
 import { avisarAplicacoes, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
+import { rotasAcessos, rotasPortal } from './portal.js';
+import { paginaPortal } from './portalpagina.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
@@ -217,6 +219,10 @@ export default {
         return html(paginaTermos());
       }
 
+      // acesso da fazenda e do operador: página e API próprias (login separado do consultor)
+      if (rota === '/portal' || rota === '/portal/') return html(paginaPortal());
+      if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url);
+
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
         return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0 });
@@ -366,6 +372,9 @@ export default {
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
+
+      // logins da fazenda / operador criados pelo consultor
+      if (rota.startsWith('/api/acessos')) return await rotasAcessos(env, req, me, rota);
 
       // aceite dos Termos de Uso (uma vez por versão)
       if (rota === '/api/termos' || rota === '/api/termos/aceitar') return await rotasTermos(env, req, me, rota);
