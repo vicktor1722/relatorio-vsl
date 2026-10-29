@@ -7,7 +7,7 @@
   'use strict';
 
   var LS = 'agro_v1';
-  var ST = { email: '', mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], fila: [], ult: {} };
+  var ST = { email: '', mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], ciclos: [], fila: [], ult: {} };
 
   var CULTURAS = [['soja', 'Soja'], ['milho', 'Milho'], ['algodao', 'Algodão'], ['feijao', 'Feijão'], ['sorgo', 'Sorgo'],
     ['pastagem', 'Pastagem'], ['pousio', 'Pousio'], ['outra', 'Outra cultura']];
@@ -119,7 +119,7 @@
   async function atualizarModulos() {
     try {
       var c0 = await Sync.conf(), uid0 = (await Sync.meuId()) || '';
-      if ((c0.email || '') !== (ST.email || '') || (uid0 && ST.uid && ST.uid !== uid0)) { ST = { email: c0.email || '', uid: uid0, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], fila: [], ult: {} }; gravar(); }
+      if ((c0.email || '') !== (ST.email || '') || (uid0 && ST.uid && ST.uid !== uid0)) { ST = { email: c0.email || '', uid: uid0, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], ciclos: [], fila: [], ult: {} }; gravar(); }
       else if (uid0 && !ST.uid) { ST.uid = uid0; gravar(); }
       var m = await chamar('/api/modulos');
       ST.mod = { plantio: !!m.plantio, recomendacoes: !!m.recomendacoes, admin: !!m.admin };
@@ -145,7 +145,8 @@
         ST.mod.recomendacoes ? chamar('/api/agro/recs') : null,
         ST.mod.recomendacoes ? chamar('/api/agro/produtos') : null,
         ST.mod.recomendacoes ? chamar('/api/agro/estoque').catch(function () { return null; }) : null,
-        ST.mod.plantio ? chamar('/api/agro/colheita').catch(function () { return null; }) : null
+        ST.mod.plantio ? chamar('/api/agro/colheita').catch(function () { return null; }) : null,
+        ST.mod.plantio ? chamar('/api/agro/ciclos').catch(function () { return null; }) : null
       ]);
       if (ST.fila.length) return false;
       if (tudo[0]) ST.plantio = tudo[0].plantio || [];
@@ -153,6 +154,7 @@
       if (tudo[2]) ST.produtos = tudo[2].produtos || [];
       if (tudo[3]) ST.estoque = tudo[3].estoque || [];
       if (tudo[4]) ST.colheita = tudo[4].colheita || [];
+      if (tudo[5]) ST.ciclos = tudo[5].ciclos || [];
       gravar(); atualizarSino();
       return true;
     } catch (e) { return false; }
@@ -260,6 +262,54 @@
       '<div class="ag-dica">Ou toque num talhão da lista abaixo para lançar só nele.</div>';
   }
 
+  /* ----- previsão de colheita: data de plantio + ciclo do material (± 5 dias) -----
+     O ciclo é informado uma vez por material; sem ele, usa o padrão da cultura (marcado "estimado"). */
+  var CICLO_PADRAO = { soja: 115, milho: 135, algodao: 180, feijao: 90, sorgo: 120, outra: 120 };
+  function cicloDe(r) {
+    if (!r || !r.cultura || SEM_PLANTIO[r.cultura]) return null;
+    var k = chaveProd(r.variedade), c = (ST.ciclos || []).filter(function (x) { return k && chaveProd(x.variedade) === k; })[0];
+    if (c && Number(c.dias) > 0) return { dias: Number(c.dias), est: false };
+    return CICLO_PADRAO[r.cultura] ? { dias: CICLO_PADRAO[r.cultura], est: true } : null;
+  }
+  function previsaoDe(r) {
+    if (!r || !r.data_plantio) return null;
+    var c = cicloDe(r); if (!c) return null;
+    return { data: addDias(r.data_plantio, c.dias), dias: c.dias, est: c.est };
+  }
+  function pintarCiclos() {
+    var m = {};
+    ST.plantio.forEach(function (r) {
+      if (!r.variedade || !r.cultura || SEM_PLANTIO[r.cultura]) return;
+      var k = chaveProd(r.variedade), x = m[k] || (m[k] = { variedade: r.variedade, cultura: r.cultura, fz: {} }); x.fz[r.fazenda_id] = 1;
+    });
+    var l = Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return a.variedade.localeCompare(b.variedade, 'pt-BR'); });
+    var linhas = l.map(function (x) {
+      var c = (ST.ciclos || []).filter(function (y) { return chaveProd(y.variedade) === chaveProd(x.variedade); })[0], nf = Object.keys(x.fz).length;
+      return '<div class="ag-colh"><div class="txt"><b>' + esc(x.variedade) + '</b><span>' + esc(NOME_CULT[x.cultura] || x.cultura) + ' · ' + nf + (nf === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
+        '<input inputmode="numeric" data-ciclo="' + esc(x.variedade) + '" data-cult="' + esc(x.cultura) + '" value="' + (c && c.dias ? c.dias : '') + '" placeholder="' + (CICLO_PADRAO[x.cultura] || '') + ' dias"></div>';
+    }).join('');
+    pintar(tP, 'Ciclo dos materiais', 'previsão de colheita', '',
+      '<div class="ag-dica">Informe os <b>dias do plantio até a colheita</b> de cada material, uma vez só: vale para todos os talhões e fazendas. ' +
+      'A previsão de colheita = data de plantio + ciclo (janela de ± 5 dias). Em branco usa o padrão da cultura (soja 115, milho 135 dias) e aparece como estimado.</div>' +
+      (linhas || '<div class="aviso">Lance a variedade no plantio dos talhões para ela aparecer aqui.</div>') +
+      (linhas ? '<button class="btn" data-a="salvarciclos">Salvar ciclos</button>' : ''));
+  }
+  function gravarCiclos() {
+    var enviar = [];
+    tP.querySelectorAll('[data-ciclo]').forEach(function (inp) {
+      var v = inp.dataset.ciclo, d = Math.round(numBR(inp.value)), k = chaveProd(v);
+      var ant = (ST.ciclos || []).filter(function (y) { return chaveProd(y.variedade) === k; })[0];
+      if ((ant ? Number(ant.dias) : 0) === d) return;
+      ST.ciclos = (ST.ciclos || []).filter(function (y) { return chaveProd(y.variedade) !== k; });
+      if (d > 0) ST.ciclos.push({ variedade: v, cultura: inp.dataset.cult, dias: d });
+      enviar.push({ variedade: v, cultura: inp.dataset.cult, dias: d });
+    });
+    gravar();
+    if (enviar.length) enfileirar('/api/agro/ciclos', { ciclos: enviar });
+    toast(enviar.length ? 'Ciclos salvos · previsão de colheita atualizada' : 'Nada mudou');
+    P.ciclos = false; pintarPlantio();
+  }
+
   /* ----- colheita: média de sacas/ha de cada talhão (vai para o comparativo custo × produção do painel) ----- */
   function colheitaDe(fid, safra, nome) {
     return (ST.colheita || []).filter(function (c) { return c.fazenda_id === fid && (c.safra || '') === (safra || '') && c.talhao === nome; })[0] || null;
@@ -300,6 +350,7 @@
   }
 
   function pintarPlantio() {
+    if (P.ciclos) return pintarCiclos();
     if (P.colh) return pintarColheita();
     if (P.ed) return pintarEditorPlantio();
     var f = fazDe(P.faz), tl = talhoesDe(f), feitos = 0;
@@ -309,6 +360,7 @@
       var ch = colheitaDe(P.faz, P.safra, t.nome);
       var l2 = r ? [r.variedade, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
       if (ch && ch.sc_ha) l2 = (l2 ? l2 + ' · ' : '') + '🌾 ' + fmt(ch.sc_ha) + ' sc/ha';
+      else { var pv = previsaoDe(r); if (pv) l2 = (l2 ? l2 + ' · ' : '') + 'colheita prev. ' + curta(pv.data) + (pv.est ? ' (estimado)' : ''); }
       return '<div class="lista-item ag-tal" data-a="edtal" data-v="' + esc(t.nome) + '"><div class="ic">' + (r && r.cultura ? '🌱' : '＋') + '</div><div class="txt"><b>' + esc(t.nome) + '</b><span>' +
         (t.ha ? fmt(t.ha) + ' ha' : '') + (r && r.cultura ? ' · ' + esc(NOME_CULT[r.cultura] || r.cultura) : '') + '</span>' +
         '<span>' + esc(l2 || 'toque para informar o plantio') + '</span></div></div>';
@@ -317,7 +369,7 @@
       '', '<div class="linha2"><div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(P.faz) + '</select></div>' +
       '<div class="campo"><label>Safra</label><select data-c="safra">' + opcoesSafra(P.safra) + '</select></div></div>' +
       (tl.length ? resumoArea(P.faz, P.safra, tl) + mapaPlantio(f, tl) +
-        '<button class="btn secundario" data-a="colheita">🌾 Lançar colheita (sacas/ha)</button>' +
+        '<div class="linha2"><button class="btn secundario" data-a="ciclos">⏱ Ciclo dos materiais</button><button class="btn secundario" data-a="colheita">🌾 Lançar colheita</button></div>' +
         (resumoColheita(tl) ? '<div class="ag-dica">' + resumoColheita(tl) + '</div>' : '') + cards
         : '<div class="aviso">Esta fazenda ainda não tem talhões. Importe o KML em Produtores e fazendas.</div>') +
       '<div class="ag-nota">Cultura, variedade, datas e sementes alimentam o mapa por variedade e a evolução do plantio no relatório do cliente.</div>');
@@ -386,14 +438,16 @@
     if (!ST.mod.plantio) return;
     marcaVisto('plantio');
     var dr = doRelatorio(); ESC = dr.prod;
-    P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.colh = false; P.outros = []; P.sel = [];
+    P.faz = dr.faz || fazPadrao(); P.safra = dr.safra || safraPadrao(); P.ed = null; P.colh = false; P.ciclos = false; P.outros = []; P.sel = [];
     tP.classList.remove('oculto'); pintarPlantio(); topoRolagem(tP);
     baixar().then(function (ok) { if (ok && !tP.classList.contains('oculto') && !P.ed) pintarPlantio(); });
   }
 
   function cliquePlantio(a, v, alvo) {
-    if (a === 'voltar') { if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
+    if (a === 'voltar') { if (P.ciclos) { P.ciclos = false; pintarPlantio(); } else if (P.colh) { P.colh = false; pintarPlantio(); } else if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } else tP.classList.add('oculto'); return; }
     if (a === 'colheita') { P.colh = true; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'ciclos') { P.ciclos = true; pintarPlantio(); topoRolagem(tP); return; }
+    if (a === 'salvarciclos') { gravarCiclos(); return; }
     if (a === 'salvarcolh') { gravarColheita(); return; }
     if (a === 'ptog') { var kp = P.sel.indexOf(v); if (kp >= 0) P.sel.splice(kp, 1); else P.sel.push(v); pintarPlantio(); return; }
     if (a === 'ptodos') { P.sel = talhoesDe(fazDe(P.faz)).map(function (t) { return t.nome; }); pintarPlantio(); return; }
@@ -648,20 +702,47 @@
         Object.keys(gg).forEach(function (dia) { var st = situ(dia, Number(d.aviso) || 0); ev.push({ d: dia, k: 'prox-' + st.k, r: r, tal: gg[dia], sit: st, txt: ordTxt(r.operacao, (Number(d.num) || 1) + 1) }); });
       }
     });
+    // colheita prevista (plantio + ciclo) dos talhões ainda não colhidos, por material
+    var gc = {};
+    ST.plantio.forEach(function (p) {
+      if (fid !== '*' && p.fazenda_id !== fid) return;
+      if (fid === '*' && !fazDe(p.fazenda_id)) return;
+      var ch = colheitaDe(p.fazenda_id, p.safra, p.talhao); if (ch && ch.sc_ha) return;
+      var pv = previsaoDe(p); if (!pv) return;
+      var k = pv.data + '|' + p.fazenda_id + '|' + (p.variedade || p.cultura);
+      var x = gc[k] || (gc[k] = { d: pv.data, k: 'colh', faz: p.fazenda_id, mat: p.variedade || NOME_CULT[p.cultura] || p.cultura, tal: [], est: pv.est });
+      x.tal.push(p.talhao); if (pv.est) x.est = true;
+    });
+    Object.keys(gc).forEach(function (k) { gc[k].txt = 'Colheita prevista · ' + gc[k].mat; ev.push(gc[k]); });
     return ev;
   }
-  function corEv(e) { return e.k === 'prev' ? 'prev' : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
+  function corEv(e) { return e.k === 'colh' ? 'colh' : e.k === 'prev' ? 'prev' : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
   /* Aplicações perto (mesma regra do aviso no celular): previstas e próximas das sequências que vencem
      dentro do aviso da recomendação (padrão 3 dias) ou que atrasaram até 7 dias. */
   function pertoDe(fid) {
     return eventosDe(fid).filter(function (e) {
-      if (e.k === 'apl') return false;
+      if (e.k === 'apl' || e.k === 'colh') return false;
       var a = dd(e.r).aviso == null ? 3 : Number(dd(e.r).aviso) || 0, n = difDias(e.d, hoje());
       return n <= a && n >= -7;
     }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
   }
   function quandoTxt(iso) { var n = difDias(iso, hoje()); return n < 0 ? 'atrasada ' + (-n) + (n === -1 ? ' dia' : ' dias') : n === 0 ? 'hoje' : n === 1 ? 'amanhã' : 'em ' + n + ' dias'; }
+  // ícones do calendário: pulverizador = aplicação, colheitadeira = colheita
+  var ICO_PULV = '<svg class="ag-ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="2.5" y="6.5" width="5" height="5.5" rx="1"/><rect x="7.5" y="5" width="9.5" height="7" rx="2.5"/><circle cx="5.2" cy="14.3" r="2.6"/><circle cx="14.5" cy="14.6" r="2.2"/><rect x="0.5" y="17.3" width="23" height="1.6" rx=".8"/><path d="M2.5 19.4 1 23h3zM9 19.4 7.5 23h3zM15.5 19.4 14 23h3zM22 19.4 20.5 23h3z"/></svg>';
+  var ICO_COLH = '<svg class="ag-ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="9" y="2.5" width="5" height="4.5" rx="1"/><path d="M7.5 7h8.5l3 4h4v6.5H7.5z"/><rect x="15" y="4.2" width="7.5" height="1.7" rx=".85"/><path d="M0.5 10.5h6v6.5h-6zM0.5 10.5 2 9h4.5v1.5z"/><circle cx="11" cy="18.3" r="3.4"/><circle cx="19.5" cy="19" r="2.4"/></svg>';
+  var PESO = { venc: 5, hoje: 5, perto: 4, prev: 3, ok: 2, apl: 1 };
+  function icoDia(es) {
+    var ap = es.filter(function (e) { return e.k !== 'colh'; }), co = es.filter(function (e) { return e.k === 'colh'; }), h = '';
+    if (ap.length) { var c = ap.map(corEv).sort(function (a, b) { return (PESO[b] || 0) - (PESO[a] || 0); })[0]; h += '<span class="c-' + c + '">' + ICO_PULV + '</span>'; }
+    if (co.length) h += '<span class="c-colh">' + ICO_COLH + '</span>';
+    return h;
+  }
   function linhaEvento(e, todas) {
+    if (e.k === 'colh') {
+      var fc = fazDe(e.faz), hac = haDe(fc, e.tal);
+      return '<div class="ag-alerta c-colh"><div class="ag-ai c-colh">' + ICO_COLH + '</div><div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (e.est ? ' <span class="badge">estimado</span>' : '') +
+        '<span>' + (todas && fc ? '<b>' + esc(fc.nome) + '</b> · ' : '') + esc(e.tal.join(', ')) + ' · ' + fmt(hac) + ' ha · janela ' + curta(addDias(e.d, -5)) + ' a ' + curta(addDias(e.d, 5)) + '</span></div></div>';
+    }
     var fe = fazDe(e.r.fazenda_id);
     return '<div class="ag-alerta c-' + corEv(e) + '" data-a="abrirrec" data-v="' + esc(e.r.id) + '"><div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (e.sit ? ' <span class="badge">' + esc(e.sit.t) + '</span>' : '') +
       '<span>' + (todas && fe ? '<b>' + esc(fe.nome) + '</b> · ' : '') + esc(e.tal.join(', ')) + ' · ' + fmt(haDe(fe, e.tal, dd(e.r).parte)) + ' ha</span></div>' +
@@ -676,12 +757,13 @@
     for (var d = 1; d <= nd; d++) {
       var iso = R.cy + '-' + p2(R.cm + 1) + '-' + p2(d), es = ev.filter(function (e) { return e.d === iso; });
       g += '<button class="ag-dia' + (iso === hoje() ? ' hoje' : '') + (iso === R.sel ? ' sel' : '') + '" data-a="calsel" data-v="' + iso + '"><span>' + d + '</span><i>' +
-        es.slice(0, 4).map(function (e) { return '<u class="c-' + corEv(e) + '"></u>'; }).join('') + '</i></button>';
+        icoDia(es) + '</i></button>';
     }
     h += '<div class="campo"><label>Fazenda</label><select data-c="faz"><option value="*"' + (todas ? ' selected' : '') + '>Todas as fazendas</option>' + opcoesFaz(R.faz) + '</select></div>' +
       '<div class="ag-calhead"><button data-a="calmes" data-v="-1">‹</button><b>' + MESES[R.cm].charAt(0).toUpperCase() + MESES[R.cm].slice(1) + ' de ' + R.cy + '</b><button data-a="calmes" data-v="1">›</button></div>' +
       '<div class="ag-grade">' + g + '</div>' +
-      '<div class="ag-leg"><span><u class="c-prev"></u>prevista</span><span><u class="c-apl"></u>aplicada</span><span><u class="c-perto"></u>próxima (perto)</span><span><u class="c-venc"></u>vencida</span><span><u class="c-ok"></u>próxima</span></div>';
+      '<div class="ag-leg"><span class="c-prev">' + ICO_PULV + 'prevista</span><span class="c-apl">' + ICO_PULV + 'aplicada</span><span class="c-perto">' + ICO_PULV + 'próxima (perto)</span>' +
+      '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span><span class="c-colh">' + ICO_COLH + 'colheita prevista</span></div>';
     var ds = ev.filter(function (e) { return e.d === R.sel; });
     h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
     var pt = pertoDe(R.faz);
@@ -1527,7 +1609,7 @@
   async function ligar() {
     carregar();
     var c = await Sync.conf(), uid = (await Sync.meuId()) || '';
-    if ((c.email || '') !== (ST.email || '') || (uid && ST.uid && ST.uid !== uid)) { ST = { email: c.email || '', uid: uid, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], fila: [], ult: {} }; gravar(); }
+    if ((c.email || '') !== (ST.email || '') || (uid && ST.uid && ST.uid !== uid)) { ST = { email: c.email || '', uid: uid, mod: { plantio: false, recomendacoes: false, admin: false }, plantio: [], recs: [], produtos: [], estoque: [], colheita: [], ciclos: [], fila: [], ult: {} }; gravar(); }
     else if (uid && !ST.uid) { ST.uid = uid; gravar(); }
     tP = criarTela('telaPlantio'); tR = criarTela('telaRecs');
     ligarTela(tP, cliquePlantio, mudancaPlantio); ligarTela(tR, cliqueRecs, mudancaRecs);

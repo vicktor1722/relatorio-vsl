@@ -160,11 +160,12 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     .bind(fid, acesso.dono_id).first();
   if (!f) return null;
   const dono = acesso.dono_id;
-  const [pl, rc, es, co] = await Promise.all([
+  const [pl, rc, es, co, ci] = await Promise.all([
     env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? ORDER BY data_prevista, criado_em').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
-    env.DB.prepare('SELECT * FROM colheita WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] }))
+    env.DB.prepare('SELECT * FROM colheita WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
+    env.DB.prepare('SELECT variedade, cultura, dias FROM ciclos WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] }))
   ]);
   const recs = (rc.results || []).map((r) => ({ id: r.id, safra: r.safra || '', operacao: r.operacao || '', data_prevista: r.data_prevista || '',
     mostrar: Number(r.mostrar) !== 0, dados: lerJson(r.dados, {}) }));
@@ -211,7 +212,8 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     blocos: { evolucao: bl.evolucao || '', mapaVar: bl.mapaVar || '', proximas: bl.topo || '', aplicacoes: bl.fim || '' },
     estoque: estoqueDe(es.results || [], recs, areas),
     custo: custo ? { talhoes: custo.talhoes, sem_preco: custo.sem_preco } : null,
-    colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha }))
+    colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
+    ciclos: (ci.results || []).map((c) => ({ variedade: c.variedade, cultura: c.cultura, dias: c.dias }))
   });
 }
 

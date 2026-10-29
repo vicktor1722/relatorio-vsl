@@ -85,6 +85,15 @@ function garantir(env) {
         atualizado_em TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (fazenda_id, safra, talhao)
       )`),
+      // ciclo (dias do plantio à colheita) de cada material, informado uma vez pelo consultor
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS ciclos (
+        usuario_id  TEXT NOT NULL,
+        variedade   TEXT NOT NULL,
+        cultura     TEXT DEFAULT '',
+        dias        INTEGER DEFAULT 0,
+        atualizado_em TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (usuario_id, variedade)
+      )`),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS estoque_faz ON estoque_agro (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS recs_faz ON recomendacoes (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS plantio_usr ON plantio (usuario_id, fazenda_id)')
@@ -448,7 +457,7 @@ export async function rotasAgro(env, req, me, rota, url) {
 
   const precisaPlantio = rota.startsWith('/api/agro/plantio');
   const precisaRec = rota.startsWith('/api/agro/rec') || rota.startsWith('/api/agro/produto') || rota.startsWith('/api/agro/estoque');
-  if (rota.startsWith('/api/agro/colheita') && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
+  if ((rota.startsWith('/api/agro/colheita') || rota.startsWith('/api/agro/ciclos')) && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaPlantio && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaRec && !mod.recomendacoes) return json({ erro: 'módulo de recomendações não liberado para esta conta' }, 403);
 
@@ -493,6 +502,27 @@ export async function rotasAgro(env, req, me, rota, url) {
           WHERE plantio.usuario_id = excluded.usuario_id`)
         .bind(fid, safra, talhao, me.id, txt(t.cultura, 20), txt(t.variedade, 80), dia(t.data_plantio),
               dia(t.data_emerg), num(t.espac_cm), num(t.sem_m), Math.round(num(t.sem_ha))));
+    }
+    if (cmds.length) await env.DB.batch(cmds);
+    return json({ ok: true, salvos: cmds.length });
+  }
+
+  /* ----- ciclo dos materiais (previsão de colheita = plantio + ciclo) ----- */
+  if (rota === '/api/agro/ciclos' && req.method === 'GET') {
+    const { results } = await env.DB.prepare('SELECT variedade, cultura, dias FROM ciclos WHERE usuario_id = ?').bind(me.id).all();
+    return json({ ok: true, ciclos: results || [] });
+  }
+  if (rota === '/api/agro/ciclos' && req.method === 'POST') {
+    const b = await req.json();
+    const cmds = [];
+    for (const c of (Array.isArray(b.ciclos) ? b.ciclos.slice(0, 300) : [])) {
+      const v = txt(c.variedade, 80), dias = Math.round(num(c.dias));
+      if (!v) continue;
+      cmds.push(dias > 0 && dias < 400
+        ? env.DB.prepare(`INSERT INTO ciclos (usuario_id, variedade, cultura, dias, atualizado_em) VALUES (?,?,?,?,datetime('now'))
+            ON CONFLICT(usuario_id, variedade) DO UPDATE SET cultura = excluded.cultura, dias = excluded.dias, atualizado_em = datetime('now')`)
+            .bind(me.id, v, txt(c.cultura, 20), dias)
+        : env.DB.prepare('DELETE FROM ciclos WHERE usuario_id = ? AND variedade = ?').bind(me.id, v));
     }
     if (cmds.length) await env.DB.batch(cmds);
     return json({ ok: true, salvos: cmds.length });

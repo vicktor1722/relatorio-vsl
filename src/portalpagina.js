@@ -92,6 +92,22 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .fotos{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}.fotos img{width:64px;height:64px;object-fit:cover;border-radius:8px}
 .addfoto{border:1.5px dashed #9AA5A0;background:none;border-radius:10px;padding:10px;font-size:14px;width:100%;color:var(--texto)}
 .folha .btn{margin-top:8px}
+.cal-h{display:flex;align-items:center;justify-content:space-between;margin:4px 0 8px}.cal-h b{font-size:15px}
+.cal-h button{border:1px solid var(--linha);background:#fff;border-radius:50%;width:34px;height:34px;font-size:16px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .dw{font-size:11px;color:var(--fraco);text-align:center;padding-bottom:2px}
+.cal button{background:#fff;border:1px solid var(--linha);border-radius:9px;aspect-ratio:1/1.05;display:flex;flex-direction:column;align-items:center;padding:4px 0 0;gap:2px;font-size:13px;color:var(--texto)}
+.cal button.hj{box-shadow:inset 0 0 0 1.5px var(--verde)}.cal button.sl{background:var(--verde);color:#fff;border-color:var(--verde)}
+.cal button i{display:flex;gap:1px;height:20px;align-items:center;font-style:normal}
+.ico{width:19px;height:19px;display:block}
+.k-prev{color:#3B78C3}.k-apl{color:#2F9E5B}.k-venc{color:#C0392B}.k-colh{color:#9A5B12}
+.cal button.sl .ico{filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff)}
+.legc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--fraco);margin:8px 2px 12px}.legc span{display:inline-flex;align-items:center;gap:4px}
+.ev{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--linha);border-radius:12px;padding:9px 11px;margin-bottom:7px;font-size:13.5px}
+.ev .ico{width:24px;height:24px;flex:none}.ev small{display:block;color:var(--fraco);font-size:12px}
+.sems{display:flex;align-items:flex-end;gap:4px;height:110px;border-bottom:1px solid var(--linha);padding:0 2px}
+.sems .c{flex:1;display:flex;flex-direction:column-reverse;gap:1px;min-width:0}.sems u{display:block;border-radius:2px}
+.semr{display:flex;gap:4px;font-size:10.5px;color:var(--fraco);padding:3px 2px 0}.semr span{flex:1;text-align:center;min-width:0;overflow:hidden}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;max-width:90%}
 .rodape{text-align:center;color:var(--fraco);font-size:12px;margin-top:24px}.rodape a{color:var(--verde)}
 ${AGRO_REL_CSS}
@@ -245,7 +261,7 @@ ${AGRO_REL_CSS}
   /* ---------- visão da fazenda ---------- */
   function abas() {
     if (eu.papel === 'operador') return '';
-    return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapas'], ['plantio', 'Plantio'], ['est', 'Estoque e custos']].map(function (x) {
+    return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapas'], ['plantio', 'Plantio'], ['colh', 'Colheita'], ['est', 'Estoque e custos']].map(function (x) {
       return '<button data-aba="' + x[0] + '" class="' + (aba === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
   }
   function ligarAbas() { document.querySelectorAll('[data-aba]').forEach(function (b) { b.onclick = function () { aba = b.dataset.aba; pintar(); window.scrollTo(0, 0); }; }); }
@@ -262,6 +278,7 @@ ${AGRO_REL_CSS}
       $('#conteudo').innerHTML = abas() + (D.blocos.evolucao || '<div class="vazio">Evolução do plantio aparece quando as datas de plantio forem lançadas.</div>') +
         (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura</th><th style="text-align:left">Variedade</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
     } else if (aba === 'est') vistaEstoque();
+    else if (aba === 'colh') vistaColheita();
     else {
       $('#conteudo').innerHTML = abas() + ((D.blocos.proximas || '') + (D.blocos.aplicacoes || '') || '<div class="vazio">Nenhuma aplicação nesta safra ainda.</div>');
     }
@@ -287,6 +304,120 @@ ${AGRO_REL_CSS}
         (c.sem_preco && c.sem_preco.length ? '<div class="obs">Sem preço no estoque (fora do gasto): ' + esc(c.sem_preco.join(', ')) + '</div>' : '');
     } else h += '<div class="vazio">O custo por talhão aparece quando houver aplicações marcadas como feitas.</div>';
     $('#conteudo').innerHTML = h;
+  }
+
+
+  /* ---------- colheita: previsão = plantio + ciclo do material (± 5 dias) ---------- */
+  var CICLO_PADRAO = { soja: 115, milho: 135, algodao: 180, feijao: 90, sorgo: 120, outra: 120 };
+  var ICO_PULV = '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="2.5" y="6.5" width="5" height="5.5" rx="1"/><rect x="7.5" y="5" width="9.5" height="7" rx="2.5"/><circle cx="5.2" cy="14.3" r="2.6"/><circle cx="14.5" cy="14.6" r="2.2"/><rect x="0.5" y="17.3" width="23" height="1.6" rx=".8"/><path d="M2.5 19.4 1 23h3zM9 19.4 7.5 23h3zM15.5 19.4 14 23h3zM22 19.4 20.5 23h3z"/></svg>';
+  var ICO_COLH = '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="9" y="2.5" width="5" height="4.5" rx="1"/><path d="M7.5 7h8.5l3 4h4v6.5H7.5z"/><rect x="15" y="4.2" width="7.5" height="1.7" rx=".85"/><path d="M0.5 10.5h6v6.5h-6zM0.5 10.5 2 9h4.5v1.5z"/><circle cx="11" cy="18.3" r="3.4"/><circle cx="19.5" cy="19" r="2.4"/></svg>';
+  function chave(x) { return String(x || '').trim().replace(/\\s+/g, ' ').toLowerCase(); }
+  function somaDias(iso, k) { var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); }
+  function previsoes() {
+    var areas = {}, col = {};
+    ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
+    (D.colheita || []).forEach(function (c) { if (c.sc_ha) col[c.talhao] = c; });
+    return (D.plantio || []).filter(function (p) { return p.cultura && p.cultura !== 'pastagem' && p.cultura !== 'pousio' && p.data_plantio; }).map(function (p) {
+      var c = (D.ciclos || []).filter(function (x) { return p.variedade && chave(x.variedade) === chave(p.variedade); })[0];
+      var dias = c && c.dias ? Number(c.dias) : CICLO_PADRAO[p.cultura]; if (!dias) return null;
+      return { talhao: p.talhao, mat: p.variedade || NC[p.cultura] || p.cultura, cultura: p.cultura, ha: areas[p.talhao] || 0, plantio: p.data_plantio,
+        dias: dias, est: !(c && c.dias), data: somaDias(p.data_plantio, dias), colhido: col[p.talhao] || null };
+    }).filter(Boolean).sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.talhao).localeCompare(b.talhao, 'pt-BR', { numeric: true }); });
+  }
+  // eventos do calendário: aplicações (pulverizador) e colheita prevista (colheitadeira)
+  function eventosCal(pv) {
+    var ev = [];
+    (D.aplicacoes || []).forEach(function (a) {
+      var g = {};
+      a.tal.forEach(function (t) {
+        var d = t.feito || t.data; if (!d) return;
+        var k = (t.feito ? 'apl' : (t.data < hoje() ? 'venc' : 'prev')) + '|' + d;
+        (g[k] = g[k] || []).push(t.nome);
+      });
+      Object.keys(g).forEach(function (k) { var p = k.split('|'); ev.push({ d: p[1], k: p[0], txt: a.titulo + (p[0] === 'apl' ? ' aplicada' : ' prevista'), tal: g[k] }); });
+    });
+    var gc = {};
+    pv.forEach(function (x) { if (x.colhido) return; var k = x.data + '|' + x.mat; (gc[k] = gc[k] || { d: x.data, k: 'colh', txt: 'Colheita prevista · ' + x.mat, tal: [], est: x.est }).tal.push(x.talhao); });
+    Object.keys(gc).forEach(function (k) { ev.push(gc[k]); });
+    return ev;
+  }
+  var CAL = { y: 0, m: 0, sel: '' };
+  var MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  function vistaColheita() {
+    var pv = previsoes(), ev = eventosCal(pv);
+    if (!CAL.y) {   // abre no mês da próxima colheita prevista (ou no mês atual)
+      var prox = pv.filter(function (x) { return !x.colhido && x.data >= hoje(); })[0], base = prox ? prox.data : hoje();
+      CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
+    }
+    var ini = new Date(Date.UTC(CAL.y, CAL.m, 1)).getUTCDay(), nd = new Date(Date.UTC(CAL.y, CAL.m + 1, 0)).getUTCDate(), g = '';
+    ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].forEach(function (x) { g += '<div class="dw">' + x + '</div>'; });
+    for (var i = 0; i < ini; i++) g += '<div></div>';
+    for (var d = 1; d <= nd; d++) {
+      var iso = CAL.y + '-' + ('0' + (CAL.m + 1)).slice(-2) + '-' + ('0' + d).slice(-2), es = ev.filter(function (e) { return e.d === iso; });
+      var ap = es.filter(function (e) { return e.k !== 'colh'; }), co = es.filter(function (e) { return e.k === 'colh'; });
+      var cor = ap.some(function (e) { return e.k === 'venc'; }) ? 'venc' : ap.some(function (e) { return e.k === 'prev'; }) ? 'prev' : 'apl';
+      g += '<button data-dia="' + iso + '" class="' + (iso === hoje() ? 'hj ' : '') + (iso === CAL.sel ? 'sl' : '') + '"><span>' + d + '</span><i>' +
+        (ap.length ? '<span class="k-' + cor + '">' + ICO_PULV + '</span>' : '') + (co.length ? '<span class="k-colh">' + ICO_COLH + '</span>' : '') + '</i></button>';
+    }
+    var ds = ev.filter(function (e) { return e.d === CAL.sel; });
+    var h = abas() + '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' +
+      '<div class="cal-h"><button data-mes="-1" aria-label="mês anterior">‹</button><b>' + MESES[CAL.m].charAt(0).toUpperCase() + MESES[CAL.m].slice(1) + ' de ' + CAL.y + '</b><button data-mes="1" aria-label="próximo mês">›</button></div>' +
+      '<div class="cal">' + g + '</div>' +
+      '<div class="legc"><span class="k-prev">' + ICO_PULV + 'aplicação prevista</span><span class="k-apl">' + ICO_PULV + 'aplicada</span><span class="k-venc">' + ICO_PULV + 'atrasada</span><span class="k-colh">' + ICO_COLH + 'colheita prevista</span></div>' +
+      '<div style="font-weight:700;margin:4px 2px 6px">' + dataBR(CAL.sel) + (CAL.sel === hoje() ? ' (hoje)' : '') + '</div>' +
+      (ds.length ? ds.map(function (e) {
+        return '<div class="ev"><span class="k-' + (e.k === 'colh' ? 'colh' : e.k) + '">' + (e.k === 'colh' ? ICO_COLH : ICO_PULV) + '</span><div><b>' + esc(e.txt) + '</b>' + (e.est ? ' <span class="sem">(estimado)</span>' : '') +
+          '<small>' + esc(e.tal.join(', ')) + (e.k === 'colh' ? ' · janela ' + dataBR(somaDias(e.d, -5)) + ' a ' + dataBR(somaDias(e.d, 5)) : '') + '</small></div></div>';
+      }).join('') : '<div class="sem" style="margin:0 2px 10px">Nada neste dia.</div>');
+
+    if (!pv.length) {
+      h += '<div class="vazio">A previsão de colheita aparece quando o consultor lançar a data de plantio dos talhões.</div>';
+    } else {
+      // resumo por material
+      var mats = {}, cores = {}, ci = 0;
+      pv.forEach(function (x) {
+        var m = mats[x.mat] || (mats[x.mat] = { ha: 0, ini: x.data, fim: x.data, est: false, colhido: 0 });
+        m.ha += x.ha; if (x.data < m.ini) m.ini = x.data; if (x.data > m.fim) m.fim = x.data; if (x.est) m.est = true; if (x.colhido) m.colhido += x.ha;
+        if (!cores[x.mat]) cores[x.mat] = CORES[ci++ % CORES.length];
+      });
+      h += '<h2 class="talhao">Previsão por material</h2><div class="tab"><table><tr><th>Material</th><th>Área</th><th>Colheita prevista</th><th>Ciclo</th></tr>' + Object.keys(mats).map(function (k) {
+        var m = mats[k];
+        return '<tr><td><b><i style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:' + cores[k] + '"></i>' + esc(k) + '</b></td><td>' + n(m.ha, 1) + ' ha' + (m.colhido ? '<br><span class="sem">' + n(m.colhido, 1) + ' ha colhidos</span>' : '') + '</td>' +
+          '<td>' + dataBR(m.ini) + (m.fim !== m.ini ? ' a ' + dataBR(m.fim) : '') + '</td><td>' + (m.est ? '<span class="sem">estimado</span>' : 'informado') + '</td></tr>';
+      }).join('') + '</table></div>';
+      // hectares prontos por semana (segunda-feira de cada semana), por material
+      var sem = {}, mx = 0;
+      pv.forEach(function (x) {
+        if (x.colhido) return;
+        var dt = new Date(x.data + 'T12:00:00Z'), seg = new Date(dt); seg.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
+        var k = seg.toISOString().slice(0, 10), w = sem[k] || (sem[k] = { tot: 0, m: {} });
+        w.tot += x.ha; w.m[x.mat] = (w.m[x.mat] || 0) + x.ha; if (w.tot > mx) mx = w.tot;
+      });
+      var ks = Object.keys(sem).sort();
+      if (ks.length > 1) {
+        var todas = [], cur = ks[0];
+        while (cur <= ks[ks.length - 1] && todas.length < 40) { todas.push(cur); if (!sem[cur]) sem[cur] = { tot: 0, m: {} }; cur = somaDias(cur, 7); }
+        ks = todas;
+      }
+      if (ks.length) {
+        h += '<h2 class="talhao">Hectares prontos por semana</h2><div class="caixa"><div class="sems">' + ks.map(function (k) {
+          return '<div class="c" title="' + n(sem[k].tot, 1) + ' ha">' + Object.keys(sem[k].m).map(function (m) { return '<u style="height:' + Math.max(2, sem[k].m[m] / mx * 100) + 'px;background:' + cores[m] + '"></u>'; }).join('') + '</div>';
+        }).join('') + '</div><div class="semr">' + ks.map(function (k) { return '<span>' + dataBR(k) + '</span>'; }).join('') + '</div>' +
+          '<div class="leg">' + Object.keys(mats).map(function (k) { return '<span><i style="background:' + cores[k] + '"></i>' + esc(k) + '</span>'; }).join('') + '</div></div>';
+      }
+      // tabela por talhão
+      h += '<h2 class="talhao">Por talhão</h2><div class="tab"><table><tr><th>Talhão</th><th>Material</th><th>Área</th><th>Plantio</th><th>Ciclo</th><th>Previsão</th><th>Janela</th><th>Faltam</th></tr>' + pv.map(function (x) {
+        var f = dif(x.data, hoje());
+        return '<tr><td><b>' + esc(x.talhao) + '</b></td><td style="text-align:left">' + esc(x.mat) + '</td><td>' + n(x.ha, 1) + '</td><td>' + dataBR(x.plantio) + '</td>' +
+          '<td>' + x.dias + ' d' + (x.est ? ' <span class="sem">(est.)</span>' : '') + '</td><td><b>' + dataBR(x.data) + '</b></td>' +
+          '<td>' + dataBR(somaDias(x.data, -5)) + ' – ' + dataBR(somaDias(x.data, 5)) + '</td>' +
+          '<td>' + (x.colhido ? '<span style="color:#2F9E5B;font-weight:700">colhido</span>' : f > 0 ? f + ' dias' : f === 0 ? 'hoje' : '<span class="neg">' + (-f) + ' dias atrás</span>') + '</td></tr>';
+      }).join('') + '</table></div>' +
+        '<div class="sem" style="font-size:12.5px;margin:0 2px">Previsão = data de plantio + ciclo do material, com janela de ± 5 dias (clima e chuva mexem na colheita). "Estimado" = ciclo padrão da cultura.</div>';
+    }
+    $('#conteudo').innerHTML = h;
+    document.querySelectorAll('[data-dia]').forEach(function (b) { b.onclick = function () { CAL.sel = b.dataset.dia; pintar(); }; });
+    document.querySelectorAll('[data-mes]').forEach(function (b) { b.onclick = function () { CAL.m += Number(b.dataset.mes); if (CAL.m < 0) { CAL.m = 11; CAL.y--; } if (CAL.m > 11) { CAL.m = 0; CAL.y++; } pintar(); }; });
   }
 
   /* ---------- visão do operador / encarregado ---------- */
