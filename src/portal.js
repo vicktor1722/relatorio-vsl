@@ -13,7 +13,7 @@ import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } fr
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo } from './agro.js';
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
-import { lerLanc, haPlantada } from './plantiodia.js';
+import { haAplicada, haPlantada, lerLanc, parciaisDe } from './plantiodia.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -124,13 +124,13 @@ export function estoqueDe(entradas, recs, areas) {
     if (Number(e.qtd) > 0 && Number(e.valor) > 0) { x.val += Number(e.valor); x.qv += Number(e.qtd); }
   });
   recs.forEach((r) => {
-    const d = r.dados, parte = d.parte || {}, feito = d.feito || {};
+    const d = r.dados, parte = d.parte || {};
     (d.tal || []).forEach((t) => {
-      const tot = areas[t] || 0, p = Number(parte[t]), ha = p > 0 && p < tot ? p : tot;
+      const tot = areas[t] || 0, p = Number(parte[t]), ha = p > 0 && p < tot ? p : tot, hf = haAplicada(d, t, ha);
       (d.prods || []).forEach((pr) => {
         if (!pr || !pr[0]) return;
-        const [un, f] = baseUnidade(pr[2]), x = item(pr[0], un), q = (Number(pr[1]) || 0) * ha * f;
-        if (feito[t]) x.apl += q; else x.prev += q;
+        const [un, f] = baseUnidade(pr[2]), x = item(pr[0], un), dose = (Number(pr[1]) || 0) * f;
+        x.apl += dose * hf; x.prev += dose * (ha - hf);
       });
     });
   });
@@ -202,7 +202,9 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     const d = r.dados, num = Number(d.num) || 1, datas = datasTal(r, porTal), feito = d.feito || {};
     const tal = (d.tal || []).map((t) => {
       const tot = areas[t] || 0, p = Number((d.parte || {})[t]), ha = p > 0 && p < tot ? p : tot;
-      return { nome: t, ha: Math.round(ha * 100) / 100, data: datas[t] || '', feito: feito[t] || '', por: (d.feitoPor || {})[t] || '',
+      const parc = feito[t] ? [] : parciaisDe(d, t).map((x) => ({ id: x.id, d: x.d, ha: x.ha, por: x.por || '', meu: x.porId === acesso.id }));
+      return { nome: t, ha: Math.round(ha * 100) / 100, data: datas[t] || '', feito: feito[t] || '', por: (d.feitoPor || {})[t] || '', parc,
+        feitoHa: Math.round(haAplicada(d, t, ha) * 100) / 100,
         meu: String((d.feitoPorId || {})[t] || '').split('|')[0] === acesso.id };
     });
     const pend = tal.filter((t) => !t.feito);
@@ -212,7 +214,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     return { id: r.id, titulo: Number(d.rep) > 0 ? ordTxt(r.operacao, num) : r.operacao, safra: r.safra, data: prox || r.data_prevista, registros,
       prods: (d.prods || []).filter((p) => p && p[0]).map((p) => ({ nome: p[0], dose: Number(p[1]) || 0, unidade: p[2] || 'L/ha' })),
       calda: Number(d.calda) || 0, tanque: Number(d.tanque) || 0, obs: d.obs || '', resp: d.resp || '', tal,
-      status: !pend.length ? 'aplicada' : pend.length < tal.length ? 'andamento' : 'pendente', atrasada: !!(prox && prox < hoje) };
+      status: !pend.length ? 'aplicada' : pend.length < tal.length || tal.some((t) => t.feitoHa > 0) ? 'andamento' : 'pendente', atrasada: !!(prox && prox < hoje) };
   });
 
   if (acesso.papel === 'operador') return Object.assign(base, { aplicacoes });
@@ -360,6 +362,7 @@ export async function rotasPortal(env, req, rota, url) {
     const data = dia(b.data) || hojeMT();
     if (data > somaDias(hojeMT(), 1)) return json({ erro: 'a data da aplicação não pode ser no futuro' }, 400);
     d.feito = d.feito || {}; d.feitoPor = d.feitoPor || {}; d.feitoPorId = d.feitoPorId || {};
+    d.parcial = d.parcial && typeof d.parcial === 'object' ? d.parcial : {};
     const tal = (Array.isArray(b.talhoes) ? b.talhoes : []).map(String).filter((t) => (d.tal || []).includes(t));
     if (!tal.length) return json({ erro: 'escolha os talhões' }, 400);
     const quem = (a.nome || a.login) + ' (' + (a.papel === 'operador' ? 'operador' : 'fazenda') + ')';
@@ -367,8 +370,38 @@ export async function rotasPortal(env, req, rota, url) {
     // a mesma marcação reenviada (fila sem internet) não duplica
     const regId = txt(b.reg_id, 60);
     if (!b.desfazer && regId && d.aplicReg.some((g) => g.id === regId)) return json({ ok: true, repetido: true });
+    const temParc = (t) => parciaisDe(d, t).length > 0;
+    const salvar = async () => {
+      await env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id).run();
+      return json({ ok: true });
+    };
+    // desfaz uma parte lançada (só a do próprio acesso) e o registro de campo dela
+    if (b.desfazer && b.parc_id) {
+      const t = tal[0], x = parciaisDe(d, t).filter((y) => y.id === txt(b.parc_id, 60))[0];
+      if (!x || x.porId !== a.id) return json({ erro: 'só dá para desfazer o que você lançou' }, 403);
+      d.parcial[t] = parciaisDe(d, t).filter((y) => y.id !== x.id);
+      if (!d.parcial[t].length) delete d.parcial[t];
+      d.aplicReg = d.aplicReg.filter((g) => g.id !== x.id);
+      return salvar();
+    }
+    // parte do talhão (um talhão só): soma às partes já lançadas; completou a área → talhão aplicado
+    let haParc = Math.round(Number(String(b.ha == null ? '' : b.ha).replace(',', '.')) * 100) / 100;
+    if (!b.desfazer && haParc > 0) {
+      if (tal.length !== 1) return json({ erro: 'aplicação parcial é lançada um talhão por vez' }, 400);
+      const t = tal[0];
+      if (d.feito[t]) return json({ erro: 'este talhão já está marcado como aplicado' }, 400);
+      const f = await env.DB.prepare('SELECT talhoes FROM fazendas WHERE id = ?').bind(r.fazenda_id).first();
+      const tot = areasDe(f && f.talhoes)[t] || 0, p = Number((d.parte || {})[t]), haTal = p > 0 && p < tot ? p : tot;
+      const ja = haAplicada(d, t, haTal);
+      if (haTal && ja + haParc < haTal - 0.05) {
+        const id = regId || novoId('rg');
+        (d.parcial[t] = parciaisDe(d, t)).push({ id, d: data, ha: haParc, por: quem, porId: a.id });
+        b.reg_id = id; b._parcial = { t, ha: haParc };
+      } else haParc = 0;   // fechou o talhão: marca aplicado normalmente
+    }
     const marcados = [];
-    tal.forEach((t) => {
+    if (b._parcial) marcados.push(b._parcial.t);
+    else tal.forEach((t) => {
       if (b.desfazer) {
         // só desfaz o que o próprio acesso marcou
         if (String(d.feitoPorId[t] || '').split('|')[0] !== a.id) return;
@@ -381,20 +414,19 @@ export async function rotasPortal(env, req, rota, url) {
     });
     if (b.desfazer) {
       // tira o talhão do registro; registro sem talhão some
-      d.aplicReg = d.aplicReg.map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).filter((t) => d.feito[t]) })).filter((g) => g.talhoes.length);
+      d.aplicReg = d.aplicReg.map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).filter((t) => d.feito[t] || (g.parc && temParc(t))) })).filter((g) => g.talhoes.length);
     } else if (marcados.length) {
       const g = b.registro && typeof b.registro === 'object' ? b.registro : {};
       const hora = (v) => { const x = String(v || '').trim(); return /^\d{2}:\d{2}$/.test(x) ? x : ''; };
       const numero = (v, min, max) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return v === '' || v == null || !Number.isFinite(n) || n < min || n > max ? null : Math.round(n * 10) / 10; };
       d.aplicReg.push({
-        id: regId || novoId('rg'), talhoes: marcados, data, inicio: hora(g.inicio), fim: hora(g.fim),
+        id: txt(b.reg_id, 60) || novoId('rg'), talhoes: marcados, data, parc: b._parcial ? b._parcial.ha : undefined, inicio: hora(g.inicio), fim: hora(g.fim),
         vento: numero(g.vento, 0, 150), temp: numero(g.temp, -10, 60), umid: numero(g.umid, 0, 100),
         obs: txt(g.obs, 500), fotos: (Array.isArray(g.fotos) ? g.fotos : []).map((k) => txt(k, 200)).filter((k) => k.startsWith('aplic/' + a.dono_id + '/')).slice(0, 6),
         por: quem, porId: a.id, em: txt(b.em, 30) || new Date().toISOString()
       });
     }
-    await env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id).run();
-    return json({ ok: true });
+    return salvar();
   }
 
   return json({ erro: 'rota não encontrada' }, 404);

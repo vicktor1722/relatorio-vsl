@@ -90,6 +90,12 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .folha{background:#fff;width:100%;max-width:560px;max-height:94dvh;overflow-y:auto;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px))}
 .folha h3{margin:0 0 2px;font-size:18px}.folha .q{font-size:13px;color:var(--fraco);margin-bottom:10px}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.g3 .campo{margin-bottom:8px;min-width:0}
+.gdh{display:grid;grid-template-columns:1.45fr 1fr 1fr;gap:6px}.gdh .campo{margin-bottom:8px;min-width:0}
+.folha .gdh .campo input{padding:7px 6px;height:40px;font-size:15px;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;text-align:left;background:#fff}
+.folha .g3 .campo input{padding:8px;height:40px}
+.seg{display:flex;gap:6px;margin:2px 0 8px}.seg button{flex:1;border:1px solid #CFD8D3;background:#fff;border-radius:10px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--fraco)}
+.seg button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.parc{font-size:12.5px;color:#9A6400;margin-top:2px}.parc button{border:0;background:none;color:#C0392B;text-decoration:underline;font-size:12px;padding:0 4px}
 .folha .campo input,.folha .campo textarea{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;font-family:inherit}
 .folha .campo select{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;background:#fff;font-family:inherit}
 .lanc{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:14px}
@@ -546,6 +552,11 @@ ${AGRO_REL_CSS}
     document.querySelectorAll('[data-marcar]').forEach(function (b) { b.onclick = function () { abrirFolha(b.dataset.marcar); }; });
     document.querySelectorAll('[data-cancela]').forEach(function (b) { b.onclick = function () { cancelarFila(b.dataset.cancela); }; });
     var bp = document.getElementById('btnPush'); if (bp) bp.onclick = ativarAvisos;
+    document.querySelectorAll('[data-desp]').forEach(function (b) { b.onclick = function (ev) {
+      ev.preventDefault(); ev.stopPropagation(); var p = b.dataset.desp.split('|');
+      if (!confirm('Desfazer esta parte lançada em ' + p.slice(2).join('|') + '?')) return;
+      api('/api/portal/aplicar', { rec_id: p[0], talhoes: [p.slice(2).join('|')], desfazer: true, parc_id: p[1] }).then(function () { toast('Desfeito'); return carregar(); }).catch(function (e) { toast(e.message); });
+    }; });
     document.querySelectorAll('[data-desf]').forEach(function (b) { b.onclick = function () { var p = b.dataset.desf.split('|'); desfazer(p[0], p.slice(1).join('|')); }; });
     document.querySelectorAll('[data-vm]').forEach(function (b) { b.onclick = function () { aberto[b.dataset.vm] = !aberto[b.dataset.vm]; pintar(); }; });
     ligarAbasOp();
@@ -559,7 +570,7 @@ ${AGRO_REL_CSS}
     return d < 0 ? '<span class="selo venc">Atrasada ' + (-d) + (d === -1 ? ' dia' : ' dias') + '</span>' : d === 0 ? '<span class="selo venc">Hoje</span>' : d === 1 ? '<span class="selo">Amanhã</span>' : '<span class="selo">' + dataBR(a.data) + '</span>';
   }
   function cartao(a) {
-    var pend = a.tal.filter(function (t) { return !t.feito; }), haP = pend.reduce(function (s, t) { return s + t.ha; }, 0);
+    var pend = a.tal.filter(function (t) { return !t.feito; }), haP = pend.reduce(function (s, t) { return s + Math.max(0, t.ha - (t.feitoHa || 0)); }, 0);
     var haT = a.tal.reduce(function (s, t) { return s + t.ha; }, 0), base = haP || haT;
     var cls = a.status === 'aplicada' ? 'aplicada' : a.atrasada ? 'atrasada' : '';
     var h = '<div class="ap ' + cls + '"><div class="ap-h"><b>' + esc(a.titulo) + '</b>' + quando(a) + '</div>' +
@@ -578,7 +589,9 @@ ${AGRO_REL_CSS}
       if (t.feito) return '<div class="tl"><span style="width:24px;text-align:center">' + (t.fila ? '⏳' : '✅') + '</span><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha</small>' + regDe(a, t.nome) + '</div>' +
         '<div class="feito">aplicado ' + dataBR(t.feito) + (t.fila ? '<br><span class="espera">esperando internet</span><br><button class="desf" data-cancela="' + esc(t.fila) + '">cancelar</button>'
           : (t.por ? '<br>' + esc(t.por) : '') + (t.meu ? '<br><button class="desf" data-desf="' + esc(a.id) + '|' + esc(t.nome) + '">desfazer</button>' : '')) + '</div></div>';
-      return '<label class="tl"><input type="checkbox" data-rec="' + esc(a.id) + '" value="' + esc(t.nome) + '"' + ((selec[a.id] || []).indexOf(t.nome) >= 0 ? ' checked' : '') + '><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha' + (t.data ? ' · prevista ' + dataBR(t.data) : '') + '</small></div></label>';
+      var pa = (t.parc || []).length ? '<div class="parc">◐ parcial: ' + n(t.feitoHa, 1) + ' de ' + n(t.ha, 1) + ' ha · faltam ' + n(Math.max(0, t.ha - t.feitoHa), 1) + ' ha' +
+        t.parc.map(function (x) { return '<br>' + dataBR(x.d) + ' · ' + n(x.ha, 1) + ' ha' + (x.fila ? ' ⏳' : (x.por ? ' · ' + esc(x.por) : '') + (x.meu ? '<button data-desp="' + esc(a.id) + '|' + esc(x.id) + '|' + esc(t.nome) + '">desfazer</button>' : '')); }).join('') + '</div>' : '';
+      return '<label class="tl"><input type="checkbox" data-rec="' + esc(a.id) + '" value="' + esc(t.nome) + '"' + ((selec[a.id] || []).indexOf(t.nome) >= 0 ? ' checked' : '') + '><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha' + (t.data ? ' · prevista ' + dataBR(t.data) : '') + '</small>' + pa + '</div></label>';
     }).join('');
     if (pend.length) h += '<div class="marcar"><button class="btn" data-marcar="' + esc(a.id) + '" id="bt_' + esc(a.id) + '">✔ Marcar aplicado</button></div>';
     h += '<button class="vermapa" data-vm="' + esc(a.id) + '">' + (aberto[a.id] ? '▴ Esconder mapa' : '🗺️ Ver no mapa') + '</button>' + (aberto[a.id] ? '<div class="mini" id="mm_' + esc(a.id) + '"></div>' : '') + '</div>';
@@ -674,11 +687,16 @@ ${AGRO_REL_CSS}
   function abrirFolha(id) {
     var a = (D.aplicacoes || []).filter(function (x) { return x.id === id; })[0], tal = marcados(id);
     if (!a || !tal.length) return;
-    var ha = a.tal.filter(function (t) { return tal.indexOf(t.nome) >= 0; }).reduce(function (s, t) { return s + t.ha; }, 0);
-    var fotos = [];
+    var sel = a.tal.filter(function (t) { return tal.indexOf(t.nome) >= 0; });
+    var ha = sel.reduce(function (s, t) { return s + Math.max(0, t.ha - (t.feitoHa || 0)); }, 0);
+    var fotos = [], modo = 'todo', um = sel.length === 1 ? sel[0] : null, falta1 = um ? Math.max(0, um.ha - (um.feitoHa || 0)) : 0;
+    var parteHtml = um ? '<div class="seg"><button type="button" data-modo="todo" class="on">Talhão todo · ' + n(falta1, 1) + ' ha</button><button type="button" data-modo="parte">Só uma parte</button></div>' +
+        '<div class="campo oculto" id="fParteBox"><label class="l">Hectares aplicados agora *</label><input id="fHa" inputmode="decimal" placeholder="até ' + n(falta1, 1) + ' ha"></div>'
+      : '<div class="sem" style="font-size:12.5px;margin:-4px 0 8px">Para lançar só parte de um talhão, marque um talhão por vez.</div>';
     var v = document.createElement('div'); v.className = 'veu';
     v.innerHTML = '<div class="folha"><h3>Marcar aplicado</h3><div class="q">' + esc(a.titulo) + ' · ' + esc(tal.join(', ')) + ' · ' + n(ha, 1) + ' ha</div>' +
-      '<div class="g3"><div class="campo"><label class="l">Data *</label><input type="date" id="fData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
+      parteHtml +
+      '<div class="gdh"><div class="campo"><label class="l">Data *</label><input type="date" id="fData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
       '<div class="campo"><label class="l">Início</label><input type="time" id="fIni"></div><div class="campo"><label class="l">Fim</label><input type="time" id="fFim"></div></div>' +
       '<div class="g3"><div class="campo"><label class="l">Vento (km/h)</label><input id="fVento" inputmode="decimal" placeholder="—"></div>' +
       '<div class="campo"><label class="l">Temp. (°C)</label><input id="fTemp" inputmode="decimal" placeholder="—"></div>' +
@@ -689,6 +707,10 @@ ${AGRO_REL_CSS}
       '<div class="campo" style="margin-top:10px"><label class="l">Observação (opcional)</label><textarea id="fObs" rows="2" placeholder="ex.: parei 20 min por garoa"></textarea></div>' +
       '<button class="btn" id="fOk">✔ Confirmar aplicação</button><button class="btn sec" id="fNao">Cancelar</button></div>';
     document.body.appendChild(v);
+    v.querySelectorAll('[data-modo]').forEach(function (bt) { bt.onclick = function () {
+      modo = bt.dataset.modo; v.querySelectorAll('[data-modo]').forEach(function (x) { x.classList.toggle('on', x === bt); });
+      v.querySelector('#fParteBox').classList.toggle('oculto', modo !== 'parte'); if (modo === 'parte') v.querySelector('#fHa').focus();
+    }; });
     var val = function (i) { var x = String(v.querySelector(i).value || '').replace(',', '.').trim(); return x === '' ? '' : Number(x); };
     var avisar = function () {
       var al = [], ve = val('#fVento'), te = val('#fTemp'), um = val('#fUmid');
@@ -709,7 +731,13 @@ ${AGRO_REL_CSS}
       var dt = v.querySelector('#fData').value;
       if (!dt) { toast('Informe a data da aplicação'); return; }
       if (dt > hoje()) { toast('A data não pode ser no futuro'); return; }
-      var item = { id: 'rg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), rec_id: id, talhoes: tal, data: dt, em: new Date().toISOString(),
+      var haParte = 0;
+      if (modo === 'parte') {
+        haParte = Number(String(v.querySelector('#fHa').value || '').replace(',', '.'));
+        if (!(haParte > 0)) { toast('Informe quantos hectares aplicou'); return; }
+        if (haParte > falta1 + 0.05) { toast('Passa do que falta no talhão (' + n(falta1, 1) + ' ha)'); return; }
+      }
+      var item = { ha: haParte || undefined, id: 'rg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), rec_id: id, talhoes: tal, data: dt, em: new Date().toISOString(),
         registro: { inicio: v.querySelector('#fIni').value, fim: v.querySelector('#fFim').value, vento: val('#fVento'), temp: val('#fTemp'), umid: val('#fUmid'), obs: v.querySelector('#fObs').value.trim() },
         fotos: fotos, fazenda: $('#selFaz').value };
       this.disabled = true;
@@ -760,7 +788,11 @@ ${AGRO_REL_CSS}
     var f = await filaTudo();
     f.forEach(function (it) {
       var a = D.aplicacoes.filter(function (x) { return x.id === it.rec_id; })[0]; if (!a) return;
-      a.tal.forEach(function (t) { if (it.talhoes.indexOf(t.nome) >= 0 && !t.feito) { t.feito = it.data; t.fila = it.id; } });
+      a.tal.forEach(function (t) {
+        if (it.talhoes.indexOf(t.nome) < 0 || t.feito) return;
+        if (it.ha && (t.feitoHa || 0) + it.ha < t.ha - 0.05) { t.feitoHa = (t.feitoHa || 0) + it.ha; (t.parc = t.parc || []).push({ id: it.id, d: it.data, ha: it.ha, fila: it.id }); return; }
+        t.feito = it.data; t.fila = it.id;
+      });
       var pend = a.tal.filter(function (t) { return !t.feito; }).length;
       a.status = !pend ? 'aplicada' : pend < a.tal.length ? 'andamento' : 'pendente';
     });
@@ -781,7 +813,7 @@ ${AGRO_REL_CSS}
             chaves.push(r.midia);
           }
           var reg = Object.assign({}, it.registro, { fotos: chaves });
-          await api('/api/portal/aplicar', { rec_id: it.rec_id, talhoes: it.talhoes, data: it.data, reg_id: it.id, em: it.em, registro: reg });
+          await api('/api/portal/aplicar', { rec_id: it.rec_id, talhoes: it.talhoes, data: it.data, reg_id: it.id, em: it.em, registro: reg, ha: it.ha || undefined });
           await filaTirar(it.id);
         } catch (e) {
           tudoOk = false;

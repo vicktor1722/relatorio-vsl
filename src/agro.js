@@ -10,7 +10,7 @@
 
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
-import { plantioPorDia } from './plantiodia.js';
+import { haAplicada, plantioPorDia } from './plantiodia.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, regraValida } from './cultivares.js';
 
 let pronta = null;
@@ -226,9 +226,12 @@ export function mesclarOperador(ant, novo) {
   });
   // marcas de quem aplicou só valem para talhões que continuam aplicados
   ['feitoPor', 'feitoPorId'].forEach((k) => { if (novo[k]) Object.keys(novo[k]).forEach((t) => { if (!novo.feito[t]) delete novo[k][t]; }); });
+  // aplicação parcial do operador: só o portal escreve; aqui vale a do servidor
+  if (ant.parcial && typeof ant.parcial === 'object') novo.parcial = ant.parcial; else delete novo.parcial;
+  const temParc = (t) => !!(novo.parcial && Array.isArray(novo.parcial[t]) && novo.parcial[t].length);
   // registro de campo do operador (clima, foto, observação): só o portal escreve; aqui vale o do servidor
   const reg = (Array.isArray(ant.aplicReg) ? ant.aplicReg : [])
-    .map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).filter((t) => novo.feito[t]) })).filter((g) => g.talhoes.length);
+    .map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).filter((t) => novo.feito[t] || temParc(t)) })).filter((g) => g.talhoes.length);
   if (reg.length) novo.aplicReg = reg; else delete novo.aplicReg;
   return novo;
 }
@@ -448,10 +451,10 @@ export async function comparativo(env, me, adm, safraPedida) {
     const F = porFaz[r.fazenda_id]; if (!F) return;
     const d = lerDados(r.dados), feito = d.feito || {}, parte = d.parte || {};
     (d.tal || []).forEach((n) => {
-      if (!feito[n]) return;                                  // só o que foi aplicado entra no gasto
       const total = F.area[n] || 0, p = Number(parte[n]);
-      const ha = p > 0 && p < total ? p : total;
-      const T = tal(F, n); T.aplic++;
+      const ha = haAplicada(d, n, p > 0 && p < total ? p : total);
+      if (!ha) return;                                        // só o que foi aplicado (todo ou em parte) entra no gasto
+      const T = tal(F, n); if (feito[n]) T.aplic++;
       (d.prods || []).forEach((pr) => {
         if (!pr || !pr[0]) return;
         const [un, fator] = baseUnidade(pr[2]);
