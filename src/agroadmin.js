@@ -207,6 +207,11 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .dp-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;border:1px solid var(--linha);border-radius:14px;padding:4px 10px;background:#fff}
 .dp-chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .dp-t{margin:16px 0 8px;font-size:13.5px;color:var(--verde-escuro)}
+.dp-det>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dp-det>summary::-webkit-details-marker{display:none}
+.dp-det>summary .dp-t{margin:16px 0 8px}
+.dp-det>summary em{font-style:normal;font-size:12.5px;font-weight:600;color:var(--verde);white-space:nowrap}
+.dp-det>summary em::after{content:"▸ Expandir"}.dp-det[open]>summary em::after{content:"▾ Recolher"}
 .dp-t span{font-weight:400;color:var(--fraco);font-size:12px;margin-left:6px}
 .dp-graf svg{display:block;width:100%;max-width:760px;height:auto}
 .dp-gl{stroke:var(--linha);stroke-width:1}
@@ -321,18 +326,23 @@ export const AGRO_JS = String.raw`
         '<div class="dp-vh"><b>' + dpN(v.ha) + ' ha</b><span>plantado ' + dpN(v.plantado) + '</span></div></div>'; }).join('') + '</div>'
       : '<div class="nota">Nenhuma variedade informada nesta safra.</div>';
 
-    h += '<h3 class="dp-t">Por fazenda</h3><div class="rolagem"><table class="dp-tab"><tr><th>Fazenda</th><th>Andamento</th><th>Período</th><th>Variedades</th></tr>' +
+    // "Por fazenda" fica recolhido (a lista é longa); o painel lembra se a pessoa deixou aberto
+    var fzAberto = false; try { fzAberto = localStorage.getItem('vsl-dp-faz') === '1'; } catch (e) {}
+    h += '<details class="dp-det" id="dpFaz"' + (fzAberto ? ' open' : '') + '><summary><h3 class="dp-t">Por fazenda <span>' + S.fazendas.length + (S.fazendas.length === 1 ? ' fazenda' : ' fazendas') + '</span></h3><em></em></summary>' +
+      '<div class="rolagem"><table class="dp-tab"><tr><th>Fazenda</th><th>Andamento</th><th>Período</th><th>Variedades</th></tr>' +
       S.fazendas.map(function (f) {
         var p = f.total_ha ? f.plantado_ha / f.total_ha * 100 : 0;
         return '<tr><td><b>' + esc(f.nome) + '</b><br><span class="peq">' + esc(f.produtor || f.conta) + '</span></td>' +
           '<td><div class="dp-mini"><i style="width:' + Math.min(100, p).toFixed(0) + '%"></i></div><span class="peq">' + dpN(f.plantado_ha) + ' de ' + dpN(f.total_ha) + ' ha · ' + dpN(p) + '%</span></td>' +
           '<td class="peq">' + (f.primeira ? dpData(f.primeira) + ' a ' + dpData(f.ultima) : '—') + '</td>' +
-          '<td class="peq">' + (f.variedades.length ? esc(f.variedades.join(', ')) : '—') + '</td></tr>'; }).join('') + '</table></div>';
+          '<td class="peq">' + (f.variedades.length ? esc(f.variedades.join(', ')) : '—') + '</td></tr>'; }).join('') + '</table></div></details>';
     if (S.sem_lancamento && S.sem_lancamento.length) {
       h += '<p class="nota">Sem plantio lançado nesta safra: ' + S.sem_lancamento.map(function (f) { return esc(f.nome) + ' (' + dpN(f.total_ha) + ' ha)'; }).join(', ') + '.</p>';
     }
     box.innerHTML = h;
     $('#dpSafra').onchange = function () { DP.safra = this.value; dpPintar(box); };
+    var df = document.getElementById('dpFaz');
+    if (df) df.addEventListener('toggle', function () { try { localStorage.setItem('vsl-dp-faz', df.open ? '1' : '0'); } catch (e) {} });
   }
 
   async function agroModulos() {
