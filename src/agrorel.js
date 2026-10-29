@@ -7,7 +7,7 @@
    Só aparece quando há dados; o relatório antigo continua igual.
    ============================================================ */
 
-import { plantioPorDia } from './plantiodia.js';
+import { haAplicada, plantioPorDia } from './plantiodia.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -139,7 +139,7 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     const d = dadosDe(r), prods = prodsDe(r);
     const k = r.operacao + '|' + (d.num || 1) + '|' + prods.map((p) => p[0] + p[1]).join(',');
     if (!grupos[k]) {
-      grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, prox: null, prev: {}, reg: [],
+      grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, parc: {}, prox: null, prev: {}, reg: [],
         total: Number(d.total || 1), rep: Number(d.rep || 0), data: r.data_prevista || '',
         calda: Number(d.calda || 0), tanque: Number(d.tanque || 0), ha: {} };
       ordem.push(k);
@@ -151,6 +151,7 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
       if (g.tal.indexOf(t) < 0) g.tal.push(t);
       { const tot = areas[t] || 0, pt = Number(d.parte && d.parte[t]) || 0; g.ha[t] = Math.min(tot, (g.ha[t] || 0) + (pt > 0 && pt < tot ? pt : tot)); }
       if (feitoDe(r)[t]) g.feito[t] = feitoDe(r)[t];
+      else { const hp = haAplicada(d, t, g.ha[t] || 0); if (hp > 0) g.parc[t] = hp; }   // parte do talhão aplicada pelo operador
       const v = venc(r, t);
       if (v && !proxDe(r)[t] && (!g.prox || v < g.prox)) g.prox = v;
     });
@@ -168,7 +169,7 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     const feitos = g.tal.filter((t) => g.feito[t]), datas = feitos.map((t) => g.feito[t]).sort(), ha = haDe(g);
     let st, sel;
     if (feitos.length && feitos.length === g.tal.length) { st = 'Aplicada'; sel = 'v'; }
-    else if (feitos.length) { st = 'Em andamento'; sel = 'a'; }
+    else if (feitos.length || Object.keys(g.parc).length) { st = 'Em andamento'; sel = 'a'; }
     else { st = 'Prevista'; sel = 'b'; }
     // datas previstas dos talhões que faltam (uma por talhão quando é por DAE)
     const prevs = g.tal.filter((t) => !g.feito[t] && g.prev[t]).map((t) => g.prev[t]).sort();
@@ -185,7 +186,8 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     const reg = registroCampo(g.reg);
     const prox = g.prox && g.num < g.total ? '<div class="ap-prox">📅 Próxima aplicação: <b>' + (g.prox < hoje ? 'a programar' : curta(g.prox)) + '</b></div>' : '';
     const corpo = '<div class="ap-tal">' + g.tal.map((t) => '<span class="' + (g.feito[t] ? 'ok' : '') + '">' +
-        (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + (!g.feito[t] && varias && g.prev[t] ? ' · ' + curta(g.prev[t]) : '') + '</span>').join('') +
+        (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + (g.parc[t] ? ' · ◐ ' + fmt(g.parc[t]) + ' de ' + fmt(g.ha[t]) + ' ha' : '') +
+        (!g.feito[t] && varias && g.prev[t] ? ' · ' + curta(g.prev[t]) : '') + '</span>').join('') +
         (ha ? '<em>' + fmt(ha) + ' ha</em>' : '') + '</div>' +
       (liq ? '<div class="ap-calda">💧 Calda <b>' + g.calda + ' L/ha</b> · tanque de <b>' + fmt(g.tanque, 0) + ' L</b> cobre <b>' +
         fmt(hat, 0) + ' ha</b>' + (ha ? '<br><span>' + tanques(ha, hat, g.calda) + '</span>' : '') + '</div>' : '') +
@@ -197,7 +199,7 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     if (out) out.push({
       titulo, status: st, quando: (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
         (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : ''),
-      talhoes: g.tal.map((t) => t + (!g.feito[t] && varias && g.prev[t] ? ' (' + curta(g.prev[t]) + ')' : '')).join(', '),
+      talhoes: g.tal.map((t) => t + (g.parc[t] ? ' (parcial ' + fmt(g.parc[t]) + ' de ' + fmt(g.ha[t]) + ' ha)' : '') + (!g.feito[t] && varias && g.prev[t] ? ' (' + curta(g.prev[t]) + ')' : '')).join(', '),
       ha: ha ? fmt(ha) + ' ha' : '',
       calda: liq ? 'Calda ' + g.calda + ' L/ha · tanque de ' + fmt(g.tanque, 0) + ' L cobre ' + fmt(hat, 0) + ' ha' : '',
       prods: g.prods.map((p) => [String(p[0]), doseTxt(Number(p[1])) + ' ' + unid(p[2]), ha ? volTotal(p[1] * ha, p[2]) : '']),

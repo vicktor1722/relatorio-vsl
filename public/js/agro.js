@@ -814,11 +814,11 @@
       var d = dd(r);
       talDe(r).forEach(function (t) {
         var tt = tl.filter(function (x) { return x.nome === t; })[0]; if (!tt) return;
-        var ha = haUsada(tt.ha, d.parte && d.parte[t]);
+        var ha = haUsada(tt.ha, d.parte && d.parte[t]), hf = haFeitaDe(d, t, ha);
         prodsDe(r).forEach(function (p) {
           if (!p[0]) return;
-          var b = baseUnidade(p[2]), x = item(p[0], b[0]), q = (Number(p[1]) || 0) * ha * b[1];
-          if (feitoDe(r)[t]) x.apl += q; else x.prev += q;
+          var b = baseUnidade(p[2]), x = item(p[0], b[0]), dose = (Number(p[1]) || 0) * b[1];
+          x.apl += dose * hf; x.prev += dose * (ha - hf);
         });
       });
     });
@@ -1174,7 +1174,7 @@
         prods.map(function (p) { return '<div><span>' + esc(p[0]) + '</span><b>' + volTotal(p[1] * hu, p[2]) + '</b></div>'; }).join('') + '</div>' +
         (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (d.feitoPor && d.feitoPor[nome] ? ' por ' + esc(d.feitoPor[nome]) : '') + regTalhao(d, nome) + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
           ' <button class="ag-link" data-a="desfazer" data-v="' + esc(nome) + '">desfazer</button></div>'
-          : '<button class="btn" data-a="aplicar" data-v="' + esc(nome) + '">Marcar como aplicado</button>') + '</div>';
+          : parcTxt(d, nome, hu) + '<button class="btn" data-a="aplicar" data-v="' + esc(nome) + '">Marcar como aplicado</button>') + '</div>';
     });
     if (pend > 1) h += '<button class="btn secundario" data-a="aplicar" data-v="*">Marcar todos os pendentes como aplicados</button>';
     h += '<h2>Volume total</h2><div class="ag-sec"><small>' + fmt(ha) + ' ha · ' + talDe(r).length + ' talhão(ões)</small>' +
@@ -1200,6 +1200,15 @@
   }
 
   // registro de campo do operador (portal) para um talhão: horário, clima, observação e fotos
+  // aplicação parcial lançada pelo operador no portal (d.parcial[talhão] = [{d, ha, por}])
+  function parcDe(d, nome) { var l = d.parcial && d.parcial[nome]; return Array.isArray(l) ? l.filter(function (x) { return x && Number(x.ha) > 0; }) : []; }
+  function haFeitaDe(d, nome, hu) { return d.feito && d.feito[nome] ? hu : Math.min(hu, parcDe(d, nome).reduce(function (s, x) { return s + Number(x.ha); }, 0)); }
+  function parcTxt(d, nome, hu) {
+    var l = parcDe(d, nome); if (!l.length) return '';
+    var f = haFeitaDe(d, nome, hu);
+    return '<div class="ag-feito" style="color:#9A6400">◐ Parcial: ' + fmt(f) + ' de ' + fmt(hu) + ' ha · faltam ' + fmt(Math.max(0, hu - f)) + ' ha<br>' +
+      l.map(function (x) { return curta(x.d) + ' · ' + fmt(x.ha) + ' ha' + (x.por ? ' por ' + esc(x.por) : ''); }).join('<br>') + '</div>';
+  }
   function regTalhao(d, nome) {
     var g = (d.aplicReg || []).filter(function (x) { return (x.talhoes || []).indexOf(nome) >= 0; }).pop();
     if (!g) return '';

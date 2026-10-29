@@ -21,3 +21,16 @@ export function plantioPorDia(p, area) {
 }
 
 export function haPlantada(p, area) { return plantioPorDia(p, area).reduce((s, x) => s + x.ha, 0); }
+
+/* ---------------- aplicação parcial do talhão ----------------
+   O operador pode lançar só parte do talhão (não deu tempo de terminar): d.parcial[t] = [{id, d, ha, por, porId}].
+   Quando a soma chega na área do talhão, o talhão vira aplicado (d.feito[t]). */
+export function parciaisDe(d, t) {
+  const l = d && d.parcial && Array.isArray(d.parcial[t]) ? d.parcial[t] : [];
+  return l.filter((x) => x && Number(x.ha) > 0);
+}
+// hectares já aplicados do talhão nesta aplicação (talhão todo se marcado aplicado)
+export function haAplicada(d, t, ha) {
+  if (d && d.feito && d.feito[t]) return ha;
+  return Math.min(ha, parciaisDe(d, t).reduce((s, x) => s + Number(x.ha), 0));
+}
