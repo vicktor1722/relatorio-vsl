@@ -885,7 +885,7 @@
       h += '<div class="ag-talc' + (ok ? ' ok' : '') + '"><div class="ag-tt"><b>' + esc(nome) + '</b><span>' + fmt(hu) + (hu < t.ha ? ' de ' + fmt(t.ha) : '') + ' ha' +
         (!ok && Number(d.dae) > 0 && datasTal(r)[nome] ? ' · 📅 ' + curta(datasTal(r)[nome]) : '') + '</span></div><div class="ag-tp">' +
         prods.map(function (p) { return '<div><span>' + esc(p[0]) + '</span><b>' + volTotal(p[1] * hu, p[2]) + '</b></div>'; }).join('') + '</div>' +
-        (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (d.feitoPor && d.feitoPor[nome] ? ' por ' + esc(d.feitoPor[nome]) : '') + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
+        (ok ? '<div class="ag-feito">✔ Aplicado em ' + curta(ok) + (d.feitoPor && d.feitoPor[nome] ? ' por ' + esc(d.feitoPor[nome]) : '') + regTalhao(d, nome) + (venc(r, nome) && (Number(d.num) || 1) < (Number(d.total) || 1) ? ' · 📅 próxima ' + curta(venc(r, nome)) : '') +
           ' <button class="ag-link" data-a="desfazer" data-v="' + esc(nome) + '">desfazer</button></div>'
           : '<button class="btn" data-a="aplicar" data-v="' + esc(nome) + '">Marcar como aplicado</button>') + '</div>';
     });
@@ -912,6 +912,15 @@
     atualizarSino();
   }
 
+  // registro de campo do operador (portal) para um talhão: horário, clima, observação e fotos
+  function regTalhao(d, nome) {
+    var g = (d.aplicReg || []).filter(function (x) { return (x.talhoes || []).indexOf(nome) >= 0; }).pop();
+    if (!g) return '';
+    var n1 = function (v) { return String(Math.round(Number(v) * 10) / 10).replace('.', ','); };
+    var l = [g.inicio ? g.inicio + (g.fim ? '–' + g.fim : '') : '', g.vento != null ? 'vento ' + n1(g.vento) + ' km/h' : '', g.temp != null ? n1(g.temp) + ' °C' : '', g.umid != null ? n1(g.umid) + '% umid.' : ''].filter(Boolean);
+    return '<div class="ag-reg">' + (l.length ? esc(l.join(' · ')) : '') + (g.obs ? '<br>“' + esc(g.obs) + '”' : '') +
+      ((g.fotos || []).length ? '<div class="ag-regf">' + g.fotos.map(function (k) { var u = '/img/' + encodeURIComponent(k); return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" loading="lazy" alt=""></a>'; }).join('') + '</div>' : '') + '</div>';
+  }
   function modalAplicar(alvo) {
     var r = recDe(R.id), ov = document.createElement('div'); ov.className = 'ag-ov';
     ov.innerHTML = '<div class="ag-mod"><h3>Marcar como aplicado</h3><p class="ag-dica">' + esc(r.operacao) + ' · ' + (alvo === '*' ? 'todos os talhões pendentes' : esc(alvo)) + '</p>' +

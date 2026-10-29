@@ -17,6 +17,7 @@ import { avisarAplicacoes, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
+import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
@@ -221,6 +222,8 @@ export default {
 
       // acesso da fazenda e do operador: página e API próprias (login separado do consultor)
       if (rota === '/portal' || rota === '/portal/') return html(paginaPortal());
+      if (rota === '/portal-sw.js') return new Response(PORTAL_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
+      if (rota === '/portal.webmanifest') return new Response(PORTAL_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
       if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url);
 
       if (rota === '/api/status') {
@@ -749,8 +752,8 @@ export default {
     }
   },
 
-  // cron das 5h40 de MT (wrangler.toml): notificação das aplicações dos próximos dias
+  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor
   async scheduled(evento, env, ctx) {
-    ctx.waitUntil(avisarAplicacoes(env));
+    ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };
