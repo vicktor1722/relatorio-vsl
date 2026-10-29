@@ -39,6 +39,7 @@ const utf8 = (s) => new TextEncoder().encode(s);
 
 /* ---------------- tabela ---------------- */
 let pronta = null;
+export function garantirPush(env) { return garantir(env); }
 function garantir(env) {
   if (!pronta) {
     pronta = env.DB.prepare(`CREATE TABLE IF NOT EXISTS push_assinaturas (
@@ -77,6 +78,8 @@ async function chaves(env) {
   vapid = { publica: pub, privada: chave };
   return vapid;
 }
+
+export async function chavePublica(env) { return (await chaves(env)).publica; }
 
 async function cabecalhoVapid(env, endpoint) {
   const v = await chaves(env);
@@ -135,8 +138,11 @@ function lerDados(s) { try { const o = JSON.parse(s || '{}'); return o && typeof
 
 // Mesma regra do app: aplicação prevista ainda não feita e a próxima de uma sequência (aplicada + intervalo).
 // Entra o que vence dentro do aviso da recomendação (padrão 3 dias) ou que atrasou até 7 dias.
-export async function proximas(env, uid, hoje) {
+// op.fazendas: só estas fazendas; op.operador: só o que já está recomendado e falta aplicar
+// (hoje, amanhã e atrasadas até 7 dias) — a próxima de uma sequência ainda não existe para o operador.
+export async function proximas(env, uid, hoje, op) {
   hoje = hoje || hojeMT();
+  op = op || {};
   const [recs, pla, faz] = await Promise.all([
     env.DB.prepare('SELECT fazenda_id, safra, operacao, data_prevista, dados FROM recomendacoes WHERE usuario_id = ?').bind(uid).all(),
     env.DB.prepare('SELECT fazenda_id, safra, talhao, data_plantio, data_emerg FROM plantio WHERE usuario_id = ?').bind(uid).all(),
@@ -148,12 +154,14 @@ export async function proximas(env, uid, hoje) {
   const out = {};
   const anota = (r, data, t, txt, aviso) => {
     if (!data) return;
+    if (op.operador) aviso = 1;
     const n = difDias(data, hoje);
     if (n > aviso || n < -7) return;
     const k = r.fazenda_id + '|' + txt + '|' + data;
     (out[k] = out[k] || { fazenda: nomeFaz[r.fazenda_id] || '', op: txt, data, dias: n, tal: [] }).tal.push(t);
   };
   (recs.results || []).forEach((r) => {
+    if (op.fazendas && !op.fazendas.includes(r.fazenda_id)) return;
     const d = lerDados(r.dados), feito = d.feito || {}, prox = d.prox || {}, dae = Number(d.dae) || 0;
     const aviso = d.aviso == null ? 3 : Math.max(0, Number(d.aviso) || 0);
     const num = Number(d.num) || 1, rep = Number(d.rep) || 0, total = Number(d.total) || 1;
@@ -166,7 +174,7 @@ export async function proximas(env, uid, hoje) {
           if (base) data = somaDias(base, dae);
         }
         anota(r, data, t, rep > 0 ? ordTxt(r.operacao, num) : r.operacao, aviso);
-      } else if (rep > 0 && num < total && !prox[t]) {
+      } else if (!op.operador && rep > 0 && num < total && !prox[t]) {
         anota(r, somaDias(feito[t], rep), t, ordTxt(r.operacao, num + 1), aviso);
       }
     });
@@ -180,8 +188,13 @@ function quando(n) {
   if (n === 1) return 'Amanhã';
   return 'Em ' + n + ' dias';
 }
-export function mensagem(lista) {
+export function mensagem(lista, operador) {
   if (!lista.length) return null;
+  if (operador) {
+    const linhas = lista.slice(0, 4).map((x) => quando(x.dias) + ' · ' + x.fazenda + ': ' + x.op + ' (' + x.tal.join(', ') + ')');
+    if (lista.length > 4) linhas.push('+ ' + (lista.length - 4) + ' outra(s)');
+    return { title: '🚜 ' + (lista.length === 1 ? '1 aplicação para você' : lista.length + ' aplicações para você'), body: linhas.join('\n'), url: '/portal?aba=fazer', tag: 'aplicacoes-op' };
+  }
   const linhas = lista.slice(0, 4).map((x) => quando(x.dias) + ' · ' + x.fazenda + ': ' + x.op + ' (' + x.tal.join(', ') + ')');
   if (lista.length > 4) linhas.push('+ ' + (lista.length - 4) + ' outra(s)');
   const hoje = lista.filter((x) => x.dias <= 0).length;
@@ -193,7 +206,7 @@ export function mensagem(lista) {
   };
 }
 
-async function enviarParaConta(env, uid, msg) {
+export async function enviarParaConta(env, uid, msg) {
   const { results } = await env.DB.prepare('SELECT endpoint, p256dh, auth FROM push_assinaturas WHERE usuario_id = ?').bind(uid).all();
   let ok = 0;
   for (const s of results || []) {
@@ -208,13 +221,26 @@ async function enviarParaConta(env, uid, msg) {
   return ok;
 }
 
-// cron da manhã: uma notificação por conta, só se houver aplicação perto
-export async function avisarAplicacoes(env) {
+// cron da manhã: uma notificação por conta, só se houver aplicação perto.
+// quem = 'operador' (5h00): logins do portal; senão (5h40) as contas dos consultores.
+export async function avisarAplicacoes(env, quem) {
   await garantir(env);
   const { results } = await env.DB.prepare('SELECT DISTINCT usuario_id FROM push_assinaturas').all();
   let contas = 0;
   for (const { usuario_id: uid } of results || []) {
+    const ehPortal = String(uid).startsWith('portal:');
+    if ((quem === 'operador') !== ehPortal) continue;
     try {
+      if (ehPortal) {
+        const a = await env.DB.prepare('SELECT * FROM acessos_fazenda WHERE id = ?').bind(uid.slice(7)).first();
+        if (!a || Number(a.ativo) === 0 || a.papel !== 'operador') continue;
+        const mod = await modulosDe(env, a.dono_id);
+        if (!mod.recomendacoes) continue;
+        let fz = []; try { fz = JSON.parse(a.fazendas || '[]'); } catch (e) {}
+        const msg = mensagem(await proximas(env, a.dono_id, null, { fazendas: fz, operador: true }), true);
+        if (msg && (await enviarParaConta(env, uid, msg))) contas++;
+        continue;
+      }
       const mod = await modulosDe(env, uid);
       if (!mod.recomendacoes) continue;
       const msg = mensagem(await proximas(env, uid));

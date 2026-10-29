@@ -13,6 +13,7 @@ export function paginaPortal() {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AMVS Fazenda">
 <link rel="apple-touch-icon" href="/api/icone/app.png">
+<link rel="manifest" href="/portal.webmanifest">
 <title>Acesso da fazenda · AMVS</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -76,6 +77,21 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .marcar{display:flex;gap:8px;align-items:flex-end;margin-top:10px;flex-wrap:wrap}.marcar .campo{margin:0;flex:0 0 150px}.marcar .btn{flex:1;min-width:160px}
 .vermapa{border:0;background:none;color:var(--verde);font-weight:600;font-size:13px;padding:4px 0}
 .mini{height:260px;border-radius:10px;overflow:hidden;margin-top:8px;border:1px solid var(--linha)}
+.faixa{border-radius:12px;padding:9px 12px;font-size:13.5px;margin-bottom:10px;background:#E6F0FA;color:#1A4E85}
+.faixa.am{background:#FFF3DC;color:#7A5200}
+.push{display:flex;flex-direction:column;gap:8px;background:#EEF6F0;border:1px solid #CFE5D6;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.reg{font-size:12.5px;color:#1A4E85;margin-top:3px;overflow-wrap:anywhere}.reg img{width:56px;height:56px;object-fit:cover;border-radius:7px;margin:4px 4px 0 0}
+.espera{color:#7A5200;font-size:12.5px}
+.veu{position:fixed;inset:0;background:rgba(10,30,20,.5);z-index:2000;display:flex;align-items:flex-end;justify-content:center}
+.folha{background:#fff;width:100%;max-width:560px;max-height:94dvh;overflow-y:auto;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.folha h3{margin:0 0 2px;font-size:18px}.folha .q{font-size:13px;color:var(--fraco);margin-bottom:10px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.g3 .campo{margin-bottom:8px;min-width:0}
+.folha .campo input,.folha .campo textarea{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;font-family:inherit}
+.folha label.l{display:block;font-size:12px;color:var(--fraco);margin-bottom:3px}
+.alerta{background:#FFF3DC;color:#7A5200;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
+.fotos{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}.fotos img{width:64px;height:64px;object-fit:cover;border-radius:8px}
+.addfoto{border:1.5px dashed #9AA5A0;background:none;border-radius:10px;padding:10px;font-size:14px;width:100%;color:var(--texto)}
+.folha .btn{margin-top:8px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;max-width:90%}
 .rodape{text-align:center;color:var(--fraco);font-size:12px;margin-top:24px}.rodape a{color:var(--verde)}
 ${AGRO_REL_CSS}
@@ -98,6 +114,7 @@ ${AGRO_REL_CSS}
   <div class="corpo">
     <div class="sel"><div class="campo" id="boxFaz"><label>Fazenda</label><select id="selFaz"></select></div>
       <div class="campo" id="boxSafra"><label>Safra</label><select id="selSafra"></select></div></div>
+    <div id="faixa" class="faixa oculto"></div>
     <div id="conteudo"><div class="vazio">Carregando…</div></div>
     <div class="rodape">AMVS Relatório · <a href="/termos">Termos de Uso</a></div>
   </div>
@@ -119,14 +136,24 @@ ${AGRO_REL_CSS}
   // total para o tanque: mL vira L e g vira kg (o operador mede em litro/quilo)
   function total(q, u) { var x = String(u || '').split('/')[0]; if (x === 'mL') return [q / 1000, 'L']; if (x === 'g') return [q / 1000, 'kg']; if (x === 't') return [q, 't']; return [q, x || 'L']; }
 
-  async function api(rota, corpo) {
-    var r = await fetch(rota, { method: corpo ? 'POST' : 'GET', headers: Object.assign({ Authorization: 'Bearer ' + tok }, corpo ? { 'Content-Type': 'application/json' } : {}), body: corpo ? JSON.stringify(corpo) : undefined });
+  var semRede = false;
+  async function api(rota, corpo, extra) {
+    var r;
+    try {
+      r = await fetch(rota, Object.assign({ method: corpo ? 'POST' : 'GET', headers: Object.assign({ Authorization: 'Bearer ' + tok }, corpo && !(corpo instanceof Blob) ? { 'Content-Type': 'application/json' } : {}, (extra && extra.headers) || {}),
+        body: corpo ? (corpo instanceof Blob ? corpo : JSON.stringify(corpo)) : undefined }));
+    } catch (e) { var er = new Error('Sem internet agora'); er.rede = true; throw er; }
+    if (!corpo) semRede = r.headers.get('X-Portal-Cache') === '1';
     var j = null; try { j = await r.json(); } catch (e) {}
     if (r.status === 401 && rota !== '/api/portal/entrar') { sair(); throw new Error('Entre de novo'); }
     if (!r.ok) throw new Error((j && j.erro) || ('HTTP ' + r.status));
     return j;
   }
-  function sair() { tok = ''; try { localStorage.removeItem(CH); } catch (e) {} $('#telaApp').classList.add('oculto'); $('#telaLogin').classList.remove('oculto'); }
+  function sair() {
+    tok = ''; try { localStorage.removeItem(CH); } catch (e) {}
+    try { caches.delete('amvs-portal-v1'); } catch (e) {}   // dados guardados para abrir sem internet
+    $('#telaApp').classList.add('oculto'); $('#telaLogin').classList.remove('oculto');
+  }
 
   $('#lgEntrar').onclick = async function () {
     var b = this; b.disabled = true; $('#lgMsg').textContent = '';
@@ -138,7 +165,12 @@ ${AGRO_REL_CSS}
     b.disabled = false;
   };
   $('#lgSenha').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#lgEntrar').click(); });
-  $('#btnSair').onclick = function () { if (confirm('Sair deste acesso?')) sair(); };
+  $('#btnSair').onclick = async function () {
+    var nf = (await filaTudo()).length;
+    if (!confirm(nf ? 'Ainda há ' + nf + ' marcação(ões) esperando internet. Se sair, elas se perdem. Sair mesmo assim?' : 'Sair deste acesso?')) return;
+    if (nf) await filaLimpar();
+    sair();
+  };
 
   async function iniciar() {
     eu = await api('/api/portal/eu');
@@ -158,10 +190,12 @@ ${AGRO_REL_CSS}
     var fid = $('#selFaz').value;
     if (!D) $('#conteudo').innerHTML = '<div class="vazio">Carregando…</div>';
     try { D = await api('/api/portal/fazenda?id=' + encodeURIComponent(fid) + (safra ? '&safra=' + encodeURIComponent(safra) : '')); }
-    catch (e) { $('#conteudo').innerHTML = '<div class="vazio">' + esc(e.message) + '</div>'; return; }
+    catch (e) { $('#conteudo').innerHTML = '<div class="vazio">' + esc(e.rede ? 'Sem internet e esta fazenda ainda não foi aberta neste celular. Abra uma vez com sinal para ela ficar guardada.' : e.message) + '</div>'; return; }
+    await sobreporFila();
     $('#hNome').textContent = D.fazenda.nome;
     $('#selSafra').innerHTML = (D.safras.length ? D.safras : [D.safra]).map(function (s) { return '<option' + (s === D.safra ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('');
     pintar();
+    faixa();
   }
 
   /* ---------- mapa (satélite + talhões) ---------- */
@@ -261,12 +295,14 @@ ${AGRO_REL_CSS}
     var l = (D.aplicacoes || []).filter(function (a) { return filtro === 'fazer' ? a.status !== 'aplicada' : a.tal.some(function (t) { return t.feito; }); });
     l.sort(function (a, b) { return filtro === 'fazer' ? (a.data < b.data ? -1 : 1) : (a.data > b.data ? -1 : 1); });
     var nFazer = (D.aplicacoes || []).filter(function (a) { return a.status !== 'aplicada'; }).length;
-    var h = '<div class="chips"><button data-f="fazer" class="' + (filtro === 'fazer' ? 'on' : '') + '">A fazer (' + nFazer + ')</button><button data-f="feitas" class="' + (filtro === 'feitas' ? 'on' : '') + '">Aplicadas</button></div>';
+    var h = cartaoPush() + '<div class="chips"><button data-f="fazer" class="' + (filtro === 'fazer' ? 'on' : '') + '">A fazer (' + nFazer + ')</button><button data-f="feitas" class="' + (filtro === 'feitas' ? 'on' : '') + '">Aplicadas</button></div>';
     if (!l.length) h += '<div class="vazio">' + (filtro === 'fazer' ? 'Nenhuma aplicação pendente. 👍' : 'Nenhuma aplicação marcada ainda.') + '</div>';
     h += l.map(cartao).join('');
     $('#conteudo').innerHTML = h;
     document.querySelectorAll('[data-f]').forEach(function (b) { b.onclick = function () { filtro = b.dataset.f; pintar(); }; });
-    document.querySelectorAll('[data-marcar]').forEach(function (b) { b.onclick = function () { marcar(b.dataset.marcar, false); }; });
+    document.querySelectorAll('[data-marcar]').forEach(function (b) { b.onclick = function () { abrirFolha(b.dataset.marcar); }; });
+    document.querySelectorAll('[data-cancela]').forEach(function (b) { b.onclick = function () { cancelarFila(b.dataset.cancela); }; });
+    var bp = document.getElementById('btnPush'); if (bp) bp.onclick = ativarAvisos;
     document.querySelectorAll('[data-desf]').forEach(function (b) { b.onclick = function () { var p = b.dataset.desf.split('|'); desfazer(p[0], p.slice(1).join('|')); }; });
     document.querySelectorAll('[data-vm]').forEach(function (b) { b.onclick = function () { aberto[b.dataset.vm] = !aberto[b.dataset.vm]; pintar(); }; });
     document.querySelectorAll('.ap input[type=checkbox]').forEach(function (c) { c.onchange = function () { contar(c.dataset.rec); }; });
@@ -289,24 +325,17 @@ ${AGRO_REL_CSS}
     if (a.calda) h += '<div class="calda">Calda ' + n(a.calda) + ' L/ha' + (a.tanque ? ' · tanque ' + n(a.tanque) + ' L = ' + n(a.tanque / a.calda, 1) + ' ha por tanque' + (base ? ' · ' + Math.ceil(base * a.calda / a.tanque) + ' tanque(s)' : '') : '') + '</div>';
     if (a.obs) h += '<div class="obs">📝 ' + esc(a.obs) + '</div>';
     h += a.tal.map(function (t) {
-      if (t.feito) return '<div class="tl"><span style="width:24px;text-align:center">✅</span><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha</small></div>' +
-        '<div class="feito">aplicado ' + dataBR(t.feito) + (t.por ? '<br>' + esc(t.por) : '') + (t.meu ? '<br><button class="desf" data-desf="' + esc(a.id) + '|' + esc(t.nome) + '">desfazer</button>' : '') + '</div></div>';
+      if (t.feito) return '<div class="tl"><span style="width:24px;text-align:center">' + (t.fila ? '⏳' : '✅') + '</span><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha</small>' + regDe(a, t.nome) + '</div>' +
+        '<div class="feito">aplicado ' + dataBR(t.feito) + (t.fila ? '<br><span class="espera">esperando internet</span><br><button class="desf" data-cancela="' + esc(t.fila) + '">cancelar</button>'
+          : (t.por ? '<br>' + esc(t.por) : '') + (t.meu ? '<br><button class="desf" data-desf="' + esc(a.id) + '|' + esc(t.nome) + '">desfazer</button>' : '')) + '</div></div>';
       return '<label class="tl"><input type="checkbox" data-rec="' + esc(a.id) + '" value="' + esc(t.nome) + '" checked><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha' + (t.data ? ' · prevista ' + dataBR(t.data) : '') + '</small></div></label>';
     }).join('');
-    if (pend.length) h += '<div class="marcar"><div class="campo"><label>Data da aplicação</label><input type="date" id="dt_' + esc(a.id) + '" value="' + hoje() + '" max="' + hoje() + '"></div>' +
-      '<button class="btn" data-marcar="' + esc(a.id) + '" id="bt_' + esc(a.id) + '">✔ Marcar aplicado</button></div>';
+    if (pend.length) h += '<div class="marcar"><button class="btn" data-marcar="' + esc(a.id) + '" id="bt_' + esc(a.id) + '">✔ Marcar aplicado</button></div>';
     h += '<button class="vermapa" data-vm="' + esc(a.id) + '">' + (aberto[a.id] ? '▴ Esconder mapa' : '🗺️ Ver no mapa') + '</button>' + (aberto[a.id] ? '<div class="mini" id="mm_' + esc(a.id) + '"></div>' : '') + '</div>';
     return h;
   }
   function marcados(id) { return Array.prototype.slice.call(document.querySelectorAll('input[data-rec="' + id + '"]:checked')).map(function (c) { return c.value; }); }
   function contar(id) { var b = document.getElementById('bt_' + id); if (!b) return; var k = marcados(id).length; b.disabled = !k; b.textContent = k ? '✔ Marcar aplicado (' + k + (k > 1 ? ' talhões' : ' talhão') + ')' : 'Escolha os talhões'; }
-  async function marcar(id) {
-    var tal = marcados(id), dt = (document.getElementById('dt_' + id) || {}).value || hoje();
-    if (!tal.length) return;
-    if (!confirm('Confirmar aplicação em ' + tal.join(', ') + ' no dia ' + dataBR(dt) + '?')) return;
-    try { await api('/api/portal/aplicar', { rec_id: id, talhoes: tal, data: dt }); toast('✔ Aplicação registrada. O consultor já vê no app.'); await carregar(); }
-    catch (e) { toast(e.message); }
-  }
   async function desfazer(id, t) {
     if (!confirm('Desfazer a aplicação marcada em ' + t + '?')) return;
     try { await api('/api/portal/aplicar', { rec_id: id, talhoes: [t], desfazer: true }); toast('Desfeito'); await carregar(); }
@@ -322,7 +351,201 @@ ${AGRO_REL_CSS}
     }, function (nm, q) { return '<b>' + esc(nm) + '</b>' + (q.area_ha ? '<br>' + n(q.area_ha, 1) + ' ha' : '') + (st[nm] ? '<br>' + (st[nm] === 'ok' ? 'aplicado' : 'a aplicar') : ''); });
   }
 
-  if (tok) iniciar().catch(function () { sair(); });
+  /* ---------- registro mostrado no cartão ---------- */
+  function n1(v) { return String(Math.round(Number(v) * 10) / 10).replace('.', ','); }
+  function regDe(a, nome) {
+    var g = (a.registros || []).filter(function (x) { return (x.talhoes || []).indexOf(nome) >= 0; }).pop();
+    if (!g) return '';
+    var l = [g.inicio ? g.inicio + (g.fim ? '–' + g.fim : '') : '', g.vento != null ? 'vento ' + n1(g.vento) + ' km/h' : '', g.temp != null ? n1(g.temp) + ' °C' : '', g.umid != null ? n1(g.umid) + '% umid.' : ''].filter(Boolean);
+    return '<div class="reg">' + esc(l.join(' · ')) + (g.obs ? (l.length ? '<br>' : '') + '“' + esc(g.obs) + '”' : '') +
+      ((g.fotos || []).length ? '<div>' + g.fotos.map(function (u) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt=""></a>'; }).join('') + '</div>' : '') + '</div>';
+  }
+
+  /* ---------- folha "Marcar aplicado": só a data é obrigatória ---------- */
+  var LIM = { vento: 10, temp: 30, umid: 55 };   // boas práticas de pulverização: só avisa, não impede
+  function abrirFolha(id) {
+    var a = (D.aplicacoes || []).filter(function (x) { return x.id === id; })[0], tal = marcados(id);
+    if (!a || !tal.length) return;
+    var ha = a.tal.filter(function (t) { return tal.indexOf(t.nome) >= 0; }).reduce(function (s, t) { return s + t.ha; }, 0);
+    var fotos = [];
+    var v = document.createElement('div'); v.className = 'veu';
+    v.innerHTML = '<div class="folha"><h3>Marcar aplicado</h3><div class="q">' + esc(a.titulo) + ' · ' + esc(tal.join(', ')) + ' · ' + n(ha, 1) + ' ha</div>' +
+      '<div class="g3"><div class="campo"><label class="l">Data *</label><input type="date" id="fData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
+      '<div class="campo"><label class="l">Início</label><input type="time" id="fIni"></div><div class="campo"><label class="l">Fim</label><input type="time" id="fFim"></div></div>' +
+      '<div class="g3"><div class="campo"><label class="l">Vento (km/h)</label><input id="fVento" inputmode="decimal" placeholder="—"></div>' +
+      '<div class="campo"><label class="l">Temp. (°C)</label><input id="fTemp" inputmode="decimal" placeholder="—"></div>' +
+      '<div class="campo"><label class="l">Umidade (%)</label><input id="fUmid" inputmode="decimal" placeholder="—"></div></div>' +
+      '<div id="fAlerta"></div>' +
+      '<div class="fotos" id="fFotos"></div><button type="button" class="addfoto" id="fAdd">📷 Adicionar foto (opcional)</button>' +
+      '<input type="file" id="fArq" accept="image/*" capture="environment" class="oculto">' +
+      '<div class="campo" style="margin-top:10px"><label class="l">Observação (opcional)</label><textarea id="fObs" rows="2" placeholder="ex.: parei 20 min por garoa"></textarea></div>' +
+      '<button class="btn" id="fOk">✔ Confirmar aplicação</button><button class="btn sec" id="fNao">Cancelar</button></div>';
+    document.body.appendChild(v);
+    var val = function (i) { var x = String(v.querySelector(i).value || '').replace(',', '.').trim(); return x === '' ? '' : Number(x); };
+    var avisar = function () {
+      var al = [], ve = val('#fVento'), te = val('#fTemp'), um = val('#fUmid');
+      if (ve !== '' && ve > LIM.vento) al.push('vento acima de ' + LIM.vento + ' km/h');
+      if (te !== '' && te > LIM.temp) al.push('temperatura acima de ' + LIM.temp + ' °C');
+      if (um !== '' && um < LIM.umid) al.push('umidade abaixo de ' + LIM.umid + '%');
+      v.querySelector('#fAlerta').innerHTML = al.length ? '<div class="alerta">⚠ Clima fora do ideal: ' + al.join(', ') + '. Pode registrar mesmo assim.</div>' : '';
+    };
+    ['#fVento', '#fTemp', '#fUmid'].forEach(function (i) { v.querySelector(i).addEventListener('input', avisar); });
+    v.querySelector('#fAdd').onclick = function () { if (fotos.length >= 3) { toast('Até 3 fotos por aplicação'); return; } v.querySelector('#fArq').click(); };
+    v.querySelector('#fArq').onchange = async function () {
+      var f = this.files && this.files[0]; this.value = ''; if (!f) return;
+      try { var b = await reduzir(f); fotos.push(b); v.querySelector('#fFotos').innerHTML = fotos.map(function (x) { return '<img src="' + URL.createObjectURL(x) + '" alt="">'; }).join(''); }
+      catch (e) { toast('Não deu para usar essa foto'); }
+    };
+    v.querySelector('#fNao').onclick = function () { v.remove(); };
+    v.querySelector('#fOk').onclick = async function () {
+      var dt = v.querySelector('#fData').value;
+      if (!dt) { toast('Informe a data da aplicação'); return; }
+      if (dt > hoje()) { toast('A data não pode ser no futuro'); return; }
+      var item = { id: 'rg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), rec_id: id, talhoes: tal, data: dt, em: new Date().toISOString(),
+        registro: { inicio: v.querySelector('#fIni').value, fim: v.querySelector('#fFim').value, vento: val('#fVento'), temp: val('#fTemp'), umid: val('#fUmid'), obs: v.querySelector('#fObs').value.trim() },
+        fotos: fotos, fazenda: $('#selFaz').value };
+      this.disabled = true;
+      // o Safari do iPhone às vezes recusa guardar Blob: guarda os bytes da foto
+      item.fotos = await Promise.all(fotos.map(function (b) { return b.arrayBuffer().then(function (buf) { return { buf: buf, tipo: b.type || 'image/jpeg' }; }); }));
+      await filaPor(item);          // guarda primeiro: sem internet nada se perde
+      v.remove();
+      await sobreporFila(); pintar(); faixa();
+      var ok = await enviarFila();
+      toast(ok ? '✔ Aplicação registrada. O consultor já vê no app.' : '✔ Guardado no celular. Envia sozinho quando tiver internet.');
+    };
+  }
+  // foto menor antes de guardar/enviar (até 1600 px, JPEG)
+  function reduzir(arq) {
+    return new Promise(function (ok, falha) {
+      var u = URL.createObjectURL(arq), im = new Image();
+      im.onload = function () {
+        var e = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.round(im.naturalWidth * e); c.height = Math.round(im.naturalHeight * e);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+        c.toBlob(function (b) { b ? ok(b) : falha(new Error('foto')); }, 'image/jpeg', 0.8);
+      };
+      im.onerror = function () { URL.revokeObjectURL(u); falha(new Error('foto')); };
+      im.src = u;
+    });
+  }
+
+  /* ---------- fila sem internet (IndexedDB: guarda também as fotos) ---------- */
+  var dbP = null;
+  function db() {
+    if (!dbP) dbP = new Promise(function (ok, falha) {
+      var r = indexedDB.open('amvs-portal', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('fila', { keyPath: 'id' }); };
+      r.onsuccess = function () { ok(r.result); }; r.onerror = function () { falha(r.error); };
+    });
+    return dbP;
+  }
+  function loja(modo, fn) { return db().then(function (d) { return new Promise(function (ok, falha) { var t = d.transaction('fila', modo), s = t.objectStore('fila'), r = fn(s); t.oncomplete = function () { ok(r && r.result); }; t.onerror = function () { falha(t.error); }; }); }); }
+  function filaPor(item) { return loja('readwrite', function (s) { return s.put(item); }); }
+  function filaTudo() { return loja('readonly', function (s) { return s.getAll(); }).then(function (l) { return (l || []).sort(function (a, b) { return a.em < b.em ? -1 : 1; }); }).catch(function () { return []; }); }
+  function filaTirar(id) { return loja('readwrite', function (s) { return s.delete(id); }); }
+  function filaLimpar() { return loja('readwrite', function (s) { return s.clear(); }); }
+
+  // o que está na fila aparece como aplicado (⏳) até subir
+  async function sobreporFila() {
+    if (!D || !D.aplicacoes) return;
+    var f = await filaTudo();
+    f.forEach(function (it) {
+      var a = D.aplicacoes.filter(function (x) { return x.id === it.rec_id; })[0]; if (!a) return;
+      a.tal.forEach(function (t) { if (it.talhoes.indexOf(t.nome) >= 0 && !t.feito) { t.feito = it.data; t.fila = it.id; } });
+      var pend = a.tal.filter(function (t) { return !t.feito; }).length;
+      a.status = !pend ? 'aplicada' : pend < a.tal.length ? 'andamento' : 'pendente';
+    });
+  }
+  var enviando = false;
+  async function enviarFila() {
+    if (enviando || !tok) return false;
+    enviando = true;
+    var tudoOk = true;
+    try {
+      var f = await filaTudo();
+      for (var i = 0; i < f.length; i++) {
+        var it = f[i], chaves = [];
+        try {
+          for (var k = 0; k < (it.fotos || []).length; k++) {
+            var fo = it.fotos[k], blob = fo instanceof Blob ? fo : new Blob([fo.buf], { type: fo.tipo || 'image/jpeg' });
+            var r = await api('/api/portal/foto', blob, { headers: { 'Content-Type': 'image/jpeg', 'X-Foto-Id': it.id + 'f' + k } });
+            chaves.push(r.midia);
+          }
+          var reg = Object.assign({}, it.registro, { fotos: chaves });
+          await api('/api/portal/aplicar', { rec_id: it.rec_id, talhoes: it.talhoes, data: it.data, reg_id: it.id, em: it.em, registro: reg });
+          await filaTirar(it.id);
+        } catch (e) {
+          tudoOk = false;
+          if (e.rede) break;                   // sem sinal: tenta de novo depois
+          await filaTirar(it.id);              // recusado pelo servidor (ex.: já aplicado por outro): avisa e tira
+          toast('Não foi possível registrar ' + it.talhoes.join(', ') + ': ' + e.message);
+        }
+      }
+    } finally { enviando = false; }
+    if (f && f.length && D) { await carregarQuieto(); }
+    faixa();
+    return tudoOk;
+  }
+  async function cancelarFila(id) {
+    if (!confirm('Cancelar esta marcação que ainda não foi enviada?')) return;
+    await filaTirar(id); await carregarQuieto();
+  }
+  async function carregarQuieto() { try { await carregar($('#selSafra').value || undefined); } catch (e) {} }
+  async function faixa() {
+    var el = $('#faixa'); if (!el) return;
+    var nf = (await filaTudo()).length, sem = semRede || !navigator.onLine;
+    var t = [];
+    if (sem) t.push('📶 Sem internet · mostrando os dados guardados neste celular');
+    if (nf) t.push('⏳ ' + nf + (nf > 1 ? ' marcações esperando' : ' marcação esperando') + ' internet para enviar');
+    el.textContent = t.join(' · ');
+    el.className = 'faixa' + (nf ? ' am' : '') + (t.length ? '' : ' oculto');
+  }
+  window.addEventListener('online', function () { enviarFila(); });
+  window.addEventListener('offline', faixa);
+  setInterval(function () { if (navigator.onLine) filaTudo().then(function (f) { if (f.length) enviarFila(); }); }, 30000);
+
+  /* ---------- aviso no celular (5h00) ---------- */
+  function pushPossivel() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function instalado() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  function perguntado() { try { return !!localStorage.getItem(CH + ':push'); } catch (e) { return false; } }
+  function cartaoPush() {
+    if (!eu || eu.papel !== 'operador' || perguntado()) return '';
+    if (pushPossivel() && Notification.permission !== 'default') return '';
+    if (!pushPossivel()) {
+      if (!/iPhone|iPad|iPod/.test(navigator.userAgent) || instalado()) return '';
+      return '<div class="push">🔔 Para receber às 5h o aviso das aplicações do dia: no Safari toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra pelo ícone <b>AMVS Fazenda</b>.</div>';
+    }
+    return '<div class="push"><span>🔔 Receba às 5h da manhã, no celular, as aplicações do dia — mesmo com o portal fechado.</span><button class="btn" id="btnPush">Receber avisos</button></div>';
+  }
+  function chaveBytes(b) { var x = String(b).replace(/-/g, '+').replace(/_/g, '/'), bin = atob(x + '==='.slice((x.length + 3) % 4)), o = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return o; }
+  async function assinarPush() {
+    var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (!sub) { var k = await api('/api/portal/push/chave'); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveBytes(k.chave) }); }
+    await api('/api/portal/push/assinar', { assinatura: sub.toJSON() });
+  }
+  function ativarAvisos() {
+    try { localStorage.setItem(CH + ':push', '1'); } catch (e) {}   // pergunta uma vez só
+    Notification.requestPermission().then(async function (p) {
+      if (p !== 'granted') { toast('Avisos bloqueados. Dá para liberar nos Ajustes do celular.'); pintar(); return; }
+      try { await assinarPush(); toast('🔔 Pronto! Às 5h chegam as aplicações do dia.'); } catch (e) { toast('Não deu para ligar os avisos: ' + e.message); }
+      pintar();
+    });
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/portal-sw.js', { scope: '/portal' }).catch(function () {});
+    navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'fazer') { filtro = 'fazer'; if (D) pintar(); } });
+  }
+  if (/[?&]aba=fazer/.test(location.search)) { filtro = 'fazer'; try { history.replaceState(null, '', '/portal'); } catch (e) {} }
+  // sessão guardada: abre mesmo sem internet (dados do aparelho); só sai se o servidor recusar o login
+  if (tok) iniciar().then(function () {
+    if (eu && eu.papel === 'operador') {
+      enviarFila();
+      if (pushPossivel() && Notification.permission === 'granted' && navigator.onLine) assinarPush().catch(function () {});
+    }
+  }).catch(function (e) {
+    if (e && e.rede) { $('#telaLogin').classList.add('oculto'); $('#telaApp').classList.remove('oculto'); $('#conteudo').innerHTML = '<div class="vazio">Sem internet e o portal ainda não foi aberto neste celular com sinal. Abra uma vez com internet.</div>'; }
+  });
 })();
 </script>
 </body></html>`;

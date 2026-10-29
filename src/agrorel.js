@@ -111,6 +111,24 @@ function datasTal(r, porTal) {
 }
 
 // out (opcional) recebe cada aplicação em dados simples, para a apresentação em PowerPoint
+// registro de campo do operador (portal): horário, clima, observação e fotos de cada aplicação
+const num1 = (v) => String(Math.round(Number(v) * 10) / 10).replace('.', ',');
+function registroCampo(regs) {
+  if (!regs || !regs.length) return '';
+  const l = regs.slice().sort((a, b) => (a.data + (a.em || '') < b.data + (b.em || '') ? -1 : 1));   // ordem em que foram marcadas
+  return '<div class="ap-reg"><div class="ap-reg-t">📋 Registro de campo</div>' + l.map((x) => {
+    const clima = [x.vento != null ? 'vento ' + num1(x.vento) + ' km/h' : '', x.temp != null ? num1(x.temp) + ' °C' : '', x.umid != null ? 'umidade ' + num1(x.umid) + '%' : ''].filter(Boolean);
+    return '<div class="ap-rg"><div><b>' + curta(x.data) + '</b>' + (x.inicio ? ' · ' + esc(x.inicio) + (x.fim ? '–' + esc(x.fim) : '') : '') +
+      ' · ' + esc((x.talhoes || []).join(', ')) + (x.por ? ' · <span>' + esc(String(x.por).replace(/ \((operador|fazenda)\)$/, '')) + '</span>' : '') + '</div>' +
+      (clima.length ? '<div class="ap-clima">' + clima.join(' · ') + '</div>' : '') +
+      (x.obs ? '<div class="ap-obs">' + esc(x.obs) + '</div>' : '') +
+      ((x.fotos || []).length ? '<div class="ap-fotos">' + x.fotos.map((k) => {
+        const u = String(k).startsWith('/img/') ? k : '/img/' + encodeURIComponent(k);
+        return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img loading="lazy" src="' + esc(u) + '" alt="foto da aplicação"></a>';
+      }).join('') + '</div>' : '') + '</div>';
+  }).join('') + '</div>';
+}
+
 function aplicacoes(recs, areas, hoje, plantio, out) {
   const porTal = {};
   (plantio || []).forEach((p) => { porTal[p.talhao] = p; });
@@ -119,12 +137,13 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     const d = dadosDe(r), prods = prodsDe(r);
     const k = r.operacao + '|' + (d.num || 1) + '|' + prods.map((p) => p[0] + p[1]).join(',');
     if (!grupos[k]) {
-      grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, prox: null, prev: {},
+      grupos[k] = { op: r.operacao, num: Number(d.num || 1), prods, tal: [], feito: {}, prox: null, prev: {}, reg: [],
         total: Number(d.total || 1), rep: Number(d.rep || 0), data: r.data_prevista || '',
         calda: Number(d.calda || 0), tanque: Number(d.tanque || 0), ha: {} };
       ordem.push(k);
     }
     const g = grupos[k], dt = datasTal(r, porTal);
+    (Array.isArray(d.aplicReg) ? d.aplicReg : []).forEach((x) => g.reg.push(x));
     talDe(r).forEach((t) => {
       if (dt[t] && (!g.prev[t] || dt[t] < g.prev[t])) g.prev[t] = dt[t];
       if (g.tal.indexOf(t) < 0) g.tal.push(t);
@@ -161,6 +180,7 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     const topo = '<div class="ap-topo"><b>' + esc(titulo) + '</b><span class="selo ' + sel + '">' + st + '</span></div>' +
       '<div class="ap-meta">' + (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
         (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : '') + '</div>';
+    const reg = registroCampo(g.reg);
     const prox = g.prox && g.num < g.total ? '<div class="ap-prox">📅 Próxima aplicação: <b>' + (g.prox < hoje ? 'a programar' : curta(g.prox)) + '</b></div>' : '';
     const corpo = '<div class="ap-tal">' + g.tal.map((t) => '<span class="' + (g.feito[t] ? 'ok' : '') + '">' +
         (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + (!g.feito[t] && varias && g.prev[t] ? ' · ' + curta(g.prev[t]) : '') + '</span>').join('') +
@@ -171,7 +191,7 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
         (liq ? '<span>Por tanque</span>' : '') + (ha ? '<span>Total</span>' : '') + '</div>' +
       g.prods.map((p) => '<div><span>' + esc(p[0]) + '</span><span>' + doseTxt(Number(p[1])) + ' ' + esc(unid(p[2])) + '</span>' +
         (liq ? '<span class="tq">' + volTotal(p[1] * hat, p[2]) + '</span>' : '') +
-        (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>';
+        (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>' + reg;
     if (out) out.push({
       titulo, status: st, quando: (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
         (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : ''),
@@ -407,6 +427,12 @@ export const AGRO_REL_CSS = `
 .ap-prod .ap-th{border-top:0;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--fraco);padding:0 0 3px}
 .ap-calda{font-size:12.5px;background:#E6F0FA;color:#1A4E85;border-radius:8px;padding:6px 9px;margin-bottom:6px;line-height:1.45}.ap-calda span{font-size:11.5px;opacity:.85}
 .ap-prod.q4>div{grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px}.ap-prod .tq{color:var(--verde-escuro);font-weight:600}
+.ap-reg{margin-top:9px;border-top:1px solid var(--linha);padding-top:8px}
+.ap-reg-t{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--fraco);margin-bottom:4px}
+.ap-rg{font-size:13px;padding:6px 0;border-top:1px dashed var(--linha)}.ap-rg:first-of-type{border-top:0}
+.ap-rg span{color:var(--fraco)}.ap-clima{font-size:12.5px;color:#1A4E85;margin-top:2px}
+.ap-obs{font-size:12.5px;background:#FFFBEF;border-radius:7px;padding:4px 8px;margin-top:4px;overflow-wrap:anywhere}
+.ap-fotos{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ap-fotos img{width:84px;height:84px;object-fit:cover;border-radius:8px;display:block}
 .ap-prox{margin-top:7px;font-size:12px;background:#EEF6F6;color:#1F5F5F;border-radius:8px;padding:5px 8px}
 .mv-det>summary{list-style:none;cursor:pointer}.mv-det>summary::-webkit-details-marker{display:none}
 .mapa-geral>summary{list-style:none;cursor:pointer;font-weight:700;font-size:15px;color:var(--verde-escuro);padding:8px 0}.mapa-geral>summary::-webkit-details-marker{display:none}

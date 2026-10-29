@@ -189,6 +189,10 @@ export function mesclarOperador(ant, novo) {
   });
   // marcas de quem aplicou só valem para talhões que continuam aplicados
   ['feitoPor', 'feitoPorId'].forEach((k) => { if (novo[k]) Object.keys(novo[k]).forEach((t) => { if (!novo.feito[t]) delete novo[k][t]; }); });
+  // registro de campo do operador (clima, foto, observação): só o portal escreve; aqui vale o do servidor
+  const reg = (Array.isArray(ant.aplicReg) ? ant.aplicReg : [])
+    .map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).filter((t) => novo.feito[t]) })).filter((g) => g.talhoes.length);
+  if (reg.length) novo.aplicReg = reg; else delete novo.aplicReg;
   return novo;
 }
 

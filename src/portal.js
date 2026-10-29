@@ -13,6 +13,8 @@ import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } fr
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, modulosDe } from './agro.js';
 import { safraPadrao } from './safras.js';
+import { chavePublica, garantirPush } from './push.js';
+import { salvar as salvarMidia } from './midia.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200,
@@ -188,7 +190,9 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     });
     const pend = tal.filter((t) => !t.feito);
     const prox = pend.map((t) => t.data).filter(Boolean).sort()[0] || '';
-    return { id: r.id, titulo: Number(d.rep) > 0 ? ordTxt(r.operacao, num) : r.operacao, safra: r.safra, data: prox || r.data_prevista,
+    const registros = (d.aplicReg || []).map((g) => Object.assign({}, g, { porId: undefined,
+      fotos: (g.fotos || []).map((k) => '/img/' + encodeURIComponent(k)) }));
+    return { id: r.id, titulo: Number(d.rep) > 0 ? ordTxt(r.operacao, num) : r.operacao, safra: r.safra, data: prox || r.data_prevista, registros,
       prods: (d.prods || []).filter((p) => p && p[0]).map((p) => ({ nome: p[0], dose: Number(p[1]) || 0, unidade: p[2] || 'L/ha' })),
       calda: Number(d.calda) || 0, tanque: Number(d.tanque) || 0, obs: d.obs || '', resp: d.resp || '', tal,
       status: !pend.length ? 'aplicada' : pend.length < tal.length ? 'andamento' : 'pendente', atrasada: !!(prox && prox < hoje) };
@@ -241,6 +245,31 @@ export async function rotasPortal(env, req, rota, url) {
   const a = await acessoDaRequisicao(req, env);
   if (!a) return json({ erro: 'sessão expirada, entre de novo' }, 401);
 
+  /* ----- aviso no celular do operador (5h00) ----- */
+  if (rota === '/api/portal/push/chave') return json({ ok: true, chave: await chavePublica(env) });
+  if (rota === '/api/portal/push/assinar' && req.method === 'POST') {
+    await garantirPush(env);
+    const b = await req.json().catch(() => ({}));
+    const s = b.assinatura || {}, k = s.keys || {}, endpoint = String(s.endpoint || '');
+    if (!/^https:\/\//.test(endpoint) || !k.p256dh || !k.auth) return json({ erro: 'assinatura inválida' }, 400);
+    await env.DB.prepare(`INSERT INTO push_assinaturas (endpoint, usuario_id, p256dh, auth) VALUES (?,?,?,?)
+        ON CONFLICT(endpoint) DO UPDATE SET usuario_id = excluded.usuario_id, p256dh = excluded.p256dh, auth = excluded.auth`)
+      .bind(endpoint.slice(0, 1000), 'portal:' + a.id, String(k.p256dh).slice(0, 200), String(k.auth).slice(0, 100)).run();
+    return json({ ok: true });
+  }
+
+  /* ----- foto do registro da aplicação ----- */
+  if (rota === '/api/portal/foto' && req.method === 'POST') {
+    if (a.papel !== 'operador') return json({ erro: 'só o operador envia foto da aplicação' }, 403);
+    const tipo = String(req.headers.get('Content-Type') || '').split(';')[0];
+    if (!/^image\/(jpeg|png|webp)$/.test(tipo)) return json({ erro: 'envie a foto em JPEG' }, 400);
+    const dados = await req.arrayBuffer();
+    if (!dados.byteLength || dados.byteLength > 5 * 1024 * 1024) return json({ erro: 'foto grande demais (máx. 5 MB)' }, 400);
+    const id = txt(req.headers.get('X-Foto-Id'), 60).replace(/[^a-z0-9]/gi, '') || novoId('f');
+    const r = await salvarMidia(env, { chave: 'aplic/' + a.dono_id + '/' + id + (tipo === 'image/png' ? '.png' : '.jpg'), mime: tipo, dados });
+    return json({ ok: true, midia: r.chave });
+  }
+
   if (rota === '/api/portal/eu') {
     const ids = a.lista;
     const fazs = ids.length ? (await env.DB.prepare('SELECT f.id, f.nome, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.usuario_id = ? AND f.id IN (' + ids.map(() => '?').join(',') + ')')
@@ -270,6 +299,11 @@ export async function rotasPortal(env, req, rota, url) {
     const tal = (Array.isArray(b.talhoes) ? b.talhoes : []).map(String).filter((t) => (d.tal || []).includes(t));
     if (!tal.length) return json({ erro: 'escolha os talhões' }, 400);
     const quem = (a.nome || a.login) + ' (' + (a.papel === 'operador' ? 'operador' : 'fazenda') + ')';
+    d.aplicReg = Array.isArray(d.aplicReg) ? d.aplicReg : [];
+    // a mesma marcação reenviada (fila sem internet) não duplica
+    const regId = txt(b.reg_id, 60);
+    if (!b.desfazer && regId && d.aplicReg.some((g) => g.id === regId)) return json({ ok: true, repetido: true });
+    const marcados = [];
     tal.forEach((t) => {
       if (b.desfazer) {
         // só desfaz o que o próprio acesso marcou
@@ -278,8 +312,23 @@ export async function rotasPortal(env, req, rota, url) {
       } else {
         if (d.feito[t] && !String(d.feitoPorId[t] || '').startsWith(a.id + '|')) return;   // já aplicado por outra pessoa
         d.feito[t] = data; d.feitoPor[t] = quem; d.feitoPorId[t] = a.id + '|' + Date.now().toString(36);
+        marcados.push(t);
       }
     });
+    if (b.desfazer) {
+      // tira o talhão do registro; registro sem talhão some
+      d.aplicReg = d.aplicReg.map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).filter((t) => d.feito[t]) })).filter((g) => g.talhoes.length);
+    } else if (marcados.length) {
+      const g = b.registro && typeof b.registro === 'object' ? b.registro : {};
+      const hora = (v) => { const x = String(v || '').trim(); return /^\d{2}:\d{2}$/.test(x) ? x : ''; };
+      const numero = (v, min, max) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return v === '' || v == null || !Number.isFinite(n) || n < min || n > max ? null : Math.round(n * 10) / 10; };
+      d.aplicReg.push({
+        id: regId || novoId('rg'), talhoes: marcados, data, inicio: hora(g.inicio), fim: hora(g.fim),
+        vento: numero(g.vento, 0, 150), temp: numero(g.temp, -10, 60), umid: numero(g.umid, 0, 100),
+        obs: txt(g.obs, 500), fotos: (Array.isArray(g.fotos) ? g.fotos : []).map((k) => txt(k, 200)).filter((k) => k.startsWith('aplic/' + a.dono_id + '/')).slice(0, 6),
+        por: quem, porId: a.id, em: txt(b.em, 30) || new Date().toISOString()
+      });
+    }
     await env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id).run();
     return json({ ok: true });
   }
