@@ -1167,14 +1167,21 @@
   function temModulo() { return !!(ST.mod && (ST.mod.plantio || ST.mod.recomendacoes)); }
   function marcaVisto(k) { if (!nv()[k]) { nv()[k] = true; gravar(); } botoes(); }
   function pontoNovo() { var b = $('#btnMapa'); if (b) b.classList.toggle('ag-ponto', temModulo() && !nv().mapa); }
+  // aparece no máximo 7 vezes (uma por abertura do app); depois nunca mais.
+  // A contagem fica numa chave própria: não volta a zero se os dados do mapa forem refeitos.
+  var MAX_AVISO = 7, LS_AVISO = 'vsl-aviso-novo';
+  function vezesAviso() { try { return Number(localStorage.getItem(LS_AVISO)) || 0; } catch (e) { return MAX_AVISO; } }
+  function contaAviso(n) { try { localStorage.setItem(LS_AVISO, String(n)); } catch (e) {} }
+  function avisoAcabou() { return nv().fim || nv().aviso || vezesAviso() >= MAX_AVISO; }   // aviso: já tinha tocado em Entendi na versão antiga
   var avisoTimer = null;
   function avisoNovo() {
-    if (avisoTimer || !temModulo() || nv().aviso) return;
+    if (avisoTimer || !temModulo() || avisoAcabou()) return;
     avisoTimer = setInterval(function () {
-      if (!temModulo() || nv().aviso) { clearInterval(avisoTimer); avisoTimer = null; return; }
+      if (!temModulo() || avisoAcabou()) { clearInterval(avisoTimer); avisoTimer = null; return; }
       var b = $('#btnMapa');
       // só aparece quando a pessoa está dentro do relatório da fazenda (nenhuma outra tela por cima)
-      if (!b || !b.offsetParent || document.getElementById('agNovo') || document.querySelector('.tela:not(.oculto)')) return;
+      // (e só depois que o app terminou de abrir: antes disso a lista inicial ainda vai aparecer por cima)
+      if (!window.__appPronto || !b || !b.offsetParent || document.getElementById('agNovo') || document.querySelector('.tela:not(.oculto)')) return;
       var l = []; if (ST.mod.plantio) l.push('<b>Plantio dos talhões</b>'); if (ST.mod.recomendacoes) l.push('<b>Recomendações</b>');
       var d = document.createElement('div'); d.id = 'agNovo'; d.className = 'ag-novo';
       d.innerHTML = '<div class="ag-novo-card"><div class="ag-novo-ic">🌱</div><h3>Novidade no app!</h3>' +
@@ -1182,9 +1189,12 @@
         '<p class="ag-novo-como">Como acessar: toque em <b>🗺️ Mapa</b> no topo da tela e escolha ' + (ST.mod.plantio ? '<b>🌱 Plantio</b>' : '') + (ST.mod.plantio && ST.mod.recomendacoes ? ' ou ' : '') + (ST.mod.recomendacoes ? '<b>📋 Recomendações</b>' : '') + '.</p>' +
         '<button class="btn" id="agNovoVer">Abrir o mapa</button><button class="btn secundario" id="agNovoOk">Entendi</button></div>';
       document.body.appendChild(d);
-      var fecha = function () { nv().aviso = true; gravar(); d.remove(); clearInterval(avisoTimer); avisoTimer = null; };
+      contaAviso(vezesAviso() + 1);
+      clearInterval(avisoTimer);   // uma vez por abertura do app
+      var fecha = function () { d.remove(); };
       document.getElementById('agNovoOk').onclick = fecha;
-      document.getElementById('agNovoVer').onclick = function () { fecha(); var m = $('#btnMapa'); if (m) m.click(); };
+      // abriu o mapa pelo aviso: já conhece a novidade, não precisa mais
+      document.getElementById('agNovoVer').onclick = function () { nv().fim = true; gravar(); contaAviso(MAX_AVISO); fecha(); var m = $('#btnMapa'); if (m) m.click(); };
     }, 1500);
   }
 

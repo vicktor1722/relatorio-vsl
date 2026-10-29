@@ -1994,6 +1994,7 @@
     // o app sempre abre na lista de relatórios; a última conversa fica pronta por baixo (seta ←)
     if (!st.rel) await renderChat();
     if (!alvo) { await listarRelatorios(); abrir('telaLista'); }
+    window.__appPronto = true;   // avisos (ex.: novidade do mapa) só depois daqui
     atualizarSync();
     atualizarBotaoEnvio();
     if ('serviceWorker' in navigator) {
