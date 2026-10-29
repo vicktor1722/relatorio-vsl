@@ -69,6 +69,10 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .ap-sub{font-size:13px;color:var(--fraco);margin:3px 0 8px}
 .pr{display:grid;grid-template-columns:1fr auto auto;gap:4px 12px;font-size:14px;padding:8px 10px;background:#F6F8F7;border-radius:10px;margin-bottom:8px}
 .pr .h{font-size:11px;color:var(--fraco);text-transform:uppercase;letter-spacing:.3px}.pr .q{font-weight:700;color:var(--verde-escuro);text-align:right}.pr .d{text-align:right;color:var(--fraco)}
+.pr.t4{grid-template-columns:1fr auto auto auto;gap:4px 10px}.pr .tq{font-weight:700;color:#1A4E85;text-align:right;background:#E6F0FA;border-radius:6px;padding:0 5px}
+.pr .h.tq{background:none;color:#1A4E85}
+.calda b{color:#0F3A66}
+.campo-sel select{width:100%;font-size:15px;padding:10px;border:1px solid var(--linha);border-radius:10px;background:#fff;margin-bottom:8px}
 .calda{font-size:13px;background:#E6F0FA;color:#1A4E85;border-radius:10px;padding:7px 10px;margin-bottom:8px}
 .obs{font-size:13px;background:#FFFBEF;border-radius:10px;padding:7px 10px;margin-bottom:8px}
 .tl{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px dashed var(--linha);font-size:14.5px}
@@ -140,6 +144,7 @@ ${AGRO_REL_CSS}
 <script>
 (function () {
   var CH = 'amvs-portal', tok = '', eu = null, D = null, aba = 'apl', filtro = 'fazer', mapas = [], modoMapa = 'var';
+  var opAba = 'apl', opMapa = '*', selec = {};   // operador: aba, aplicação do mapa e talhões que ele marcou
   try { tok = localStorage.getItem(CH) || ''; } catch (e) {}
   var $ = function (s) { return document.querySelector(s); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -429,10 +434,11 @@ ${AGRO_REL_CSS}
   /* ---------- visão do operador / encarregado ---------- */
   var aberto = {};
   function vistaOperador() {
+    if (opAba === 'mapa') return mapaOperador();
     var l = (D.aplicacoes || []).filter(function (a) { return filtro === 'fazer' ? a.status !== 'aplicada' : a.tal.some(function (t) { return t.feito; }); });
     l.sort(function (a, b) { return filtro === 'fazer' ? (a.data < b.data ? -1 : 1) : (a.data > b.data ? -1 : 1); });
     var nFazer = (D.aplicacoes || []).filter(function (a) { return a.status !== 'aplicada'; }).length;
-    var h = cartaoPush() + '<div class="chips"><button data-f="fazer" class="' + (filtro === 'fazer' ? 'on' : '') + '">A fazer (' + nFazer + ')</button><button data-f="feitas" class="' + (filtro === 'feitas' ? 'on' : '') + '">Aplicadas</button></div>';
+    var h = abasOp() + cartaoPush() + '<div class="chips"><button data-f="fazer" class="' + (filtro === 'fazer' ? 'on' : '') + '">A fazer (' + nFazer + ')</button><button data-f="feitas" class="' + (filtro === 'feitas' ? 'on' : '') + '">Aplicadas</button></div>';
     if (!l.length) h += '<div class="vazio">' + (filtro === 'fazer' ? 'Nenhuma aplicação pendente. 👍' : 'Nenhuma aplicação marcada ainda.') + '</div>';
     h += l.map(cartao).join('');
     $('#conteudo').innerHTML = h;
@@ -442,7 +448,8 @@ ${AGRO_REL_CSS}
     var bp = document.getElementById('btnPush'); if (bp) bp.onclick = ativarAvisos;
     document.querySelectorAll('[data-desf]').forEach(function (b) { b.onclick = function () { var p = b.dataset.desf.split('|'); desfazer(p[0], p.slice(1).join('|')); }; });
     document.querySelectorAll('[data-vm]').forEach(function (b) { b.onclick = function () { aberto[b.dataset.vm] = !aberto[b.dataset.vm]; pintar(); }; });
-    document.querySelectorAll('.ap input[type=checkbox]').forEach(function (c) { c.onchange = function () { contar(c.dataset.rec); }; });
+    ligarAbasOp();
+    document.querySelectorAll('.ap input[type=checkbox]').forEach(function (c) { c.onchange = function () { selec[c.dataset.rec] = marcados(c.dataset.rec); contar(c.dataset.rec); }; });
     l.forEach(function (a) { contar(a.id); if (aberto[a.id]) miniMapa(a); });
   }
   function quando(a) {
@@ -457,26 +464,80 @@ ${AGRO_REL_CSS}
     var cls = a.status === 'aplicada' ? 'aplicada' : a.atrasada ? 'atrasada' : '';
     var h = '<div class="ap ' + cls + '"><div class="ap-h"><b>' + esc(a.titulo) + '</b>' + quando(a) + '</div>' +
       '<div class="ap-sub">' + a.tal.length + ' talhão(ões) · ' + n(haT, 1) + ' ha' + (a.resp ? ' · resp.: ' + esc(a.resp) : '') + '</div>';
-    if (a.prods.length) h += '<div class="pr"><span class="h">Produto</span><span class="h d">Dose</span><span class="h q">Total ' + (haP ? 'a aplicar' : '') + '</span>' +
-      a.prods.map(function (p) { var t = total(p.dose * base, p.unidade); return '<span>' + esc(p.nome) + '</span><span class="d">' + n(p.dose, p.dose < 1 ? 2 : 1) + ' ' + esc(p.unidade) + '</span><span class="q">' + n(t[0], t[0] < 10 ? 1 : 0) + ' ' + esc(t[1]) + '</span>'; }).join('') + '</div>';
-    if (a.calda) h += '<div class="calda">Calda ' + n(a.calda) + ' L/ha' + (a.tanque ? ' · tanque ' + n(a.tanque) + ' L = ' + n(a.tanque / a.calda, 1) + ' ha por tanque' + (base ? ' · ' + Math.ceil(base * a.calda / a.tanque) + ' tanque(s)' : '') : '') + '</div>';
+    // quanto de cada produto vai em um tanque cheio: dose × hectares que um tanque cobre (tanque ÷ calda)
+    var haTq = a.calda && a.tanque ? a.tanque / a.calda : 0;
+    if (a.prods.length) h += '<div class="pr' + (haTq ? ' t4' : '') + '"><span class="h">Produto</span><span class="h d">Dose</span>' + (haTq ? '<span class="h tq">Por tanque</span>' : '') + '<span class="h q">Total ' + (haP ? 'a aplicar' : '') + '</span>' +
+      a.prods.map(function (p) {
+        var t = total(p.dose * base, p.unidade), k = haTq ? total(p.dose * haTq, p.unidade) : null;
+        return '<span>' + esc(p.nome) + '</span><span class="d">' + n(p.dose, p.dose < 1 ? 2 : 1) + ' ' + esc(p.unidade) + '</span>' +
+          (k ? '<span class="tq">' + qtd(k) + '</span>' : '') + '<span class="q">' + n(t[0], t[0] < 10 ? 1 : 0) + ' ' + esc(t[1]) + '</span>';
+      }).join('') + '</div>';
+    if (a.calda) h += '<div class="calda">' + caldaTxt(a, base, haTq) + '</div>';
     if (a.obs) h += '<div class="obs">📝 ' + esc(a.obs) + '</div>';
     h += a.tal.map(function (t) {
       if (t.feito) return '<div class="tl"><span style="width:24px;text-align:center">' + (t.fila ? '⏳' : '✅') + '</span><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha</small>' + regDe(a, t.nome) + '</div>' +
         '<div class="feito">aplicado ' + dataBR(t.feito) + (t.fila ? '<br><span class="espera">esperando internet</span><br><button class="desf" data-cancela="' + esc(t.fila) + '">cancelar</button>'
           : (t.por ? '<br>' + esc(t.por) : '') + (t.meu ? '<br><button class="desf" data-desf="' + esc(a.id) + '|' + esc(t.nome) + '">desfazer</button>' : '')) + '</div></div>';
-      return '<label class="tl"><input type="checkbox" data-rec="' + esc(a.id) + '" value="' + esc(t.nome) + '" checked><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha' + (t.data ? ' · prevista ' + dataBR(t.data) : '') + '</small></div></label>';
+      return '<label class="tl"><input type="checkbox" data-rec="' + esc(a.id) + '" value="' + esc(t.nome) + '"' + ((selec[a.id] || []).indexOf(t.nome) >= 0 ? ' checked' : '') + '><div class="n"><b>' + esc(t.nome) + '</b><small>' + n(t.ha, 1) + ' ha' + (t.data ? ' · prevista ' + dataBR(t.data) : '') + '</small></div></label>';
     }).join('');
     if (pend.length) h += '<div class="marcar"><button class="btn" data-marcar="' + esc(a.id) + '" id="bt_' + esc(a.id) + '">✔ Marcar aplicado</button></div>';
     h += '<button class="vermapa" data-vm="' + esc(a.id) + '">' + (aberto[a.id] ? '▴ Esconder mapa' : '🗺️ Ver no mapa') + '</button>' + (aberto[a.id] ? '<div class="mini" id="mm_' + esc(a.id) + '"></div>' : '') + '</div>';
     return h;
   }
+  function qtd(t) { return n(t[0], t[0] < 1 ? 2 : t[0] < 10 ? 1 : 0) + ' ' + esc(t[1]); }
+  // calda e tanques: quantos tanques cheios e quanto vai no último (quando sobra área)
+  function caldaTxt(a, base, haTq) {
+    var s = 'Calda ' + n(a.calda) + ' L/ha';
+    if (!haTq) return s;
+    s += ' · tanque de ' + n(a.tanque) + ' L = <b>' + n(haTq, 1) + ' ha por tanque</b>';
+    if (!base) return s;
+    var cheios = Math.floor(base / haTq + 1e-6), resto = base - cheios * haTq;
+    if (resto < 0.05) return s + ' · ' + cheios + (cheios === 1 ? ' tanque' : ' tanques');
+    return s + ' · ' + cheios + (cheios === 1 ? ' tanque cheio' : ' tanques cheios') + ' + 1 último de <b>' + n(resto * a.calda) + ' L</b> (' + n(resto, 1) + ' ha): ' +
+      a.prods.map(function (p) { return esc(p.nome) + ' ' + qtd(total(p.dose * resto, p.unidade)); }).join(' · ');
+  }
   function marcados(id) { return Array.prototype.slice.call(document.querySelectorAll('input[data-rec="' + id + '"]:checked')).map(function (c) { return c.value; }); }
-  function contar(id) { var b = document.getElementById('bt_' + id); if (!b) return; var k = marcados(id).length; b.disabled = !k; b.textContent = k ? '✔ Marcar aplicado (' + k + (k > 1 ? ' talhões' : ' talhão') + ')' : 'Escolha os talhões'; }
+  function contar(id) { var b = document.getElementById('bt_' + id); if (!b) return; var k = marcados(id).length; b.disabled = !k; b.textContent = k ? '✔ Marcar aplicado (' + k + (k > 1 ? ' talhões' : ' talhão') + ')' : 'Toque no talhão que você aplicou'; }
   async function desfazer(id, t) {
     if (!confirm('Desfazer a aplicação marcada em ' + t + '?')) return;
     try { await api('/api/portal/aplicar', { rec_id: id, talhoes: [t], desfazer: true }); toast('Desfeito'); await carregar(); }
     catch (e) { toast(e.message); }
+  }
+  /* ---------- operador: aba Mapa (onde já foi aplicado) ---------- */
+  function abasOp() {
+    return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapa']].map(function (x) {
+      return '<button data-opa="' + x[0] + '" class="' + (opAba === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
+  }
+  function ligarAbasOp() { document.querySelectorAll('[data-opa]').forEach(function (b) { b.onclick = function () { opAba = b.dataset.opa; pintar(); window.scrollTo(0, 0); }; }); }
+  var COR_ST = { ok: '#2E7D32', pend: '#E08A00', atr: '#C62828' };
+  function stTal(a, t) { return t.feito ? 'ok' : (t.data && t.data < hoje()) ? 'atr' : 'pend'; }
+  function mapaOperador() {
+    var ap = (D.aplicacoes || []).slice().sort(function (x, y) { return (x.status === 'aplicada') - (y.status === 'aplicada') || (x.data < y.data ? -1 : 1); });
+    if (opMapa !== '*' && !ap.some(function (x) { return x.id === opMapa; })) opMapa = '*';
+    var areas = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
+    // situação de cada talhão: numa aplicação escolhida, ou somando todas (pior situação vence)
+    var st = {}, det = {}, peso = { atr: 3, pend: 2, ok: 1 };
+    ap.forEach(function (x) {
+      if (opMapa !== '*' && x.id !== opMapa) return;
+      x.tal.forEach(function (t) {
+        var s = stTal(x, t);
+        if (!st[t.nome] || peso[s] > peso[st[t.nome]]) st[t.nome] = s;
+        (det[t.nome] = det[t.nome] || []).push(esc(x.titulo) + ': ' + (s === 'ok' ? 'aplicado ' + dataBR(t.feito) : s === 'atr' ? 'atrasado (prevista ' + dataBR(t.data) + ')' : 'a aplicar' + (t.data ? ' · prevista ' + dataBR(t.data) : '')));
+      });
+    });
+    var ha = { ok: 0, pend: 0, atr: 0 }; Object.keys(st).forEach(function (k) { ha[st[k]] += areas[k] || 0; });
+    var h = abasOp() + '<div class="campo-sel"><select id="selOpMapa"><option value="*">Todas as aplicações</option>' + ap.map(function (x) {
+      return '<option value="' + esc(x.id) + '"' + (x.id === opMapa ? ' selected' : '') + '>' + esc(x.titulo) + (x.status === 'aplicada' ? ' (aplicada)' : x.data ? ' · ' + dataBR(x.data) : '') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="mapa-sat" id="mapaOp"></div>' +
+      '<div class="leg"><span><i style="background:' + COR_ST.ok + '"></i>Aplicado · ' + n(ha.ok, 1) + ' ha</span><span><i style="background:' + COR_ST.pend + '"></i>A aplicar · ' + n(ha.pend, 1) + ' ha</span>' +
+      '<span><i style="background:' + COR_ST.atr + '"></i>Atrasado · ' + n(ha.atr, 1) + ' ha</span><span><i style="background:#9AA5A0"></i>' + (opMapa === '*' ? 'sem aplicação' : 'fora desta aplicação') + '</span></div>' +
+      '<div class="sem" style="font-size:12.5px;margin:4px 2px">' + (opMapa === '*' ? 'Com todas as aplicações, o talhão mostra a situação mais urgente. ' : '') + 'Toque no talhão para ver o detalhe.</div>';
+    $('#conteudo').innerHTML = h;
+    ligarAbasOp();
+    $('#selOpMapa').onchange = function () { opMapa = this.value; pintar(); };
+    desenharMapa($('#mapaOp'), function (nm) {
+      return st[nm] ? { color: '#FFFFFF', weight: 2, fillColor: COR_ST[st[nm]], fillOpacity: 0.6 } : { color: '#FFFFFF', weight: 1, fillColor: '#9AA5A0', fillOpacity: 0.15 };
+    }, function (nm, q) { return '<b>' + esc(nm) + '</b>' + (q.area_ha ? ' · ' + n(q.area_ha, 1) + ' ha' : '') + (det[nm] ? '<br>' + det[nm].join('<br>') : '<br>sem aplicação'); });
   }
   function miniMapa(a) {
     var el = document.getElementById('mm_' + a.id); if (!el) return;
@@ -545,6 +606,7 @@ ${AGRO_REL_CSS}
       // o Safari do iPhone às vezes recusa guardar Blob: guarda os bytes da foto
       item.fotos = await Promise.all(fotos.map(function (b) { return b.arrayBuffer().then(function (buf) { return { buf: buf, tipo: b.type || 'image/jpeg' }; }); }));
       await filaPor(item);          // guarda primeiro: sem internet nada se perde
+      selec[id] = [];
       v.remove();
       await sobreporFila(); pintar(); faixa();
       var ok = await enviarFila();
