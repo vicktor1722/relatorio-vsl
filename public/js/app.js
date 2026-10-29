@@ -2159,6 +2159,7 @@
       await Conta.atualizarCadastro(navigator.onLine);
       await Sync.fixarDono();   // com o cadastro atualizado, confere de quem é cada relatório
       await recuperarSeSolicitado();
+      Termos.checar();          // primeiro acesso (ou termos novos): tela de aceite por cima de tudo
     }
     // o app sempre abre na lista de relatórios; a última conversa fica pronta por baixo (seta ←)
     if (!st.rel) await renderChat();
@@ -2200,6 +2201,7 @@
 
   global.App = {
     aoEntrar: async function () {
+      Termos.checar();
       await recuperarSeSolicitado();
       await listarRelatorios();
       await renderChat();
