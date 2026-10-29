@@ -313,6 +313,12 @@ ${AGRO_REL_CSS}
   var ICO_COLH = '<svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="9" y="2.5" width="5" height="4.5" rx="1"/><path d="M7.5 7h8.5l3 4h4v6.5H7.5z"/><rect x="15" y="4.2" width="7.5" height="1.7" rx=".85"/><path d="M0.5 10.5h6v6.5h-6zM0.5 10.5 2 9h4.5v1.5z"/><circle cx="11" cy="18.3" r="3.4"/><circle cx="19.5" cy="19" r="2.4"/></svg>';
   function chave(x) { return String(x || '').trim().replace(/\\s+/g, ' ').toLowerCase(); }
   function somaDias(iso, k) { var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); }
+  // de onde veio o ciclo: informado pelo consultor ou calculado pelo grupo de maturação (GMR) da cultivar
+  function rotCiclo(c) {
+    if (!c || !c.dias) return 'estimado';
+    var g = String(Number(c.gmr || 0).toFixed(1)).replace('.', ',');
+    return c.fonte === 'gmr' ? 'GMR ' + g : c.fonte === 'faixa' ? 'GMR ~' + g : 'informado';
+  }
   function previsoes() {
     var areas = {}, col = {};
     ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
@@ -321,7 +327,7 @@ ${AGRO_REL_CSS}
       var c = (D.ciclos || []).filter(function (x) { return p.variedade && chave(x.variedade) === chave(p.variedade); })[0];
       var dias = c && c.dias ? Number(c.dias) : CICLO_PADRAO[p.cultura]; if (!dias) return null;
       return { talhao: p.talhao, mat: p.variedade || NC[p.cultura] || p.cultura, cultura: p.cultura, ha: areas[p.talhao] || 0, plantio: p.data_plantio,
-        dias: dias, est: !(c && c.dias), data: somaDias(p.data_plantio, dias), colhido: col[p.talhao] || null };
+        dias: dias, est: !(c && c.dias), lab: rotCiclo(c), data: somaDias(p.data_plantio, dias), colhido: col[p.talhao] || null };
     }).filter(Boolean).sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.talhao).localeCompare(b.talhao, 'pt-BR', { numeric: true }); });
   }
   // eventos do calendário: aplicações (pulverizador) e colheita prevista (colheitadeira)
@@ -376,14 +382,14 @@ ${AGRO_REL_CSS}
       // resumo por material
       var mats = {}, cores = {}, ci = 0;
       pv.forEach(function (x) {
-        var m = mats[x.mat] || (mats[x.mat] = { ha: 0, ini: x.data, fim: x.data, est: false, colhido: 0 });
+        var m = mats[x.mat] || (mats[x.mat] = { ha: 0, ini: x.data, fim: x.data, est: false, colhido: 0, lab: x.lab, dias: x.dias });
         m.ha += x.ha; if (x.data < m.ini) m.ini = x.data; if (x.data > m.fim) m.fim = x.data; if (x.est) m.est = true; if (x.colhido) m.colhido += x.ha;
         if (!cores[x.mat]) cores[x.mat] = CORES[ci++ % CORES.length];
       });
       h += '<h2 class="talhao">Previsão por material</h2><div class="tab"><table><tr><th>Material</th><th>Área</th><th>Colheita prevista</th><th>Ciclo</th></tr>' + Object.keys(mats).map(function (k) {
         var m = mats[k];
         return '<tr><td><b><i style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:' + cores[k] + '"></i>' + esc(k) + '</b></td><td>' + n(m.ha, 1) + ' ha' + (m.colhido ? '<br><span class="sem">' + n(m.colhido, 1) + ' ha colhidos</span>' : '') + '</td>' +
-          '<td>' + dataBR(m.ini) + (m.fim !== m.ini ? ' a ' + dataBR(m.fim) : '') + '</td><td>' + (m.est ? '<span class="sem">estimado</span>' : 'informado') + '</td></tr>';
+          '<td>' + dataBR(m.ini) + (m.fim !== m.ini ? ' a ' + dataBR(m.fim) : '') + '</td><td>' + m.dias + ' dias<br><span class="sem">' + esc(m.lab) + '</span></td></tr>';
       }).join('') + '</table></div>';
       // hectares prontos por semana (segunda-feira de cada semana), por material
       var sem = {}, mx = 0;
@@ -413,7 +419,7 @@ ${AGRO_REL_CSS}
           '<td>' + dataBR(somaDias(x.data, -5)) + ' – ' + dataBR(somaDias(x.data, 5)) + '</td>' +
           '<td>' + (x.colhido ? '<span style="color:#2F9E5B;font-weight:700">colhido</span>' : f > 0 ? f + ' dias' : f === 0 ? 'hoje' : '<span class="neg">' + (-f) + ' dias atrás</span>') + '</td></tr>';
       }).join('') + '</table></div>' +
-        '<div class="sem" style="font-size:12.5px;margin:0 2px">Previsão = data de plantio + ciclo do material, com janela de ± 5 dias (clima e chuva mexem na colheita). "Estimado" = ciclo padrão da cultura.</div>';
+        '<div class="sem" style="font-size:12.5px;margin:0 2px">Previsão = data de plantio + ciclo do material, com janela de ± 5 dias (clima e chuva mexem na colheita). Na soja o ciclo sai do grupo de maturação (GMR) da cultivar; "estimado" = ciclo padrão da cultura.</div>';
     }
     $('#conteudo').innerHTML = h;
     document.querySelectorAll('[data-dia]').forEach(function (b) { b.onclick = function () { CAL.sel = b.dataset.dia; pintar(); }; });
