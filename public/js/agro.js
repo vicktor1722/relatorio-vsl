@@ -153,7 +153,7 @@
       if (tudo[2]) ST.produtos = tudo[2].produtos || [];
       if (tudo[3]) ST.estoque = tudo[3].estoque || [];
       if (tudo[4]) ST.colheita = tudo[4].colheita || [];
-      gravar();
+      gravar(); atualizarSino();
       return true;
     } catch (e) { return false; }
   }
@@ -462,6 +462,7 @@
     if (v === 'wiz') return pintarWiz();
     if (v === 'prods') return pintarCatalogo();
     if (v === 'cal') return pintarCalendario();
+    if (R.faz === '*') R.faz = fazPadrao();   // "todas as fazendas" só existe no calendário
     if (v === 'estoque') return pintarEstoque();
     var f = fazDe(R.faz);
     var lista = ST.recs.filter(function (r) { return r.fazenda_id === R.faz; }).filter(function (r) {
@@ -492,8 +493,32 @@
     if (!fazendas().length) $('.conteudo', tR).innerHTML = '<div class="aviso">Nenhuma fazenda com talhões. Importe o KML em Produtores e fazendas.</div>';
   }
 
+  // ícone 📅 da tela inicial: calendário de todas as fazendas
+  function abrirCalendarioGeral() {
+    if (!ST.mod.recomendacoes) return;
+    ESC = ''; R.faz = '*'; R.view = 'cal'; R.inicio = true; R.W = null; R.cy = 0;
+    tR.classList.remove('oculto'); pintarRecs(); topoRolagem(tR);
+    baixar().then(function (ok) { atualizarSino(); if (ok && !tR.classList.contains('oculto') && R.view === 'cal') pintarRecs(); });
+  }
+  // bolinha vermelha com o número de aplicações perto
+  function atualizarSino() {
+    var acoes = document.querySelector('#telaLista .acoes'); if (!acoes) return;
+    var b = document.getElementById('btnCalAg');
+    if (!b) {
+      b = document.createElement('button'); b.id = 'btnCalAg'; b.className = 'ag-calbtn'; b.title = 'Calendário de aplicações';
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><i></i>';
+      b.onclick = abrirCalendarioGeral;
+      acoes.insertBefore(b, acoes.firstChild);
+    }
+    b.style.display = ST.mod.recomendacoes ? '' : 'none';
+    var n = ST.mod.recomendacoes ? pertoDe('*').length : 0, i = b.querySelector('i');
+    i.textContent = n > 9 ? '9+' : String(n); i.style.display = n ? '' : 'none';
+    b.title = n ? n + ' aplicação(ões) perto — calendário' : 'Calendário de aplicações';
+  }
+
   function abrirRecs() {
     if (!ST.mod.recomendacoes) return;
+    R.inicio = false;
     marcaVisto('recs');
     var dr = doRelatorio(); ESC = dr.prod;
     R.faz = dr.faz || fazPadrao(); R.view = 'lista'; R.filtro = 'todas'; R.W = null;
@@ -610,7 +635,8 @@
   function eventosDe(fid) {
     var ev = [];
     ST.recs.forEach(function (r) {
-      if (r.fazenda_id !== fid) return;
+      if (fid !== '*' && r.fazenda_id !== fid) return;
+      if (fid === '*' && !fazDe(r.fazenda_id)) return;   // fazenda apagada
       var d = dd(r), pend = talDe(r).filter(function (t) { return !feitoDe(r)[t]; });
       var dt = datasTal(r), gp = {};
       pend.forEach(function (t) { if (dt[t]) (gp[dt[t]] = gp[dt[t]] || []).push(t); });
@@ -625,8 +651,24 @@
     return ev;
   }
   function corEv(e) { return e.k === 'prev' ? 'prev' : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
+  /* Aplicações perto (mesma regra do aviso no celular): previstas e próximas das sequências que vencem
+     dentro do aviso da recomendação (padrão 3 dias) ou que atrasaram até 7 dias. */
+  function pertoDe(fid) {
+    return eventosDe(fid).filter(function (e) {
+      if (e.k === 'apl') return false;
+      var a = dd(e.r).aviso == null ? 3 : Number(dd(e.r).aviso) || 0, n = difDias(e.d, hoje());
+      return n <= a && n >= -7;
+    }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+  }
+  function quandoTxt(iso) { var n = difDias(iso, hoje()); return n < 0 ? 'atrasada ' + (-n) + (n === -1 ? ' dia' : ' dias') : n === 0 ? 'hoje' : n === 1 ? 'amanhã' : 'em ' + n + ' dias'; }
+  function linhaEvento(e, todas) {
+    var fe = fazDe(e.r.fazenda_id);
+    return '<div class="ag-alerta c-' + corEv(e) + '" data-a="abrirrec" data-v="' + esc(e.r.id) + '"><div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (e.sit ? ' <span class="badge">' + esc(e.sit.t) + '</span>' : '') +
+      '<span>' + (todas && fe ? '<b>' + esc(fe.nome) + '</b> · ' : '') + esc(e.tal.join(', ')) + ' · ' + fmt(haDe(fe, e.tal, dd(e.r).parte)) + ' ha</span></div>' +
+      (e.k.indexOf('prox-') === 0 ? '<button class="ag-peq" data-a="prog" data-v="' + esc(e.r.id) + '|' + e.d + '">Programar</button>' : '') + '</div>';
+  }
   function pintarCalendario() {
-    var f = fazDe(R.faz), ev = eventosDe(R.faz), h = abasRec('cal');
+    var todas = R.faz === '*', f = todas ? null : fazDe(R.faz), ev = eventosDe(R.faz), h = R.inicio ? '' : abasRec('cal');
     if (!R.cy) { var t0 = new Date(); R.cy = t0.getFullYear(); R.cm = t0.getMonth(); R.sel = hoje(); }
     var ini = new Date(Date.UTC(R.cy, R.cm, 1)).getUTCDay(), nd = new Date(Date.UTC(R.cy, R.cm + 1, 0)).getUTCDate(), g = '';
     ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].forEach(function (x) { g += '<div class="ag-dow">' + x + '</div>'; });
@@ -636,17 +678,17 @@
       g += '<button class="ag-dia' + (iso === hoje() ? ' hoje' : '') + (iso === R.sel ? ' sel' : '') + '" data-a="calsel" data-v="' + iso + '"><span>' + d + '</span><i>' +
         es.slice(0, 4).map(function (e) { return '<u class="c-' + corEv(e) + '"></u>'; }).join('') + '</i></button>';
     }
-    h += '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
+    h += '<div class="campo"><label>Fazenda</label><select data-c="faz"><option value="*"' + (todas ? ' selected' : '') + '>Todas as fazendas</option>' + opcoesFaz(R.faz) + '</select></div>' +
       '<div class="ag-calhead"><button data-a="calmes" data-v="-1">‹</button><b>' + MESES[R.cm].charAt(0).toUpperCase() + MESES[R.cm].slice(1) + ' de ' + R.cy + '</b><button data-a="calmes" data-v="1">›</button></div>' +
       '<div class="ag-grade">' + g + '</div>' +
       '<div class="ag-leg"><span><u class="c-prev"></u>prevista</span><span><u class="c-apl"></u>aplicada</span><span><u class="c-perto"></u>próxima (perto)</span><span><u class="c-venc"></u>vencida</span><span><u class="c-ok"></u>próxima</span></div>';
     var ds = ev.filter(function (e) { return e.d === R.sel; });
-    h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) {
-      return '<div class="ag-alerta c-' + corEv(e) + '" data-a="abrirrec" data-v="' + esc(e.r.id) + '"><div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (e.sit ? ' <span class="badge">' + esc(e.sit.t) + '</span>' : '') +
-        '<span>' + esc(e.tal.join(', ')) + ' · ' + fmt(haDe(f, e.tal, dd(e.r).parte)) + ' ha</span></div>' +
-        (e.k.indexOf('prox-') === 0 ? '<button class="ag-peq" data-a="prog" data-v="' + esc(e.r.id) + '|' + e.d + '">Programar</button>' : '') + '</div>';
-    }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
-    pintar(tR, 'Calendário', f ? f.nome : '—', '', h);
+    h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
+    var pt = pertoDe(R.faz);
+    if (pt.length) h += '<h2>Próximas aplicações</h2>' + pt.map(function (e) {
+      return '<div class="ag-quando">' + dataBR(e.d).slice(0, 5) + ' · ' + quandoTxt(e.d) + '</div>' + linhaEvento(e, todas);
+    }).join('');
+    pintar(tR, todas ? 'Calendário de aplicações' : 'Calendário', todas ? 'Todas as fazendas' : (f ? f.nome : '—'), '', h);
   }
 
   /* ----- compartilhar a ordem de campo (WhatsApp / PDF) ----- */
@@ -867,6 +909,7 @@
     if (i >= 0) ST.recs[i] = r; else ST.recs.unshift(r);
     gravar();
     enfileirar('/api/agro/rec', { id: r.id, fazenda_id: r.fazenda_id, safra: r.safra, operacao: r.operacao, data_prevista: r.data_prevista, mostrar: r.mostrar, dados: r.dados });
+    atualizarSino();
   }
 
   function modalAplicar(alvo) {
@@ -1274,10 +1317,11 @@
         if (!confirm('Descartar esta recomendação?')) return;
         R.view = R.W && R.W.id ? 'det' : 'lista'; R.W = null; pintarRecs(); return;
       }
+      if (R.inicio && (R.view === 'cal' || (R.view === 'det' && R.de !== 'cal'))) { R.inicio = false; tR.classList.add('oculto'); atualizarSino(); return; }
       if (R.view === 'det' || R.view === 'prods' || R.view === 'cal' || R.view === 'estoque') { R.view = (R.view === 'det' && R.de === 'cal') ? 'cal' : 'lista'; R.de = ''; pintarRecs(); return; }
       tR.classList.add('oculto'); return;
     }
-    if (a === 'aba') { R.view = v; pintarRecs(); topoRolagem(tR); return; }
+    if (a === 'aba') { R.view = v; R.inicio = false; pintarRecs(); topoRolagem(tR); return; }
     if (a === 'entrada') { modalEntrada(null, v); return; }
     if (a === 'push') { ativarAvisos(); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
@@ -1431,7 +1475,7 @@
       if (!er) { er = document.createElement('div'); er.id = 'agErro'; er.className = 'ag-dica'; c.insertBefore(er, c.firstChild); }
       er.textContent = msg;
     } else if (er) { er.remove(); }
-    pontoNovo(); avisoNovo();
+    pontoNovo(); avisoNovo(); atualizarSino();
   }
 
   /* ---------------- aviso de versão nova (o iPhone deixa o app aberto por dias) ---------------- */
@@ -1483,7 +1527,8 @@
     var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { marcaVisto('mapa'); atualizarModulos(); });
     window.addEventListener('online', function () { atualizarModulos().then(descarregar); verificarVersao(); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { atualizarModulos().then(descarregar); verificarVersao(); } });
-    atualizarModulos().then(function () { conferirPush(); return descarregar(); });
+    atualizarModulos().then(function () { conferirPush(); return ST.mod.recomendacoes ? baixar() : descarregar(); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') atualizarSino(); });
     // tocou na notificação: abre direto nas recomendações
     var abrirPeloAviso = function () { if (ST.mod.recomendacoes) { var tl = document.getElementById('telaLista'); if (tl) tl.classList.add('oculto'); abrirRecs(); } };
     if (/[?&]abrir=recs/.test(location.search)) {
