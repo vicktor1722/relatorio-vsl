@@ -116,7 +116,7 @@ export function paginaTermos() {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Termos de Uso e Privacidade · AMVS Relatório</title>
 <style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#F3F5F4;color:#1C2B23;line-height:1.55}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#F3F5F4;color:#1C2B23;line-height:1.55;overflow-wrap:break-word}
 header{background:#1B7A43;color:#fff;padding:22px 18px}
 header h1{margin:0;font-size:21px}header p{margin:4px 0 0;opacity:.85;font-size:14px}
 main{max-width:760px;margin:0 auto;padding:8px 18px 40px;background:#fff}
