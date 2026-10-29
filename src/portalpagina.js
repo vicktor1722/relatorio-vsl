@@ -19,7 +19,8 @@ export function paginaPortal() {
 <style>
 :root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#E3F2E8;--linha:#E1E7E3;--fraco:#6B7B72;--texto:#1C2B23;--fundo:#F3F5F4;--erro:#C62828;--laranja:#E08A00}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--fundo);color:var(--texto);-webkit-text-size-adjust:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--fundo);color:var(--texto);-webkit-text-size-adjust:100%;overflow-wrap:break-word}
+.obs,.ap-sub,.tl .n,.caixa,.nota,.grupo-leg,.px{overflow-wrap:anywhere;min-width:0}
 button{font:inherit;cursor:pointer}
 .oculto{display:none!important}
 .login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px}

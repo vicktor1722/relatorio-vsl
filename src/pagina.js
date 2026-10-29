@@ -11,7 +11,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&
 const CSS = `
 :root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#E8F4EC;--texto:#1B2B22;--fraco:#6B7B72;--linha:#E4E9E6}
 *{box-sizing:border-box}
-body{margin:0;background:#F2F4F2;color:var(--texto);line-height:1.5;
+body{margin:0;background:#F2F4F2;color:var(--texto);line-height:1.5;overflow-wrap:break-word;
  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 .folha{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;box-shadow:0 0 30px rgba(0,0,0,.07)}
 header.capa{background:var(--verde);color:#fff;padding:22px 22px 18px}
@@ -55,6 +55,7 @@ h3.dia{margin:16px 0 10px;padding:0 0 4px;font-size:13px;font-weight:600;color:v
 .audio-ico{flex:none}
 .audio-item audio{display:block;width:100%;height:40px}
 @media print{.audio-item audio{display:none}}
+.nota,.grupo-leg,.audio-leg,.legenda,.ap-card,.px{overflow-wrap:anywhere;min-width:0}
 .nota{background:var(--verde-claro);border-left:4px solid var(--verde);padding:10px 14px;border-radius:0 8px 8px 0;margin:0 0 18px;font-size:14.5px;white-space:pre-wrap}
 .mapa{border:1px solid var(--linha);border-radius:12px;padding:10px;margin:18px 0}
 .mapa>svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}
