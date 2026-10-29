@@ -32,3 +32,7 @@ binding = "AI"
 directory = "./site"
 binding = "ASSETS"
 run_worker_first = ["/", "/r/*", "/img/*", "/api/*", "/oauth/*", "/admin", "/admin/*"]
+
+# todo dia às 6h37 de Mato Grosso (10h37 UTC): aviso no celular das aplicações dos próximos dias
+[triggers]
+crons = ["37 10 * * *"]
