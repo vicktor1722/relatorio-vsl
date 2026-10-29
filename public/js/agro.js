@@ -241,13 +241,19 @@
   // área de plantio da fazenda nesta safra: todos os talhões menos os marcados como pastagem/pousio,
   // que ficam fora da conta (aparecem à parte)
   var SEM_PLANTIO = { pastagem: 1, pousio: 1 };
+  // plantio lançado por dia pela fazenda (r.lanc): soma os hectares; sem lançamentos, data de plantio = talhão todo
+  function lancDe(r) { var l = r && r.lanc; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } } return Array.isArray(l) ? l.filter(function (x) { return x && x.d && Number(x.ha) > 0; }) : []; }
+  function haPlantadaDe(r, area) {
+    var l = lancDe(r); if (!l.length) return r && r.data_plantio ? area : 0;
+    return Math.min(area || Infinity, l.reduce(function (s, x) { return s + Number(x.ha); }, 0));
+  }
   function resumoArea(fid, safra, tl) {
     var area = 0, nArea = 0, fora = 0, nomesFora = [], plantado = 0;
     tl.forEach(function (t) {
       var r = linhaPlantio(fid, safra, t.nome);
       if (r && SEM_PLANTIO[r.cultura]) { fora += t.ha; nomesFora.push(t.nome); return; }
       area += t.ha; nArea++;
-      if (r && r.cultura && r.data_plantio) plantado += t.ha;
+      if (r && r.cultura) plantado += haPlantadaDe(r, t.ha);
     });
     return '<div class="ag-resumo-ha"><b>Área de plantio: ' + fmt(area) + ' ha</b> · ' + nArea + (nArea === 1 ? ' talhão' : ' talhões') +
       (plantado ? '<br>Plantado: ' + fmt(plantado) + ' ha (' + fmt(area ? plantado / area * 100 : 0) + '%)' : '') +
@@ -503,7 +509,8 @@
       var r = linhaPlantio(P.faz, P.safra, t.nome); if (r && (r.cultura || r.variedade || r.data_plantio)) feitos++;
       var d = r ? daeDe(r.data_emerg) : null;
       var ch = colheitaDe(P.faz, P.safra, t.nome);
-      var l2 = r ? [r.variedade, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
+      var hpl = r && lancDe(r).length ? haPlantadaDe(r, t.ha) : 0;
+      var l2 = r ? [r.variedade, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', hpl && hpl < t.ha - 0.05 ? 'plantado ' + fmt(hpl) + ' de ' + fmt(t.ha) + ' ha' : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
       if (ch && ch.sc_ha) l2 = (l2 ? l2 + ' · ' : '') + '🌾 ' + fmt(ch.sc_ha) + ' sc/ha';
       else { var pv = previsaoDe(r); if (pv) l2 = (l2 ? l2 + ' · ' : '') + 'colheita prev. ' + curta(pv.data) + (pv.est ? ' (estimado)' : ''); }
       return '<div class="lista-item ag-tal" data-a="edtal" data-v="' + esc(t.nome) + '"><div class="ic">' + (r && r.cultura ? '🌱' : '＋') + '</div><div class="txt"><b>' + esc(t.nome) + '</b><span>' +
@@ -535,7 +542,7 @@
       '<div class="linha2"><div class="campo"><label>Data de plantio</label><input type="date" data-k="data_plantio" value="' + esc(e.data_plantio) + '"></div>' +
       '<div class="campo"><label>Data de emergência</label><input type="date" data-k="data_emerg" value="' + esc(e.data_emerg) + '"></div></div>' +
       '<div class="ag-chips"><span>Emergência:</span><button class="ag-chip" data-a="emerg" data-v="4">plantio + 4 dias</button><button class="ag-chip" data-a="emerg" data-v="5">plantio + 5 dias</button></div>' +
-      '<div class="ag-dica" id="agDae">' + daeTxt(e) + '</div>' +
+      '<div class="ag-dica" id="agDae">' + daeTxt(e) + '</div>' + lancTxt(t) +
       '<div class="linha2"><div class="campo"><label>Espaçamento (cm)</label><input inputmode="decimal" data-k="espac_cm" value="' + (e.espac_cm ? String(e.espac_cm).replace('.', ',') : '') + '" placeholder="' + (esp || 'ex.: 50') + '"></div><div></div></div>' +
       '<div class="linha2"><div class="campo"><label>Sementes por metro</label><input inputmode="decimal" data-k="sem_m" value="' + (e.sem_m ? String(e.sem_m).replace('.', ',') : '') + '"></div>' +
       '<div class="campo"><label>Sementes por hectare</label><input inputmode="numeric" data-k="sem_ha" value="' + (e.sem_ha ? fmt(e.sem_ha, 0) : '') + '"></div></div>' +
@@ -568,6 +575,12 @@
     var c = e.variedade ? cicloDe({ cultura: e.cultura, variedade: e.variedade }) : null;
     if (!c) return !e.cultura || e.cultura === 'soja' ? 'Escolha a empresa e a variedade: o ciclo sai do grupo de maturação (GMR).' : 'Informe a variedade para a previsão de colheita.';
     return '⏱ Ciclo ' + cicloTxt(c) + (e.data_plantio ? ' · colheita prevista ' + curta(addDias(e.data_plantio, c.dias)) : '');
+  }
+  function lancTxt(t) {
+    var l = lancDe(linhaPlantio(P.faz, P.safra, P.nome)); if (!l.length) return '';
+    var tot = l.reduce(function (s, x) { return s + Number(x.ha); }, 0);
+    return '<div class="ag-dica">🌱 <b>Plantio por dia (lançado pela fazenda):</b> ' + l.map(function (x) { return curta(x.d) + ' ' + fmt(x.ha) + ' ha'; }).join(' · ') +
+      ' = ' + fmt(tot) + (t.ha ? ' de ' + fmt(t.ha) + ' ha' : ' ha') + '</div>';
   }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }
   function semDica(e) { var esp = espDe(e.cultura, e.espac_cm); return e.sem_ha ? '= ' + fmt(e.sem_m, 1) + ' sementes/m a ' + esp + ' cm = ' + fmt(e.sem_ha, 0) + ' sementes/ha' : 'Informe sementes/m ou sementes/ha: a outra é calculada pelo espaçamento (' + (esp ? esp + ' cm' : 'informe o espaçamento') + ').'; }
@@ -608,6 +621,7 @@
       var row = { fazenda_id: P.faz, safra: P.safra, talhao: nome, cultura: limpar ? '' : e.cultura, variedade: limpar ? '' : e.variedade,
         data_plantio: limpar ? '' : e.data_plantio, data_emerg: limpar ? '' : e.data_emerg,
         espac_cm: limpar ? 0 : (e.sem_m ? espDe(e.cultura, e.espac_cm) : (e.espac_cm || 0)), sem_m: limpar ? 0 : e.sem_m, sem_ha: limpar ? 0 : e.sem_ha };
+      var antP = linhaPlantio(P.faz, P.safra, nome); if (antP && antP.lanc && !limpar) row.lanc = antP.lanc;
       ST.plantio = ST.plantio.filter(function (r) { return !(r.fazenda_id === P.faz && (r.safra || '') === (P.safra || '') && r.talhao === nome); });
       if (!vazioPlantio(row)) ST.plantio.push(row);
       enviar.push(row);

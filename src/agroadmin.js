@@ -582,13 +582,19 @@ export const AGRO_JS = String.raw`
   // área de plantio da fazenda nesta safra: todos os talhões menos os marcados como pastagem/pousio,
   // que ficam fora da conta (aparecem à parte)
   var SEM_PLANTIO = { pastagem: 1, pousio: 1 };
+  // plantio lançado por dia pela fazenda (r.lanc): soma os hectares; sem lançamentos, data de plantio = talhão todo
+  function lancDe(r) { var l = r && r.lanc; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } } return Array.isArray(l) ? l.filter(function (x) { return x && x.d && Number(x.ha) > 0; }) : []; }
+  function haPlantadaDe(r, area) {
+    var l = lancDe(r); if (!l.length) return r && r.data_plantio ? area : 0;
+    return Math.min(area || Infinity, l.reduce(function (s, x) { return s + Number(x.ha); }, 0));
+  }
   function resumoArea(fid, safra, tl) {
     var area = 0, nArea = 0, fora = 0, nomesFora = [], plantado = 0;
     tl.forEach(function (t) {
       var r = linhaPlantio(fid, safra, t.nome);
       if (r && SEM_PLANTIO[r.cultura]) { fora += t.ha; nomesFora.push(t.nome); return; }
       area += t.ha; nArea++;
-      if (r && r.cultura && r.data_plantio) plantado += t.ha;
+      if (r && r.cultura) plantado += haPlantadaDe(r, t.ha);
     });
     return '<div class="ag-resumo-ha"><b>Área de plantio: ' + fmt(area) + ' ha</b> · ' + nArea + (nArea === 1 ? ' talhão' : ' talhões') +
       (plantado ? '<br>Plantado: ' + fmt(plantado) + ' ha (' + fmt(area ? plantado / area * 100 : 0) + '%)' : '') +
