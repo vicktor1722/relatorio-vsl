@@ -516,6 +516,10 @@
 
   async function publicar(rel) {
     if (!(await logado())) throw new Error('entre na sua conta para publicar');
+    // vídeo ainda esperando a redução: na hora de publicar vai o original, para não travar o envio
+    for (const i of await DB.itensDoRelatorio(rel.id)) {
+      if (i.sync_state === 'preparando') { i.sync_state = 'pendente'; await DB.put('itens', i); }
+    }
     await sincronizar(rel.id);
     const pend = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
     if (pend.length) throw new Error(pend.length + ' item(ns) ainda não subiram. Tente de novo com internet.');
