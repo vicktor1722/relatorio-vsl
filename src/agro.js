@@ -60,6 +60,32 @@ function garantir(env) {
         criado_em    TEXT DEFAULT (datetime('now')),
         atualizado_em TEXT DEFAULT (datetime('now'))
       )`),
+      // estoque de cada fazenda: só as entradas (compras/ajustes). A saída é calculada das
+      // recomendações aplicadas (dose × área), então desfazer uma aplicação devolve ao estoque.
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS estoque_agro (
+        id          TEXT PRIMARY KEY,
+        usuario_id  TEXT NOT NULL,
+        fazenda_id  TEXT NOT NULL,
+        produto     TEXT NOT NULL,
+        unidade     TEXT DEFAULT 'L',
+        qtd         REAL DEFAULT 0,
+        valor       REAL DEFAULT 0,
+        data        TEXT DEFAULT '',
+        obs         TEXT DEFAULT '',
+        criado_em   TEXT DEFAULT (datetime('now'))
+      )`),
+      // produtividade colhida de cada talhão (sacas/ha), por safra
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS colheita (
+        fazenda_id  TEXT NOT NULL,
+        safra       TEXT NOT NULL DEFAULT '',
+        talhao      TEXT NOT NULL,
+        usuario_id  TEXT NOT NULL,
+        sc_ha       REAL DEFAULT 0,
+        data        TEXT DEFAULT '',
+        atualizado_em TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (fazenda_id, safra, talhao)
+      )`),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS estoque_faz ON estoque_agro (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS recs_faz ON recomendacoes (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS plantio_usr ON plantio (usuario_id, fazenda_id)')
     ]).catch((e) => { pronta = null; throw e; });
@@ -297,6 +323,99 @@ export async function plantioGeral(env) {
   return { ok: true, safras };
 }
 
+/* ---------------- custo × produção (painel) ---------------- */
+
+// dose por hectare → quantidade na unidade do estoque (L ou kg)
+export function baseUnidade(u) {
+  const x = String(u || '').split('/')[0].trim();
+  if (x === 'mL') return ['L', 0.001];
+  if (x === 'g') return ['kg', 0.001];
+  if (x === 't') return ['kg', 1000];
+  if (x === 'kg') return ['kg', 1];
+  return ['L', 1];
+}
+const chaveProd = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+function areasDe(f) {
+  const out = {};
+  try {
+    const t = typeof f.talhoes === 'string' ? JSON.parse(f.talhoes || '{}') : f.talhoes;
+    ((t && t.features) || []).forEach((x) => { const p = x.properties || {}; if (p.nome) out[String(p.nome)] = Number(p.area_ha) || 0; });
+  } catch (e) { /* sem talhões */ }
+  return out;
+}
+
+// Por fazenda e talhão: quanto se gastou em produtos aplicados (custo médio das entradas do estoque
+// daquela fazenda) e quanto se colheu. Conta comum vê só as suas; administrador vê todas.
+export async function comparativo(env, me, adm, safraPedida) {
+  await garantir(env);
+  let safra = safraPadrao(safraPedida || '');
+  const onde = adm ? '' : ' WHERE usuario_id = ?';
+  const arg = adm ? [] : [me.id];
+  const [faz, recs, ent, col, pla, contas] = await Promise.all([
+    env.DB.prepare('SELECT f.id, f.nome, f.talhoes, f.usuario_id, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id' + (adm ? '' : ' WHERE f.usuario_id = ?')).bind(...arg).all(),
+    env.DB.prepare('SELECT fazenda_id, safra, operacao, dados FROM recomendacoes' + onde).bind(...arg).all(),
+    env.DB.prepare('SELECT fazenda_id, produto, unidade, qtd, valor FROM estoque_agro' + onde).bind(...arg).all(),
+    env.DB.prepare('SELECT fazenda_id, safra, talhao, sc_ha FROM colheita' + onde).bind(...arg).all(),
+    env.DB.prepare('SELECT fazenda_id, safra, talhao, cultura FROM plantio' + onde).bind(...arg).all(),
+    env.DB.prepare('SELECT id, email, nome FROM usuarios').all()
+  ]);
+  const nomeConta = {}; (contas.results || []).forEach((u) => { nomeConta[u.id] = u.nome || u.email; });
+  // safras que têm dados; sem escolha, abre na mais recente que já tem colheita (ou a mais recente de todas)
+  const lista = new Set(), comColheita = new Set();
+  [recs, col, pla].forEach((q) => (q.results || []).forEach((x) => { if (x.safra) lista.add(safraPadrao(x.safra)); }));
+  (col.results || []).forEach((x) => { if (x.safra) comColheita.add(safraPadrao(x.safra)); });
+  const safras = [...lista].sort().reverse();
+  if (!safra) safra = [...comColheita].sort().reverse()[0] || safras[0] || '';
+  const daSafra = (x) => !safra || safraPadrao(x.safra) === safra;
+
+  // custo médio de cada produto em cada fazenda (R$ por L ou kg)
+  const custo = {};
+  (ent.results || []).forEach((e) => {
+    const k = e.fazenda_id + '|' + chaveProd(e.produto) + '|' + (e.unidade || 'L');
+    const c = custo[k] || (custo[k] = { q: 0, v: 0 });
+    if (Number(e.qtd) > 0 && Number(e.valor) > 0) { c.q += Number(e.qtd); c.v += Number(e.valor); }
+  });
+  const preco = (fid, nome, un) => { const c = custo[fid + '|' + chaveProd(nome) + '|' + un]; return c && c.q ? c.v / c.q : 0; };
+
+  const porFaz = {};
+  (faz.results || []).forEach((f) => {
+    porFaz[f.id] = { id: f.id, nome: f.nome, produtor: f.produtor || '', conta: nomeConta[f.usuario_id] || '', area: areasDe(f), tal: {}, semPreco: {} };
+  });
+  const tal = (F, n) => F.tal[n] || (F.tal[n] = { nome: n, ha: F.area[n] || 0, cultura: '', custo: 0, sc_ha: 0, aplic: 0 });
+
+  (recs.results || []).filter(daSafra).forEach((r) => {
+    const F = porFaz[r.fazenda_id]; if (!F) return;
+    const d = lerDados(r.dados), feito = d.feito || {}, parte = d.parte || {};
+    (d.tal || []).forEach((n) => {
+      if (!feito[n]) return;                                  // só o que foi aplicado entra no gasto
+      const total = F.area[n] || 0, p = Number(parte[n]);
+      const ha = p > 0 && p < total ? p : total;
+      const T = tal(F, n); T.aplic++;
+      (d.prods || []).forEach((pr) => {
+        if (!pr || !pr[0]) return;
+        const [un, fator] = baseUnidade(pr[2]);
+        const q = Number(pr[1]) * ha * fator, pu = preco(r.fazenda_id, pr[0], un);
+        if (pu) T.custo += q * pu; else F.semPreco[pr[0]] = 1;
+      });
+    });
+  });
+  (col.results || []).filter(daSafra).forEach((c) => { const F = porFaz[c.fazenda_id]; if (F) tal(F, c.talhao).sc_ha = Number(c.sc_ha) || 0; });
+  // fazenda com algum dado na safra: mostra todos os talhões dela (área completa no total)
+  Object.values(porFaz).forEach((F) => { if (Object.keys(F.tal).length) Object.keys(F.area).forEach((n) => tal(F, n)); });
+  (pla.results || []).filter(daSafra).forEach((p) => { const F = porFaz[p.fazenda_id]; if (F && F.tal[p.talhao]) F.tal[p.talhao].cultura = p.cultura || ''; });
+
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const fazendas = Object.values(porFaz).map((F) => {
+    const lista = Object.values(F.tal).map((T) => ({
+      nome: T.nome, ha: r2(T.ha), cultura: T.cultura, aplicacoes: T.aplic, custo: r2(T.custo),
+      custo_ha: T.ha ? r2(T.custo / T.ha) : 0, sc_ha: T.sc_ha, producao_sc: r2(T.sc_ha * T.ha)
+    })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true }));
+    return { id: F.id, nome: F.nome, produtor: F.produtor, conta: F.conta, talhoes: lista, sem_preco: Object.keys(F.semPreco) };
+  }).filter((F) => F.talhoes.length).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  return { ok: true, safra, safras, fazendas };
+}
+
 /* ---------------- rotas /api/agro/* ---------------- */
 
 export async function rotasAgro(env, req, me, rota, url) {
@@ -306,7 +425,8 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (rota === '/api/modulos') return json({ ok: true, plantio: mod.plantio, recomendacoes: mod.recomendacoes, admin: mod.admin });
 
   const precisaPlantio = rota.startsWith('/api/agro/plantio');
-  const precisaRec = rota.startsWith('/api/agro/rec') || rota.startsWith('/api/agro/produto');
+  const precisaRec = rota.startsWith('/api/agro/rec') || rota.startsWith('/api/agro/produto') || rota.startsWith('/api/agro/estoque');
+  if (rota.startsWith('/api/agro/colheita') && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaPlantio && !mod.plantio) return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   if (precisaRec && !mod.recomendacoes) return json({ erro: 'módulo de recomendações não liberado para esta conta' }, 403);
 
@@ -354,6 +474,61 @@ export async function rotasAgro(env, req, me, rota, url) {
     }
     if (cmds.length) await env.DB.batch(cmds);
     return json({ ok: true, salvos: cmds.length });
+  }
+
+  /* ----- colheita (produtividade por talhão) ----- */
+  if (rota === '/api/agro/colheita' && req.method === 'GET') {
+    const { results } = await env.DB.prepare('SELECT fazenda_id, safra, talhao, sc_ha, data FROM colheita WHERE usuario_id = ?').bind(me.id).all();
+    return json({ ok: true, colheita: results || [] });
+  }
+  if (rota === '/api/agro/colheita' && req.method === 'POST') {
+    const b = await req.json();
+    const fid = txt(b.fazenda_id, 80);
+    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    const safra = safraPadrao(txt(b.safra, 40));
+    const cmds = [];
+    for (const t of (Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [])) {
+      const talhao = txt(t.talhao, 80), sc = Math.max(0, num(t.sc_ha));
+      if (!talhao) continue;
+      cmds.push(sc
+        ? env.DB.prepare(`INSERT INTO colheita (fazenda_id, safra, talhao, usuario_id, sc_ha, data, atualizado_em) VALUES (?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(fazenda_id, safra, talhao) DO UPDATE SET sc_ha = excluded.sc_ha, data = excluded.data, atualizado_em = datetime('now')
+            WHERE colheita.usuario_id = excluded.usuario_id`).bind(fid, safra, talhao, me.id, sc, dia(t.data))
+        : env.DB.prepare('DELETE FROM colheita WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?').bind(fid, safra, talhao, me.id));
+    }
+    if (cmds.length) await env.DB.batch(cmds);
+    return json({ ok: true, salvos: cmds.length });
+  }
+
+  /* ----- comparativo custo × produção (painel) ----- */
+  if (rota === '/api/agro/comparativo' && req.method === 'GET') {
+    if (!mod.plantio && !mod.recomendacoes) return json({ erro: 'módulos não liberados para esta conta' }, 403);
+    return json(await comparativo(env, me, mod.admin, url.searchParams.get('safra')));
+  }
+
+  /* ----- estoque de produtos por fazenda ----- */
+  if (rota === '/api/agro/estoque' && req.method === 'GET') {
+    const { results } = await env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? ORDER BY data, criado_em').bind(me.id).all();
+    return json({ ok: true, estoque: results || [] });
+  }
+  if (rota === '/api/agro/estoque' && req.method === 'POST') {
+    const b = await req.json();
+    const fid = txt(b.fazenda_id, 80), produto = txt(b.produto, 120);
+    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    if (!produto) return json({ erro: 'informe o produto' }, 400);
+    const id = b.id ? txt(b.id, 60) : novoId('es');
+    await env.DB.prepare(`INSERT INTO estoque_agro (id, usuario_id, fazenda_id, produto, unidade, qtd, valor, data, obs)
+        VALUES (?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET produto = excluded.produto, unidade = excluded.unidade, qtd = excluded.qtd,
+          valor = excluded.valor, data = excluded.data, obs = excluded.obs
+        WHERE estoque_agro.usuario_id = excluded.usuario_id`)
+      .bind(id, me.id, fid, produto, txt(b.unidade, 4) === 'kg' ? 'kg' : 'L', num(b.qtd), Math.max(0, num(b.valor)), dia(b.data), txt(b.obs, 200)).run();
+    return json({ ok: true, id: id });
+  }
+  if (rota === '/api/agro/estoque/apagar' && req.method === 'POST') {
+    const b = await req.json();
+    await env.DB.prepare('DELETE FROM estoque_agro WHERE id = ? AND usuario_id = ?').bind(txt(b.id, 60), me.id).run();
+    return json({ ok: true });
   }
 
   /* ----- produtos (catálogo) ----- */

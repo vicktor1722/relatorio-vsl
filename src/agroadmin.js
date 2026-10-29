@@ -8,11 +8,13 @@
 export const AGRO_ABAS =
   '<button data-aba="plantio" id="abaPlantio" style="display:none">Plantio</button>' +
   '<button data-aba="recs" id="abaRecs" style="display:none">Recomendações</button>' +
+  '<button data-aba="custo" id="abaCusto" style="display:none">Custo × produção</button>' +
   '<button data-aba="modulos" id="abaModulos" style="display:none">Módulos</button>';
 
 export const AGRO_PAINEIS = `
     <section class="painel" id="pPlantio"><div id="agPlantio" class="ag-tela"></div></section>
     <section class="painel" id="pRecs"><div id="agRecs" class="ag-tela"></div></section>
+    <section class="painel" id="pCusto"><div id="agCusto"><div class="aviso">Carregando…</div></div></section>
     <section class="painel" id="pModulos">
       <div id="boxModulos"><div class="aviso">Carregando…</div></div>
     </section>
@@ -25,6 +27,26 @@ export const AGRO_CSS = `
 .ck input{width:20px;height:20px;accent-color:var(--verde)}
 .ck.fixo{color:var(--fraco);cursor:default}
 .nota{font-size:12.5px;color:var(--fraco);line-height:1.4;margin:6px 0 0}
+/* ---------- Custo × produção ---------- */
+.cp-topo{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
+.cp-topo label{display:block;font-size:12px;color:var(--fraco);margin-bottom:3px}
+.cp-topo select,.cp-topo input{padding:8px 10px;border:1px solid var(--linha);border-radius:8px;font-size:14px;background:#fff}
+.cp-topo input{width:110px}
+.cp-faz{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:12px;margin:0 0 14px;overflow-x:auto}
+.cp-faz h3{margin:0 0 2px;font-size:16px;color:var(--verde-escuro)}
+.cp-faz .sub{font-size:12.5px;color:var(--fraco);margin-bottom:8px}
+.cp-kpis{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
+.cp-kpis div{background:#F3F7F4;border-radius:10px;padding:8px 12px;min-width:120px}
+.cp-kpis b{display:block;font-size:17px;color:var(--verde-escuro)}.cp-kpis span{font-size:11.5px;color:var(--fraco)}
+.cp-faz table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+.cp-faz th{text-align:right;font-size:11.5px;color:var(--fraco);font-weight:600;padding:6px 6px;border-bottom:1px solid var(--linha);white-space:nowrap}
+.cp-faz td{text-align:right;padding:6px;border-bottom:1px solid #EEF1EF;white-space:nowrap}
+.cp-faz th:first-child,.cp-faz td:first-child{text-align:left}
+.cp-faz tr.tot td{font-weight:700;border-top:2px solid var(--linha);border-bottom:0}
+.cp-pos{color:#1B7A43}.cp-neg{color:#C62828}.cp-sem{color:var(--fraco)}
+.cp-barra{height:8px;border-radius:4px;background:#E3E8E5;overflow:hidden;min-width:70px}
+.cp-barra i{display:block;height:100%;background:#D9A21B}
+.cp-aviso{background:#FFF3DC;color:#7A5200;border-radius:10px;padding:8px 10px;font-size:12.5px;margin:8px 0 0}
 /* ---------- Plantio e Recomendações (módulos novos) ---------- */
 .ag-nova-aba::after{content:"novo";margin-left:6px;background:#E53935;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;text-transform:uppercase;vertical-align:middle}
 .ag-novo{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -423,6 +445,7 @@ export const AGRO_JS = String.raw`
     var a = document.getElementById('abaPlantio'), b = document.getElementById('abaRecs');
     if (a) a.style.display = ST.mod.plantio ? '' : 'none';
     if (b) b.style.display = ST.mod.recomendacoes ? '' : 'none';
+    var c = document.getElementById('abaCusto'); if (c) c.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
   }
 
   async function baixar() {
@@ -1304,6 +1327,70 @@ export const AGRO_JS = String.raw`
     document.getElementById('agNovoOk').onclick = function () { o.aviso = true; try { localStorage.setItem('agro_novo_adm', JSON.stringify(o)); } catch (e) { /* sem espaço */ } d.remove(); };
   }
 
+  /* ---------------- custo × produção ----------------
+     Gasto = produtos das recomendações marcadas como aplicadas (dose × área) × preço médio das entradas
+     do estoque daquela fazenda. Produção = sacas/ha lançadas na colheita do app. */
+  var CP = { safra: '', dados: null };
+  var CP_CULT = { soja: 'Soja', milho: 'Milho', algodao: 'Algodão', feijao: 'Feijão', sorgo: 'Sorgo', trigo: 'Trigo', outra: 'Outra' };
+  function cpBRL(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function cpN(v, d) { return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+  function cpPrecos() { try { return JSON.parse(localStorage.getItem('vsl-preco-saca') || '{}') || {}; } catch (e) { return {}; } }
+  function cpNum(s) { var n = Number(String(s || '').replace(/\./g, '').replace(',', '.')); return isFinite(n) ? n : 0; }
+  async function agroCusto() {
+    var box = document.getElementById('agCusto'); if (!box) return;
+    try { CP.dados = await api('/api/agro/comparativo' + (CP.safra ? '?safra=' + encodeURIComponent(CP.safra) : '')); CP.safra = CP.dados.safra || ''; }
+    catch (e) { box.innerHTML = '<div class="aviso">Não foi possível carregar: ' + esc(e.message) + '</div>'; return; }
+    pintarCusto();
+  }
+  function pintarCusto() {
+    var box = document.getElementById('agCusto'), D = CP.dados || { fazendas: [], safras: [] }, pr = cpPrecos();
+    var culturas = {};
+    D.fazendas.forEach(function (f) { f.talhoes.forEach(function (t) { if (t.cultura) culturas[t.cultura] = 1; }); });
+    var h = '<div class="cp-topo"><div><label>Safra</label><select id="cpSafra">' + (D.safras.length ? D.safras : [CP.safra]).map(function (s) {
+      return '<option' + (s === CP.safra ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('') + '</select></div>' +
+      Object.keys(culturas).filter(function (c) { return c !== 'pastagem' && c !== 'pousio'; }).map(function (c) {
+        return '<div><label>Preço da saca · ' + esc(CP_CULT[c] || c) + '</label><input data-preco="' + esc(c) + '" inputmode="decimal" placeholder="R$" value="' + (pr[c] ? String(pr[c]).replace('.', ',') : '') + '"></div>';
+      }).join('') + '</div>' +
+      '<p class="nota" style="margin:-4px 0 12px">Gasto = produtos das recomendações já aplicadas (dose × área) × preço médio das entradas do estoque de cada fazenda. ' +
+      'Produção = média de sacas/ha lançada na colheita (app → Mapa → Plantio → Lançar colheita). Com o preço da saca, aparece o custo em sacas e o resultado.</p>';
+    if (!D.fazendas.length) h += '<div class="aviso">Nada para comparar nesta safra ainda: marque recomendações como aplicadas, lance entradas no estoque e a colheita dos talhões.</div>';
+    D.fazendas.forEach(function (f) {
+      var tot = { ha: 0, custo: 0, sc: 0, haCol: 0, rec: 0, haRec: 0 };
+      var maxCha = Math.max.apply(null, f.talhoes.map(function (t) { return t.custo_ha || 0; }).concat([1]));
+      var linhas = f.talhoes.map(function (t) {
+        var p = pr[t.cultura] || 0, cs = p && t.custo_ha ? t.custo_ha / p : 0, res = p && t.sc_ha ? t.sc_ha * p - t.custo_ha : null;
+        tot.ha += t.ha; tot.custo += t.custo;
+        if (t.sc_ha) { tot.sc += t.producao_sc; tot.haCol += t.ha; }
+        if (res !== null) { tot.rec += t.producao_sc * p; tot.haRec += t.ha; }
+        return '<tr><td><b>' + esc(t.nome) + '</b></td><td style="text-align:left">' + esc(CP_CULT[t.cultura] || t.cultura || '—') + '</td><td>' + cpN(t.ha, 1) + '</td>' +
+          '<td>' + (t.aplicacoes || '—') + '</td><td>' + (t.custo ? cpBRL(t.custo) : '<span class="cp-sem">—</span>') + '</td>' +
+          '<td>' + (t.custo_ha ? cpBRL(t.custo_ha) : '<span class="cp-sem">—</span>') + '</td>' +
+          '<td><div class="cp-barra"><i style="width:' + Math.round((t.custo_ha || 0) / maxCha * 100) + '%"></i></div></td>' +
+          '<td>' + (t.sc_ha ? cpN(t.sc_ha, 1) : '<span class="cp-sem">—</span>') + '</td><td>' + (t.sc_ha ? cpN(t.producao_sc) : '<span class="cp-sem">—</span>') + '</td>' +
+          '<td>' + (cs ? cpN(cs, 1) + ' sc' : '<span class="cp-sem">—</span>') + '</td>' +
+          '<td>' + (res === null ? '<span class="cp-sem">—</span>' : '<span class="' + (res >= 0 ? 'cp-pos' : 'cp-neg') + '">' + cpBRL(res) + '</span>') + '</td></tr>';
+      }).join('');
+      var chaMed = tot.ha ? tot.custo / tot.ha : 0, scMed = tot.haCol ? tot.sc / tot.haCol : 0;
+      var custoColhido = 0; f.talhoes.forEach(function (t) { if (t.sc_ha && pr[t.cultura]) custoColhido += t.custo; });
+      var resTot = tot.haRec ? tot.rec - custoColhido : null;
+      h += '<div class="cp-faz"><h3>' + esc(f.nome) + '</h3><div class="sub">' + esc([f.produtor, f.conta].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="cp-kpis"><div><b>' + cpBRL(tot.custo) + '</b><span>gasto em produtos</span></div><div><b>' + cpBRL(chaMed) + '</b><span>custo médio por ha</span></div>' +
+        '<div><b>' + (scMed ? cpN(scMed, 1) + ' sc/ha' : '—') + '</b><span>produtividade média' + (tot.haCol ? ' (' + cpN(tot.haCol, 1) + ' ha colhidos)' : '') + '</span></div>' +
+        '<div><b>' + (tot.sc ? cpN(tot.sc) + ' sc' : '—') + '</b><span>produção total</span></div>' +
+        (resTot === null ? '' : '<div><b class="' + (resTot >= 0 ? 'cp-pos' : 'cp-neg') + '">' + cpBRL(resTot) + '</b><span>receita − gasto (talhões colhidos)</span></div>') + '</div>' +
+        '<table><tr><th>Talhão</th><th style="text-align:left">Cultura</th><th>Área (ha)</th><th>Aplicações</th><th>Gasto</th><th>Gasto/ha</th><th></th><th>sc/ha</th><th>Produção (sc)</th><th>Custo em sc/ha</th><th>Resultado/ha</th></tr>' +
+        linhas + '<tr class="tot"><td>Total</td><td></td><td>' + cpN(tot.ha, 1) + '</td><td></td><td>' + cpBRL(tot.custo) + '</td><td>' + cpBRL(chaMed) + '</td><td></td>' +
+        '<td>' + (scMed ? cpN(scMed, 1) : '—') + '</td><td>' + (tot.sc ? cpN(tot.sc) : '—') + '</td><td></td><td></td></tr></table>' +
+        (f.sem_preco.length ? '<div class="cp-aviso">Sem preço no estoque desta fazenda (o gasto deles não entrou): <b>' + esc(f.sem_preco.join(', ')) + '</b>. Lance uma entrada com valor no app (Recomendações → 📦 Estoque).</div>' : '') +
+        '</div>';
+    });
+    box.innerHTML = h;
+    var sel = document.getElementById('cpSafra'); if (sel) sel.onchange = function () { CP.safra = sel.value; agroCusto(); };
+    box.querySelectorAll('[data-preco]').forEach(function (inp) {
+      inp.onchange = function () { var o = cpPrecos(); var v = cpNum(inp.value); if (v) o[inp.dataset.preco] = v; else delete o[inp.dataset.preco]; try { localStorage.setItem('vsl-preco-saca', JSON.stringify(o)); } catch (e) {} pintarCusto(); };
+    });
+  }
+
   var iniciado = false;
   window.agroIniciar = async function () {
     if (!iniciado) {
@@ -1316,6 +1403,7 @@ export const AGRO_JS = String.raw`
       if (ap) ap.addEventListener('click', function () { marcaNvA('plantio'); abrirPlantio(); });
       var am = document.getElementById('abaModulos'); if (am) am.addEventListener('click', function () { marcaNvA('modulos'); });
       if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
+      var ac = document.getElementById('abaCusto'); if (ac) ac.addEventListener('click', function () { agroCusto(); });
     }
     zoomIniciar();
     await atualizarModulos();
