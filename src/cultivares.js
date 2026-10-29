@@ -10,7 +10,7 @@
 export const FONTES_CULT = {
   bmx: 'brasmaxgenetica.com.br/cultivares',
   tmg: 'tmg.agr.br/cultivares/soja',
-  neo: 'Folders Neogen Cerrado e Sul 2026/27',
+  neo: 'Folders Neogen Cerrado e Sul 2026/27 e neogensementes.com.br',
   ns: 'Catálogos Nidera 2025 (Norte/Nordeste e Sul/Sudeste)',
   basf: 'Guia de variedades BASF Soytech 2026 Centro-Norte',
   bs: 'Fichas técnicas Boa Safra Sementes 2026/27',
@@ -39,7 +39,7 @@ export const CATALOGO = [
     ["NEO 550 I2X", 5.5], ["NEO 780 CE", 7.8, 110], ["NEO 791 CE", 7.9], ["NEO 811 I2X", 8.1],
     ["NEO 821 I2X", 8.2], ["NEO 700 I2X", 7.0, 101], ["NEO 771 I2X", 7.7, 106], ["NEO 801 CE", 8.1, 113],
     ["NEO 802 I2X", 8.1, 114], ["NEO 640 I2X", 6.4], ["NEO 690 I2X", 7.1, 97], ["NEO 800 I2X", 8.0, 114],
-    ["NEO 680 IPRO", 6.8], ["NEO 720 I2X", 7.4, 101], ["NEO 760 CE", 7.6, 103], ["NEO 761 I2X", 7.6, 101],
+    ["NEO 680 IPRO", 6.8], ["NEO 720 I2X", 7.4, 101], ["NEO 740 IPRO", 7.7], ["NEO 760 CE", 7.6, 103], ["NEO 761 I2X", 7.6, 101],
     ["NEO 790 IPRO", 7.9, 109], ["NEO 810 I2X", 8.2, 116], ["NEO 820 IPRO", 8.2, 114], ["NEO 840 IPRO", 8.4, 116],
     ["NEO 600 I2X", 6.0], ["NEO 531 I2X", 5.3], ["NEO 581 E", 5.8], ["NEO 620 IPRO", 6.2],
     ["NEO 661 I2X", 6.6], ["NEO 510 IPRO", 5.1], ["NEO 560 IPRO", 5.6], ["NEO 580 IPRO", 5.9],

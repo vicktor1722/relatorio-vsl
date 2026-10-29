@@ -126,7 +126,7 @@ export async function regraCiclo(env, uid) {
 }
 
 // muda quando o catálogo (src/cultivares.js) é atualizado: o app baixa de novo
-export const VERSAO_CAT = '2026-10-29';
+export const VERSAO_CAT = '2026-10-29b';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200,
