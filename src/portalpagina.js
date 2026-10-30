@@ -113,12 +113,12 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal .dw{font-size:11px;color:var(--fraco);text-align:center;padding-bottom:2px}
 .cal button{background:#fff;border:1px solid var(--linha);border-radius:9px;aspect-ratio:1/1.05;display:flex;flex-direction:column;align-items:center;padding:4px 0 0;gap:2px;font-size:13px;color:var(--texto)}
-.cal button.hj{box-shadow:inset 0 0 0 1.5px var(--verde)}.cal button.sl{background:var(--verde);color:#fff;border-color:var(--verde)}
+.cal button.hj{box-shadow:inset 0 0 0 1.5px var(--verde)}.cal button.sl{background:#E4F2E8;color:#14532D;font-weight:800;border:2.5px solid var(--verde);padding-top:2.5px}
 .cal button i{display:flex;gap:1px;height:20px;align-items:center;font-style:normal}
 .ico{width:19px;height:19px;display:block}
 .ico.colh{width:30px;height:17px}.legc .ico.colh{width:28px;height:16px}
 .k-prev{color:#3B78C3}.k-apl{color:#2F9E5B}.k-venc{color:#C0392B}.k-colh{color:#9A5B12}
-.cal button.sl .ico{filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff)}
+
 .legc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--fraco);margin:8px 2px 12px}.legc span{display:inline-flex;align-items:center;gap:4px}
 .ev{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--linha);border-radius:12px;padding:9px 11px;margin-bottom:7px;font-size:13.5px}
 .ev .ico{width:24px;height:24px;flex:none}.ev .ico.colh{width:42px;height:24px}.ev small{display:block;color:var(--fraco);font-size:12px}
