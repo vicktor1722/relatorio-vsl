@@ -57,7 +57,8 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin:8px 2px 4px}.leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .tg{display:flex;gap:6px;margin-bottom:8px}.tg button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:6px 12px;font-size:13px}
 .tg button.on{background:var(--verde);border-color:var(--verde);color:#fff}
-.rot{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap}
+.rot{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap;text-align:center;line-height:1.15}
+.rot small{display:block;font-size:11px;font-weight:600}
 /* operador */
 .chips{display:flex;gap:6px;margin-bottom:10px}.chips button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:7px 14px;font-size:14px}
 .chips button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
@@ -233,7 +234,8 @@ ${AGRO_REL_CSS}
 
   /* ---------- mapa (satélite + talhões) ---------- */
   var CORES = ['#2E7D32', '#F9A825', '#1565C0', '#C62828', '#6A1B9A', '#00838F', '#EF6C00', '#558B2F', '#AD1457', '#4E342E'];
-  function desenharMapa(el, estilo, rotulo) {
+  // etiqueta (opcional): o que vai escrito dentro do talhão; sem ela, só o nome
+  function desenharMapa(el, estilo, rotulo, etiqueta) {
     if (!window.L || !D.mapa || !D.mapa.features || !D.mapa.features.length) { el.innerHTML = '<div class="vazio" style="border:0">Mapa da fazenda ainda não cadastrado (KML).</div>'; return null; }
     var m = L.map(el, { scrollWheelZoom: false });
     var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
@@ -245,7 +247,7 @@ ${AGRO_REL_CSS}
       onEachFeature: function (f, c) {
         var nm = (f.properties || {}).nome || '';
         c.bindPopup(rotulo(nm, f.properties || {}));
-        c.bindTooltip(esc(nm), { permanent: true, direction: 'center', className: 'rot' });
+        c.bindTooltip(etiqueta ? etiqueta(nm, f.properties || {}) : esc(nm), { permanent: true, direction: 'center', className: 'rot' });
       }
     }).addTo(m);
     mapas.push(m);
@@ -261,7 +263,10 @@ ${AGRO_REL_CSS}
     var h = '<div class="tg"><button data-mm="var" class="' + (modoMapa === 'var' ? 'on' : '') + '">Variedade</button><button data-mm="area" class="' + (modoMapa === 'area' ? 'on' : '') + '">Áreas</button></div>' +
       '<div class="mapa-sat" id="mapaFaz"></div>';
     if (modoMapa === 'var') h += '<div class="leg">' + (Object.keys(vars).length ? Object.keys(vars).map(function (k) { return '<span><i style="background:' + vars[k] + '"></i>' + esc(k) + (haVar[k] ? ' · ' + n(haVar[k], 1) + ' ha' : '') + '</span>'; }).join('') + '<span><i style="background:#9AA5A0"></i>sem plantio</span>' : '<span>Plantio ainda não informado.</span>') + '</div>';
-    else h += '<div class="leg"><span>Toque no talhão para ver a área.</span></div>';
+    else {
+      var tot = Object.keys(areas).reduce(function (s, k) { return s + areas[k]; }, 0);
+      h += '<div class="leg"><span><b>Área total: ' + n(tot, 1) + ' ha</b> · ' + Object.keys(areas).length + ' talhões</span></div>';
+    }
     $('#conteudo').innerHTML = abas() + h;
     document.querySelectorAll('[data-mm]').forEach(function (b) { b.onclick = function () { modoMapa = b.dataset.mm; pintar(); }; });
     desenharMapa($('#mapaFaz'), function (nm) {
@@ -272,7 +277,7 @@ ${AGRO_REL_CSS}
       var p = plantioDe(nm);
       return '<b>' + esc(nm) + '</b>' + (q.area_ha ? '<br>' + n(q.area_ha, 1) + ' ha' : '') +
         (p ? '<br>' + esc(NC[p.cultura] || p.cultura || '') + (p.variedade ? ' · ' + esc(p.variedade) : '') + (p.data_plantio ? '<br>plantio ' + dataBR(p.data_plantio) : '') : '');
-    });
+    }, modoMapa === 'area' ? function (nm, q) { return esc(nm) + (q.area_ha ? '<small>' + n(q.area_ha, 1) + ' ha</small>' : ''); } : null);
   }
 
   /* ---------- visão da fazenda ---------- */
