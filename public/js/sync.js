@@ -89,8 +89,8 @@
 
   /* ---------------- conta ---------------- */
 
-  async function entrar(email, senha, codigo) {
-    const r = await comJson('/api/entrar', codigo ? { email, senha, codigo } : { email, senha });
+  async function entrar(email, senha) {
+    const r = await comJson('/api/entrar', { email, senha });
     await salvarConf({ token: r.token, nome: r.nome, email: r.email });
     return r;
   }

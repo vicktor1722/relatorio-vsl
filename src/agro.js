@@ -521,6 +521,7 @@ export async function comparativo(env, me, adm, safraPedida) {
 export async function rotasAgro(env, req, me, rota, url) {
   await garantir(env);
   const mod = await modulosDe(env, me.id);
+  if (!me.cf) mod.admin = false;   // visão de todas as contas só no painel que entrou com o código
 
   if (rota === '/api/modulos') return json({ ok: true, plantio: mod.plantio, recomendacoes: mod.recomendacoes, admin: mod.admin });
 

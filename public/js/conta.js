@@ -49,10 +49,8 @@
           convite: $('#loginConvite').value.trim()
         });
       } else {
-        const cod = $('#loginCodigoBox').classList.contains('oculto') ? '' : $('#loginCodigo').value.trim();
-        await Sync.entrar(email, senha, cod);
+        await Sync.entrar(email, senha);
       }
-      $('#loginCodigo').value = ''; $('#loginCodigoBox').classList.add('oculto');
       $('#loginSenha').value = '';
       verSenha(false);
       aviso(msg, '');
@@ -78,7 +76,6 @@
       if (global.App && App.aoEntrar) await App.aoEntrar();
     } catch (e) {
       aviso(msg, e.message);
-      if (e.precisaCodigo) { $('#loginCodigoBox').classList.remove('oculto'); $('#loginCodigo').focus(); }
     } finally {
       $('#btnEntrar').disabled = false;
     }
@@ -452,7 +449,6 @@
     $('#btnAlternarConta').onclick = alternarModo;
     if ($('#btnTrocarServidor')) $('#btnTrocarServidor').onclick = trocarServidor;
     $('#loginSenha').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
-    $('#loginCodigo').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
     $('#btnVerSenha').onclick = function () { verSenha(); $('#loginSenha').focus(); };
 
     $('#btnAbrirCadastro').onclick = async function () { await atualizarCadastro(true); abrir('telaCadastro'); };

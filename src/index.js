@@ -365,8 +365,9 @@ export default {
         if (!u || !(await conferirSenha(String(b.senha || ''), u.senha_hash))) {
           return json({ erro: 'e-mail ou senha incorretos' }, 401);
         }
-        // conta administradora: além da senha, pede o código de confirmação
-        if (Number(u.admin) === 1) {
+        // painel de administração (/admin) com conta administradora: além da senha, pede o código de confirmação.
+        // No app de campo a conta entra só com a senha, como conta normal (sem os poderes de administrador).
+        if (Number(u.admin) === 1 && b.painel) {
           const trava = await travaCodigo(env, u.id);
           if (trava.bloqueado) return json({ erro: 'muitas tentativas com o código: tente de novo em ' + trava.min + ' min', precisaCodigo: true }, 429);
           if (!String(b.codigo || '').trim()) return json({ erro: 'Conta administradora: informe o código de confirmação', precisaCodigo: true }, 401);
@@ -386,8 +387,6 @@ export default {
       const me = await usuarioDaRequisicao(req, env);
       if (rota.startsWith('/api/')) {
         if (!me) return json({ erro: 'sessão expirada, entre de novo' }, 401);
-        // administrador com sessão aberta antes do código de confirmação: entra de novo com o código
-        if (!me.cf && await ehAdminSemCodigo(env, me.id)) return json({ erro: 'sessão expirada, entre de novo' }, 401);
         await padronizarSafras(env);   // dados antigos "2026/27" → "2026/2027" (uma vez por instância)
         await padronizarVariedades(env);
       }
@@ -409,6 +408,8 @@ export default {
       /* ---------- administração ---------- */
       if (rota.startsWith('/api/admin/')) {
         const adm = await ehAdmin(env, me);
+        // administrador sem o código (sessão do app ou anterior ao código): o painel pede para entrar com o código
+        if (!adm && await ehAdminSemCodigo(env, me.id)) return json({ erro: 'Conta administradora: entre com o código de confirmação', precisaCodigo: true }, 401);
         // qualquer conta vê o próprio painel; admin vê o de todos
         if (rota === '/api/admin/resumo') return json(await resumoAdmin(env, me, adm));
         if (rota === '/api/admin/areas') return json(await areasAdmin(env, me, adm));
@@ -511,7 +512,7 @@ export default {
           await garantirResponsaveis(env);
           resp = await env.DB.prepare('SELECT * FROM responsaveis WHERE usuario_id = ? ORDER BY criado_em, nome').bind(me.id).all();
         } catch (e) { /* sem responsáveis por enquanto */ }
-        const limiteResp = (await ehAdmin(env, me)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
+        const limiteResp = (await ehAdmin(env, me, true)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
         // safras: a lista pronta para escolher + alguma outra que a conta já tinha cadastrado
         const nomesSaf = safrasProntas();
         const extras = (saf.results || []).filter((s) => nomesSaf.indexOf(s.nome) < 0);
@@ -536,7 +537,7 @@ export default {
         const ja = (results || []).find((x) => norm(x.nome) === norm(nome));
         if (ja) return json({ ok: true, id: ja.id, repetido: true });
         const id = novoId('o');
-        const limiteResp = (await ehAdmin(env, me)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
+        const limiteResp = (await ehAdmin(env, me, true)) ? MAX_RESPONSAVEIS_ADMIN : MAX_RESPONSAVEIS;
         // o limite é conferido dentro do próprio INSERT, então dois aparelhos ao mesmo tempo não passam do limite
         const r = await env.DB.prepare(`INSERT INTO responsaveis (id, usuario_id, nome)
           SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM responsaveis WHERE usuario_id = ?) < ?`)
