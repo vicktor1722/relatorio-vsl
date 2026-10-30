@@ -1082,8 +1082,19 @@
     }
     txt(M, H - 90, 11, false, o.fazenda + '  -  prevista ' + o.data + '  -  ' + fmt(o.ha) + ' ha', BRANCO);
     y = H - 132;
-    if (o.resp) { txt(M, y, 11, false, 'Quem aplica: ' + o.resp); y -= 18; }
-    if (o.obs) { txt(M, y, 11, true, 'Atenção: ' + o.obs, LARANJA); y -= 18; }
+    // texto longo quebra em linhas dentro da margem (Helvetica ≈ 0,48 da fonte por letra; negrito ≈ 0,52)
+    function quebrar(s, size, bold) {
+      var cabeL = Math.floor((W - 2 * M) / (size * (bold ? 0.52 : 0.48))), out = [], l = '';
+      String(s || '').replace(/\s+/g, ' ').trim().split(' ').forEach(function (p) {
+        while (p.length > cabeL) { if (l) { out.push(l); l = ''; } out.push(p.slice(0, cabeL)); p = p.slice(cabeL); }
+        if ((l + ' ' + p).trim().length > cabeL) { out.push(l); l = p; } else l = (l + ' ' + p).trim();
+      });
+      if (l) out.push(l);
+      return out;
+    }
+    function bloco(s, size, bold, cor) { quebrar(s, size, bold).forEach(function (l) { cabe(16); txt(M, y, size, bold, l, cor); y -= size + 4; }); y -= 4; }
+    if (o.resp) bloco('Quem aplica: ' + o.resp, 11, false);
+    if (o.obs) bloco('Atenção: ' + o.obs, 11, true, LARANJA);
     function sec(titulo) { cabe(60); y -= 10; txt(M, y, 13, true, titulo, VERDE); y -= 6; linha(y); y -= 16; }
     function par(a, b, bold, x2) { cabe(18); txt(M, y, 11, !!bold, a); if (b) txt(x2 || 400, y, 11, true, b); y -= 16; }
     sec('Ordem de mistura');
