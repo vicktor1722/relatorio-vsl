@@ -3,7 +3,7 @@
    (/r/*, /admin, /api/*, /img/*, /oauth/*) passam direto, sem cache.
    O Safari recusa resposta "redirecionada" vinda do service worker; por isso toda
    página que entra no cache (ou sai dele) é recriada limpa por limpar(). */
-const CACHE = 'relatorio-vsl-v15';
+const CACHE = 'relatorio-vsl-v16';
 const CHAVE_APP = '/__app-shell';
 const ESPERA_MS = 3500;   // se a rede não responder nisso, abre pelo cache
 const ESTATICOS = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];

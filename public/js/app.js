@@ -1131,7 +1131,14 @@
     });
     const chaves = Object.keys(grupos);
     const cont = {};   // registros de cada visita
-    for (const r of rels) cont[r.id] = (await DB.itensDoRelatorio(r.id)).length;
+    // última atividade da conversa (como no WhatsApp): visita criada, registro novo, envio
+    const ativ = {}, quando = function (x) { return String(x || '').replace(' ', 'T'); };
+    for (const r of rels) {
+      const it = await DB.itensDoRelatorio(r.id), k = chaveConversa(r);
+      cont[r.id] = it.length;
+      const t = [r.criado_em, r.publicado_em, r.fila_desde, it.length ? it[it.length - 1].capturado_em : ''].map(quando).sort().pop();
+      if (!ativ[k] || t > ativ[k]) ativ[k] = t;
+    }
     chaves.forEach(function (k) {
       grupos[k].sort(function (a, b) { return String(a.criado_em || '').localeCompare(String(b.criado_em || '')); });
       // visita sem nenhum registro e que não foi enviada some da tela (não há o que sincronizar);
@@ -1139,11 +1146,7 @@
       const uteis = grupos[k].filter(function (v) { return cont[v.id] > 0 || v.status === 'publicado' || v.na_fila; });
       grupos[k] = uteis.length ? uteis : [grupos[k][grupos[k].length - 1]];
     });
-    chaves.sort(function (a, b) {
-      const ua = grupos[a][grupos[a].length - 1].criado_em || '';
-      const ub = grupos[b][grupos[b].length - 1].criado_em || '';
-      return ub.localeCompare(ua);
-    });
+    chaves.sort(function (a, b) { return (ativ[b] || '').localeCompare(ativ[a] || ''); });
     const totalVisitas = chaves.reduce(function (s, k) { return s + grupos[k].length; }, 0);
     $('#subLista').textContent = chaves.length + ' conversa(s) · ' + totalVisitas + ' visita(s)';
 
