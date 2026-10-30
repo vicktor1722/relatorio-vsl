@@ -493,6 +493,12 @@ export async function resumoAdmin(env, me, adm) {
   `).bind(...(adm ? [] : [me.id])).all();
 
   if (adm) { await aplicarPrazos(env, contas.results || []); await aplicarPagamentos(env, contas.results || []); }
+  // responsáveis cadastrados em cada conta (nomes que aparecem para escolher no relatório)
+  try {
+    const rs = (await env.DB.prepare('SELECT usuario_id, nome FROM responsaveis ORDER BY criado_em').all()).results || [];
+    const por = {}; rs.forEach((x) => { (por[x.usuario_id] = por[x.usuario_id] || []).push(x.nome); });
+    (contas.results || []).forEach((c) => { c.responsaveis = por[c.id] || []; });
+  } catch (e) { /* tabela ainda não criada */ }
 
   const relatorios = await env.DB.prepare(`
     SELECT r.id, r.fazenda, r.produtor, r.safra, r.servico, r.responsavel,
@@ -1122,7 +1128,8 @@ ${AGRO_CSS}
     var linhas = dados.contas.map(function (c) {
       return '<tr><td><b>' + esc(c.nome || '—') + '</b><br><span style="color:var(--fraco);font-size:12px">' + esc(c.email) + '</span>' +
         (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') +
-        '<br>' + (c.termos_em ? '<span class="peq">✔ termos aceitos em ' + dataBR(c.termos_em) + '</span>' : '<span class="selo perto">termos pendentes</span>') + '</td>' +
+        '<br>' + (c.termos_em ? '<span class="peq">✔ termos aceitos em ' + dataBR(c.termos_em) + '</span>' : '<span class="selo perto">termos pendentes</span>') +
+        ((c.responsaveis || []).length ? '<br><span class="peq">👥 ' + c.responsaveis.length + (c.responsaveis.length > 1 ? ' responsáveis: ' : ' responsável: ') + esc(c.responsaveis.join(', ')) + '</span>' : '') + '</td>' +
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
         '<td>' + c.produtores + ' / ' + c.fazendas + '</td>' +
         '<td>' + espacoCel(c) + '</td>' +
