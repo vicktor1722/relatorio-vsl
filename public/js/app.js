@@ -110,6 +110,31 @@
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
   }
 
+  // iPhone: a localização de site fica em "Perguntar" até a pessoa mudar nos Ajustes (nenhum site consegue
+  // gravar "sempre permitir"). Enquanto estiver perguntando, mostra como deixar liberado — até 3 vezes.
+  async function dicaLocalizacaoIphone() {
+    try {
+      const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!ios || !navigator.permissions || !navigator.permissions.query) return;
+      const vezes = Number(localStorage.getItem('vsl-dica-gps') || 0);
+      if (vezes >= 3) return;
+      const p = await navigator.permissions.query({ name: 'geolocation' });
+      if (p.state !== 'prompt') return;          // já liberado (ou negado de vez): não incomoda
+      localStorage.setItem('vsl-dica-gps', String(vezes + 1));
+      setTimeout(function () {
+        if (document.getElementById('dicaGps')) return;
+        const d = document.createElement('div'); d.id = 'dicaGps';
+        d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:9997;background:#14532D;color:#fff;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.35;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+        d.innerHTML = '<b>📍 Para o iPhone parar de perguntar a localização</b><br>' +
+          'Ajustes → Apps → Safari → <b>Localização</b> → <b>Permitir</b>.<br>' +
+          '<span style="opacity:.85;font-size:12.5px">Ou no Safari: toque em <b>aA</b> ao lado do endereço → Ajustes do Site → Localização → Permitir.</span>' +
+          '<div style="text-align:right;margin-top:8px"><button style="background:#fff;color:#14532D;border:0;border-radius:8px;padding:7px 14px;font-weight:700">Entendi</button></div>';
+        d.querySelector('button').onclick = function () { try { localStorage.setItem('vsl-dica-gps', '3'); } catch (e) {} d.remove(); };
+        document.body.appendChild(d);
+      }, 2500);
+    } catch (e) { /* sem a API de permissões: segue normal */ }
+  }
+
   // toque na faixa do GPS: tenta de novo e explica como liberar
   function ligarToqueGps() {
     const alvo = $('#txtGps').closest('.pill') || $('#txtGps');
@@ -2143,6 +2168,7 @@
     await Sync.fixarDono();   // separa os dados de cada conta antes de listar ou sincronizar
     iniciarGPS();
     ligarToqueGps();
+    dicaLocalizacaoIphone();
     Sync.autoSync();
     // ao sair do app a câmera é desligada (o iPhone mata a trilha de qualquer jeito)
     document.addEventListener('visibilitychange', function () { if (document.hidden && !st.gravando) pararStream(); });
