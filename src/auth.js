@@ -48,13 +48,13 @@ async function chaveHmac(segredo) {
   return crypto.subtle.importKey('raw', te.encode(segredo), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-export async function criarToken(env, usuario, dias) {
-  const payload = {
+export async function criarToken(env, usuario, dias, extra) {
+  const payload = Object.assign({
     id: usuario.id,
     email: usuario.email,
     nome: usuario.nome || '',
     exp: Date.now() + (dias || 90) * 86400000
-  };
+  }, extra || {});   // cf: 1 = conta administradora que entrou com o código de confirmação
   const corpo = b64url(te.encode(JSON.stringify(payload)));
   const assinatura = await crypto.subtle.sign('HMAC', await chaveHmac(env.SEGREDO), te.encode(corpo));
   return corpo + '.' + b64url(assinatura);
@@ -105,4 +105,15 @@ export async function usuarioDaRequisicao(req, env) {
 
 export function novoId(prefixo) {
   return (prefixo || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+/* ---------- código de confirmação da conta administradora ----------
+   Pedido no login depois da senha. Guardado só como hash (PBKDF2, igual às senhas); o segredo
+   ADMIN_CODIGO do Cloudflare, se existir, vale no lugar dele (trocar o código sem mexer no código-fonte). */
+const CODIGO_ADMIN_HASH = 'y5EctFU10eFHOH-I7swiiQ$Q20_vljv_Sdk7bMBhPkG0udQgZqN76isT9r9iW0tqsY';
+export async function conferirCodigoAdmin(env, codigo) {
+  const c = String(codigo || '').trim();
+  if (!c) return false;
+  if (env.ADMIN_CODIGO) return c === String(env.ADMIN_CODIGO);
+  return conferirSenha(c, CODIGO_ADMIN_HASH);
 }
