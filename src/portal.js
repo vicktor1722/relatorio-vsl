@@ -11,7 +11,7 @@
 
 import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } from './auth.js';
 import { blocosAgro } from './agrorel.js';
-import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo } from './agro.js';
+import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo, variedadePadrao } from './agro.js';
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
 import { haAplicada, haPlantada, lerLanc, parciaisDe } from './plantiodia.js';
 import { safraPadrao } from './safras.js';
@@ -334,7 +334,7 @@ export async function rotasPortal(env, req, rota, url) {
     }
     l.sort((x, y) => (x.d < y.d ? -1 : 1));
     const cultura = txt(b.cultura, 20) || (ant && ant.cultura) || 'soja';
-    const variedade = txt(b.variedade, 80) || (ant && ant.variedade) || '';
+    const variedade = variedadePadrao(txt(b.variedade, 80) || (ant && ant.variedade) || '', cultura);
     // data de plantio do talhão = primeiro dia lançado (é dela que sai a previsão de colheita)
     const dp = l.length ? l[0].d : (ant ? ant.data_plantio || '' : '');
     await env.DB.prepare(`INSERT INTO plantio (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, lanc, atualizado_em)

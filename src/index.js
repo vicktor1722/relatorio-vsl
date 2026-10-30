@@ -12,7 +12,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 
 // onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
-import { dadosParaRelatorio, modulosAdmin, rotasAgro, salvarModulos } from './agro.js';
+import { dadosParaRelatorio, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
 import { avisarAplicacoes, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
@@ -273,6 +273,7 @@ export default {
 
       if (rota.startsWith('/r/')) {
         await padronizarSafras(env);   // relatório aberto antes de alguém usar o app já sai com a safra no padrão
+        await padronizarVariedades(env);   // e com as variedades no nome do catálogo ("Olimpo" → "BMX Olimpo IPRO")
         let bruto = rota.slice(3).replace(/\/$/, '');
         try { bruto = decodeURIComponent(bruto); } catch (e) {}
         // /r/<id>/traduzir?lang=en devolve as legendas e textos do relatório traduzidos (pt → en/es)
@@ -372,6 +373,7 @@ export default {
       if (rota.startsWith('/api/')) {
         if (!me) return json({ erro: 'sessão expirada, entre de novo' }, 401);
         await padronizarSafras(env);   // dados antigos "2026/27" → "2026/2027" (uma vez por instância)
+        await padronizarVariedades(env);
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
