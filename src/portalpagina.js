@@ -627,14 +627,12 @@ ${AGRO_REL_CSS}
     return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapa'], ['cal', 'Calendário']].map(function (x) {
       return '<button data-opa="' + x[0] + '" class="' + (opAba === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
   }
-  function ligarAbasOp() { document.querySelectorAll('[data-opa]').forEach(function (b) { b.onclick = function () { opAba = b.dataset.opa; pintar(); window.scrollTo(0, 0); }; }); }
+  // o calendário do operador sempre abre no dia de hoje
+  function calHoje() { var h = hoje(); CAL.y = Number(h.slice(0, 4)); CAL.m = Number(h.slice(5, 7)) - 1; CAL.sel = h; }
+  function ligarAbasOp() { document.querySelectorAll('[data-opa]').forEach(function (b) { b.onclick = function () { opAba = b.dataset.opa; if (opAba === 'cal') calHoje(); pintar(); window.scrollTo(0, 0); }; }); }
   function calOperador() {
     var ev = eventosCal([]);
-    if (!CAL.y) {   // abre no mês da próxima aplicação a fazer (com atrasada, em hoje)
-      var pr = ev.filter(function (e) { return e.k !== 'apl'; }).map(function (e) { return e.d; }).sort();
-      var base = pr.some(function (d) { return d < hoje(); }) ? hoje() : (pr.filter(function (d) { return d >= hoje(); })[0] || hoje());
-      CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
-    }
+    if (!CAL.y) calHoje();
     $('#conteudo').innerHTML = abasOp() + '<h2 class="talhao">Calendário<small>aplicações a fazer e feitas</small></h2>' + calendario(ev, false);
     ligarAbasOp(); ligarCal();
   }
