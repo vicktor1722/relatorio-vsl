@@ -70,10 +70,14 @@
     let j = null; try { j = JSON.parse(txt); } catch (e) {}
     if (r.status === 401) {
       // no login, 401 quer dizer e-mail/senha errados — não é sessão expirada
-      if (rota === '/api/entrar' || rota === '/api/registrar') throw new Error((j && j.erro) || 'e-mail ou senha incorretos');
+      if (rota === '/api/entrar' || rota === '/api/registrar') {
+        const er = new Error((j && j.erro) || 'e-mail ou senha incorretos');
+        er.precisaCodigo = !!(j && j.precisaCodigo);   // conta administradora: falta o código de confirmação
+        throw er;
+      }
       emitir({ tipo: 'sem-sessao' }); throw new Error('sessão expirada');
     }
-    if (!r.ok) throw new Error((j && j.erro) || ('HTTP ' + r.status));
+    if (!r.ok) { const er = new Error((j && j.erro) || ('HTTP ' + r.status)); er.precisaCodigo = !!(j && j.precisaCodigo); throw er; }
     return j;
   }
 
@@ -85,8 +89,8 @@
 
   /* ---------------- conta ---------------- */
 
-  async function entrar(email, senha) {
-    const r = await comJson('/api/entrar', { email, senha });
+  async function entrar(email, senha, codigo) {
+    const r = await comJson('/api/entrar', codigo ? { email, senha, codigo } : { email, senha });
     await salvarConf({ token: r.token, nome: r.nome, email: r.email });
     return r;
   }

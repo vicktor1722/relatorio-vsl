@@ -2,7 +2,7 @@
    Relatório VSL — Worker
    API (login, cadastro, relatórios) + página pública do relatório
    ============================================================ */
-import { conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
+import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
@@ -354,7 +354,7 @@ export default {
         const u = { id: novoId('u'), email: email, nome: String(b.nome || '').trim() };
         await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin) VALUES (?,?,?,?,1)')
           .bind(u.id, u.email, await hashSenha(senha), u.nome).run();
-        return json({ ok: true, token: await criarToken(env, u), nome: u.nome, email: u.email });
+        return json({ ok: true, token: await criarToken(env, u, null, { cf: 1 }), nome: u.nome, email: u.email });
       }
 
       if (rota === '/api/entrar' && req.method === 'POST') {
@@ -364,6 +364,19 @@ export default {
         if (!u || !(await conferirSenha(String(b.senha || ''), u.senha_hash))) {
           return json({ erro: 'e-mail ou senha incorretos' }, 401);
         }
+        // conta administradora: além da senha, pede o código de confirmação
+        if (Number(u.admin) === 1) {
+          const trava = await travaCodigo(env, u.id);
+          if (trava.bloqueado) return json({ erro: 'muitas tentativas com o código: tente de novo em ' + trava.min + ' min', precisaCodigo: true }, 429);
+          if (!String(b.codigo || '').trim()) return json({ erro: 'Conta administradora: informe o código de confirmação', precisaCodigo: true }, 401);
+          if (!(await conferirCodigoAdmin(env, b.codigo))) {
+            await travaCodigo(env, u.id, 'erro');
+            return json({ erro: 'código de confirmação incorreto', precisaCodigo: true }, 401);
+          }
+          await travaCodigo(env, u.id, 'ok');
+          admSemCodigo.delete(u.id);
+          return json({ ok: true, token: await criarToken(env, u, null, { cf: 1 }), nome: u.nome, email: u.email });
+        }
         return json({ ok: true, token: await criarToken(env, u), nome: u.nome, email: u.email });
       }
 
@@ -372,6 +385,8 @@ export default {
       const me = await usuarioDaRequisicao(req, env);
       if (rota.startsWith('/api/')) {
         if (!me) return json({ erro: 'sessão expirada, entre de novo' }, 401);
+        // administrador com sessão aberta antes do código de confirmação: entra de novo com o código
+        if (!me.cf && await ehAdminSemCodigo(env, me.id)) return json({ erro: 'sessão expirada, entre de novo' }, 401);
         await padronizarSafras(env);   // dados antigos "2026/27" → "2026/2027" (uma vez por instância)
         await padronizarVariedades(env);
       }
@@ -404,6 +419,7 @@ export default {
         if (rota === '/api/admin/promover' && req.method === 'POST') {
           const b = await req.json();
           if (b.id === me.id && !b.admin) return json({ erro: 'não dá para tirar o seu próprio acesso' }, 400);
+          admSemCodigo.delete(b.id);
           return json(await promover(env, b.id, b.admin));
         }
         if (rota === '/api/admin/excluir' && req.method === 'POST') {
@@ -759,3 +775,25 @@ export default {
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };
+
+/* ---------- código de confirmação do administrador ---------- */
+// quem já se sabe que não é admin não consulta o banco de novo (cache da instância)
+const admSemCodigo = new Map();
+async function ehAdminSemCodigo(env, id) {
+  if (admSemCodigo.has(id)) return admSemCodigo.get(id);
+  let adm = false;
+  try { const u = await env.DB.prepare('SELECT admin FROM usuarios WHERE id = ?').bind(id).first(); adm = !!(u && Number(u.admin) === 1); } catch (e) { adm = false; }
+  admSemCodigo.set(id, adm);
+  return adm;
+}
+// 5 códigos errados seguidos travam por 15 minutos; acerto zera
+async function travaCodigo(env, id, evento) {
+  const chave = 'cod_admin:' + id, agora = Date.now();
+  let t = { n: 0, ate: 0 };
+  try { const r = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(chave).first(); if (r) t = JSON.parse(r.valor) || t; } catch (e) {}
+  if (!evento) return { bloqueado: t.ate > agora, min: Math.max(1, Math.ceil((t.ate - agora) / 60000)) };
+  if (evento === 'ok') t = { n: 0, ate: 0 };
+  else { t.n = (t.ate && t.ate <= agora ? 0 : t.n) + 1; t.ate = t.n >= 5 ? agora + 15 * 60000 : 0; if (t.n >= 5) t.n = 0; }
+  try { await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(chave, JSON.stringify(t)).run(); } catch (e) {}
+  return t;
+}

@@ -18,7 +18,8 @@
 
   async function mostrarLogin() {
     const q = await Sync.quemSou();
-    $('#loginEmail').value = q.email || '';
+    // não apaga o que a pessoa já está digitando (o aviso de sessão pode chegar no meio do login)
+    if (!$('#loginEmail').value) $('#loginEmail').value = q.email || '';
     abrir('telaLogin');
   }
 
@@ -48,8 +49,10 @@
           convite: $('#loginConvite').value.trim()
         });
       } else {
-        await Sync.entrar(email, senha);
+        const cod = $('#loginCodigoBox').classList.contains('oculto') ? '' : $('#loginCodigo').value.trim();
+        await Sync.entrar(email, senha, cod);
       }
+      $('#loginCodigo').value = ''; $('#loginCodigoBox').classList.add('oculto');
       $('#loginSenha').value = '';
       verSenha(false);
       aviso(msg, '');
@@ -75,6 +78,7 @@
       if (global.App && App.aoEntrar) await App.aoEntrar();
     } catch (e) {
       aviso(msg, e.message);
+      if (e.precisaCodigo) { $('#loginCodigoBox').classList.remove('oculto'); $('#loginCodigo').focus(); }
     } finally {
       $('#btnEntrar').disabled = false;
     }
@@ -448,6 +452,7 @@
     $('#btnAlternarConta').onclick = alternarModo;
     if ($('#btnTrocarServidor')) $('#btnTrocarServidor').onclick = trocarServidor;
     $('#loginSenha').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
+    $('#loginCodigo').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
     $('#btnVerSenha').onclick = function () { verSenha(); $('#loginSenha').focus(); };
 
     $('#btnAbrirCadastro').onclick = async function () { await atualizarCadastro(true); abrir('telaCadastro'); };

@@ -18,7 +18,7 @@ const esc = (s) => String(s == null ? '' : s)
 /* ---------------- quem é admin ---------------- */
 
 export async function ehAdmin(env, me) {
-  if (!me) return false;
+  if (!me || !me.cf) return false;   // administrador só vale com o código de confirmação no login
   try {
     const u = await env.DB.prepare('SELECT admin FROM usuarios WHERE id = ?').bind(me.id).first();
     return !!(u && Number(u.admin) === 1);
@@ -711,6 +711,7 @@ header.topo button{background:rgba(255,255,255,.18);color:#fff;border:none;borde
 .abas button.fora{display:none}
 main{padding:16px;max-width:1100px;margin:0 auto}
 .painel{display:none}.painel.on{display:block}
+.oculto{display:none!important}
 .cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
 .cartao{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:14px}
 .cartao b{display:block;font-size:24px;color:var(--verde-escuro);line-height:1.2}
@@ -824,6 +825,7 @@ ${AGRO_CSS}
   <p>${esc(empresa || 'AMVS Relatório')}</p>
   <div class="campo"><label>E-mail</label><input id="eMail" type="email" autocomplete="username"></div>
   <div class="campo"><label>Senha</label><div class="senha-box"><input id="eSenha" type="password" autocomplete="current-password"><button type="button" class="ver-senha" id="btnVerSenha" aria-pressed="false">Mostrar</button></div></div>
+  <div class="campo oculto" id="eCodigoBox"><label>Código de confirmação (administrador)</label><input id="eCodigo" type="password" autocomplete="one-time-code"></div>
   <button class="btn" id="btnEntrar">Entrar</button>
   <div id="eMsg"></div>
 </div>
@@ -949,7 +951,7 @@ ${AGRO_CSS}
       body: corpo ? JSON.stringify(corpo) : undefined
     });
     var j = null; try { j = await r.json(); } catch (e) {}
-    if (!r.ok) throw new Error((j && j.erro) || ('HTTP ' + r.status));
+    if (!r.ok) { var er = new Error((j && j.erro) || ('HTTP ' + r.status)); er.precisaCodigo = !!(j && j.precisaCodigo); throw er; }
     return j;
   }
 
@@ -958,13 +960,18 @@ ${AGRO_CSS}
     var msg = $('#eMsg');
     aviso(msg, 'Entrando…');
     try {
-      var r = await api('/api/entrar', { email: $('#eMail').value.trim(), senha: $('#eSenha').value });
-      token = r.token;
+      var cod = $('#eCodigoBox').classList.contains('oculto') ? '' : $('#eCodigo').value.trim();
+      var r = await api('/api/entrar', cod ? { email: $('#eMail').value.trim(), senha: $('#eSenha').value, codigo: cod } : { email: $('#eMail').value.trim(), senha: $('#eSenha').value });
+      token = r.token; $('#eCodigo').value = '';
       try { localStorage.setItem(CHAVE, token); } catch (e) {}
       aviso(msg, '');
       await abrirPainel();
-    } catch (e) { aviso(msg, e.message, true); }
+    } catch (e) {
+      aviso(msg, e.message, true);
+      if (e.precisaCodigo) { $('#eCodigoBox').classList.remove('oculto'); $('#eCodigo').focus(); }
+    }
   };
+  $('#eCodigo').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#btnEntrar').click(); });
   $('#eSenha').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#btnEntrar').click(); });
   $('#btnVerSenha').onclick = function () {
     var i = $('#eSenha'), mostrar = i.type === 'password';
