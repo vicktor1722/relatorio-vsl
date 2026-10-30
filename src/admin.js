@@ -17,8 +17,10 @@ const esc = (s) => String(s == null ? '' : s)
 
 /* ---------------- quem é admin ---------------- */
 
-export async function ehAdmin(env, me) {
-  if (!me || !me.cf) return false;   // administrador só vale com o código de confirmação no login
+// semCodigo: só a marcação da conta (ex.: limite de responsáveis); sem ela, administrador só vale
+// na sessão do painel que entrou com o código de confirmação
+export async function ehAdmin(env, me, semCodigo) {
+  if (!me || (!me.cf && !semCodigo)) return false;
   try {
     const u = await env.DB.prepare('SELECT admin FROM usuarios WHERE id = ?').bind(me.id).first();
     return !!(u && Number(u.admin) === 1);
@@ -961,7 +963,7 @@ ${AGRO_CSS}
     aviso(msg, 'Entrando…');
     try {
       var cod = $('#eCodigoBox').classList.contains('oculto') ? '' : $('#eCodigo').value.trim();
-      var r = await api('/api/entrar', cod ? { email: $('#eMail').value.trim(), senha: $('#eSenha').value, codigo: cod } : { email: $('#eMail').value.trim(), senha: $('#eSenha').value });
+      var r = await api('/api/entrar', { email: $('#eMail').value.trim(), senha: $('#eSenha').value, codigo: cod || undefined, painel: true });
       token = r.token; $('#eCodigo').value = '';
       try { localStorage.setItem(CHAVE, token); } catch (e) {}
       aviso(msg, '');
@@ -1056,6 +1058,7 @@ ${AGRO_CSS}
       dados = await api('/api/admin/resumo');
     } catch (e) {
       aviso($('#eMsg'), e.message, true);
+      if (e.precisaCodigo) $('#eCodigoBox').classList.remove('oculto');
       token = ''; try { localStorage.removeItem(CHAVE); } catch (er) {}
       $('#telaEntrar').style.display = '';
       $('#telaPainel').style.display = 'none';
