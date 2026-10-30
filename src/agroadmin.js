@@ -155,7 +155,7 @@ export const AGRO_CSS = `
 .ag-dow{text-align:center;font-size:11px;color:var(--texto-fraco);padding:2px 0}
 .ag-dia{aspect-ratio:1/1.05;background:#fff;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:5px;font-size:14px;gap:3px}
 .ag-dia.hoje{box-shadow:inset 0 0 0 1.5px var(--verde)}
-.ag-dia.sel{background:var(--verde);color:#fff}
+.ag-dia.sel{background:#E4F2E8;color:#14532D;font-weight:800;box-shadow:inset 0 0 0 2.5px var(--verde)}
 .ag-dia i{display:flex;gap:2px;height:6px}
 .ag-grade u,.ag-leg u{display:inline-block;width:6px;height:6px;border-radius:50%;text-decoration:none}
 u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A100}u.c-venc{background:#C0392B}u.c-ok{background:#2E8B8B}
