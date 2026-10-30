@@ -11,7 +11,7 @@
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
 import { haAplicada, plantioPorDia } from './plantiodia.js';
-import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, regraValida } from './cultivares.js';
+import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
 
 let pronta = null;
 
@@ -117,6 +117,43 @@ export function garantir(env) {
 async function colunasCiclos(env) {
   for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''"]) {
     try { await env.DB.prepare('ALTER TABLE ' + c).run(); } catch (e) { /* já existe */ }
+  }
+}
+
+// soja: nome da variedade no padrão do catálogo ("Olimpo" → "BMX Olimpo IPRO"); outras culturas ficam como digitado
+export function variedadePadrao(variedade, cultura) {
+  const v = String(variedade || '').trim();
+  if (!v || (cultura && cultura !== 'soja')) return v;
+  return nomeOficial(v) || v;
+}
+
+// dados antigos: troca nomes curtos ou escritos de outro jeito pelo nome do catálogo, no plantio e no ciclo
+// dos materiais (uma vez por instância, como a padronização das safras)
+let variedadesOk = false;
+export async function padronizarVariedades(env) {
+  if (variedadesOk) return;
+  variedadesOk = true;
+  try {
+    await garantir(env);
+    const vs = (await env.DB.prepare("SELECT DISTINCT variedade AS v FROM plantio WHERE variedade != '' AND (cultura = 'soja' OR cultura = '' OR cultura IS NULL)").all()).results || [];
+    for (const { v } of vs) {
+      const n = variedadePadrao(v, 'soja');
+      if (n === v) continue;
+      await env.DB.prepare("UPDATE plantio SET variedade = ? WHERE variedade = ? AND (cultura = 'soja' OR cultura = '' OR cultura IS NULL)").bind(n, v).run();
+    }
+    const cs = (await env.DB.prepare("SELECT DISTINCT variedade AS v FROM ciclos WHERE (cultura = 'soja' OR cultura = '' OR cultura IS NULL) AND (empresa = '' OR empresa IS NULL)").all()).results || [];
+    for (const { v } of cs) {
+      const n = variedadePadrao(v, 'soja');
+      if (n === v) continue;
+      // o ciclo informado no nome antigo passa para o nome novo (se o novo ainda não tinha); depois sai o antigo
+      await env.DB.prepare(`UPDATE ciclos SET dias = (SELECT o.dias FROM ciclos o WHERE o.usuario_id = ciclos.usuario_id AND o.variedade = ?1),
+          gmr = CASE WHEN gmr > 0 THEN gmr ELSE (SELECT o.gmr FROM ciclos o WHERE o.usuario_id = ciclos.usuario_id AND o.variedade = ?1) END
+        WHERE variedade = ?2 AND dias = 0 AND EXISTS (SELECT 1 FROM ciclos o WHERE o.usuario_id = ciclos.usuario_id AND o.variedade = ?1)`).bind(v, n).run();
+      await env.DB.prepare('UPDATE OR IGNORE ciclos SET variedade = ? WHERE variedade = ?').bind(n, v).run();
+      await env.DB.prepare('DELETE FROM ciclos WHERE variedade = ?').bind(v).run();
+    }
+  } catch (e) {
+    variedadesOk = false;   // tenta de novo na próxima requisição
   }
 }
 
@@ -532,7 +569,7 @@ export async function rotasAgro(env, req, me, rota, url) {
             data_emerg = excluded.data_emerg, espac_cm = excluded.espac_cm, sem_m = excluded.sem_m,
             sem_ha = excluded.sem_ha, atualizado_em = datetime('now')
           WHERE plantio.usuario_id = excluded.usuario_id`)
-        .bind(fid, safra, talhao, me.id, txt(t.cultura, 20), txt(t.variedade, 80), dia(t.data_plantio),
+        .bind(fid, safra, talhao, me.id, txt(t.cultura, 20), variedadePadrao(txt(t.variedade, 80), txt(t.cultura, 20)), dia(t.data_plantio),
               dia(t.data_emerg), num(t.espac_cm), num(t.sem_m), Math.round(num(t.sem_ha))));
     }
     if (cmds.length) await env.DB.batch(cmds);

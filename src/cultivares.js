@@ -301,3 +301,15 @@ export function cicloMaterial(variedade, cultura, linha, regra) {
   if (c && c.faixa) return { dias: cicloPorGmr(GMR_FAIXA[c.faixa], regra), fonte: 'faixa', gmr: GMR_FAIXA[c.faixa] };
   return null;
 }
+
+// nome oficial do catálogo para um nome digitado ("Olimpo" → "BMX Olimpo IPRO"); '' quando não tem certeza.
+// Se o nome digitado traz a tecnologia e ela é outra (ex.: "Olimpo I2X"), não troca.
+const TECS = { IPRO: 1, I2X: 1, RR: 1, CE: 1, E: 1, XTD: 1, CE3: 1, TF: 1, RSF: 1 };
+const tecDe = (n) => { const u = String(n || '').trim().toUpperCase().split(/\s+/).pop(); return TECS[u] ? u : ''; };
+export function nomeOficial(nome) {
+  const c = acharCultivar(nome);
+  if (!c) return '';
+  const t1 = tecDe(nome), t2 = tecDe(c.nome);
+  if (t1 && t2 && t1 !== t2) return '';
+  return c.nome;
+}
