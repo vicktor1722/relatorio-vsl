@@ -268,7 +268,8 @@ export default {
 
       // a página do painel é aberta; quem valida é o /api/admin/* com o token
       if (rota === '/admin' || rota === '/admin/') {
-        return html(paginaAdmin('AMVS'));
+        // sem cache: o navegador sempre pega o painel atual (ex.: campo do código de confirmação)
+        return new Response(paginaAdmin('AMVS'), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
       }
 
       if (rota.startsWith('/r/')) {
