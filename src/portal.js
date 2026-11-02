@@ -15,7 +15,7 @@ import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCic
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
 import { haAplicada, haPlantada, lerLanc, parciaisDe } from './plantiodia.js';
 import { safraPadrao } from './safras.js';
-import { chavePublica, garantirPush } from './push.js';
+import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
@@ -170,6 +170,26 @@ async function ciclosDoPlantio(env, dono, plantio, linhas) {
   return out;
 }
 
+// notificação para o consultor: "✔ Aplicação lançada · FAZENDA — Herbicida pós · TH-05 (20 de 50 ha) · por …"
+async function avisarConsultor(env, dono, r, d, talhoes, parcial, quem, data, regId) {
+  await garantirPush(env);
+  const f = await env.DB.prepare('SELECT nome, talhoes FROM fazendas WHERE id = ?').bind(r.fazenda_id).first();
+  const areas = areasDe(f && f.talhoes), parte = d.parte || {};
+  const haTal = (t) => { const tot = areas[t] || 0, p = Number(parte[t]); return p > 0 && p < tot ? p : tot; };
+  const n1 = (v) => (Math.round(v * 10) / 10).toString().replace('.', ',');
+  const tal = parcial
+    ? parcial.t + ' (' + n1(parcial.ha) + ' de ' + n1(haTal(parcial.t)) + ' ha · parcial)'
+    : talhoes.join(', ') + ' · ' + n1(talhoes.reduce((s, t) => s + haTal(t), 0)) + ' ha';
+  const op = Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao;
+  const dm = String(data).split('-');
+  return enviarParaConta(env, dono, {
+    title: (parcial ? '◐ Aplicação parcial lançada · ' : '✔ Aplicação lançada · ') + ((f && f.nome) || 'fazenda'),
+    body: op + ' · ' + tal + '\npor ' + quem + ' · ' + dm[2] + '/' + dm[1],
+    url: '/?abrir=recs',
+    tag: 'aplic-' + (regId || r.id + '-' + Date.now().toString(36))   // um aviso por lançamento (não substitui o anterior)
+  });
+}
+
 async function dadosFazenda(env, acesso, fid, safraPedida) {
   const f = await env.DB.prepare('SELECT f.id, f.nome, f.talhoes, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
     .bind(fid, acesso.dono_id).first();
@@ -248,7 +268,7 @@ async function acessoDaRequisicao(req, env) {
   return a;
 }
 
-export async function rotasPortal(env, req, rota, url) {
+export async function rotasPortal(env, req, rota, url, ctx) {
   await garantir(env);
   if (req.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' } });
 
@@ -426,7 +446,13 @@ export async function rotasPortal(env, req, rota, url) {
         por: quem, porId: a.id, em: txt(b.em, 30) || new Date().toISOString()
       });
     }
-    return salvar();
+    const resp = await salvar();
+    // avisa no celular do consultor (dono da fazenda) que o operador lançou a aplicação
+    if (!b.desfazer && marcados.length) {
+      const aviso = avisarConsultor(env, a.dono_id, r, d, marcados, b._parcial, quem, data, txt(b.reg_id, 60)).catch(() => {});
+      if (ctx && ctx.waitUntil) ctx.waitUntil(aviso); else await aviso;
+    }
+    return resp;
   }
 
   return json({ erro: 'rota não encontrada' }, 404);

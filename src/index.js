@@ -224,7 +224,7 @@ export default {
       if (rota === '/portal' || rota === '/portal/') return html(paginaPortal());
       if (rota === '/portal-sw.js') return new Response(PORTAL_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
       if (rota === '/portal.webmanifest') return new Response(PORTAL_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
-      if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url);
+      if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url, ctx);
 
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
