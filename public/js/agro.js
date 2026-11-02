@@ -921,7 +921,8 @@
     Object.keys(gc).forEach(function (k) { gc[k].txt = 'Colheita prevista · ' + gc[k].mat; ev.push(gc[k]); });
     return ev;
   }
-  function corEv(e) { return e.k === 'colh' ? 'colh' : e.k === 'prev' ? 'prev' : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
+  // prevista com a data já passada e ainda não aplicada = atrasada (vermelho), igual ao portal
+  function corEv(e) { return e.k === 'colh' ? 'colh' : e.k === 'prev' ? (e.d < hoje() ? 'venc' : 'prev') : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
   /* Aplicações perto (mesma regra do aviso no celular): previstas e próximas das sequências que vencem
      dentro do aviso da recomendação (padrão 3 dias) ou que atrasaram até 7 dias. */
   function pertoDe(fid) {
