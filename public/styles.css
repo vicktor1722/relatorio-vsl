@@ -549,3 +549,9 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-ico.colh{width:30px;height:17px}
 .ag-leg .ag-ico.colh{width:28px;height:16px}
 .ag-ai.c-colh .ag-ico.colh{width:44px;height:25px}
+/* pulverizador autopropelido de frente (ícone largo 64×30); a cor da máquina segue a situação */
+.ag-ico.pulv{width:32px;height:15px}
+.ag-leg .ag-ico.pulv{width:28px;height:13px}
+.ag-ai .ag-ico.pulv{width:40px;height:19px}
+.ag-dia i{flex-direction:column;height:auto;min-height:16px;gap:1px}
+.ag-dia i .ag-ico.colh{width:26px;height:15px}
