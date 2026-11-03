@@ -7,7 +7,7 @@
    Só aparece quando há dados; o relatório antigo continua igual.
    ============================================================ */
 
-import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
+import { dividirTalhao, haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -258,17 +258,15 @@ function mapaVariedade(mapa, plantio, hoje) {
       (p.data_plantio ? ' · plantio ' + curta(p.data_plantio) : '') + (dae !== null ? ' · DAE ' + dae : '');
     let d = '';
     each(f, (rings) => { d += rings.map((r) => 'M' + r.map((q) => px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1)).join('L') + 'Z').join(' '); });
-    let fill = cor(p.variedade);
-    if (pts.length > 1) {
-      // talhão com mais de uma variedade: listras com a cor de cada uma, na proporção da área
-      const tot = pts.reduce((s, x) => s + x.ha, 0) || 1, W0 = 36;
-      let x0 = 0;
-      sv += '<defs><pattern id="mvp' + fi + '" width="' + W0 + '" height="' + W0 + '" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
-        pts.map((x) => { const w = W0 * x.ha / tot, r = '<rect x="' + x0.toFixed(2) + '" width="' + w.toFixed(2) + '" height="' + W0 + '" fill="' + cor(x.variedade) + '"/>'; x0 += w; return r; }).join('') +
-        '</pattern></defs>';
-      fill = 'url(#mvp' + fi + ')';
-    }
-    sv += '<path class="mv" data-info="' + esc(info) + '" d="' + d + '" fill="' + fill + '"/>';
+    // talhão com mais de uma variedade: o desenho dividido, cada parte na cor da variedade e na proporção da área
+    const div = pts.length > 1 ? dividirTalhao(f.geometry, pts) : [];
+    if (div.length > 1) {
+      div.forEach((x) => {
+        sv += '<path d="' + x.aneis.map((r) => 'M' + r.map((q) => px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1)).join('L') + 'Z').join(' ') +
+          '" fill="' + cor(x.variedade) + '" stroke="#fff" stroke-width="1.2" stroke-dasharray="5 4"/>';
+      });
+      sv += '<path class="mv" data-info="' + esc(info) + '" d="' + d + '" fill="#000" fill-opacity="0"/>';
+    } else sv += '<path class="mv" data-info="' + esc(info) + '" d="' + d + '" fill="' + cor(p.variedade) + '"/>';
     // centro do talhão pela área (o centro por vértices desloca o rótulo para o lado mais recortado)
     let ar = 0, gx = 0, gy = 0, sx = 0, sy = 0, n = 0;
     each(f, (rings) => {

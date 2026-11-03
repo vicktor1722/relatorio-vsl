@@ -54,3 +54,50 @@ export function partesDe(p, area) {
   }
   return p && (p.variedade || p.cultura) ? [{ variedade: p.variedade || '', ha: area || 0, data_plantio: p.data_plantio || '' }] : [];
 }
+
+/* ---------------- talhão dividido no mapa ----------------
+   Corta o desenho do talhão em faixas (no sentido mais comprido) com a área proporcional a cada parte:
+   60 ha de uma variedade num talhão de 100 ha = 60% do desenho na cor dela. */
+function cortar(anel, eixo, c, menor) {
+  const dentro = (p) => (menor ? p[eixo] <= c : p[eixo] >= c);
+  const out = [];
+  for (let i = 0; i < anel.length; i++) {
+    const a = anel[i], b = anel[(i + 1) % anel.length], da = dentro(a), db = dentro(b);
+    if (da) out.push(a);
+    if (da !== db) {
+      const t = (c - a[eixo]) / (b[eixo] - a[eixo]);
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+  }
+  return out;
+}
+const areaPlana = (anel) => { let s = 0; for (let i = 0; i < anel.length; i++) { const a = anel[i], b = anel[(i + 1) % anel.length]; s += a[0] * b[1] - b[0] * a[1]; } return Math.abs(s) / 2; };
+
+// geometry (GeoJSON) + partes [{variedade, ha}] → [{variedade, ha, aneis: [[lon,lat]...]}]
+export function dividirTalhao(geometry, partes) {
+  if (!geometry || !partes || partes.length < 2) return [];
+  const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+  const ext = polys.map((p) => p[0]).filter((r) => r && r.length > 2);
+  if (!ext.length) return [];
+  let lat0 = 0, n = 0; ext.forEach((r) => r.forEach((q) => { lat0 += q[1]; n++; }));
+  const k = Math.cos((lat0 / n) * Math.PI / 180);
+  const an = ext.map((r) => r.map((q) => [q[0] * k, q[1]]));   // longitude encolhida: área proporcional à real
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  an.forEach((r) => r.forEach((q) => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); }));
+  const eixo = x1 - x0 >= y1 - y0 ? 0 : 1, lo = eixo ? y0 : x0, hi = eixo ? y1 : x1;
+  const ate = (c) => an.reduce((s, r) => { const q = cortar(r, eixo, c, true); return s + (q.length > 2 ? areaPlana(q) : 0); }, 0);
+  const total = ate(hi) || 1, soma = partes.reduce((s, x) => s + Number(x.ha), 0) || 1;
+  const cortes = [lo]; let acum = 0;
+  partes.forEach((x, i) => {
+    acum += Number(x.ha);
+    if (i === partes.length - 1) { cortes.push(hi); return; }
+    const alvo = total * acum / soma; let a = lo, b = hi;
+    for (let it = 0; it < 40; it++) { const m = (a + b) / 2; if (ate(m) < alvo) a = m; else b = m; }
+    cortes.push((a + b) / 2);
+  });
+  return partes.map((x, i) => ({
+    variedade: x.variedade, ha: Number(x.ha),
+    aneis: an.map((r) => cortar(cortar(r, eixo, cortes[i], false), eixo, cortes[i + 1], true))
+      .filter((q) => q.length > 2).map((q) => { const f = q.map((p) => [p[0] / k, p[1]]); f.push(f[0]); return f; })
+  })).filter((x) => x.aneis.length);
+}

@@ -278,16 +278,23 @@ ${AGRO_REL_CSS}
     }
     $('#conteudo').innerHTML = abas() + h;
     document.querySelectorAll('[data-mm]').forEach(function (b) { b.onclick = function () { modoMapa = b.dataset.mm; pintar(); }; });
-    desenharMapa($('#mapaFaz'), function (nm) {
+    var divididos = {}; (D.mapaPartes || []).forEach(function (x) { divididos[x.properties.talhao] = 1; });
+    var mm = desenharMapa($('#mapaFaz'), function (nm) {
       if (modoMapa === 'area') return { color: '#FFFFFF', weight: 2, fillColor: '#2FA05A', fillOpacity: 0.22 };
+      if (divididos[nm]) return { color: '#FFFFFF', weight: 2, fillOpacity: 0 };   // as partes coloridas vão por baixo
       var p = plantioDe(nm), k = p ? (p.variedade || NC[p.cultura] || p.cultura) : '';
-      if (p && p.partes && p.partes.length) k = p.partes.slice().sort(function (a, b) { return b.ha - a.ha; })[0].variedade;   // a variedade com mais área
       return { color: '#FFFFFF', weight: 2, fillColor: vars[k] || '#9AA5A0', fillOpacity: 0.55 };
     }, function (nm, q) {
       var p = plantioDe(nm);
       return '<b>' + esc(nm) + '</b>' + (q.area_ha ? '<br>' + n(q.area_ha, 1) + ' ha' : '') +
         (p ? '<br>' + esc(NC[p.cultura] || p.cultura || '') + (p.partes && p.partes.length ? '<br>' + p.partes.map(function (x) { return esc(x.variedade) + ' · ' + n(x.ha, 1) + ' ha'; }).join('<br>') : p.variedade ? ' · ' + esc(p.variedade) : '') + (p.data_plantio ? '<br>plantio ' + dataBR(p.data_plantio) : '') : '');
     }, modoMapa === 'area' ? function (nm, q) { return esc(nm) + (q.area_ha ? '<small>' + n(q.area_ha, 1) + ' ha</small>' : ''); } : null);
+    // talhão com mais de uma variedade: cada parte na cor da variedade, na proporção da área
+    if (mm && modoMapa === 'var' && (D.mapaPartes || []).length) {
+      L.geoJSON({ type: 'FeatureCollection', features: D.mapaPartes }, { interactive: false,
+        style: function (f) { return { color: '#FFFFFF', weight: 1, dashArray: '4 3', fillColor: vars[f.properties.variedade] || '#9AA5A0', fillOpacity: 0.55 }; }
+      }).addTo(mm).bringToBack();
+    }
   }
 
   /* ---------- visão da fazenda ---------- */
