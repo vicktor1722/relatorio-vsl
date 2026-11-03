@@ -13,7 +13,7 @@ import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } fr
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo, variedadePadrao } from './agro.js';
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
-import { haAplicada, haPlantada, lerLanc, parciaisDe, partesDe } from './plantiodia.js';
+import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe } from './plantiodia.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -255,8 +255,23 @@ async function dadosTodas(env, acesso, safraPedida) {
     custo: custos.length ? { talhoes: custos.flatMap((d) => d.custo.talhoes.map((t) => Object.assign({}, t, { nome: pre(d) + t.nome }))),
       sem_preco: [...new Set(custos.flatMap((d) => d.custo.sem_preco || []))] } : null,
     colheita: lista.flatMap((d) => (d.colheita || []).map((c) => Object.assign({}, c, { talhao: pre(d) + c.talhao }))),
+    mapaPartes: lista.flatMap((d) => (d.mapaPartes || []).map((x) => Object.assign({}, x, { properties: Object.assign({}, x.properties, { talhao: pre(d) + x.properties.talhao }) }))),
     ciclos: Object.values(ciclos)
   };
+}
+
+// talhões com mais de uma variedade: o desenho dividido em faixas proporcionais à área de cada uma
+function partesDoMapa(mapa, plantio, areas) {
+  const out = [];
+  ((mapa && mapa.features) || []).forEach((f) => {
+    const nome = (f.properties || {}).nome, p = plantio.filter((x) => x.talhao === nome)[0];
+    if (!p) return;
+    const pts = partesDe(p, areas[nome] || 0).filter((x) => x.variedade);
+    if (pts.length < 2) return;
+    dividirTalhao(f.geometry, pts).forEach((x) => out.push({ type: 'Feature', properties: { talhao: nome, variedade: x.variedade, ha: x.ha },
+      geometry: { type: 'MultiPolygon', coordinates: x.aneis.map((r) => [r]) } }));
+  });
+  return out;
 }
 
 async function dadosFazenda(env, acesso, fid, safraPedida) {
@@ -321,6 +336,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     estoque: estoqueDe(es.results || [], recs, areas),
     custo: custo ? { talhoes: custo.talhoes, sem_preco: custo.sem_preco } : null,
     colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
+    mapaPartes: partesDoMapa(mapa, plantio, areas),
     ciclos: await ciclosDoPlantio(env, dono, plantio, ci.results || [])
   });
 }
