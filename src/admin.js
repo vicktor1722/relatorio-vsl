@@ -1142,6 +1142,7 @@ ${AGRO_CSS}
           '<button class="selo" data-pago="' + esc(c.id) + '">marcar pago</button> ' +
           '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ' +
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
+          '<button class="selo" data-kml="' + esc(c.id) + '" data-nome="' + esc(c.nome || c.email) + '">📐 mapa KML</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
           (Number(c.admin) === 1 ? 'tirar admin' : 'tornar admin') + '</button>' +
           (Number(c.admin) === 1 || (dados.eu && c.id === dados.eu.id) ? '' :
@@ -1160,11 +1161,89 @@ ${AGRO_CSS}
     document.querySelectorAll('[data-senha]').forEach(function (b) {
       b.onclick = function () { abrirTrocaSenha(b.dataset.senha, b.dataset.email); };
     });
+    document.querySelectorAll('[data-kml]').forEach(function (b) {
+      b.onclick = function () { abrirKml(b.dataset.kml, b.dataset.nome); };
+    });
     document.querySelectorAll('[data-excluir]').forEach(function (b) {
       b.onclick = function () { abrirExcluir(b.dataset.excluir, b.dataset.email, b.dataset.rel); };
     });
     ligarPrazos();
     ligarPagto();
+  }
+
+  /* ---------- mapa (KML) na fazenda de uma conta ---------- */
+  // KMZ = zip com o KML dentro: abre o primeiro .kml (sem biblioteca, com o DecompressionStream do navegador)
+  async function kmlDoKmz(buf) {
+    var dv = new DataView(buf), by = new Uint8Array(buf), fim = -1;
+    for (var i = by.length - 22; i >= 0 && i > by.length - 66000; i--) { if (dv.getUint32(i, true) === 0x06054b50) { fim = i; break; } }
+    if (fim < 0) throw new Error('KMZ inválido');
+    var qtd = dv.getUint16(fim + 10, true), p = dv.getUint32(fim + 16, true);
+    for (var k = 0; k < qtd; k++) {
+      var met = dv.getUint16(p + 10, true), tam = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), loc = dv.getUint32(p + 42, true);
+      var nome = new TextDecoder().decode(by.subarray(p + 46, p + 46 + nl)).toLowerCase();
+      p += 46 + nl + el + cl;
+      if (nome.slice(-4) !== '.kml') continue;
+      var ini = loc + 30 + dv.getUint16(loc + 26, true) + dv.getUint16(loc + 28, true), cru = by.subarray(ini, ini + tam);
+      if (met === 0) return new TextDecoder().decode(cru);
+      var ds = new Blob([cru]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      return await new Response(ds).text();
+    }
+    throw new Error('o KMZ não tem um arquivo KML dentro');
+  }
+  async function abrirKml(uid, nomeConta) {
+    var veu = document.createElement('div'); veu.className = 'veu';
+    var cx = document.createElement('div'); cx.className = 'modal';
+    cx.innerHTML = '<h2 style="margin:0 0 4px">Mapa (KML) na fazenda</h2><p style="margin:0 0 10px;font-size:13px">Conta: <b>' + esc(nomeConta) + '</b></p><div id="kmCorpo">Carregando fazendas…</div>';
+    veu.appendChild(cx); document.body.appendChild(veu);
+    var sair = function () { veu.remove(); };
+    veu.onclick = function (e) { if (e.target === veu) sair(); };
+    var d;
+    try { d = await api('/api/admin/fazendas?uid=' + encodeURIComponent(uid)); }
+    catch (e) { cx.querySelector('#kmCorpo').innerHTML = '<div class="aviso ruim">' + esc(e.message) + '</div>'; return; }
+    var nb = function (v) { return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+    cx.querySelector('#kmCorpo').innerHTML =
+      '<div class="campo"><label>Fazenda</label><select id="kmFaz">' + d.fazendas.map(function (f) {
+        return '<option value="' + esc(f.id) + '">' + esc(f.nome) + (f.produtor ? ' · ' + esc(f.produtor) : '') + (f.n_talhoes ? ' · ' + f.n_talhoes + ' talhões' : ' · sem mapa') + '</option>'; }).join('') +
+        '<option value="">＋ Nova fazenda…</option></select></div>' +
+      '<div id="kmNova" style="display:none"><div class="campo"><label>Nome da fazenda nova</label><input id="kmNome" type="text"></div>' +
+        '<div class="campo"><label>Produtor</label><select id="kmProd"><option value="">— sem produtor —</option>' + d.produtores.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nome) + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="campo"><label>Arquivo KML ou KMZ</label><input id="kmArq" type="file" accept=".kml,.kmz"></div>' +
+      '<div id="kmPrev"></div><div id="kmMsg"></div>' +
+      '<button class="btn" id="kmOk" disabled>Gravar mapa na fazenda</button><button class="btn sec" id="kmCancel" style="margin-top:8px">Cancelar</button>';
+    var sel = cx.querySelector('#kmFaz'), kml = '';
+    var mostrarNova = function () { cx.querySelector('#kmNova').style.display = sel.value ? 'none' : ''; };
+    if (!d.fazendas.length) sel.value = '';
+    mostrarNova(); sel.onchange = function () { mostrarNova(); avisoTroca(); };
+    var avisoTroca = function () {
+      var f = d.fazendas.filter(function (x) { return x.id === sel.value; })[0];
+      var p = cx.querySelector('#kmPrev .troca'); if (p) p.style.display = f && f.n_talhoes ? '' : 'none';
+    };
+    cx.querySelector('#kmCancel').onclick = sair;
+    cx.querySelector('#kmArq').onchange = async function () {
+      var arq = this.files && this.files[0], msg = cx.querySelector('#kmMsg'), prev = cx.querySelector('#kmPrev');
+      kml = ''; cx.querySelector('#kmOk').disabled = true; prev.innerHTML = '';
+      if (!arq) return;
+      aviso(msg, 'Lendo o arquivo…');
+      try {
+        kml = arq.name.toLowerCase().slice(-4) === '.kmz' ? await kmlDoKmz(await arq.arrayBuffer()) : await arq.text();
+        var r = await api('/api/admin/fazenda-kml', { uid: uid, kml: kml, previa: true });
+        prev.innerHTML = '<div class="aviso" style="margin:0 0 10px"><b>' + r.n_talhoes + ' talhões · ' + nb(r.area_ha) + ' ha</b><br><span style="font-size:12.5px">' +
+          r.talhoes.map(function (t) { return esc(t.nome) + ' ' + nb(t.ha) + ' ha'; }).join(' · ') + '</span></div>' +
+          '<div class="aviso ruim troca" style="margin:0 0 10px;display:none">Esta fazenda já tem mapa: os talhões serão trocados por estes. O plantio e as aplicações ficam ligados pelo nome do talhão.</div>';
+        avisoTroca(); aviso(msg, ''); cx.querySelector('#kmOk').disabled = false;
+      } catch (e) { aviso(msg, e.message, true); }
+    };
+    cx.querySelector('#kmOk').onclick = async function () {
+      var msg = cx.querySelector('#kmMsg');
+      if (!kml) return;
+      if (!sel.value && !cx.querySelector('#kmNome').value.trim()) { aviso(msg, 'Informe o nome da fazenda nova.', true); return; }
+      this.disabled = true; aviso(msg, 'Gravando…');
+      try {
+        var r = await api('/api/admin/fazenda-kml', { uid: uid, kml: kml, fazenda_id: sel.value, nome: cx.querySelector('#kmNome').value.trim(), produtor_id: cx.querySelector('#kmProd').value });
+        sair(); await abrirPainel();
+        alert('Mapa gravado: ' + r.n_talhoes + ' talhões · ' + nb(r.area_ha) + ' ha. No app da conta ele aparece ao abrir Produtores e fazendas (ou ao voltar para o app).');
+      } catch (e) { aviso(msg, e.message, true); this.disabled = false; }
+    };
   }
 
   /* ---------- excluir uma conta (definitivo) ---------- */
