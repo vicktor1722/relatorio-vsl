@@ -214,7 +214,7 @@ ${AGRO_REL_CSS}
     $('#hSub').textContent = eu.papel_nome + ' · ' + eu.nome;
     var sf = $('#selFaz'), ult = ''; try { ult = localStorage.getItem(CH + ':faz') || ''; } catch (e) {}
     // produtor com mais de uma fazenda pode ver todas juntas
-    var todas = eu.papel !== 'operador' && eu.fazendas.length > 1;
+    var todas = eu.fazendas.length > 1;
     sf.innerHTML = (todas ? '<option value="*"' + (ult === '*' ? ' selected' : '') + '>Todas as fazendas</option>' : '') +
       eu.fazendas.map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === ult ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('');
     $('#boxFaz').classList.toggle('oculto', eu.fazendas.length < 2);
@@ -362,7 +362,7 @@ ${AGRO_REL_CSS}
         var k = (t.feito ? 'apl' : (t.data < hoje() ? 'venc' : 'prev')) + '|' + d;
         (g[k] = g[k] || []).push(t.nome);
       });
-      Object.keys(g).forEach(function (k) { var p = k.split('|'); ev.push({ d: p[1], k: p[0], txt: a.titulo + (p[0] === 'apl' ? ' aplicada' : ' prevista'), tal: g[k] }); });
+      Object.keys(g).forEach(function (k) { var p = k.split('|'); ev.push({ d: p[1], k: p[0], txt: (D.todas && a.fazenda ? a.fazenda + ' · ' : '') + a.titulo + (p[0] === 'apl' ? ' aplicada' : ' prevista'), tal: g[k] }); });
     });
     var gc = {};
     pv.forEach(function (x) { if (x.colhido) return; var k = x.data + '|' + x.mat; (gc[k] = gc[k] || { d: x.data, k: 'colh', txt: 'Colheita prevista · ' + x.mat, tal: [], est: x.est }).tal.push(x.talhao); });
@@ -587,7 +587,7 @@ ${AGRO_REL_CSS}
     var haT = a.tal.reduce(function (s, t) { return s + t.ha; }, 0), base = haP || haT;
     var cls = a.status === 'aplicada' ? 'aplicada' : a.atrasada ? 'atrasada' : '';
     var h = '<div class="ap ' + cls + '"><div class="ap-h"><b>' + esc(a.titulo) + '</b>' + quando(a) + '</div>' +
-      '<div class="ap-sub">' + a.tal.length + ' talhão(ões) · ' + n(haT, 1) + ' ha' + (a.resp ? ' · resp.: ' + esc(a.resp) : '') + '</div>';
+      '<div class="ap-sub">' + (D.todas && a.fazenda ? '<b>🌾 ' + esc(a.fazenda) + '</b> · ' : '') + a.tal.length + ' talhão(ões) · ' + n(haT, 1) + ' ha' + (a.resp ? ' · resp.: ' + esc(a.resp) : '') + '</div>';
     // quanto de cada produto vai em um tanque cheio: dose × hectares que um tanque cobre (tanque ÷ calda)
     var haTq = a.calda && a.tanque ? a.tanque / a.calda : 0;
     if (a.prods.length) h += '<div class="pr' + (haTq ? ' t4' : '') + '"><span class="h">Produto</span><span class="h d">Dose</span>' + (haTq ? '<span class="h tq">Por tanque</span>' : '') + '<span class="h q">Total ' + (haP ? 'a aplicar' : '') + '</span>' +
@@ -655,8 +655,9 @@ ${AGRO_REL_CSS}
       if (opMapa !== '*' && x.id !== opMapa) return;
       x.tal.forEach(function (t) {
         var s = stTal(x, t);
-        if (!st[t.nome] || peso[s] > peso[st[t.nome]]) st[t.nome] = s;
-        (det[t.nome] = det[t.nome] || []).push(esc(x.titulo) + ': ' + (s === 'ok' ? 'aplicado ' + dataBR(t.feito) : s === 'atr' ? 'atrasado (prevista ' + dataBR(t.data) + ')' : 'a aplicar' + (t.data ? ' · prevista ' + dataBR(t.data) : '')));
+        var k = t.chave || t.nome;   // em "Todas as fazendas" o talhão leva o nome da fazenda
+        if (!st[k] || peso[s] > peso[st[k]]) st[k] = s;
+        (det[k] = det[k] || []).push(esc(x.titulo) + ': ' + (s === 'ok' ? 'aplicado ' + dataBR(t.feito) : s === 'atr' ? 'atrasado (prevista ' + dataBR(t.data) + ')' : 'a aplicar' + (t.data ? ' · prevista ' + dataBR(t.data) : '')));
       });
     });
     var ha = { ok: 0, pend: 0, atr: 0 }; Object.keys(st).forEach(function (k) { ha[st[k]] += areas[k] || 0; });
@@ -675,7 +676,7 @@ ${AGRO_REL_CSS}
   }
   function miniMapa(a) {
     var el = document.getElementById('mm_' + a.id); if (!el) return;
-    var st = {}; a.tal.forEach(function (t) { st[t.nome] = t.feito ? 'ok' : 'pend'; });
+    var st = {}; a.tal.forEach(function (t) { st[t.chave || t.nome] = t.feito ? 'ok' : 'pend'; });
     desenharMapa(el, function (nm) {
       return st[nm] === 'pend' ? { color: '#FFFFFF', weight: 2, fillColor: '#E08A00', fillOpacity: 0.6 }
         : st[nm] === 'ok' ? { color: '#FFFFFF', weight: 2, fillColor: '#2E7D32', fillOpacity: 0.55 }

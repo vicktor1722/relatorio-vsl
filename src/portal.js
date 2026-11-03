@@ -240,10 +240,9 @@ async function dadosTodas(env, acesso, safraPedida) {
     plantio: lista.flatMap((d) => (d.plantio || []).map((p) => Object.assign({}, p, { talhao: pre(d) + p.talhao }))),
     aplicacoes: lista.flatMap((d) => (d.aplicacoes || []).map((x) => Object.assign({}, x, {
       fazenda: d.fazenda.nome,
-      tal: (x.tal || []).map((t) => Object.assign({}, t, { nome: pre(d) + t.nome })),
-      registros: (x.registros || []).map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).map((t) => pre(d) + t) }))
+      tal: (x.tal || []).map((t) => Object.assign({}, t, { chave: pre(d) + t.nome }))
     }))).sort((x, y) => (x.data < y.data ? -1 : x.data > y.data ? 1 : 0)),
-    blocos: {
+    blocos: acesso.papel === 'operador' ? {} : {
       evolucao: bl.evolucao || '', mapaVar: bl.mapaVar || '',
       proximas: lista.map((d) => {
         const b = d.blocos || {}, corpo = (b.proximas || '') + (b.aplicacoes || '');
@@ -391,7 +390,7 @@ export async function rotasPortal(env, req, rota, url, ctx) {
   if (rota === '/api/portal/fazenda') {
     const fid = txt(url.searchParams.get('id'), 80);
     // "Todas as fazendas": acesso da fazenda com mais de uma fazenda vê tudo junto
-    if (fid === '*' && a.papel !== 'operador' && a.lista.length > 1) return json(Object.assign({ ok: true }, await dadosTodas(env, a, url.searchParams.get('safra'))));
+    if (fid === '*' && a.lista.length > 1) return json(Object.assign({ ok: true }, await dadosTodas(env, a, url.searchParams.get('safra'))));
     if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
     const d = await dadosFazenda(env, a, fid, url.searchParams.get('safra'));
     return d ? json(Object.assign({ ok: true }, d)) : json({ erro: 'fazenda não encontrada' }, 404);
