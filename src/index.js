@@ -8,6 +8,7 @@ import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
+import { kmlParaGeo } from './kml.js';
 import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safras.js';
 
 // onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
@@ -460,6 +461,40 @@ export default {
           const b = await req.json();
           try { return json(await trocarSenha(env, b.id, b.senha)); }
           catch (e) { return json({ erro: e.message }, 400); }
+        }
+        // mapa (KML) na fazenda de qualquer conta: lista as fazendas e importa o arquivo
+        if (rota === '/api/admin/fazendas' && req.method === 'GET') {
+          const uid = String(url.searchParams.get('uid') || '');
+          const [pr, fz] = await Promise.all([
+            env.DB.prepare('SELECT id, nome FROM produtores WHERE usuario_id = ? ORDER BY nome').bind(uid).all(),
+            env.DB.prepare('SELECT f.id, f.nome, f.n_talhoes, f.area_ha, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.usuario_id = ? ORDER BY f.nome').bind(uid).all()
+          ]);
+          return json({ ok: true, produtores: pr.results || [], fazendas: fz.results || [] });
+        }
+        if (rota === '/api/admin/fazenda-kml' && req.method === 'POST') {
+          const b = await req.json();
+          const uid = String(b.uid || '');
+          const dono = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ?').bind(uid).first();
+          if (!dono) return json({ erro: 'conta não encontrada' }, 404);
+          const gj = kmlParaGeo(String(b.kml || '').slice(0, 15000000));
+          if (!gj.features.length) return json({ erro: 'nenhum talhão (polígono) encontrado no arquivo' }, 400);
+          const n = gj.features.length, area = Math.round(gj.features.reduce((s, x) => s + x.properties.area_ha, 0) * 100) / 100;
+          if (b.previa) return json({ ok: true, n_talhoes: n, area_ha: area, talhoes: gj.features.map((x) => ({ nome: x.properties.nome, ha: x.properties.area_ha })) });
+          let fid = String(b.fazenda_id || '');
+          if (fid) {
+            const f = await env.DB.prepare('SELECT id FROM fazendas WHERE id = ? AND usuario_id = ?').bind(fid, uid).first();
+            if (!f) return json({ erro: 'fazenda não encontrada nesta conta' }, 404);
+            await env.DB.prepare("UPDATE fazendas SET talhoes = ?, n_talhoes = ?, area_ha = ?, atualizado_em = datetime('now') WHERE id = ? AND usuario_id = ?")
+              .bind(JSON.stringify(gj), n, area, fid, uid).run();
+          } else {
+            const nome = String(b.nome || '').trim();
+            if (!nome) return json({ erro: 'informe o nome da fazenda nova' }, 400);
+            fid = novoId('f');
+            const pid = String(b.produtor_id || '') || null;
+            await env.DB.prepare(`INSERT INTO fazendas (id,usuario_id,produtor_id,nome,municipio,uf,area_ha,talhoes,n_talhoes,atualizado_em)
+              VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))`).bind(fid, uid, pid, nome, '', '', area, JSON.stringify(gj), n).run();
+          }
+          return json({ ok: true, fazenda_id: fid, n_talhoes: n, area_ha: area });
         }
         if (rota === '/api/admin/modulos') {
           if (req.method === 'POST') return json(await salvarModulos(env, await req.json()));
