@@ -7,7 +7,7 @@
    Só aparece quando há dados; o relatório antigo continua igual.
    ============================================================ */
 
-import { haAplicada, plantioPorDia } from './plantiodia.js';
+import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -225,8 +225,11 @@ function mapaVariedade(mapa, plantio, hoje) {
   const porTal = {};
   plantio.forEach((p) => { porTal[p.talhao] = p; });
   if (!plantio.some((p) => p.variedade)) return '';
+  const areasM = areasDoMapa(mapa);
+  // variedades de cada talhão (talhão em partes: uma por parte, com a área de cada uma)
+  const ptsDe = (p) => partesDe(p, areasM[p.talhao] || 0).filter((x) => x.variedade);
 
-  const vars = [...new Set(plantio.map((p) => p.variedade).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const vars = [...new Set(plantio.flatMap((p) => ptsDe(p).map((x) => x.variedade)))].sort((a, b) => a.localeCompare(b));
   const cor = (v) => { const i = vars.indexOf(v); return v && i >= 0 ? PALETA[i % PALETA.length] : SEM_VAR; };
 
   let minX = 180, minY = 90, maxX = -180, maxY = -90;
@@ -243,17 +246,29 @@ function mapaVariedade(mapa, plantio, hoje) {
   let sv = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Mapa da fazenda colorido por variedade">' +
     '<rect width="' + W + '" height="' + H + '" fill="#F1F4F2"/>';
   const rot = [];
-  feats.forEach((f) => {
+  feats.forEach((f, fi) => {
     const nome = (f.properties && f.properties.nome) || '';
     const p = porTal[nome] || {};
     const area = (f.properties && Number(f.properties.area_ha)) || 0;
+    const pts = p.talhao ? ptsDe(p) : [];
     const dae = p.data_emerg && difDias(hoje, p.data_emerg) >= 0 ? difDias(hoje, p.data_emerg) : null;
     const info = '<b>' + esc(nome) + '</b> · ' + esc(CULTURAS[p.cultura] || 'sem cadastro') +
-      (p.variedade ? ' · ' + esc(codVar(p.variedade)) : ' · sem variedade') + (area ? ' · ' + fmt(area) + ' ha' : '') +
+      (pts.length > 1 ? ' · ' + pts.map((x) => esc(codVar(x.variedade)) + ' ' + fmt(x.ha) + ' ha').join(' + ')
+        : (p.variedade ? ' · ' + esc(codVar(p.variedade)) : ' · sem variedade') + (area ? ' · ' + fmt(area) + ' ha' : '')) +
       (p.data_plantio ? ' · plantio ' + curta(p.data_plantio) : '') + (dae !== null ? ' · DAE ' + dae : '');
     let d = '';
     each(f, (rings) => { d += rings.map((r) => 'M' + r.map((q) => px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1)).join('L') + 'Z').join(' '); });
-    sv += '<path class="mv" data-info="' + esc(info) + '" d="' + d + '" fill="' + cor(p.variedade) + '"/>';
+    let fill = cor(p.variedade);
+    if (pts.length > 1) {
+      // talhão com mais de uma variedade: listras com a cor de cada uma, na proporção da área
+      const tot = pts.reduce((s, x) => s + x.ha, 0) || 1, W0 = 36;
+      let x0 = 0;
+      sv += '<defs><pattern id="mvp' + fi + '" width="' + W0 + '" height="' + W0 + '" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+        pts.map((x) => { const w = W0 * x.ha / tot, r = '<rect x="' + x0.toFixed(2) + '" width="' + w.toFixed(2) + '" height="' + W0 + '" fill="' + cor(x.variedade) + '"/>'; x0 += w; return r; }).join('') +
+        '</pattern></defs>';
+      fill = 'url(#mvp' + fi + ')';
+    }
+    sv += '<path class="mv" data-info="' + esc(info) + '" d="' + d + '" fill="' + fill + '"/>';
     // centro do talhão pela área (o centro por vértices desloca o rótulo para o lado mais recortado)
     let ar = 0, gx = 0, gy = 0, sx = 0, sy = 0, n = 0;
     each(f, (rings) => {
@@ -266,7 +281,7 @@ function mapaVariedade(mapa, plantio, hoje) {
       }
     });
     const ok = Math.abs(ar) > 1e-14;
-    const vr = p.variedade ? codVar(p.variedade) : '';
+    const vr = pts.length > 1 ? codVar(pts.slice().sort((a, b) => b.ha - a.ha)[0].variedade) + ' +' + (pts.length - 1) : p.variedade ? codVar(p.variedade) : '';
     rot.push({ nome, vr, x: px(ok ? gx / (3 * ar) : sx / n), y: py(ok ? gy / (3 * ar) : sy / n),
       w: Math.max(nome.length * 16, vr.length * 12.5) + 8, h: vr ? 56 : 30 });
   });
@@ -296,7 +311,7 @@ function mapaVariedade(mapa, plantio, hoje) {
     if (!p.variedade) return;
     const c = p.cultura || 'outra';
     grp[c] = grp[c] || {};
-    grp[c][p.variedade] = (grp[c][p.variedade] || 0) + (areas[p.talhao] || 0);
+    ptsDe(p).forEach((x) => { grp[c][x.variedade] = (grp[c][x.variedade] || 0) + x.ha; });
   });
   let leg = '';
   Object.keys(grp).forEach((c) => {
@@ -389,7 +404,9 @@ function chipsDoTalhao(nome, plantio, hoje) {
   if (!p || !(p.cultura || p.variedade || p.data_plantio)) return '';
   const dae = p.data_emerg && difDias(hoje, p.data_emerg) >= 0 ? difDias(hoje, p.data_emerg) : null;
   let h = '<div class="cult">';
-  if (p.cultura || p.variedade) h += '<span>🌱 ' + esc([CULTURAS[p.cultura] || '', p.variedade ? codVar(p.variedade) : ''].filter(Boolean).join(' · ')) + '</span>';
+  const pts = partesDe(p, 0).filter((x) => x.variedade);
+  const vtxt = pts.length > 1 ? pts.map((x) => codVar(x.variedade) + ' ' + fmt(x.ha) + ' ha').join(' + ') : (p.variedade ? codVar(p.variedade) : '');
+  if (p.cultura || p.variedade) h += '<span>🌱 ' + esc([CULTURAS[p.cultura] || '', vtxt].filter(Boolean).join(' · ')) + '</span>';
   if (p.data_plantio) h += '<span>Plantio ' + curta(p.data_plantio) + '</span>';
   if (dae !== null) h += '<span class="dae">DAE ' + dae + '</span>';
   if (p.sem_ha) h += '<span>' + (p.sem_m ? fmt(p.sem_m, 1) + ' sem/m · ' : '') + fmt(p.sem_ha / 1000, 0) + ' mil sem/ha</span>';

@@ -10,7 +10,7 @@
 
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
-import { haAplicada, plantioPorDia } from './plantiodia.js';
+import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
 
 let pronta = null;
@@ -115,7 +115,7 @@ export function garantir(env) {
 // colunas novas da tabela ciclos: GMR informado e empresa (materiais cadastrados pelo consultor)
 // + plantio lançado por dia pelo gerente da fazenda (plantio.lanc)
 async function colunasCiclos(env) {
-  for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''"]) {
+  for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''", "plantio ADD COLUMN partes TEXT DEFAULT ''"]) {
     try { await env.DB.prepare('ALTER TABLE ' + c).run(); } catch (e) { /* já existe */ }
   }
 }
@@ -386,12 +386,14 @@ export async function plantioGeral(env) {
           c.ha += ha; c.plantado += hp;
           comCultura += ha; cultsFaz[r.cultura] = 1;
         }
-        if (r.variedade) {
-          const k = (r.cultura || '') + '|' + r.variedade;
-          const v = vari[k] = vari[k] || { cultura: r.cultura || '', variedade: r.variedade, ha: 0, plantado: 0, fazs: {} };
-          v.ha += ha; v.plantado += hp; v.fazs[fid] = 1;
-          vs[r.variedade] = 1;
-        }
+        // cada variedade do talhão (talhão em partes: a área de cada parte)
+        partesDe(r, ha).forEach((pt) => {
+          if (!pt.variedade) return;
+          const k = (r.cultura || '') + '|' + pt.variedade;
+          const v = vari[k] = vari[k] || { cultura: r.cultura || '', variedade: pt.variedade, ha: 0, plantado: 0, fazs: {} };
+          v.ha += pt.ha; v.plantado += ha ? hp * pt.ha / ha : 0; v.fazs[fid] = 1;
+          vs[pt.variedade] = 1;
+        });
         dias.forEach((x) => {
           plant += x.ha;
           linha[x.d] = (linha[x.d] || 0) + x.ha;
@@ -562,16 +564,23 @@ export async function rotasAgro(env, req, me, rota, url) {
           .bind(fid, safra, talhao, me.id));
         continue;
       }
+      // talhão em partes (mais de uma variedade): [{variedade, ha, data_plantio}]; sem a lista (app antigo) mantém o que estava
+      let partes = null;
+      if (Array.isArray(t.partes)) {
+        const l = t.partes.slice(0, 20).map((x) => ({ variedade: variedadePadrao(txt(x && x.variedade, 80), txt(t.cultura, 20)), ha: Math.round(num(x && x.ha) * 100) / 100, data_plantio: dia(x && x.data_plantio) }))
+          .filter((x) => x.ha > 0);
+        partes = l.length > 1 ? JSON.stringify(l) : '';
+      }
       cmds.push(env.DB.prepare(`INSERT INTO plantio
-          (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, data_emerg, espac_cm, sem_m, sem_ha, atualizado_em)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+          (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, data_emerg, espac_cm, sem_m, sem_ha, partes, atualizado_em)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
           ON CONFLICT(fazenda_id, safra, talhao) DO UPDATE SET
             cultura = excluded.cultura, variedade = excluded.variedade, data_plantio = excluded.data_plantio,
             data_emerg = excluded.data_emerg, espac_cm = excluded.espac_cm, sem_m = excluded.sem_m,
-            sem_ha = excluded.sem_ha, atualizado_em = datetime('now')
+            sem_ha = excluded.sem_ha, partes = COALESCE(excluded.partes, plantio.partes), atualizado_em = datetime('now')
           WHERE plantio.usuario_id = excluded.usuario_id`)
         .bind(fid, safra, talhao, me.id, txt(t.cultura, 20), variedadePadrao(txt(t.variedade, 80), txt(t.cultura, 20)), dia(t.data_plantio),
-              dia(t.data_emerg), num(t.espac_cm), num(t.sem_m), Math.round(num(t.sem_ha))));
+              dia(t.data_emerg), num(t.espac_cm), num(t.sem_m), Math.round(num(t.sem_ha)), partes));
     }
     if (cmds.length) await env.DB.batch(cmds);
     return json({ ok: true, salvos: cmds.length });

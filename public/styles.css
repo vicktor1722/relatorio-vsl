@@ -555,3 +555,6 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-ai .ag-ico.pulv{width:40px;height:19px}
 .ag-dia i{flex-direction:column;height:auto;min-height:16px;gap:1px}
 .ag-dia i .ag-ico.colh{width:26px;height:15px}
+/* plantio parcial: outra variedade do talhão */
+.ag-parte{background:#fff;border:1px solid #DCE5DF;border-radius:10px;padding:8px 10px 6px;margin:8px 0}
+.ag-parte .ag-link{margin:2px 0 4px}
