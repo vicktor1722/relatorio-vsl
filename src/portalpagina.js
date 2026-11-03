@@ -59,6 +59,7 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .tg button.on{background:var(--verde);border-color:var(--verde);color:#fff}
 .rot{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap;text-align:center;line-height:1.15}
 .rot small{display:block;font-size:11px;font-weight:600}
+.fz-tit{margin-top:18px}
 /* operador */
 .chips{display:flex;gap:6px;margin-bottom:10px}.chips button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:7px 14px;font-size:14px}
 .chips button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
@@ -212,7 +213,10 @@ ${AGRO_REL_CSS}
     $('#telaLogin').classList.add('oculto'); $('#telaApp').classList.remove('oculto');
     $('#hSub').textContent = eu.papel_nome + ' · ' + eu.nome;
     var sf = $('#selFaz'), ult = ''; try { ult = localStorage.getItem(CH + ':faz') || ''; } catch (e) {}
-    sf.innerHTML = eu.fazendas.map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === ult ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('');
+    // produtor com mais de uma fazenda pode ver todas juntas
+    var todas = eu.papel !== 'operador' && eu.fazendas.length > 1;
+    sf.innerHTML = (todas ? '<option value="*"' + (ult === '*' ? ' selected' : '') + '>Todas as fazendas</option>' : '') +
+      eu.fazendas.map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === ult ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('');
     $('#boxFaz').classList.toggle('oculto', eu.fazendas.length < 2);
     $('#boxSafra').classList.toggle('oculto', eu.papel === 'operador');
     if (!eu.fazendas.length) { $('#conteudo').innerHTML = '<div class="vazio">Nenhuma fazenda liberada para este acesso. Fale com o consultor.</div>'; return; }
@@ -248,7 +252,8 @@ ${AGRO_REL_CSS}
       onEachFeature: function (f, c) {
         var nm = (f.properties || {}).nome || '';
         c.bindPopup(rotulo(nm, f.properties || {}));
-        c.bindTooltip(etiqueta ? etiqueta(nm, f.properties || {}) : esc(nm), { permanent: true, direction: 'center', className: 'rot' });
+        var curto = D.todas ? nm.split(' · ').slice(1).join(' · ') || nm : nm;
+        c.bindTooltip(etiqueta ? etiqueta(curto, f.properties || {}) : esc(curto), { permanent: true, direction: 'center', className: 'rot' });
       }
     }).addTo(m);
     mapas.push(m);
@@ -465,12 +470,13 @@ ${AGRO_REL_CSS}
         '<td>' + dataBR(p.data_plantio) + '</td><td>' + (dae !== null && dae >= 0 ? dae : '—') + '</td></tr>';
     }).join('');
     var gerente = eu.papel !== 'operador';
-    var h = abas() + (gerente ? '<button class="btn" id="btnLancPl">🌱 Lançar plantio do dia</button>' : '') +
+    var h = abas() + (gerente && !D.todas ? '<button class="btn" id="btnLancPl">🌱 Lançar plantio do dia</button>' : '') +
+      (gerente && D.todas ? '<div class="sem" style="margin:0 2px 10px">Para lançar o plantio do dia, escolha uma fazenda no topo.</div>' : '') +
       (D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
       (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura / variedade</th><th>Plantado</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
     if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
       return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + esc(x.por || 'lançado') + '</small></div>' +
-        (gerente ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
+        (gerente && !D.todas ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
     }).join('');
     $('#conteudo').innerHTML = h;
     var bl = document.getElementById('btnLancPl'); if (bl) bl.onclick = function () { folhaPlantio(); };
