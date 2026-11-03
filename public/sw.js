@@ -3,12 +3,13 @@
    (/r/*, /admin, /api/*, /img/*, /oauth/*) passam direto, sem cache.
    O Safari recusa resposta "redirecionada" vinda do service worker; por isso toda
    página que entra no cache (ou sai dele) é recriada limpa por limpar(). */
-const CACHE = 'relatorio-vsl-v22';
+const CACHE = 'relatorio-vsl-v23';
 const CHAVE_APP = '/__app-shell';
 const ESPERA_MS = 3500;   // se a rede não responder nisso, abre pelo cache
 const ESTATICOS = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];
-// o portal e os termos são páginas do servidor (o portal tem o próprio service worker)
-const DO_SERVIDOR = /^\/(r|api|img|oauth|admin|termos)(\/|$)|^\/portal/;
+// o portal e os termos são páginas do servidor (o portal tem o próprio service worker);
+// /amvs/ é o site institucional: sempre da rede, nunca o app
+const DO_SERVIDOR = /^\/(r|api|img|oauth|admin|termos|amvs)(\/|$)|^\/portal/;
 
 // copia a resposta sem a marca de redirecionamento
 async function limpar(resp) {
@@ -55,7 +56,9 @@ self.addEventListener('fetch', e => {
 
   const ehApp = url.pathname === '/' || url.pathname === '/index.html';
 
-  if (e.request.mode === 'navigate' || ehApp) {
+  // abrir outra página do domínio (que não é o app) vai direto para a rede: o app guardado só substitui o próprio app
+  if (e.request.mode === 'navigate' && !ehApp) return;
+  if (ehApp) {
     e.respondWith((async () => {
       // rede primeiro, mas sem travar: se demorar ou falhar, entrega o app guardado
       const daRede = fetch(e.request).then(async resp => {
