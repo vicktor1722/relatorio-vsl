@@ -190,6 +190,75 @@ async function avisarConsultor(env, dono, r, d, talhoes, parcial, quem, data, re
   });
 }
 
+// todas as fazendas do acesso juntas: talhões com o nome da fazenda na frente ("SANTA PAULA · TH-05"),
+// evolução do plantio somando todas as áreas e as aplicações de cada fazenda em sequência
+async function dadosTodas(env, acesso, safraPedida) {
+  let safra = safraPadrao(safraPedida || '');
+  let lista = [];
+  for (const fid of acesso.lista) { const d = await dadosFazenda(env, acesso, fid, safra); if (d) lista.push(d); }
+  const safras = [...new Set(lista.flatMap((d) => d.safras || []))].sort().reverse();
+  if (!safra) {
+    safra = safras[0] || '';
+    if (lista.some((d) => d.safra !== safra)) {   // cada fazenda escolheu a sua safra mais nova: refaz com a mesma
+      lista = [];
+      for (const fid of acesso.lista) { const d = await dadosFazenda(env, acesso, fid, safra); if (d) lista.push(d); }
+    }
+  }
+  lista.sort((x, y) => x.fazenda.nome.localeCompare(y.fazenda.nome, 'pt-BR'));
+  const pre = (d) => d.fazenda.nome + ' · ';
+  const html = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const feats = [];
+  lista.forEach((d) => ((d.mapa && d.mapa.features) || []).forEach((f) => feats.push(Object.assign({}, f, {
+    properties: Object.assign({}, f.properties, { nome: pre(d) + ((f.properties || {}).nome || '') })
+  }))));
+  const mapa = feats.length ? { type: 'FeatureCollection', features: feats } : null;
+  // evolução do plantio de todas as áreas (linhas do banco, com o plantio por dia)
+  const nomeFaz = {}; lista.forEach((d) => { nomeFaz[d.fazenda.id] = d.fazenda.nome; });
+  const ids = Object.keys(nomeFaz);
+  const brutos = ids.length ? ((await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id IN (' + ids.map(() => '?').join(',') + ')')
+    .bind(acesso.dono_id, ...ids).all()).results || []) : [];
+  const daSafra = (p) => !safra || !p.safra || safraPadrao(p.safra) === safra;
+  const plantioBruto = brutos.filter(daSafra).map((p) => Object.assign({}, p, { talhao: nomeFaz[p.fazenda_id] + ' · ' + p.talhao }));
+  const bl = blocosAgro({ plantio: plantioBruto, recs: [], mapa }) || {};
+  // estoque: soma por produto e unidade
+  const est = {};
+  lista.forEach((d) => (d.estoque || []).forEach((x) => {
+    const k = x.produto.toLowerCase() + '|' + x.unidade, e = est[k] || (est[k] = { produto: x.produto, unidade: x.unidade, entradas: 0, aplicado: 0, a_aplicar: 0, saldo: 0, sobra: 0, valor_saldo: 0, gasto: 0, _q: 0, _v: 0 });
+    ['entradas', 'aplicado', 'a_aplicar', 'saldo', 'sobra', 'valor_saldo', 'gasto'].forEach((c) => { e[c] += Number(x[c]) || 0; });
+    if (x.custo_unit) { e._q += Number(x.entradas) || 0; e._v += (Number(x.entradas) || 0) * x.custo_unit; }
+  }));
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const estoque = Object.values(est).map((e) => ({ produto: e.produto, unidade: e.unidade, entradas: r2(e.entradas), aplicado: r2(e.aplicado), a_aplicar: r2(e.a_aplicar),
+    saldo: r2(e.saldo), sobra: r2(e.sobra), custo_unit: e._q ? r2(e._v / e._q) : 0, valor_saldo: r2(e.valor_saldo), gasto: r2(e.gasto) }))
+    .sort((x, y) => x.produto.localeCompare(y.produto, 'pt-BR'));
+  const custos = lista.filter((d) => d.custo && d.custo.talhoes);
+  const ciclos = {}; lista.forEach((d) => (d.ciclos || []).forEach((c) => { ciclos[chaveCult(c.variedade)] = c; }));
+  return {
+    todas: true,
+    fazenda: { id: '*', nome: 'Todas as fazendas', produtor: [...new Set(lista.map((d) => d.fazenda.produtor).filter(Boolean))].join(', ') },
+    safra, safras, mapa,
+    plantio: lista.flatMap((d) => (d.plantio || []).map((p) => Object.assign({}, p, { talhao: pre(d) + p.talhao }))),
+    aplicacoes: lista.flatMap((d) => (d.aplicacoes || []).map((x) => Object.assign({}, x, {
+      fazenda: d.fazenda.nome,
+      tal: (x.tal || []).map((t) => Object.assign({}, t, { nome: pre(d) + t.nome })),
+      registros: (x.registros || []).map((g) => Object.assign({}, g, { talhoes: (g.talhoes || []).map((t) => pre(d) + t) }))
+    }))).sort((x, y) => (x.data < y.data ? -1 : x.data > y.data ? 1 : 0)),
+    blocos: {
+      evolucao: bl.evolucao || '', mapaVar: bl.mapaVar || '',
+      proximas: lista.map((d) => {
+        const b = d.blocos || {}, corpo = (b.proximas || '') + (b.aplicacoes || '');
+        return corpo ? '<h2 class="talhao fz-tit">🌾 ' + html(d.fazenda.nome) + '</h2>' + corpo : '';
+      }).join(''),
+      aplicacoes: ''
+    },
+    estoque,
+    custo: custos.length ? { talhoes: custos.flatMap((d) => d.custo.talhoes.map((t) => Object.assign({}, t, { nome: pre(d) + t.nome }))),
+      sem_preco: [...new Set(custos.flatMap((d) => d.custo.sem_preco || []))] } : null,
+    colheita: lista.flatMap((d) => (d.colheita || []).map((c) => Object.assign({}, c, { talhao: pre(d) + c.talhao }))),
+    ciclos: Object.values(ciclos)
+  };
+}
+
 async function dadosFazenda(env, acesso, fid, safraPedida) {
   const f = await env.DB.prepare('SELECT f.id, f.nome, f.talhoes, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
     .bind(fid, acesso.dono_id).first();
@@ -321,6 +390,8 @@ export async function rotasPortal(env, req, rota, url, ctx) {
 
   if (rota === '/api/portal/fazenda') {
     const fid = txt(url.searchParams.get('id'), 80);
+    // "Todas as fazendas": acesso da fazenda com mais de uma fazenda vê tudo junto
+    if (fid === '*' && a.papel !== 'operador' && a.lista.length > 1) return json(Object.assign({ ok: true }, await dadosTodas(env, a, url.searchParams.get('safra'))));
     if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
     const d = await dadosFazenda(env, a, fid, url.searchParams.get('safra'));
     return d ? json(Object.assign({ ok: true }, d)) : json({ erro: 'fazenda não encontrada' }, 404);
