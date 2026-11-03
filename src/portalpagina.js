@@ -265,7 +265,10 @@ ${AGRO_REL_CSS}
   function vistaMapas() {
     var vars = {}, haVar = {}, i = 0, areas = {};
     ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
-    (D.plantio || []).forEach(function (p) { var k = p.variedade || (p.cultura ? NC[p.cultura] || p.cultura : ''); if (!k) return; if (!vars[k]) vars[k] = CORES[i++ % CORES.length]; haVar[k] = (haVar[k] || 0) + (areas[p.talhao] || 0); });
+    (D.plantio || []).forEach(function (p) {
+      var pts = p.partes && p.partes.length ? p.partes.map(function (x) { return [x.variedade, x.ha]; }) : [[p.variedade || (p.cultura ? NC[p.cultura] || p.cultura : ''), areas[p.talhao] || 0]];
+      pts.forEach(function (x) { var k = x[0]; if (!k) return; if (!vars[k]) vars[k] = CORES[i++ % CORES.length]; haVar[k] = (haVar[k] || 0) + x[1]; });
+    });
     var h = '<div class="tg"><button data-mm="var" class="' + (modoMapa === 'var' ? 'on' : '') + '">Variedade</button><button data-mm="area" class="' + (modoMapa === 'area' ? 'on' : '') + '">Áreas</button></div>' +
       '<div class="mapa-sat" id="mapaFaz"></div>';
     if (modoMapa === 'var') h += '<div class="leg">' + (Object.keys(vars).length ? Object.keys(vars).map(function (k) { return '<span><i style="background:' + vars[k] + '"></i>' + esc(k) + (haVar[k] ? ' · ' + n(haVar[k], 1) + ' ha' : '') + '</span>'; }).join('') + '<span><i style="background:#9AA5A0"></i>sem plantio</span>' : '<span>Plantio ainda não informado.</span>') + '</div>';
@@ -278,11 +281,12 @@ ${AGRO_REL_CSS}
     desenharMapa($('#mapaFaz'), function (nm) {
       if (modoMapa === 'area') return { color: '#FFFFFF', weight: 2, fillColor: '#2FA05A', fillOpacity: 0.22 };
       var p = plantioDe(nm), k = p ? (p.variedade || NC[p.cultura] || p.cultura) : '';
+      if (p && p.partes && p.partes.length) k = p.partes.slice().sort(function (a, b) { return b.ha - a.ha; })[0].variedade;   // a variedade com mais área
       return { color: '#FFFFFF', weight: 2, fillColor: vars[k] || '#9AA5A0', fillOpacity: 0.55 };
     }, function (nm, q) {
       var p = plantioDe(nm);
       return '<b>' + esc(nm) + '</b>' + (q.area_ha ? '<br>' + n(q.area_ha, 1) + ' ha' : '') +
-        (p ? '<br>' + esc(NC[p.cultura] || p.cultura || '') + (p.variedade ? ' · ' + esc(p.variedade) : '') + (p.data_plantio ? '<br>plantio ' + dataBR(p.data_plantio) : '') : '');
+        (p ? '<br>' + esc(NC[p.cultura] || p.cultura || '') + (p.partes && p.partes.length ? '<br>' + p.partes.map(function (x) { return esc(x.variedade) + ' · ' + n(x.ha, 1) + ' ha'; }).join('<br>') : p.variedade ? ' · ' + esc(p.variedade) : '') + (p.data_plantio ? '<br>plantio ' + dataBR(p.data_plantio) : '') : '');
     }, modoMapa === 'area' ? function (nm, q) { return esc(nm) + (q.area_ha ? '<small>' + n(q.area_ha, 1) + ' ha</small>' : ''); } : null);
   }
 
@@ -345,12 +349,20 @@ ${AGRO_REL_CSS}
     var areas = {}, col = {};
     ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
     (D.colheita || []).forEach(function (c) { if (c.sc_ha) col[c.talhao] = c; });
-    return (D.plantio || []).filter(function (p) { return p.cultura && p.cultura !== 'pastagem' && p.cultura !== 'pousio' && p.data_plantio; }).map(function (p) {
-      var c = (D.ciclos || []).filter(function (x) { return p.variedade && chave(x.variedade) === chave(p.variedade); })[0];
-      var dias = c && c.dias ? Number(c.dias) : CICLO_PADRAO[p.cultura]; if (!dias) return null;
-      return { talhao: p.talhao, mat: p.variedade || NC[p.cultura] || p.cultura, cultura: p.cultura, ha: areas[p.talhao] || 0, plantio: p.data_plantio,
-        dias: dias, est: !(c && c.dias), lab: rotCiclo(c), data: somaDias(p.data_plantio, dias), colhido: col[p.talhao] || null };
-    }).filter(Boolean).sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.talhao).localeCompare(b.talhao, 'pt-BR', { numeric: true }); });
+    var lista = [];
+    (D.plantio || []).filter(function (p) { return p.cultura && p.cultura !== 'pastagem' && p.cultura !== 'pousio'; }).forEach(function (p) {
+      // talhão em partes (mais de uma variedade): uma previsão para cada parte
+      var pts = p.partes && p.partes.length ? p.partes.map(function (x) { return { v: x.variedade, ha: x.ha, d: x.data_plantio || p.data_plantio }; })
+        : [{ v: p.variedade, ha: areas[p.talhao] || 0, d: p.data_plantio }];
+      pts.forEach(function (x) {
+        if (!x.d) return;
+        var c = (D.ciclos || []).filter(function (y) { return x.v && chave(y.variedade) === chave(x.v); })[0];
+        var dias = c && c.dias ? Number(c.dias) : CICLO_PADRAO[p.cultura]; if (!dias) return;
+        lista.push({ talhao: p.talhao, mat: x.v || NC[p.cultura] || p.cultura, cultura: p.cultura, ha: x.ha, plantio: x.d,
+          dias: dias, est: !(c && c.dias), lab: rotCiclo(c), data: somaDias(x.d, dias), colhido: col[p.talhao] || null });
+      });
+    });
+    return lista.sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.talhao).localeCompare(b.talhao, 'pt-BR', { numeric: true }); });
   }
   // eventos do calendário: aplicações (pulverizador) e colheita prevista (colheitadeira)
   function eventosCal(pv) {
@@ -465,7 +477,7 @@ ${AGRO_REL_CSS}
     var lin = nomes.map(function (t) {
       var p = pl[t] || {}, ar = areas[t] || 0, hp = Number(p.ha_plantada) || 0, pc = ar ? Math.min(100, hp / ar * 100) : 0;
       var dae = p.data_emerg ? dif(hoje(), p.data_emerg) : null;
-      return '<tr><td><b>' + esc(t) + '</b></td><td style="text-align:left">' + esc(NC[p.cultura] || p.cultura || '—') + (p.variedade ? '<br><span class="sem">' + esc(p.variedade) + '</span>' : '') + '</td>' +
+      return '<tr><td><b>' + esc(t) + '</b></td><td style="text-align:left">' + esc(NC[p.cultura] || p.cultura || '—') + (p.partes && p.partes.length ? '<br><span class="sem">' + p.partes.map(function (x) { return esc(x.variedade) + ' ' + n(x.ha, 1) + ' ha'; }).join('<br>') + '</span>' : p.variedade ? '<br><span class="sem">' + esc(p.variedade) + '</span>' : '') + '</td>' +
         '<td style="white-space:nowrap">' + (hp ? n(hp, 1) + ' ha · ' + pc.toFixed(0) + '%<div class="barra"><i style="width:' + pc.toFixed(0) + '%"></i></div>' : '<span class="sem">' + n(ar, 1) + ' ha</span>') + '</td>' +
         '<td>' + dataBR(p.data_plantio) + '</td><td>' + (dae !== null && dae >= 0 ? dae : '—') + '</td></tr>';
     }).join('');

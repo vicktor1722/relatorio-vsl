@@ -13,7 +13,7 @@ import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } fr
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo, variedadePadrao } from './agro.js';
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
-import { haAplicada, haPlantada, lerLanc, parciaisDe } from './plantiodia.js';
+import { haAplicada, haPlantada, lerLanc, parciaisDe, partesDe } from './plantiodia.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -160,13 +160,14 @@ function datasTal(r, plantio) {
 // ciclo de cada material plantado: informado pelo consultor ou calculado pelo GMR (catálogo de cultivares)
 async function ciclosDoPlantio(env, dono, plantio, linhas) {
   const regra = await regraCiclo(env, dono), vistos = {}, out = [];
-  plantio.forEach((p) => {
-    const k = chaveCult(p.variedade);
+  // cada variedade plantada (talhão em partes: as variedades de todas as partes)
+  plantio.forEach((p) => partesDe(p, 0).map((x) => x.variedade).concat(p.variedade || []).forEach((v) => {
+    const k = chaveCult(v);
     if (!k || vistos[k]) return; vistos[k] = 1;
     const linha = linhas.filter((l) => chaveCult(l.variedade) === k)[0];
-    const c = cicloMaterial(p.variedade, p.cultura, linha, regra);
-    if (c) out.push({ variedade: p.variedade, cultura: p.cultura, dias: c.dias, gmr: c.gmr || 0, fonte: c.fonte });
-  });
+    const c = cicloMaterial(v, p.cultura, linha, regra);
+    if (c) out.push({ variedade: v, cultura: p.cultura, dias: c.dias, gmr: c.gmr || 0, fonte: c.fonte });
+  }));
   return out;
 }
 
@@ -282,6 +283,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
   const porTal = {}; plantio.forEach((p) => { porTal[safraPadrao(p.safra) + '|' + p.talhao] = p; });
   const base = { fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '' }, safra, safras, mapa,
     plantio: plantio.map((p) => ({ talhao: p.talhao, cultura: p.cultura, variedade: p.variedade, data_plantio: p.data_plantio, data_emerg: p.data_emerg,
+      partes: (() => { const l = partesDe(p, areas[p.talhao] || 0); return l.length > 1 || (l[0] && l[0].ha < (areas[p.talhao] || 0) - 0.05) ? l : []; })(),
       lanc: lerLanc(p), ha_plantada: Math.round(haPlantada(p, areas[p.talhao] || 0) * 100) / 100 })) };
 
   // aplicações em formato de lista (as duas visões usam)

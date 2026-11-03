@@ -243,8 +243,21 @@
   var SEM_PLANTIO = { pastagem: 1, pousio: 1 };
   // plantio lançado por dia pela fazenda (r.lanc): soma os hectares; sem lançamentos, data de plantio = talhão todo
   function lancDe(r) { var l = r && r.lanc; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } } return Array.isArray(l) ? l.filter(function (x) { return x && x.d && Number(x.ha) > 0; }) : []; }
+  // talhão em partes (mais de uma variedade): [{variedade, ha, data_plantio}]; sem partes = o talhão todo da variedade da linha
+  function partesDe(r) {
+    var l = r && r.partes; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } }
+    return Array.isArray(l) ? l.filter(function (x) { return x && Number(x.ha) > 0; }) : [];
+  }
+  // cada variedade plantada no talhão, como linhas separadas (para previsão de colheita e ciclos)
+  function variedadesDe(r, area) {
+    var pt = partesDe(r);
+    if (!pt.length) return r ? [{ variedade: r.variedade || '', ha: area || 0, data_plantio: r.data_plantio || '' }] : [];
+    return pt.map(function (x) { return { variedade: x.variedade || '', ha: Number(x.ha), data_plantio: x.data_plantio || r.data_plantio || '' }; });
+  }
   function haPlantadaDe(r, area) {
-    var l = lancDe(r); if (!l.length) return r && r.data_plantio ? area : 0;
+    var l = lancDe(r);
+    if (!l.length && partesDe(r).length) return Math.min(area || Infinity, partesDe(r).filter(function (x) { return x.data_plantio || (r && r.data_plantio); }).reduce(function (s, x) { return s + Number(x.ha); }, 0));
+    if (!l.length) return r && r.data_plantio ? area : 0;
     return Math.min(area || Infinity, l.reduce(function (s, x) { return s + Number(x.ha); }, 0));
   }
   function resumoArea(fid, safra, tl) {
@@ -364,8 +377,11 @@
     if (P.cv === 'novo') return pintarNovoMaterial();
     var R = regra(), m = {};
     ST.plantio.forEach(function (r) {
-      if (!r.variedade || !r.cultura || SEM_PLANTIO[r.cultura]) return;
-      var k = chaveCult(r.variedade), x = m[k] || (m[k] = { variedade: r.variedade, cultura: r.cultura, fz: {} }); x.fz[r.fazenda_id] = 1;
+      if (!r.cultura || SEM_PLANTIO[r.cultura]) return;
+      variedadesDe(r, 0).forEach(function (vv) {   // talhão em partes: cada variedade entra
+        if (!vv.variedade) return;
+        var k = chaveCult(vv.variedade), x = m[k] || (m[k] = { variedade: vv.variedade, cultura: r.cultura, fz: {} }); x.fz[r.fazenda_id] = 1;
+      });
     });
     var l = Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return a.variedade.localeCompare(b.variedade, 'pt-BR'); });
     var linhas = l.map(function (x) {
@@ -510,7 +526,8 @@
       var d = r ? daeDe(r.data_emerg) : null;
       var ch = colheitaDe(P.faz, P.safra, t.nome);
       var hpl = r && lancDe(r).length ? haPlantadaDe(r, t.ha) : 0;
-      var l2 = r ? [r.variedade, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', hpl && hpl < t.ha - 0.05 ? 'plantado ' + fmt(hpl) + ' de ' + fmt(t.ha) + ' ha' : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
+      var vtx = r && partesDe(r).length ? partesDe(r).map(function (x) { return x.variedade + ' ' + fmt(x.ha) + ' ha'; }).join(' + ') : (r ? r.variedade : '');
+      var l2 = r ? [vtx, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', hpl && hpl < t.ha - 0.05 ? 'plantado ' + fmt(hpl) + ' de ' + fmt(t.ha) + ' ha' : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
       if (ch && ch.sc_ha) l2 = (l2 ? l2 + ' · ' : '') + '🌾 ' + fmt(ch.sc_ha) + ' sc/ha';
       else { var pv = previsaoDe(r); if (pv) l2 = (l2 ? l2 + ' · ' : '') + 'colheita prev. ' + curta(pv.data) + (pv.est ? ' (estimado)' : ''); }
       return '<div class="lista-item ag-tal" data-a="edtal" data-v="' + esc(t.nome) + '"><div class="ic">' + (r && r.cultura ? '🌱' : '＋') + '</div><div class="txt"><b>' + esc(t.nome) + '</b><span>' +
@@ -547,9 +564,38 @@
       '<div class="linha2"><div class="campo"><label>Sementes por metro</label><input inputmode="decimal" data-k="sem_m" value="' + (e.sem_m ? String(e.sem_m).replace('.', ',') : '') + '"></div>' +
       '<div class="campo"><label>Sementes por hectare</label><input inputmode="numeric" data-k="sem_ha" value="' + (e.sem_ha ? fmt(e.sem_ha, 0) : '') + '"></div></div>' +
       '<div class="ag-dica" id="agSem">' + semDica(e) + '</div>' +
-      (outros ? '<h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div>' : '') +
+      partesHtml(e, t) +
+      (outros && !(e.extras || []).length ? '<h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div>' : '') +
       '<button class="btn" data-a="salvarplantio">Salvar</button><button class="btn perigo" data-a="limparplantio">Limpar plantio deste talhão</button>');
   }
+  // plantio parcial: o talhão dividido em mais de uma variedade (cada uma com a área e a data dela)
+  function nomesVariedade() {
+    var v = {}; ST.plantio.forEach(function (r) { variedadesDe(r, 0).forEach(function (x) { if (x.variedade) v[x.variedade] = 1; }); });
+    var E = empresasCat(); E.ordem.forEach(function (emp) { E.m[emp].forEach(function (x) { v[x.nome] = 1; }); });
+    return Object.keys(v).sort(function (a, b) { return a.localeCompare(b, 'pt-BR', { numeric: true }); });
+  }
+  function resumoPartes(e, t) {
+    var ex = e.extras || [], usa = (Number(e.haMain) || 0) + ex.reduce(function (s, x) { return s + (Number(x.ha) || 0); }, 0);
+    var sobra = (t.ha || 0) - usa;
+    return 'Total: <b>' + fmt(usa) + ' de ' + fmt(t.ha || 0) + ' ha</b>' + (sobra > 0.05 ? ' · ' + fmt(sobra) + ' ha sem variedade' : sobra < -0.05 ? ' · <b style="color:#C0392B">passa ' + fmt(-sobra) + ' ha da área do talhão</b>' : ' ✔');
+  }
+  function partesHtml(e, t) {
+    var ex = e.extras || [];
+    if (!ex.length) return '<button class="btn secundario" data-a="pextra">＋ Outra variedade neste talhão (plantio parcial)</button>';
+    var nomes = nomesVariedade();
+    return '<h2>Plantio parcial · mais de uma variedade</h2>' +
+      '<div class="campo"><label>Área de ' + esc(e.variedade || 'variedade acima') + ' (ha)</label><input inputmode="decimal" data-k="haMain" value="' + (e.haMain ? String(e.haMain).replace('.', ',') : '') + '" placeholder="ex.: 60"></div>' +
+      ex.map(function (x, i) {
+        return '<div class="ag-parte"><div class="campo"><label>Outra variedade ' + (i + 1) + '</label><input data-x="variedade" data-i="' + i + '" list="agVarsCat" value="' + esc(x.variedade) + '" placeholder="digite ou escolha (ex.: NEO 790 IPRO)" autocomplete="off"></div>' +
+          '<div class="linha2"><div class="campo"><label>Área (ha)</label><input inputmode="decimal" data-x="ha" data-i="' + i + '" value="' + (x.ha ? String(x.ha).replace('.', ',') : '') + '"></div>' +
+          '<div class="campo"><label>Data de plantio</label><input type="date" data-x="data_plantio" data-i="' + i + '" value="' + esc(x.data_plantio || e.data_plantio) + '"></div></div>' +
+          '<button class="ag-link" data-a="pextradel" data-v="' + i + '">remover esta variedade</button></div>';
+      }).join('') +
+      '<datalist id="agVarsCat">' + nomes.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<div class="ag-dica" id="agPartes">' + resumoPartes(e, t) + '</div>' +
+      '<button class="btn secundario" data-a="pextra">＋ Mais uma variedade</button>';
+  }
+
   // soja: escolhe a empresa e depois a cultivar do catálogo (com GMR); outras culturas ou "Outra": digita o nome
   function campoVariedade(e, vars) {
     var livre = '<input data-k="variedade" list="agVars" value="' + esc(e.variedade) + '" placeholder="Ex.: Cultivar A-7210" autocomplete="off">' +
@@ -587,6 +633,7 @@
 
   function entradaPlantio(inp) {
     var e = P.ed, k = inp.dataset.k; if (!e) return;
+    if (k === 'haMain') { e.haMain = numBR(inp.value); var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(e, talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 }); return; }
     if (k === 'empresa') {
       e.empresa = inp.value; var c = acharCult(e.variedade);
       if (e.empresa !== '*' && !(c && c.empresa === e.empresa)) e.variedade = '';
@@ -615,13 +662,29 @@
 
   function vazioPlantio(e) { return !e.cultura && !e.variedade && !e.data_plantio && !e.data_emerg && !e.sem_m && !e.sem_ha; }
   function gravarPlantio(limpar) {
-    var e = P.ed, alvo = [P.nome].concat(P.outros), enviar = [];
+    var e = P.ed, enviar = [], ex = limpar ? [] : (e.extras || []);
+    var alvo = ex.length ? [P.nome] : [P.nome].concat(P.outros);   // plantio parcial vale só para este talhão
     if (!limpar && !e.cultura) { toast('Escolha a cultura (Soja, Milho…) antes de salvar o plantio'); return; }
+    var partes = [];
+    if (ex.length) {
+      var tt = talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 };
+      if (!e.variedade) { toast('Escolha a variedade principal'); return; }
+      if (!(Number(e.haMain) > 0)) { toast('Informe a área (ha) de ' + e.variedade); return; }
+      for (var i = 0; i < ex.length; i++) {
+        if (!String(ex[i].variedade || '').trim() || !(Number(ex[i].ha) > 0)) { toast('Preencha variedade e área da outra variedade ' + (i + 1)); return; }
+      }
+      var soma = Number(e.haMain) + ex.reduce(function (s, x) { return s + Number(x.ha); }, 0);
+      if (tt.ha && soma > tt.ha + 0.05) { toast('As áreas somam ' + fmt(soma) + ' ha: passa dos ' + fmt(tt.ha) + ' ha do talhão'); return; }
+      partes = [{ variedade: e.variedade, ha: Number(e.haMain), data_plantio: e.data_plantio }].concat(ex.map(function (x) {
+        return { variedade: String(x.variedade).trim(), ha: Number(x.ha), data_plantio: x.data_plantio || e.data_plantio };
+      }));
+    }
     alvo.forEach(function (nome) {
       var row = { fazenda_id: P.faz, safra: P.safra, talhao: nome, cultura: limpar ? '' : e.cultura, variedade: limpar ? '' : e.variedade,
         data_plantio: limpar ? '' : e.data_plantio, data_emerg: limpar ? '' : e.data_emerg,
         espac_cm: limpar ? 0 : (e.sem_m ? espDe(e.cultura, e.espac_cm) : (e.espac_cm || 0)), sem_m: limpar ? 0 : e.sem_m, sem_ha: limpar ? 0 : e.sem_ha };
       var antP = linhaPlantio(P.faz, P.safra, nome); if (antP && antP.lanc && !limpar) row.lanc = antP.lanc;
+      row.partes = nome === P.nome ? partes : [];
       ST.plantio = ST.plantio.filter(function (r) { return !(r.fazenda_id === P.faz && (r.safra || '') === (P.safra || '') && r.talhao === nome); });
       if (!vazioPlantio(row)) ST.plantio.push(row);
       enviar.push(row);
@@ -660,7 +723,9 @@
     if (a === 'edtal') {
       var r = linhaPlantio(P.faz, P.safra, v);
       P.nome = v; P.outros = [];
-      P.ed = r ? { cultura: r.cultura || '', variedade: r.variedade || '', data_plantio: r.data_plantio || '', data_emerg: r.data_emerg || '', espac_cm: r.espac_cm || 0, sem_m: r.sem_m || 0, sem_ha: r.sem_ha || 0 }
+      var pts0 = r ? partesDe(r) : [];
+      P.ed = r ? { cultura: r.cultura || '', variedade: r.variedade || '', data_plantio: r.data_plantio || '', data_emerg: r.data_emerg || '', espac_cm: r.espac_cm || 0, sem_m: r.sem_m || 0, sem_ha: r.sem_ha || 0,
+          haMain: pts0.length ? Number(pts0[0].ha) : 0, extras: pts0.slice(1).map(function (x) { return { variedade: x.variedade || '', ha: Number(x.ha) || 0, data_plantio: x.data_plantio || '' }; }) }
         : { cultura: '', variedade: '', data_plantio: '', data_emerg: '', espac_cm: 0, sem_m: 0, sem_ha: 0 };
       pintarPlantio(); topoRolagem(tP); return;
     }
@@ -668,6 +733,14 @@
       if (!P.ed.data_plantio) { toast('Informe primeiro a data de plantio'); return; }
       P.ed.data_emerg = addDias(P.ed.data_plantio, Number(v)); pintarPlantio(); return;
     }
+    if (a === 'pextra') {
+      var e0 = P.ed, t0 = talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 };
+      e0.extras = e0.extras || [];
+      if (!e0.extras.length && !e0.haMain) e0.haMain = 0;
+      e0.extras.push({ variedade: '', ha: 0, data_plantio: e0.data_plantio || '' });
+      pintarPlantio(); return;
+    }
+    if (a === 'pextradel') { P.ed.extras.splice(Number(v), 1); if (!P.ed.extras.length) P.ed.haMain = 0; pintarPlantio(); return; }
     if (a === 'outro') { var i = P.outros.indexOf(v); if (i >= 0) P.outros.splice(i, 1); else P.outros.push(v); pintarPlantio(); return; }
     if (a === 'salvarplantio') { gravarPlantio(false); return; }
     if (a === 'limparplantio') { if (confirm('Limpar o plantio de ' + P.nome + '?')) gravarPlantio(true); }
@@ -913,10 +986,13 @@
       if (fid !== '*' && p.fazenda_id !== fid) return;
       if (fid === '*' && !fazDe(p.fazenda_id)) return;
       var ch = colheitaDe(p.fazenda_id, p.safra, p.talhao); if (ch && ch.sc_ha) return;
-      var pv = previsaoDe(p); if (!pv) return;
-      var k = pv.data + '|' + p.fazenda_id + '|' + (p.variedade || p.cultura);
-      var x = gc[k] || (gc[k] = { d: pv.data, k: 'colh', faz: p.fazenda_id, mat: p.variedade || NOME_CULT[p.cultura] || p.cultura, tal: [], est: pv.est });
-      x.tal.push(p.talhao); if (pv.est) x.est = true;
+      variedadesDe(p, 0).forEach(function (vv) {
+        var q = Object.assign({}, p, { variedade: vv.variedade, data_plantio: vv.data_plantio });
+        var pv = previsaoDe(q); if (!pv) return;
+        var k = pv.data + '|' + p.fazenda_id + '|' + (q.variedade || p.cultura);
+        var x = gc[k] || (gc[k] = { d: pv.data, k: 'colh', faz: p.fazenda_id, mat: q.variedade || NOME_CULT[p.cultura] || p.cultura, tal: [], est: pv.est });
+        if (x.tal.indexOf(p.talhao) < 0) x.tal.push(p.talhao); if (pv.est) x.est = true;
+      });
     });
     Object.keys(gc).forEach(function (k) { gc[k].txt = 'Colheita prevista · ' + gc[k].mat; ev.push(gc[k]); });
     return ev;
@@ -1844,6 +1920,11 @@
     tP.addEventListener('input', function (ev) {
       var n = ev.target;
       if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n);
+      if (n.dataset && n.dataset.x && P.ed && P.ed.extras) {   // plantio parcial: outra variedade do talhão
+        var px = P.ed.extras[Number(n.dataset.i)]; if (!px) return;
+        px[n.dataset.x] = n.dataset.x === 'ha' ? numBR(n.value) : n.value;
+        var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(P.ed, talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 });
+      }
       if (n.dataset && n.dataset.rg) { var ex = $('#agRegraEx', tP); if (ex) ex.textContent = exRegra(regraTela()); }
       if (n.dataset && n.dataset.n && P.novo) { P.novo[n.dataset.n] = n.value; var en = $('#agNovoEx', tP); if (en) en.textContent = exNovo(P.novo); }
       if (n.dataset && n.dataset.colh) {   // colheita: total na hora
