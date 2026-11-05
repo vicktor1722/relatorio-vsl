@@ -377,7 +377,7 @@ export async function plantioGeral(env, uid) {
     Object.keys(porFaz).forEach((fid) => {
       const F = faz[fid], rs = porFaz[fid];
       let naoPlanta = 0, plant = 0, primeira = '', ultima = '', comCultura = 0;
-      const vs = {}, cultsFaz = {};
+      const vs = {}, cultsFaz = {}, fl = {}, fc = {}, fv = {};   // por fazenda: o painel filtra as fazendas sem voltar ao servidor
       rs.forEach((r) => {
         const ha = F.areas[r.talhao] || 0;
         if (SEM_PLANTIO[r.cultura]) { naoPlanta += ha; return; }
@@ -385,6 +385,8 @@ export async function plantioGeral(env, uid) {
         if (r.cultura) {
           const c = cult[r.cultura] = cult[r.cultura] || { cultura: r.cultura, ha: 0, plantado: 0 };
           c.ha += ha; c.plantado += hp;
+          const c2 = fc[r.cultura] = fc[r.cultura] || { cultura: r.cultura, ha: 0, plantado: 0 };
+          c2.ha += ha; c2.plantado += hp;
           comCultura += ha; cultsFaz[r.cultura] = 1;
         }
         // cada variedade do talhão (talhão em partes: a área de cada parte)
@@ -393,11 +395,14 @@ export async function plantioGeral(env, uid) {
           const k = (r.cultura || '') + '|' + pt.variedade;
           const v = vari[k] = vari[k] || { cultura: r.cultura || '', variedade: pt.variedade, ha: 0, plantado: 0, fazs: {} };
           v.ha += pt.ha; v.plantado += ha ? hp * pt.ha / ha : 0; v.fazs[fid] = 1;
+          const v2 = fv[k] = fv[k] || { cultura: r.cultura || '', variedade: pt.variedade, ha: 0, plantado: 0 };
+          v2.ha += pt.ha; v2.plantado += ha ? hp * pt.ha / ha : 0;
           vs[pt.variedade] = 1;
         });
         dias.forEach((x) => {
           plant += x.ha;
           linha[x.d] = (linha[x.d] || 0) + x.ha;
+          fl[x.d] = (fl[x.d] || 0) + x.ha;
           if (!primeira || x.d < primeira) primeira = x.d;
           if (!ultima || x.d > ultima) ultima = x.d;
         });
@@ -406,10 +411,13 @@ export async function plantioGeral(env, uid) {
       // fazenda com uma cultura só (ex.: soja): os talhões ainda sem cultura entram na área dela;
       // pastagem e pousio já ficaram fora de tot
       const unica = Object.keys(cultsFaz);
-      if (unica.length === 1 && tot > comCultura) cult[unica[0]].ha += tot - comCultura;
+      if (unica.length === 1 && tot > comCultura) { cult[unica[0]].ha += tot - comCultura; fc[unica[0]].ha += tot - comCultura; }
       total += tot; plantado += plant; fora += naoPlanta;
       fazendas.push({ id: fid, nome: F.nome, produtor: F.produtor, conta: F.conta, total_ha: r1(tot), plantado_ha: r1(plant),
-        primeira, ultima, variedades: Object.keys(vs).sort() });
+        primeira, ultima, variedades: Object.keys(vs).sort(), fora_ha: r1(naoPlanta),
+        linha: Object.keys(fl).sort().map((d) => ({ d, ha: r1(fl[d]) })),
+        culturas: Object.values(fc).map((c) => ({ cultura: c.cultura, ha: r1(c.ha), plantado: r1(c.plantado) })),
+        vars: Object.values(fv).map((v) => ({ cultura: v.cultura, variedade: v.variedade, ha: r1(v.ha), plantado: r1(v.plantado) })) });
     });
     fazendas.sort((a, b) => (b.plantado_ha / (b.total_ha || 1)) - (a.plantado_ha / (a.total_ha || 1)) || a.nome.localeCompare(b.nome));
     // fazendas de contas com o módulo que ainda não têm nada lançado nesta safra
