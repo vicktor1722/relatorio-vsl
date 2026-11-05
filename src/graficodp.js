@@ -10,6 +10,7 @@ export const DPG_CSS = `
 .dpg-seta:active{background:var(--verde-claro)}
 .dpg-tit{flex:1;text-align:center;min-width:0}
 .dpg-tit b{display:block;font-size:14.5px;color:var(--verde-escuro)}
+.dpg.fixo .dpg-tit{text-align:left}
 .dpg-dots{display:inline-flex;gap:6px;margin-top:5px}
 .dpg-dots button{width:8px;height:8px;border-radius:4px;border:0;padding:0;background:var(--linha);cursor:pointer;transition:width .2s}
 .dpg-dots button.on{background:var(--verde);width:20px}
@@ -148,8 +149,10 @@ var DPG = (function () {
 
   function html(st, S, opt) {
     opt = opt || {};
-    var lado = st.lado;
-    var h = '<div class="dpg" data-lado="' + lado + '"><div class="dpg-cab">' +
+    var lado = opt.so || st.lado;   // opt.so: um gráfico só, sem troca para o lado
+    if (opt.so) st.lado = opt.so;
+    var h = opt.so ? '<div class="dpg fixo" data-lado="' + lado + '"><div class="dpg-cab"><div class="dpg-tit"><b>' + TIT[lado] + '</b></div></div>' :
+      '<div class="dpg" data-lado="' + lado + '"><div class="dpg-cab">' +
       '<button type="button" class="dpg-seta" data-dpgir="-1" aria-label="Gráfico anterior">‹</button>' +
       '<div class="dpg-tit"><b>' + TIT[lado] + '</b><span class="dpg-dots">' + LADOS.map(function (x) {
         return '<button type="button" data-dpgl="' + x + '" class="' + (x === lado ? 'on' : '') + '" aria-label="' + TIT[x] + '"></button>'; }).join('') + '</span></div>' +
@@ -169,7 +172,7 @@ var DPG = (function () {
       h += '<p class="nota">Previsão = dia plantado + ciclo do material' + ((S.prev || []).some(function (x) { return x.est; }) ? '; material sem ciclo cadastrado usa o ciclo padrão da cultura' : '') + '. Clima e chuva podem adiantar ou atrasar a colheita.</p>';
     }
     st.anim = '';
-    return h + '</div><p class="dpg-dica">Toque nas setas ‹ › ou arraste para o lado para trocar o gráfico</p></div>';
+    return h + '</div>' + (opt.so ? '' : '<p class="dpg-dica">Toque nas setas ‹ › ou arraste para o lado para trocar o gráfico</p>') + '</div>';
   }
 
   function ligar(root, st, repintar) {
@@ -179,14 +182,16 @@ var DPG = (function () {
     el.querySelectorAll('[data-dpgir]').forEach(function (b) { b.onclick = function () { ir(Number(b.dataset.dpgir)); }; });
     el.querySelectorAll('[data-dpgl]').forEach(function (b) { b.onclick = function () {
       var i = LADOS.indexOf(b.dataset.dpgl), j = LADOS.indexOf(st.lado); if (i !== j) ir(i - j); }; });
-    // arrastar para o lado troca o gráfico
+    // arrastar para o lado troca o gráfico (menos no gráfico fixo)
     var tx = null, ty = 0;
+    if (!el.classList.contains('fixo')) {
     el.addEventListener('touchstart', function (e) { var t = e.touches[0]; tx = t.clientX; ty = t.clientY; }, { passive: true });
     el.addEventListener('touchend', function (e) {
       if (tx === null) return;
       var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty; tx = null;
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) ir(dx < 0 ? 1 : -1);
     }, { passive: true });
+    }
     var sv = el.querySelector('.dpg-svg');
     if (sv) sv.addEventListener('click', function (ev) {
       var r = sv.getBoundingClientRect(), E = st.eixo, xs = (ev.clientX - r.left) / r.width * E.W;
