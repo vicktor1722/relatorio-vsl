@@ -133,7 +133,7 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .rodape{text-align:center;color:var(--fraco);font-size:12px;margin-top:24px}.rodape a{color:var(--verde)}
 ${AGRO_REL_CSS}
 ${DPG_CSS}
-.ini-ola{font-size:13px;color:var(--fraco);margin:2px 2px 10px}.ini-ola b{color:var(--texto);font-size:17px;display:block}
+.ini-ola{font-size:13px;color:var(--fraco);margin:2px 2px 10px}.ini-ola>div>b{color:var(--texto);font-size:17px;display:block}
 .ini-card{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:13px;margin-bottom:12px}
 .ini-ct{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.ini-ct h3{margin:0;font-size:14.5px;color:var(--verde-escuro)}.ini-ct span{font-size:12px;color:var(--fraco)}
 .ini-lk{border:0;background:none;color:var(--verde);font-size:12.5px;font-weight:600;padding:0;cursor:pointer}
@@ -191,6 +191,19 @@ ${DPG_CSS}
 .chv-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
 .chv-escx{display:flex;justify-content:space-between;font-size:10px;color:var(--fraco);margin-top:2px}
 .chv-ctrl{display:flex;align-items:center;gap:10px;margin-top:8px}.chv-ctrl button{width:38px;height:38px;border-radius:50%;border:0;background:#134A7C;color:#fff;font-size:14px;flex:none}.chv-ctrl input{flex:1;accent-color:#134A7C}
+.ini-ola{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}.ini-agora-mini{font-size:15px;white-space:nowrap;color:var(--texto)}.ini-agora-mini b{display:inline;font-size:16px}
+.ini-sec{font-size:11.5px;font-weight:800;letter-spacing:.06em;color:var(--fraco);text-transform:uppercase;margin:16px 4px 8px;display:flex;align-items:center;gap:8px}.ini-sec::after{content:"";flex:1;height:1px;background:var(--linha)}
+.fp-cab{display:flex;align-items:center;gap:10px;width:100%;border:0;background:#E8F3EC;border-radius:12px;padding:12px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.fp-cab span{flex:1;font-weight:600;font-size:14px}.fp-cab b{font-size:20px;color:var(--verde-escuro);white-space:nowrap}.fp-cab i{font-style:normal;color:var(--verde);transition:transform .15s}
+.fp-card{padding:8px}.fp-card.aberto{padding:13px}.fp-card.aberto .fp-cab i{transform:rotate(180deg)}
+.chv-mapa .chv-fs{position:absolute;z-index:600;right:8px;bottom:8px;width:40px;height:38px;border:0;border-radius:9px;background:#fff;font-size:19px;box-shadow:0 1px 5px rgba(0,0,0,.35);cursor:pointer}
+.chv-cheia-cab{display:none}
+.chv-bloco.cheia{position:fixed;inset:0;z-index:3000;background:#0B1F14;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px))}
+.chv-bloco.cheia .chv-cheia-cab{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:2px 2px 8px}
+.chv-bloco.cheia .chv-cheia-cab button{width:38px;height:38px;border-radius:50%;border:0;background:#fff;font-size:16px;cursor:pointer}
+.chv-bloco.cheia .chv-mapa{flex:1;height:auto}.chv-bloco.cheia .chv-escx{color:#DDE7E1}.chv-bloco.cheia .chv-fs{display:none}
+body.sem-rolar{overflow:hidden}
+.chv-pe b{color:var(--texto)}
 .ini-al{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:7px 0;border-top:1px dashed var(--linha)}.ini-al:first-of-type{border-top:0}
 
 .caixa.gr{padding:10px 12px 12px;margin-bottom:12px}
@@ -432,12 +445,15 @@ ${DPG_CSS}
     return h + '<div class="ini-pe">' + esc(m.fonte) + '. Praça mais perto da fazenda.</div></div>';
   }
   // formação do preço da soja: Chicago + prêmio do porto × dólar − frete = valor na fazenda
-  var FRETE_ED = false;
+  var FRETE_ED = false, FORM_AB = false;
   function cartaoFormacao() {
     var m = INI.dados && INI.dados.mercado, F = m && m.formacao;
     if (!F) return '';
     var sinal = function (v, c) { return (v >= 0 ? '+ ' : '− ') + n(Math.abs(v), c); };
-    var h = '<div class="ini-card"><div class="ini-ct"><h3>🧮 Preço da soja: da bolsa à fazenda</h3><span>' + dataBR(F.porto.em) + '</span></div><div class="ini-fp">' +
+    var venda = F.venda != null ? F.venda : F.fazenda;
+    var cab = '<button class="fp-cab" id="fpAbre" aria-expanded="' + FORM_AB + '"><span>💰 ' + (F.venda != null ? 'Soja na fazenda (venda estimada)' : 'Soja na fazenda (paridade)') + '</span><b>R$ ' + n(venda, 2) + '/sc</b><i>▾</i></button>';
+    if (!FORM_AB) return '<div class="ini-card fp-card">' + cab + '</div>';
+    var h = '<div class="ini-card fp-card aberto">' + cab + '<div class="ini-ct" style="margin-top:10px"><h3>🧮 Da bolsa à fazenda</h3><span>' + dataBR(F.porto.em) + '</span></div><div class="ini-fp">' +
       '<div><span>🏛️ Chicago</span><b>US$ ' + n(F.cbot, 2) + '/bu</b></div>' +
       '<div><span>⚓ Prêmio no porto (' + esc(F.porto.nome) + ')</span><b>' + sinal(F.premio, 2) + ' US$/bu</b></div>' +
       '<div><span>💵 Dólar</span><b>× R$ ' + n(F.dolar, 2) + '</b></div>' +
@@ -466,6 +482,7 @@ ${DPG_CSS}
       (F.frete.estimado ? 'Frete estimado pela distância (~R$ 0,16 por t·km): toque em "alterar" e coloque o frete real.' : 'Frete informado' + (F.frete.por ? ' por ' + esc(F.frete.por) : '') + (F.frete.em ? ' em ' + dataBR(F.frete.em) : '') + '.') + '</div></div>';
   }
   function ligarFormacao() {
+    var ab = document.getElementById('fpAbre'); if (ab) ab.onclick = function () { FORM_AB = !FORM_AB; if (!FORM_AB) FRETE_ED = false; pintar(); };
     var ed = document.getElementById('fpEd'); if (ed) ed.onclick = function () { FRETE_ED = !FRETE_ED; pintar(); };
     var sv = document.getElementById('fpSalva'), es = document.getElementById('fpEst');
     function salvar(rt) {
@@ -505,21 +522,22 @@ ${DPG_CSS}
     if (!C || C.erro === 'sem local') return '';
     if (!P) return CHV.carregando ? '<div class="ini-card"><div class="ini-ct"><h3>🌧️ Chuva nos próximos 30 dias</h3></div><div class="ini-vz">Carregando…</div></div>' : '';
     var prov = P.dias.filter(function (x) { return x.p1 >= 70; }).length, prox = P.dias.filter(function (x) { return x.p5 >= 50; })[0];
-    var h = '<div class="ini-card chv' + (CHV.aberto ? ' aberto' : '') + '"><button class="chv-cab" id="chvAbre" aria-expanded="' + CHV.aberto + '"><span class="t">🌧️ Chuva nos próximos 30 dias</span>' +
-      '<span class="r"><b>~' + n(P.acc[1]) + ' mm</b> · ' + prov + ' dias de chuva provável</span><i>▾</i></button>';
-    if (!CHV.aberto) return h + '</div>';
+    var h = '<div class="ini-card chv aberto"><div class="ini-ct"><h3>🌧️ Chuva e mapa · próximos 30 dias</h3></div>';
     h += '<div class="chv-chips"><span>Acumulado 30 dias: <b>~' + n(P.acc[1]) + ' mm</b> (' + n(P.acc[0]) + ' a ' + n(P.acc[2]) + ')</span><span>' + prov + ' dias com chuva provável</span>' +
       (prox ? '<span>1ª chuva ≥ 5 mm: <b>' + dataBR(prox.d) + '</b> (' + prox.p5 + '%)</span>' : '<span>sem chuva ≥ 5 mm provável</span>') + '</div>';
     var M = C.mapa;
     if (M && M.v && M.v.length) {
-      h += '<h4 class="chv-t">🗺️ Mapa da chuva</h4><div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) {
+      h += '<div class="chv-bloco" id="chvBloco"><div class="chv-cheia-cab"><b>🌧️ Mapa da chuva</b><button id="chvSai" aria-label="Fechar tela cheia">✕</button></div>' +
+        '<div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) {
         return '<button data-chvm="' + x[0] + '" class="' + (CHV.modo === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
-        '<div class="chv-mapa"><div id="chvMapa"></div><div class="chv-tit" id="chvTit"></div><div class="chv-dia" id="chvDia"></div></div>' +
+        '<div class="chv-mapa"><div id="chvMapa"></div><div class="chv-tit" id="chvTit"></div><div class="chv-dia" id="chvDia"></div>' +
+        '<button class="chv-fs" id="chvFs" aria-label="Tela cheia" title="Tela cheia">⛶</button></div>' +
         '<div class="chv-esc"></div><div class="chv-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div>' +
-        '<div class="chv-ctrl' + (CHV.modo === 'dia' ? '' : ' oculto') + '" id="chvCtrl"><button id="chvPlay" aria-label="Animar">▶</button><input type="range" id="chvSl" min="0" max="' + (M.v.length - 1) + '" value="' + CHV.dia + '"></div>';
+        '<div class="chv-ctrl' + (CHV.modo === 'dia' ? '' : ' oculto') + '" id="chvCtrl"><button id="chvPlay" aria-label="Animar">▶</button><input type="range" id="chvSl" min="0" max="' + (M.v.length - 1) + '" value="' + CHV.dia + '"></div></div>';
     }
     var em = new Date(P.gerado_em);
-    return h + '<div class="ini-pe">Atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' · próxima atualização domingo ' + dataBR(C.proxima) + ' à noite.</div></div>';
+    return h + '<div class="ini-pe chv-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
+      ' · próxima atualização domingo ' + dataBR(C.proxima) + ' à noite</div></div>';
   }
   // camada da chuva: canvas no mapa (projeção do mapa), bordas que somem, textura de nuvem que anda com o tempo
   var CanvasCamada = window.L && L.ImageOverlay.extend({
@@ -574,8 +592,7 @@ ${DPG_CSS}
   }
   function chvParar() { if (CHV.play) { cancelAnimationFrame(CHV.play); CHV.play = null; } var pl = document.getElementById('chvPlay'); if (pl) pl.textContent = '▶'; }
   function ligarChuva() {
-    var ab = document.getElementById('chvAbre');
-    if (ab) ab.onclick = function () { CHV.aberto = !CHV.aberto; chvParar(); pintar(); };
+    document.body.classList.remove('sem-rolar');
     chvParar();
     CHV.mapa = null; CHV.canvas = null;
     var el = document.getElementById('chvMapa');
@@ -601,6 +618,14 @@ ${DPG_CSS}
       $('#chvCtrl').classList.toggle('oculto', CHV.modo !== 'dia');
       chvDesenhar(CHV.dia);
     }; });
+    var bloco = document.getElementById('chvBloco'), mp2 = CHV.mapa;
+    function cheia(sim) {
+      bloco.classList.toggle('cheia', sim); document.body.classList.toggle('sem-rolar', sim);
+      setTimeout(function () { try { mp2.invalidateSize(); } catch (e) {} }, 60);
+    }
+    var fs = document.getElementById('chvFs'), sai = document.getElementById('chvSai');
+    if (fs) fs.onclick = function () { cheia(!bloco.classList.contains('cheia')); };
+    if (sai) sai.onclick = function () { cheia(false); };
     var sl = document.getElementById('chvSl'), pl = document.getElementById('chvPlay');
     if (sl) sl.oninput = function () { chvParar(); CHV.dia = Number(sl.value); chvDesenhar(CHV.dia); };
     // ▶: um dia vira o outro aos poucos (~1,4 s por dia), como a chuva andando
@@ -647,8 +672,10 @@ ${DPG_CSS}
     var nome = D.todas ? 'Todas as fazendas' : D.fazenda.nome;
     var hr = new Date().getHours(), sau = hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     var dt = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-    var h = abas() + '<div class="ini-ola"><b>' + sau + ' 👋</b>' + esc(nome) + ' · ' + esc(dt) + ' · safra ' + esc(D.safra || '') + '</div>';
-    h += cartaoClima(false) + cartaoChuva() + cartaoMercado() + cartaoFormacao();
+    var ag = INI.dados && INI.dados.clima && INI.dados.clima.agora;
+    var h = abas() + '<div class="ini-ola"><div><b>' + sau + ' 👋</b>' + esc(nome) + ' · ' + esc(dt) + ' · safra ' + esc(D.safra || '') + '</div>' +
+      (ag ? '<span class="ini-agora-mini">' + ag.ic + ' <b>' + ag.temp + '°</b></span>' : '') + '</div>';
+    var hTopo = h, secao = function (t) { return '<div class="ini-sec">' + t + '</div>'; }; h = '';
     // plantio e colheita
     var pv = (g.prev || []), prox = pv.filter(function (x) { return !x.col && x.d >= hj; }).map(function (x) { return x.d; }).sort()[0];
     var semanas = {}; pv.forEach(function (x) { var dd = new Date(x.d + 'T12:00:00Z'); dd.setUTCDate(dd.getUTCDate() - ((dd.getUTCDay() + 6) % 7)); var k = dd.toISOString().slice(0, 10); semanas[k] = (semanas[k] || 0) + x.ha; });
@@ -675,6 +702,7 @@ ${DPG_CSS}
           esc(x.pend.slice(0, 4).map(function (t) { return t.nome; }).join(', ') + (x.pend.length > 4 ? '…' : '')) + ' · ' + n(ha) + ' ha' + (ch ? ' · ⚠️ chuva ' + (ch.mm >= 1 ? n(ch.mm) + ' mm' : ch.prob + '%') : '') + '</small></div></div>';
       }).join('') : '<div class="ini-vz">Nenhuma aplicação pendente. 👍</div>') +
       '<div class="ini-mini">Últimos 7 dias: <b>' + R.feitos + (R.feitos === 1 ? ' talhão' : ' talhões') + '</b> aplicados · <b>' + n(R.haF) + ' ha</b></div></div>';
+    var hLav = h; h = '';
     // custo
     var ct = D.custo && D.custo.talhoes ? D.custo.talhoes : [], cT = 0, cHa = 0;
     ct.forEach(function (t) { if (t.custo) { cT += t.custo; cHa += t.ha; } });
@@ -685,6 +713,7 @@ ${DPG_CSS}
         (soja ? '<div class="dir"><b>' + n(cT / (cHa || 1) / soja.preco, 1) + ' sc/ha</b><br><span>em sacas de soja (' + esc(soja.praca.split('/')[0]) + ')</span></div>' : '') + '</div>' +
         (D.custo.sem_preco && D.custo.sem_preco.length ? '<div class="ini-pe">Sem preço no estoque: ' + esc(D.custo.sem_preco.slice(0, 4).join(', ')) + (D.custo.sem_preco.length > 4 ? '…' : '') + '</div>' : '') + '</div>';
     }
+    var hCusto = h; h = '';
     // atenção
     var al = [];
     (D.estoque || []).filter(function (e) { return e.sobra < 0 && e.a_aplicar > 0; }).sort(function (a, b) { return a.sobra - b.sobra; }).slice(0, 3).forEach(function (e) {
@@ -692,6 +721,8 @@ ${DPG_CSS}
     R.lista.forEach(function (x) { var ch = x.d && x.d >= hj && x.d <= somaDias(hj, 3) ? chuvaNo(x.d) : null; if (ch && ch.mm >= 10 && al.length < 6) al.push('🌧️<div><b>' + (ch.mm >= 1 ? n(ch.mm) + ' mm' : ch.prob + '% de chuva') + ' ' + (x.d === hj ? 'hoje' : diaSem(x.d) + ' ' + dataBR(x.d)) + '</b>: confira a ' + esc(x.a.titulo) + ' marcada para esse dia</div>'); });
     if (R.at) al.push('⏰<div><b>' + R.at + (R.at === 1 ? ' aplicação atrasada' : ' aplicações atrasadas') + '</b>: veja na aba Aplicações</div>');
     if (al.length) h += '<div class="ini-card"><div class="ini-ct"><h3>🔔 Atenção</h3></div>' + al.map(function (x) { return '<div class="ini-al">' + x + '</div>'; }).join('') + '</div>';
+    var hAt = h;
+    h = hTopo + secao('Lavoura') + hLav + hAt + secao('Mercado') + cartaoMercado() + cartaoFormacao() + secao('Clima') + cartaoClima(false) + cartaoChuva() + (hCusto ? secao('Custos') + hCusto : '');
     $('#conteudo').innerHTML = h;
     document.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { aba = b.dataset.ir; pintar(); window.scrollTo(0, 0); }; });
     var sl = document.getElementById('iniLoc'); if (sl) sl.onchange = function () { INI.loc = sl.value; iniCarregar(); };
