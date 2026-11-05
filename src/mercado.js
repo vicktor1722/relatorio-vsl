@@ -51,7 +51,9 @@ export async function geocodificar(cidade, uf) {
   if (!x && /\bd[oa]s?\s+[AEIOUÁÉÍÓÚ]/i.test(nome)) x = await tenta(nome.replace(/\bd[oa]s?\s+(?=[AEIOUÁÉÍÓÚ])/i, "D'"));   // Conquista do Oeste → Conquista D'Oeste
   const pal = nome.split(' ');
   for (let n = Math.min(pal.length - 1, 3); !x && n >= 2; n--) x = await tenta(pal.slice(0, n).join(' '));
-  return x ? { lat: x.latitude, lon: x.longitude } : null;
+  if (!x) return null;
+  const ufAchada = Object.keys(UF_NOME).filter((k) => semAcento(UF_NOME[k]) === semAcento(x.admin1))[0] || u || '';
+  return { lat: x.latitude, lon: x.longitude, uf: ufAchada };   // ex.: Cáceres → Cáceres/MT (Brasil)
 }
 
 /* ---------------- tempo ---------------- */
