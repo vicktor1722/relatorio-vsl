@@ -419,7 +419,7 @@ ${MAPA_CHUVA_JS}
           (dc != null ? '<em class="' + (dc > 0 ? 'up' : dc < 0 ? 'dn' : '') + '">' + (dc > 0 ? '▲' : dc < 0 ? '▼' : '=') + (dc ? Math.abs(dc) + '¢' : '') + '</em>' : '') + '</div>'; })(M.premio) : ''));
     var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;
     if (D.admin) h += '<div class="pf-cal"><button class="pf-calb" id="pfCalAbre">⚙️ Cotações da região (calibração do preço da soja) ' + (PF.calAb ? '▴' : '▾') + '</button>' + (PF.calAb ? pfCalHtml() : '') + '</div>';
-    var fechada = false; try { fechada = localStorage.getItem('vsl-pf-lista') === '0'; } catch (e) {}
+    var fechada = !PF.listaAberta;   // ao abrir o painel a lista vem sempre recolhida; abre só quando tocar
     h += '<button class="pf-tg" id="pfTg" aria-expanded="' + !fechada + '">' + (fechada ? '▸ Ver as ' + all.length + ' fazendas' + (nAl ? ' · ⚠️ ' + nAl + ' com alerta' : '') : '▾ Recolher a lista de fazendas') + '</button>';
     if (fechada) { box.innerHTML = h; pfLigarTopo(); return; }
     h += '<div class="pf-filtros"><input id="pfBusca" placeholder="🔍 Buscar fazenda ou produtor" value="' + esc(PF.busca) + '">' +
@@ -435,7 +435,7 @@ ${MAPA_CHUVA_JS}
   }
   function pfLigarTopo() {
     var tg = document.getElementById('pfTg');
-    if (tg) tg.onclick = function () { var f = tg.getAttribute('aria-expanded') === 'true'; try { localStorage.setItem('vsl-pf-lista', f ? '0' : '1'); } catch (e) {} pfPintar(); };
+    if (tg) tg.onclick = function () { PF.listaAberta = tg.getAttribute('aria-expanded') !== 'true'; pfPintar(); };
     pfLigarCal();
   }
   // cotações passando sozinhas (letreiro); toque ou mouse em cima para parar
