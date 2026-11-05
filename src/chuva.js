@@ -5,19 +5,10 @@
 import { localDaFazenda } from './mercado.js';
 
 const UA = 'Mozilla/5.0 (compatible; AMVS-Relatorio/1.0)';
-const GRADE = { la0: -35, la1: 7, lo0: -76, lo1: -32, passo: 2, ver: 3 };   // ver 3: + dias 16 a 30   // ver: muda quando a grade muda (refaz o guardado)
+const GRADE = { la0: -35, la1: 7, lo0: -76, lo1: -32, passo: 2, ver: 2 };   // ver: muda quando a grade muda (refaz o guardado)
 const VALIDADE = 8 * 864e5;   // passou disso sem atualizar (cron falhou): refaz quando alguém abrir
 
-// limite por minuto do Open-Meteo: na atualização de domingo (sem pressa) espera 1 minuto e tenta de novo
-let PACIENTE = false;
-async function buscar(url, tentou) {
-  try { return await buscar1(url); }
-  catch (e) {
-    if (PACIENTE && !tentou && /minut/i.test(e.message)) { await new Promise((r) => setTimeout(r, 61000)); return buscar(url, true); }
-    throw e;
-  }
-}
-async function buscar1(url) {
+async function buscar(url) {
   const r = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
   const j = await r.json().catch(() => null);
   if (!r.ok || !j || j.error) throw new Error((j && j.reason) || ('HTTP ' + r.status));
@@ -56,33 +47,7 @@ export async function mapaChuva() {
   const datas = lista[0].daily.time;
   const v = datas.map((_, i) => lista.map((p) => { const m = membros(p.daily, i); return r1(m.reduce((s, x) => s + x, 0) / (m.length || 1)); }));
   const nlon = Math.round((GRADE.lo1 - GRADE.lo0) / GRADE.passo) + 1, nlat = Math.round((GRADE.la1 - GRADE.la0) / GRADE.passo) + 1;
-  // dias 16 a 30: tendência do modelo americano (GFS, média de 30 cenários), numa grade de 4° e preenchida para a de 2°
-  let v1630 = null, ate30 = '';
-  try {
-    const ini = somaDia(datas[datas.length - 1], 1); ate30 = somaDia(ini, 14);
-    const r = await acumuladoGfs(ini, ate30);
-    v1630 = []; for (let a = 0; a < nlat; a++) for (let b = 0; b < nlon; b++) v1630.push(r1(r(GRADE.la1 - a * GRADE.passo, GRADE.lo0 + b * GRADE.passo)));
-  } catch (e) { v1630 = null; }
-  return Object.assign({}, GRADE, { nlat, nlon, datas, v, v1630, ate30: v1630 ? ate30 : '', fonte, gerado_em: new Date().toISOString() });
-}
-const somaDia = (iso, k) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); };
-// soma da chuva do período (média dos cenários do GFS) em pontos a cada 4°; devolve uma função (lat, lon) → mm, interpolada
-export async function acumuladoGfs(ini, fim) {
-  const P = 4, la1 = GRADE.la1 + 1, lo0 = GRADE.lo0, nla = Math.ceil((la1 - GRADE.la0) / P) + 1, nlo = Math.ceil((GRADE.lo1 - lo0) / P) + 1;
-  const lats = [], lons = [];
-  for (let a = 0; a < nla; a++) for (let b = 0; b < nlo; b++) { lats.push(la1 - a * P); lons.push(lo0 + b * P); }
-  const val = [];
-  for (let i = 0; i < lats.length; i += 70) {
-    let parte = await buscar('https://ensemble-api.open-meteo.com/v1/ensemble?latitude=' + lats.slice(i, i + 70).join(',') + '&longitude=' + lons.slice(i, i + 70).join(',') +
-      '&daily=precipitation_sum&models=gfs05&timezone=America%2FSao_Paulo&start_date=' + ini + '&end_date=' + fim);
-    if (!Array.isArray(parte)) parte = [parte];
-    parte.forEach((p) => { const d = p.daily; let s = 0; d.time.forEach((_, k) => { const m = membros(d, k); s += m.reduce((a, x) => a + x, 0) / (m.length || 1); }); val.push(s); });
-  }
-  const g = (a, b) => val[Math.max(0, Math.min(nla - 1, a)) * nlo + Math.max(0, Math.min(nlo - 1, b))];
-  return (la, lo) => {
-    const fa = (la1 - la) / P, fb = (lo - lo0) / P, a = Math.floor(fa), b = Math.floor(fb), ta = fa - a, tb = fb - b;
-    return g(a, b) * (1 - ta) * (1 - tb) + g(a + 1, b) * ta * (1 - tb) + g(a, b + 1) * (1 - ta) * tb + g(a + 1, b + 1) * ta * tb;
-  };
+  return Object.assign({}, GRADE, { nlat, nlon, datas, v, fonte, gerado_em: new Date().toISOString() });
 }
 
 // 30 dias no ponto da fazenda: chuva do dia (mediana dos cenários), chance de ≥1 mm e ≥5 mm, acumulado (10%, 50%, 90%)
@@ -110,10 +75,6 @@ const chaveP = (l) => 'chuva:p:' + (Math.round(l.lat * 4) / 4).toFixed(2) + ',' 
 
 // cron de domingo à noite: o mapa e o ponto de cada fazenda que tem acesso de dono/gerente
 export async function atualizarChuva(env) {
-  PACIENTE = true;
-  try { await atualizarChuva1(env); } finally { PACIENTE = false; }
-}
-async function atualizarChuva1(env) {
   try { await gravar(env, 'chuva:mapa', await mapaChuva()); } catch (e) { console.log('mapa da chuva:', e.message); }
   let ids = [];
   try {
