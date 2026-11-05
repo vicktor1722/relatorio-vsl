@@ -33,7 +33,7 @@ const UF_NOME = { AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: '
   RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins' };
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
-async function geocodificar(cidade, uf) {
+export async function geocodificar(cidade, uf) {
   const j = await buscar('https://geocoding-api.open-meteo.com/v1/search?count=10&language=pt&country=BR&name=' + encodeURIComponent(cidade), 7 * 86400);
   const est = semAcento(UF_NOME[String(uf || '').toUpperCase()] || '');
   const l = (j.results || []).filter((x) => !est || semAcento(x.admin1) === est || semAcento(x.admin1).startsWith(est));
@@ -204,15 +204,17 @@ let MEM = null;   // cache do isolate: { em, dados }
 export async function mercadoGeral(env) {
   if (MEM && Date.now() - MEM.em < 20 * 60 * 1000) return MEM.dados;
   const pega = (p) => p.then((v) => v, () => null);
-  const [usd, zs, zc, hs, hm] = await Promise.all([pega(dolar()), pega(yahoo('ZS=F', 100)), pega(yahoo('ZC=F', 100)),
-    pega(buscar(NA.soja, 1800, true)), pega(buscar(NA.milho, 1800, true))]);
-  let dados = { dolar: usd, cbot_soja: zs, cbot_milho: zc, pracas: { soja: hs ? lerPracas(hs) : null, milho: hm ? lerPracas(hm) : null },
+  const cal = await calibracao(env);
+  const [usd, zs, zc, hs, hm, zf] = await Promise.all([pega(dolar()), pega(yahoo('ZS=F', 100)), pega(yahoo('ZC=F', 100)),
+    pega(buscar(NA.soja, 1800, true)), pega(buscar(NA.milho, 1800, true)), cal.futuro ? pega(yahoo(cal.futuro.contrato, 100)) : null]);
+  let dados = { dolar: usd, cbot_soja: zs, cbot_milho: zc, cbot_fut: zf ? Object.assign({ contrato: cal.futuro.contrato }, zf) : null,
+    pracas: { soja: hs ? lerPracas(hs) : null, milho: hm ? lerPracas(hm) : null },
     portos: { soja: hs ? lerPortos(hs) : null, milho: hm ? lerPortos(hm) : null }, em: new Date().toISOString() };
   // o que não veio agora sai do último guardado
   let guardado = null;
   try { const r = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'mercado_ultimo'").first(); guardado = r ? JSON.parse(r.valor) : null; } catch (e) { guardado = null; }
   if (guardado) {
-    ['dolar', 'cbot_soja', 'cbot_milho'].forEach((k) => { if (!dados[k] && guardado[k]) dados[k] = Object.assign({}, guardado[k], { antigo: true }); });
+    ['dolar', 'cbot_soja', 'cbot_milho', 'cbot_fut'].forEach((k) => { if (!dados[k] && guardado[k]) dados[k] = Object.assign({}, guardado[k], { antigo: true }); });
     ['soja', 'milho'].forEach((k) => { if ((!dados.pracas[k] || !Object.keys(dados.pracas[k]).length) && guardado.pracas && guardado.pracas[k]) dados.pracas[k] = guardado.pracas[k]; });
     ['soja', 'milho'].forEach((k) => { if ((!dados.portos[k] || !Object.keys(dados.portos[k]).length) && guardado.portos && guardado.portos[k]) dados.portos[k] = guardado.portos[k]; });
   }
@@ -224,6 +226,92 @@ export async function mercadoGeral(env) {
   }
   MEM = { em: completo ? Date.now() : Date.now() - 15 * 60 * 1000, dados };   // incompleto: tenta de novo em 5 min
   return dados;
+}
+
+/* ---------------- calibração com cotações reais da região ----------------
+   O consultor informa o preço disponível de um município (e o futuro). Guarda a diferença daquele dia
+   para o porto (R$/sc) e, no futuro, a base sobre o contrato de Chicago e o prêmio do dólar a termo.
+   Daí em diante o preço da região acompanha o porto/Chicago/dólar mantendo essa diferença. */
+const REF_0511 = { porto: 'Paranaguá', porto_preco: 159, cbot: 12.045, dolar: 5.4667 };   // mercado em 05/11/2026 (cotações passadas pelo consultor)
+const CALIB_PADRAO = {
+  pontos: [
+    { municipio: 'Pontes e Lacerda', uf: 'MT', lat: -15.226, lon: -59.335, disp: 125, data: '2026-11-05', ref: REF_0511 },
+    { municipio: 'Comodoro', uf: 'MT', lat: -13.66, lon: -59.79, disp: 126, data: '2026-11-05', ref: REF_0511 }
+  ],
+  futuro: { venc: '2027-04-30', contrato: 'ZSK27.CBT', usd_sc: 20.6, brl_sc: 117, data: '2026-11-05', ref: { cbot: 12.215, dolar: 5.4667 } }
+};
+let MEM_CAL = null;
+export async function calibracao(env) {
+  if (MEM_CAL && Date.now() - MEM_CAL.em < 5 * 60 * 1000) return MEM_CAL.v;
+  let v = null;
+  try { const r = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'calib:soja'").first(); v = r ? JSON.parse(r.valor) : null; } catch (e) { v = null; }
+  v = v || CALIB_PADRAO;
+  MEM_CAL = { em: Date.now(), v };
+  return v;
+}
+// contrato de Chicago que vence logo depois da data de entrega (soja: jan, mar, mai, jul, ago, set, nov)
+export function contratoSoja(venc) {
+  const ms = [[1, 'F'], [3, 'H'], [5, 'K'], [7, 'N'], [8, 'Q'], [9, 'U'], [11, 'X']];
+  let a = Number(venc.slice(0, 4)), mes = Number(venc.slice(5, 7)) + 1;
+  if (mes > 12) { mes = 1; a++; }
+  let c = ms.filter((x) => x[0] >= mes)[0];
+  if (!c) { c = ms[0]; a++; }
+  return 'ZS' + c[1] + String(a).slice(2) + '.CBT';
+}
+// salva (painel do consultor): guarda junto o mercado do dia como referência
+export async function salvarCalibracao(env, b) {
+  const atual = JSON.parse(JSON.stringify(await calibracao(env)));
+  const m = await mercadoGeral(env);
+  const par = m.portos && m.portos.soja && m.portos.soja['Paranaguá'];
+  const ref = { porto: 'Paranaguá', porto_preco: par ? par[par.length - 1].p : null, cbot: m.cbot_soja && m.cbot_soja.preco, dolar: m.dolar && m.dolar.preco };
+  const hoje = new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
+  const nb = (x) => Math.round(Number(String(x == null ? '' : x).replace(',', '.')) * 100) / 100;
+  if (b.apagar) atual.pontos = atual.pontos.filter((p) => p.municipio.toLowerCase() !== String(b.apagar).toLowerCase());
+  if (b.municipio) {
+    const disp = nb(b.disp);
+    if (!(disp > 30 && disp < 400)) throw new Error('preço disponível inválido (R$/sc)');
+    if (!ref.porto_preco) throw new Error('sem o preço do porto hoje; tente mais tarde');
+    const g = await geocodificar(String(b.municipio).trim(), b.uf || 'MT');
+    if (!g) throw new Error('município não encontrado');
+    atual.pontos = atual.pontos.filter((p) => p.municipio.toLowerCase() !== String(b.municipio).trim().toLowerCase());
+    atual.pontos.push({ municipio: String(b.municipio).trim(), uf: (b.uf || 'MT').toUpperCase(), lat: g.lat, lon: g.lon, disp, data: hoje, ref });
+  }
+  if (b.futuro) {
+    const f = b.futuro, usd = nb(f.usd_sc), brl = nb(f.brl_sc), venc = String(f.venc || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || !(usd > 3 && usd < 80)) throw new Error('futuro: informe a data de entrega e o preço em US$/sc');
+    const contrato = contratoSoja(venc);
+    const q = await yahoo(contrato, 100).catch(() => null);
+    if (!q) throw new Error('não achei o contrato ' + contrato + ' de Chicago');
+    atual.futuro = { venc, contrato, usd_sc: usd, brl_sc: brl > 0 ? brl : null, data: hoje, ref: { cbot: q.preco, dolar: ref.dolar } };
+  }
+  await env.DB.prepare("INSERT INTO config (chave, valor) VALUES ('calib:soja', ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").bind(JSON.stringify(atual)).run();
+  MEM_CAL = null; MEM = null;
+  return atual;
+}
+// preço calibrado para um local: ponto mais perto (até 150 km) e futuro (até 250 km de algum ponto)
+function calibrado(m, cal, local) {
+  if (!cal || !local) return null;
+  let pt = null, dmin = Infinity;
+  (cal.pontos || []).forEach((p) => { const d = km([local.lat, local.lon], [p.lat, p.lon]); if (d < dmin) { dmin = d; pt = p; } });
+  const out = {};
+  if (pt && dmin <= 150) {
+    const ps = m.portos && m.portos.soja && m.portos.soja[pt.ref.porto];
+    const porto = ps ? ps[ps.length - 1] : null;
+    if (porto) {
+      const dif = pt.disp - pt.ref.porto_preco;   // diferença da região para o porto (frete, custos, margem, logística)
+      out.disp = { municipio: pt.municipio, uf: pt.uf, km: Math.round(dmin), preco_ref: pt.disp, data: pt.data, porto: pt.ref.porto,
+        porto_ref: pt.ref.porto_preco, porto_hoje: porto.p, porto_em: porto.d, dif: r2(dif), preco: r2(porto.p + dif) };
+    }
+  }
+  const f = cal.futuro;
+  if (f && m.cbot_fut && dmin <= 250) {
+    const base = f.usd_sc / BU_SC - f.ref.cbot;   // base da região sobre o contrato de Chicago (US$/bu)
+    const usd = (m.cbot_fut.preco + base) * BU_SC;
+    const prem = f.brl_sc ? f.brl_sc / (f.usd_sc * f.ref.dolar) - 1 : 0;   // dólar a termo implícito no preço em reais
+    out.futuro = { venc: f.venc, contrato: f.contrato, data: f.data, usd_ref: f.usd_sc, brl_ref: f.brl_sc, base: r2(base),
+      cbot_ref: f.ref.cbot, cbot_hoje: m.cbot_fut.preco, usd: r2(usd), brl: f.brl_sc && m.dolar ? r2(usd * m.dolar.preco * (1 + prem)) : null, prem: r2(prem * 100) };
+  }
+  return out.disp || out.futuro ? out : null;
 }
 
 function km(a, b) {
@@ -267,7 +355,7 @@ export function freteEstimado(local, porto) {
   const kmRod = Math.round(km([local.lat, local.lon], PORTOS[porto]) * 1.3);   // estrada ≈ 30% mais que a linha reta
   return { km: kmRod, rt: Math.round(kmRod * 0.16) };                       // ~R$ 0,16 por tonelada·km (granel, longa distância)
 }
-function formacao(m, local, praca, frete) {
+function formacao(m, local, praca, frete, cal) {
   const cbot = m.cbot_soja, usd = m.dolar, portos = (m.portos && m.portos.soja) || {};
   if (!cbot || !usd || !local) return null;
   const nomes = Object.keys(portos);
@@ -287,8 +375,11 @@ function formacao(m, local, praca, frete) {
     const parPraca = u.p - fp.rt * escala / SC_T;
     custos = { sc: r2(Math.max(0, parPraca - praca.preco)), paridade_praca: r2(parPraca), frete_praca_rt: Math.round(fp.rt * escala) };
   }
-  const venda = custos ? naFaz - custos.sc : null;
+  let venda = custos ? naFaz - custos.sc : null;
+  const calib = calibrado(m, cal, local);
+  if (calib && calib.disp) venda = calib.disp.preco;   // cotação real da região manda
   return {
+    calib,
     cbot: cbot.preco, dolar: usd.preco, porto: { nome: porto, preco: u.p, em: u.d }, premio: r2(premio),
     frete: { rt, estimado: !(frete && frete.rt > 0), km: est.km, rt_estimado: est.rt, sc: r2(freteSc), em: frete && frete.em, por: frete && frete.por },
     fazenda: r2(naFaz), custos, venda: venda != null ? r2(venda) : null,
@@ -303,7 +394,7 @@ export async function mercadoDaFazenda(env, local, frete) {
   return {
     dolar: m.dolar, cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho,
     soja, milho: await pracaPerto(m.pracas.milho, local),
-    formacao: formacao(m, local, soja, frete),
+    formacao: formacao(m, local, soja, frete, await calibracao(env)),
     fonte: 'Dólar e Chicago: Yahoo Finance · Físico: Notícias Agrícolas (sindicatos e cooperativas)'
   };
 }

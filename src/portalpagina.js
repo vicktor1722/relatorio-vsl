@@ -206,6 +206,7 @@ body.sem-rolar{overflow:hidden}
 .chv-pe b{color:var(--texto)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g2 .campo{min-width:0}
 .pl-calc{font-size:12.5px;line-height:1.55;color:#1C2B23;background:#EEF6F0;border-radius:10px;padding:7px 10px;margin:-2px 0 10px}.pl-calc:empty{display:none}
+.ini-fp .fp-fut{align-items:center}.fp-fut small{display:block;font-size:11px;color:var(--fraco);font-weight:400}.fp-fut b{text-align:right;line-height:1.25}.fp-fut b small{display:inline}
 .ini-al{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:7px 0;border-top:1px dashed var(--linha)}.ini-al:first-of-type{border-top:0}
 
 .caixa.gr{padding:10px 12px 12px;margin-bottom:12px}
@@ -453,8 +454,23 @@ body.sem-rolar{overflow:hidden}
     if (!F) return '';
     var sinal = function (v, c) { return (v >= 0 ? '+ ' : '− ') + n(Math.abs(v), c); };
     var venda = F.venda != null ? F.venda : F.fazenda;
-    var cab = '<button class="fp-cab" id="fpAbre" aria-expanded="' + FORM_AB + '"><span>💰 ' + (F.venda != null ? 'Soja na fazenda (venda estimada)' : 'Soja na fazenda (paridade)') + '</span><b>R$ ' + n(venda, 2) + '/sc</b><i>▾</i></button>';
+    var C = F.calib || {}, fut = C.futuro, dAno = function (i) { return i ? i.slice(8, 10) + '/' + i.slice(5, 7) + '/' + i.slice(2, 4) : ''; };
+    var mesC = { F: 'jan', H: 'mar', K: 'mai', N: 'jul', Q: 'ago', U: 'set', X: 'nov' };
+    var linhaFut = fut ? '<div class="fp-fut"><span>🗓️ Futuro · entrega ' + dAno(fut.venc) + '<small>base ' + sinal(fut.base, 2) + ' US$/bu sobre Chicago ' + (mesC[fut.contrato.charAt(2)] || '') + '/' + fut.contrato.slice(3, 5) +
+      ' (US$ ' + n(fut.cbot_hoje, 2) + ')' + (fut.brl ? ' · dólar a termo ' + sinal(fut.prem, 1) + '%' : '') + '</small></span><b>US$ ' + n(fut.usd, 2) + (fut.brl ? '<br>R$ ' + n(fut.brl, 2) : '') + '<small>/sc</small></b></div>' : '';
+    var cab = '<button class="fp-cab" id="fpAbre" aria-expanded="' + FORM_AB + '"><span>💰 ' + (C.disp ? 'Soja disponível na fazenda' : F.venda != null ? 'Soja na fazenda (venda estimada)' : 'Soja na fazenda (paridade)') + '</span><b>R$ ' + n(venda, 2) + '/sc</b><i>▾</i></button>';
     if (!FORM_AB) return '<div class="ini-card fp-card">' + cab + '</div>';
+    if (C.disp) {   // calibrado com a cotação real da região
+      var D2 = C.disp;
+      return '<div class="ini-card fp-card aberto">' + cab + '<div class="ini-ct" style="margin-top:10px"><h3>🧮 Preço da região</h3><span>porto ' + dataBR(D2.porto_em) + '</span></div><div class="ini-fp">' +
+        '<div><span>⚓ Preço no porto de ' + esc(D2.porto) + ' hoje</span><b>R$ ' + n(D2.porto_hoje, 2) + '/sc</b></div>' +
+        '<div><span>📍 Diferença da região <em>calibrada</em></span><b>' + sinal(D2.dif, 2) + '/sc</b></div>' +
+        '<div class="tot fz"><span>= Disponível na fazenda</span><b>R$ ' + n(D2.preco, 2) + '/sc</b></div>' + linhaFut + '</div>' +
+        '<div class="ini-fpc">📍 Calibrado com a cotação de <b>' + esc(D2.municipio) + '</b>: R$ ' + n(D2.preco_ref, 2) + ' em ' + dataBR(D2.data) + ' (porto R$ ' + n(D2.porto_ref, 2) + ' naquele dia)' +
+        (D2.km > 15 ? ' · fazenda a ' + n(D2.km) + ' km' : '') + '.<br>O preço acompanha o porto todo dia mantendo essa diferença' + (fut ? '; o futuro acompanha Chicago e o dólar mantendo a base' : '') + '.' +
+        (F.praca ? '<br>Praça de ' + esc(F.praca.nome) + ' hoje: R$ ' + n(F.praca.preco, 2) + '/sc' : '') + '</div>' +
+        '<div class="ini-pe">Chicago US$ ' + n(F.cbot, 2) + '/bu · prêmio do porto ' + sinal(F.premio, 2) + ' US$/bu · dólar R$ ' + n(F.dolar, 2) + '. Com a cotação real da região, frete, custos e margem já estão dentro da diferença calibrada.</div></div>';
+    }
     var h = '<div class="ini-card fp-card aberto">' + cab + '<div class="ini-ct" style="margin-top:10px"><h3>🧮 Da bolsa à fazenda</h3><span>' + dataBR(F.porto.em) + '</span></div><div class="ini-fp">' +
       '<div><span>🏛️ Chicago</span><b>US$ ' + n(F.cbot, 2) + '/bu</b></div>' +
       '<div><span>⚓ Prêmio no porto (' + esc(F.porto.nome) + ')</span><b>' + sinal(F.premio, 2) + ' US$/bu</b></div>' +
@@ -470,7 +486,7 @@ body.sem-rolar{overflow:hidden}
     if (F.venda != null) {
       h += '<div class="tot"><span>= Paridade de exportação na fazenda</span><b>R$ ' + n(F.fazenda, 2) + '/sc</b></div>' +
         '<div><span>🏢 Custos e margem da região <em>porto, impostos, armazém, trade</em></span><b>− R$ ' + n(F.custos.sc, 2) + '/sc</b></div>' +
-        '<div class="tot fz"><span>= Preço estimado de venda na fazenda</span><b>R$ ' + n(F.venda, 2) + '/sc</b></div></div>';
+        '<div class="tot fz"><span>= Preço estimado de venda na fazenda</span><b>R$ ' + n(F.venda, 2) + '/sc</b></div>' + linhaFut + '</div>';
     } else h += '<div class="tot fz"><span>= Paridade de exportação na fazenda</span><b>R$ ' + n(F.fazenda, 2) + '/sc</b></div></div>';
     if (F.praca) {
       var d = F.praca.dif;
