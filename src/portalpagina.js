@@ -185,7 +185,7 @@ ${DPG_CSS}
 .chv-t{margin:14px 0 8px;font-size:14px;color:var(--verde-escuro)}
 .chv-seg{display:flex;gap:4px;background:#EEF2F0;border-radius:10px;padding:3px;margin-bottom:8px}.chv-seg button{flex:1;border:0;background:none;font-size:12.5px;padding:7px 2px;border-radius:8px;color:var(--fraco);font-weight:600}
 .chv-seg button.on{background:#fff;color:#134A7C;box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.chv-mapa{position:relative;height:320px;border-radius:12px;overflow:hidden}.chv-cv{filter:blur(3px)}.chv-mapa #chvMapa{position:absolute;inset:0}
+.chv-mapa{position:relative;height:320px;border-radius:12px;overflow:hidden}.chv-cv{filter:blur(2px) saturate(1.35) contrast(1.08)}.chv-mapa #chvMapa{position:absolute;inset:0}
 .chv-tit,.chv-dia{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none}
 .chv-tit{left:8px;font-size:11px;padding:4px 8px;line-height:1.3}.chv-dia{right:8px;font-weight:800;font-size:19px;padding:4px 10px}
 .chv-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
@@ -563,7 +563,7 @@ ${DPG_CSS}
         var vv = v * (CHV.modo === 'dia' ? 0.7 + 0.6 * nz : 0.94 + 0.12 * nz), c = corChuva(vv);   // no acumulado a textura quase não mexe no valor
         if (!c) continue;
         var ex = Math.min(x, cw - 1 - x) / (cw * 0.12), borda = Math.min(1, ex, ey);   // bordas somem aos poucos
-        var al = Math.min(1, (vv - 1) / 7) * (0.55 + 0.45 * nz) * borda * borda * 215;
+        var al = Math.min(1, (vv - 0.8) / 4) * (0.72 + 0.28 * nz) * borda * borda * 240;   // nuvem mais densa
         var o = (y * cw + x) * 4; im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = al;
       }
     }
@@ -584,6 +584,13 @@ ${DPG_CSS}
     CHV.mapa = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView([P.lat || -14, P.lon || -54], 4);
     mapas.push(CHV.mapa);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10 }).addTo(CHV.mapa);
+    // divisas dos estados e dos países (com os nomes) por cima da chuva
+    CHV.mapa.createPane('limites'); CHV.mapa.getPane('limites').style.zIndex = 450; CHV.mapa.getPane('limites').style.pointerEvents = 'none';
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, pane: 'limites' }).addTo(CHV.mapa);
+    // divisas dos estados (linhas do Brasil guardadas no próprio app)
+    var mp = CHV.mapa;
+    (window.UFS_GEO ? Promise.resolve(window.UFS_GEO) : fetch('/portal/ufs.json').then(function (r) { return r.json(); }).then(function (g) { window.UFS_GEO = g; return g; }))
+      .then(function (g) { if (CHV.mapa === mp) L.geoJSON(g, { pane: 'limites', interactive: false, style: { color: '#FFFFFF', weight: 1.1, opacity: 0.85 } }).addTo(mp); }).catch(function () {});
     CHV.canvas = document.createElement('canvas'); CHV.canvas.width = 220; CHV.canvas.height = 240; CHV.canvas.className = 'chv-cv';
     new CanvasCamada(CHV.canvas, [[M.la0, M.lo0], [M.la1, M.lo1]], { interactive: false }).addTo(CHV.mapa);
     if (P.lat) L.circleMarker([P.lat, P.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#C62828', fillOpacity: 1 }).addTo(CHV.mapa).bindTooltip(esc(CHV.dados.fazenda.nome));

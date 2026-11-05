@@ -19,6 +19,7 @@ import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
 import { climaDe } from './mercado.js';
+import { UFS_LINHAS } from './ufs.js';
 import { atualizarChuva } from './chuva.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
@@ -224,6 +225,8 @@ export default {
       }
 
       // acesso da fazenda e do operador: página e API próprias (login separado do consultor)
+      // divisas dos estados para o mapa da chuva (arquivo fixo, cache longo)
+      if (rota === '/portal/ufs.json') return new Response(UFS_LINHAS, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=2592000' } });
       if (rota === '/portal' || rota === '/portal/') return html(paginaPortal());
       if (rota === '/portal-sw.js') return new Response(PORTAL_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
       if (rota === '/portal.webmanifest') return new Response(PORTAL_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
