@@ -182,13 +182,15 @@ async function yahoo(simbolo, div) {
   if (!r) throw new Error('sem dados ' + simbolo);
   const ts = r.timestamp || [], cl = (r.indicators && r.indicators.quote && r.indicators.quote[0] && r.indicators.quote[0].close) || [];
   const serie = [];
-  ts.forEach((t, i) => { if (cl[i] != null) serie.push({ d: new Date(t * 1000).toISOString().slice(0, 10), p: cl[i] / div }); });
+  const off = (r.meta && r.meta.gmtoffset) || 0;
+  ts.forEach((t, i) => { if (cl[i] != null) serie.push({ d: new Date((t + off) * 1000).toISOString().slice(0, 10), p: cl[i] / div }); });
   const atual = (r.meta && r.meta.regularMarketPrice) ? r.meta.regularMarketPrice / div : (serie.length ? serie[serie.length - 1].p : null);
   if (atual == null) throw new Error('sem preço ' + simbolo);
-  const hoje = new Date((r.meta.regularMarketTime || Date.now() / 1000) * 1000).toISOString().slice(0, 10);
+  const hoje = new Date(((r.meta.regularMarketTime || Date.now() / 1000) + off) * 1000).toISOString().slice(0, 10);
   if (serie.length && serie[serie.length - 1].d === hoje) serie[serie.length - 1].p = atual; else serie.push({ d: hoje, p: atual });
   const ant = serie.length > 1 ? serie[serie.length - 2].p : null;
-  return { preco: r2(atual * 10000) / 10000, var: ant ? r2((atual - ant) / ant * 100) : null, serie: serie.slice(-15).map((x) => r2(x.p * 100) / 100), em: hoje };
+  return { preco: r2(atual * 10000) / 10000, var: ant ? r2((atual - ant) / ant * 100) : null, serie: serie.slice(-15).map((x) => r2(x.p * 100) / 100), em: hoje,
+    dias: serie.slice(-25).map((x) => [x.d, Math.round(x.p * 10000) / 10000]) };
 }
 async function dolar() {
   try { return await yahoo('BRL=X', 1); } catch (e) {
@@ -196,8 +198,21 @@ async function dolar() {
     const l = (Array.isArray(j) ? j : []).slice().reverse();
     if (!l.length) throw e;
     const u = l[l.length - 1];
-    return { preco: Number(u.bid), var: Number(u.pctChange), serie: l.map((x) => Number(x.bid)), em: new Date(Number(u.timestamp) * 1000).toISOString().slice(0, 10) };
+    return { preco: Number(u.bid), var: Number(u.pctChange), serie: l.map((x) => Number(x.bid)), em: new Date(Number(u.timestamp) * 1000).toISOString().slice(0, 10),
+      dias: l.map((x) => [new Date((Number(x.timestamp) - 3 * 3600) * 1000).toISOString().slice(0, 10), Number(x.bid)]) };
   }
+}
+
+// prêmio no porto (US$/bu) em cada fechamento: porto ÷ (dólar × 2,2046) − Chicago do mesmo dia (ou o último antes)
+function premioPorto(m, nome) {
+  const ps = m.portos && m.portos.soja && m.portos.soja[nome];
+  const cb = m.cbot_soja && m.cbot_soja.dias, fx = m.dolar && m.dolar.dias;
+  if (!ps || !ps.length || !cb || !fx) return null;
+  const ate = (l, d) => { let v = null; l.forEach((x) => { if (x[0] <= d) v = x[1]; }); return v; };
+  const l = ps.map((x) => { const c = ate(cb, x.d), f = ate(fx, x.d); return c && f ? { d: x.d, v: Math.round((x.p / (f * 2.20462) - c) * 100) / 100, porto: x.p } : null; }).filter(Boolean);
+  if (!l.length) return null;
+  const u = l[l.length - 1], a = l.length > 1 ? l[l.length - 2] : null;
+  return { porto: nome, valor: u.v, em: u.d, preco_porto: u.porto, dif: a ? Math.round((u.v - a.v) * 100) / 100 : null, serie: l.slice(-15).map((x) => x.v) };
 }
 
 let MEM = null;   // cache do isolate: { em, dados }
@@ -218,6 +233,7 @@ export async function mercadoGeral(env) {
     ['soja', 'milho'].forEach((k) => { if ((!dados.pracas[k] || !Object.keys(dados.pracas[k]).length) && guardado.pracas && guardado.pracas[k]) dados.pracas[k] = guardado.pracas[k]; });
     ['soja', 'milho'].forEach((k) => { if ((!dados.portos[k] || !Object.keys(dados.portos[k]).length) && guardado.portos && guardado.portos[k]) dados.portos[k] = guardado.portos[k]; });
   }
+  dados.premio = premioPorto(dados, 'Paranaguá') || (guardado && guardado.premio) || null;
   const completo = dados.dolar && !dados.dolar.antigo && dados.pracas.soja && Object.keys(dados.pracas.soja).length;
   if (completo) {
     try {
@@ -396,7 +412,7 @@ export async function mercadoDaFazenda(env, local, frete) {
   const m = await mercadoGeral(env);
   const soja = await pracaPerto(m.pracas.soja, local);
   return {
-    dolar: m.dolar, cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho,
+    dolar: m.dolar, cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho, premio: m.premio,
     soja, milho: await pracaPerto(m.pracas.milho, local),
     formacao: formacao(m, local, soja, frete, await calibracao(env)),
     fonte: 'Dólar e Chicago: Yahoo Finance · Físico: Notícias Agrícolas (sindicatos e cooperativas)'
