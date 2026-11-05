@@ -182,12 +182,10 @@ ${DPG_CSS}
 .chv-cab .t{font-size:14.5px;font-weight:700;color:var(--verde-escuro);flex:1 1 auto}.chv-cab .r{font-size:12.5px;color:#134A7C}.chv-cab i{font-style:normal;color:var(--verde);transition:transform .15s}
 .chv.aberto .chv-cab{margin-bottom:10px}.chv.aberto .chv-cab i{transform:rotate(180deg)}
 .chv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.chv-chips span{font-size:12.5px;background:#E6F0FA;color:#134A7C;border-radius:12px;padding:4px 10px}
-.chv-graf svg{display:block;width:100%;height:auto}
-.chv-leg{display:flex;gap:10px;font-size:11px;color:var(--fraco);margin-top:4px;flex-wrap:wrap}.chv-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .chv-t{margin:14px 0 8px;font-size:14px;color:var(--verde-escuro)}
 .chv-seg{display:flex;gap:4px;background:#EEF2F0;border-radius:10px;padding:3px;margin-bottom:8px}.chv-seg button{flex:1;border:0;background:none;font-size:12.5px;padding:7px 2px;border-radius:8px;color:var(--fraco);font-weight:600}
 .chv-seg button.on{background:#fff;color:#134A7C;box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.chv-mapa{position:relative;height:320px;border-radius:12px;overflow:hidden}.chv-mapa #chvMapa{position:absolute;inset:0}
+.chv-mapa{position:relative;height:320px;border-radius:12px;overflow:hidden}.chv-cv{filter:blur(3px)}.chv-mapa #chvMapa{position:absolute;inset:0}
 .chv-tit,.chv-dia{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none}
 .chv-tit{left:8px;font-size:11px;padding:4px 8px;line-height:1.3}.chv-dia{right:8px;font-weight:800;font-size:19px;padding:4px 10px}
 .chv-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
@@ -475,7 +473,7 @@ ${DPG_CSS}
   }
 
   /* ---------- chuva dos próximos 30 dias + mapa da chuva (dono/gerente; atualiza no domingo à noite) ---------- */
-  var CHV = { chave: '', dados: null, carregando: false, aberto: false, modo: 'dia', dia: 0, play: null, mapa: null, camada: null };
+  var CHV = { chave: '', dados: null, carregando: false, aberto: false, modo: 'dia', dia: 0, play: null, mapa: null, canvas: null };
   function chvCarregar() {
     var k = iniChave();
     if (CHV.carregando || CHV.chave === k) return;
@@ -495,27 +493,6 @@ ${DPG_CSS}
     }
     return ESC_CHUVA[ESC_CHUVA.length - 1][1];
   }
-  function chvGrafico(P) {
-    var dias = P.dias, W = 640, H = 220, Lm = 34, Rm = 38, T = 14, B = 26, bw = (W - Lm - Rm) / dias.length;
-    var mx = Math.max.apply(null, dias.map(function (x) { return x.med; }).concat([1])), ymx = Math.ceil(mx / 5) * 5;
-    var tot = dias.reduce(function (s, x) { return s + x.med; }, 0), amx = Math.max(10, Math.ceil(tot / 50) * 50);
-    var g = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Chuva por dia nos próximos 30 dias">';
-    for (var k = 0; k <= 3; k++) {
-      var y = T + (H - T - B) * k / 3;
-      g += '<line x1="' + Lm + '" x2="' + (W - Rm) + '" y1="' + y + '" y2="' + y + '" stroke="#E1E7E3"/><text x="' + (Lm - 4) + '" y="' + (y + 4) + '" text-anchor="end" font-size="10" fill="#6B7B72">' + n(ymx * (3 - k) / 3) + '</text>' +
-        '<text x="' + (W - Rm + 4) + '" y="' + (y + 4) + '" font-size="10" fill="#C77700">' + n(amx * (3 - k) / 3) + '</text>';
-    }
-    var iT = dias.findIndex ? dias.findIndex(function (x) { return x.mod === 'GFS'; }) : -1;
-    if (iT > 0) g += '<rect x="' + (Lm + iT * bw) + '" y="' + T + '" width="' + ((dias.length - iT) * bw) + '" height="' + (H - T - B) + '" fill="#F4F6F8"/><text x="' + (Lm + iT * bw + 4) + '" y="' + (T + 11) + '" font-size="10" fill="#6B7B72">tendência</text>';
-    var acc = 0, ln = '';
-    dias.forEach(function (x, i) {
-      var h = x.med / ymx * (H - T - B), c = x.p1 >= 70 ? '#1E6FB8' : x.p1 >= 40 ? '#7FB2E5' : '#D3E3F3';
-      g += '<rect x="' + (Lm + i * bw + 1.5) + '" y="' + (H - B - h) + '" width="' + Math.max(1, bw - 3) + '" height="' + Math.max(1, h) + '" rx="2" fill="' + c + '"><title>' + dataBR(x.d) + ': ' + n(x.med, 1) + ' mm · chance de chuva ' + x.p1 + '%</title></rect>';
-      acc += x.med; ln += (i ? ' L' : 'M') + (Lm + i * bw + bw / 2).toFixed(1) + ',' + (H - B - acc / amx * (H - T - B)).toFixed(1);
-      if (i % 5 === 0) g += '<text x="' + (Lm + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10" fill="#6B7B72">' + dataBR(x.d) + '</text>';
-    });
-    return g + '<path d="' + ln + '" fill="none" stroke="#C77700" stroke-width="2.5"/></svg>';
-  }
   function cartaoChuva() {
     chvCarregar();
     var C = CHV.dados, P = C && C.ponto;
@@ -526,10 +503,7 @@ ${DPG_CSS}
       '<span class="r"><b>~' + n(P.acc[1]) + ' mm</b> · ' + prov + ' dias de chuva provável</span><i>▾</i></button>';
     if (!CHV.aberto) return h + '</div>';
     h += '<div class="chv-chips"><span>Acumulado 30 dias: <b>~' + n(P.acc[1]) + ' mm</b> (' + n(P.acc[0]) + ' a ' + n(P.acc[2]) + ')</span><span>' + prov + ' dias com chuva provável</span>' +
-      (prox ? '<span>1ª chuva ≥ 5 mm: <b>' + dataBR(prox.d) + '</b> (' + prox.p5 + '%)</span>' : '<span>sem chuva ≥ 5 mm provável</span>') + '</div>' +
-      '<div class="chv-graf">' + chvGrafico(P) + '</div>' +
-      '<div class="chv-leg"><span><i style="background:#1E6FB8"></i>chuva provável (≥70%)</span><span><i style="background:#7FB2E5"></i>possível</span><span><i style="background:#D3E3F3"></i>pouco provável</span><span><i style="background:#C77700;height:3px"></i>acumulado</span></div>' +
-      '<div class="ini-pe">Barra = chuva do dia (mediana dos cenários); cor = chance de chover 1 mm ou mais. Até 15 dias: modelo europeu ECMWF (50 cenários). De 16 a 30 dias: tendência do modelo americano GFS, menos precisa.</div>';
+      (prox ? '<span>1ª chuva ≥ 5 mm: <b>' + dataBR(prox.d) + '</b> (' + prox.p5 + '%)</span>' : '<span>sem chuva ≥ 5 mm provável</span>') + '</div>';
     var M = C.mapa;
     if (M && M.v && M.v.length) {
       h += '<h4 class="chv-t">🗺️ Mapa da chuva</h4><div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) {
@@ -541,55 +515,96 @@ ${DPG_CSS}
     var em = new Date(P.gerado_em);
     return h + '<div class="ini-pe">Atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' · próxima atualização domingo ' + dataBR(C.proxima) + ' à noite.</div></div>';
   }
-  function chvCamada() {
-    var M = CHV.dados && CHV.dados.mapa; if (!M || !CHV.mapa) return;
-    var somaDe = CHV.modo === 'dia' ? [CHV.dia, CHV.dia] : [0, Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15) - 1], np = M.nlat * M.nlon, G = [];
-    for (var i = 0; i < np; i++) { var s = 0; for (var d = somaDe[0]; d <= somaDe[1]; d++) s += M.v[d][i] || 0; G.push(s); }
-    var cw = 260, ch = 260, cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
-    var cx = cv.getContext('2d'), im = cx.createImageData(cw, ch);
-    function g(a, b) { a = Math.max(0, Math.min(M.nlat - 1, a)); b = Math.max(0, Math.min(M.nlon - 1, b)); return G[a * M.nlon + b]; }
-    for (var y = 0; y < ch; y++) for (var x = 0; x < cw; x++) {
-      var fa = (y + 0.5) / ch * (M.nlat - 1), fb = (x + 0.5) / cw * (M.nlon - 1), a = Math.floor(fa), b = Math.floor(fb), ta = fa - a, tb = fb - b;
-      var v = g(a, b) * (1 - ta) * (1 - tb) + g(a + 1, b) * ta * (1 - tb) + g(a, b + 1) * (1 - ta) * tb + g(a + 1, b + 1) * ta * tb;
-      var c = corChuva(v), o = (y * cw + x) * 4;
-      if (c) { im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = v < 3 ? 0 : Math.min(205, (v - 3) * 45); }
+  // camada da chuva: canvas no mapa (projeção do mapa), bordas que somem, textura de nuvem que anda com o tempo
+  var CanvasCamada = window.L && L.ImageOverlay.extend({
+    _initImage: function () {
+      var el = this._image = this._url;
+      L.DomUtil.addClass(el, 'leaflet-image-layer');
+      if (this._zoomAnimated) L.DomUtil.addClass(el, 'leaflet-zoom-animated');
+      el.onselectstart = L.Util.falseFn; el.onmousemove = L.Util.falseFn;
+    }
+  });
+  var RUIDO = (function () { var a = [], s = 7; for (var i = 0; i < 64 * 64; i++) { s = (s * 16807) % 2147483647; a.push(s / 2147483647); } return a; })();
+  function ruido(x, y) {
+    var x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    function r(i, j) { return RUIDO[((j & 63) * 64) + (i & 63)]; }
+    return r(x0, y0) * (1 - fx) * (1 - fy) + r(x0 + 1, y0) * fx * (1 - fy) + r(x0, y0 + 1) * (1 - fx) * fy + r(x0 + 1, y0 + 1) * fx * fy;
+  }
+  function merc(la) { var r = la * Math.PI / 180; return Math.log(Math.tan(Math.PI / 4 + r / 2)); }
+  function chvDesenhar(t) {
+    var M = CHV.dados && CHV.dados.mapa, cv = CHV.canvas; if (!M || !cv) return;
+    var np = M.nlat * M.nlon, G = new Array(np), i, d;
+    if (CHV.modo === 'dia') {
+      var d0 = Math.floor(t), d1 = Math.min(M.v.length - 1, d0 + 1), f = t - d0;
+      for (i = 0; i < np; i++) G[i] = (M.v[d0][i] || 0) * (1 - f) + (M.v[d1][i] || 0) * f;
+    } else {
+      var nd = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15);
+      for (i = 0; i < np; i++) { var s = 0; for (d = 0; d < nd; d++) s += M.v[d][i] || 0; G[i] = s; }
+    }
+    var cw = cv.width, ch = cv.height, cx = cv.getContext('2d'), im = cx.createImageData(cw, ch);
+    var m1 = merc(M.la1), m0 = merc(M.la0), dx = CHV.modo === 'dia' ? t * 2.2 : 0, dy = CHV.modo === 'dia' ? -t * 1.3 : 0;
+    function g(a, b) { a = a < 0 ? 0 : a > M.nlat - 1 ? M.nlat - 1 : a; b = b < 0 ? 0 : b > M.nlon - 1 ? M.nlon - 1 : b; return G[a * M.nlon + b]; }
+    for (var y = 0; y < ch; y++) {
+      var la = Math.atan(Math.sinh(m1 - (y + 0.5) / ch * (m1 - m0))) * 180 / Math.PI;   // linha da tela → latitude (Mercator)
+      var fa = (M.la1 - la) / M.passo, a0 = Math.floor(fa), ta = fa - a0;
+      var ey = Math.min(y, ch - 1 - y) / (ch * 0.12);
+      for (var x = 0; x < cw; x++) {
+        var fb = (x + 0.5) / cw * (M.nlon - 1), b0 = Math.floor(fb), tb = fb - b0;
+        var v = g(a0, b0) * (1 - ta) * (1 - tb) + g(a0 + 1, b0) * ta * (1 - tb) + g(a0, b0 + 1) * (1 - ta) * tb + g(a0 + 1, b0 + 1) * ta * tb;
+        if (v < 1) continue;
+        var nz = 0.65 * ruido(x / 9 + dx, y / 9 + dy) + 0.35 * ruido(x / 4 - dx * 1.6, y / 4 + dy * 1.4);   // nuvem: duas escalas
+        var vv = v * (CHV.modo === 'dia' ? 0.7 + 0.6 * nz : 0.94 + 0.12 * nz), c = corChuva(vv);   // no acumulado a textura quase não mexe no valor
+        if (!c) continue;
+        var ex = Math.min(x, cw - 1 - x) / (cw * 0.12), borda = Math.min(1, ex, ey);   // bordas somem aos poucos
+        var al = Math.min(1, (vv - 1) / 7) * (0.55 + 0.45 * nz) * borda * borda * 215;
+        var o = (y * cw + x) * 4; im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = al;
+      }
     }
     cx.putImageData(im, 0, 0);
-    if (CHV.camada) CHV.mapa.removeLayer(CHV.camada);
-    CHV.camada = L.imageOverlay(cv.toDataURL(), [[M.la0, M.lo0], [M.la1, M.lo1]], { opacity: 1 }).addTo(CHV.mapa);
-    var d0 = M.datas[somaDe[0]], d1 = M.datas[somaDe[1]];
-    $('#chvTit').innerHTML = CHV.modo === 'dia' ? 'Chuva prevista<br>no dia (mm)' : 'Acumulado<br>' + dataBR(d0) + ' a ' + dataBR(d1);
-    $('#chvDia').textContent = CHV.modo === 'dia' ? dataBR(d0) : (CHV.modo === 'a7' ? '7 dias' : '15 dias');
+    var di = Math.min(M.v.length - 1, Math.round(t)), nd2 = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15);
+    $('#chvTit').innerHTML = CHV.modo === 'dia' ? 'Chuva prevista<br>no dia (mm)' : 'Acumulado<br>' + dataBR(M.datas[0]) + ' a ' + dataBR(M.datas[nd2 - 1]);
+    $('#chvDia').textContent = CHV.modo === 'dia' ? dataBR(M.datas[di]) : (CHV.modo === 'a7' ? '7 dias' : '15 dias');
   }
+  function chvParar() { if (CHV.play) { cancelAnimationFrame(CHV.play); CHV.play = null; } var pl = document.getElementById('chvPlay'); if (pl) pl.textContent = '▶'; }
   function ligarChuva() {
     var ab = document.getElementById('chvAbre');
-    if (ab) ab.onclick = function () { CHV.aberto = !CHV.aberto; pintar(); };
+    if (ab) ab.onclick = function () { CHV.aberto = !CHV.aberto; chvParar(); pintar(); };
+    chvParar();
+    CHV.mapa = null; CHV.canvas = null;
     var el = document.getElementById('chvMapa');
-    if (CHV.play) { clearInterval(CHV.play); CHV.play = null; }
-    CHV.mapa = null; CHV.camada = null;
-    if (!el || !window.L) return;
-    var P = CHV.dados.ponto;
+    if (!el || !window.L || !CanvasCamada) return;
+    var P = CHV.dados.ponto, M = CHV.dados.mapa;
     CHV.mapa = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView([P.lat || -14, P.lon || -54], 4);
     mapas.push(CHV.mapa);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10 }).addTo(CHV.mapa);
+    CHV.canvas = document.createElement('canvas'); CHV.canvas.width = 220; CHV.canvas.height = 240; CHV.canvas.className = 'chv-cv';
+    new CanvasCamada(CHV.canvas, [[M.la0, M.lo0], [M.la1, M.lo1]], { interactive: false }).addTo(CHV.mapa);
     if (P.lat) L.circleMarker([P.lat, P.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#C62828', fillOpacity: 1 }).addTo(CHV.mapa).bindTooltip(esc(CHV.dados.fazenda.nome));
-    chvCamada();
+    chvDesenhar(CHV.dia);
     document.querySelectorAll('[data-chvm]').forEach(function (b) { b.onclick = function () {
-      CHV.modo = b.dataset.chvm;
+      CHV.modo = b.dataset.chvm; chvParar();
       document.querySelectorAll('[data-chvm]').forEach(function (x) { x.classList.toggle('on', x === b); });
       $('#chvCtrl').classList.toggle('oculto', CHV.modo !== 'dia');
-      if (CHV.play) { clearInterval(CHV.play); CHV.play = null; $('#chvPlay').textContent = '▶'; }
-      chvCamada();
+      chvDesenhar(CHV.dia);
     }; });
     var sl = document.getElementById('chvSl'), pl = document.getElementById('chvPlay');
-    if (sl) sl.oninput = function () { CHV.dia = Number(sl.value); chvCamada(); };
+    if (sl) sl.oninput = function () { chvParar(); CHV.dia = Number(sl.value); chvDesenhar(CHV.dia); };
+    // ▶: um dia vira o outro aos poucos (~1,4 s por dia), como a chuva andando
     if (pl) pl.onclick = function () {
-      if (CHV.play) { clearInterval(CHV.play); CHV.play = null; pl.textContent = '▶'; return; }
+      if (CHV.play) { chvParar(); return; }
       pl.textContent = '❚❚';
-      CHV.play = setInterval(function () {
-        if (!document.getElementById('chvSl')) { clearInterval(CHV.play); CHV.play = null; return; }
-        CHV.dia = (CHV.dia + 1) % CHV.dados.mapa.v.length; sl.value = CHV.dia; chvCamada();
-      }, 900);
+      var ult = 0, n = M.v.length;
+      function passo(ts) {
+        if (!document.getElementById('chvSl')) { CHV.play = null; return; }
+        if (ts - ult > 50) {
+          CHV.dia = ult ? CHV.dia + (ts - ult) / 1400 : CHV.dia; ult = ts;
+          if (CHV.dia > n - 1) CHV.dia = 0;
+          sl.value = Math.floor(CHV.dia); chvDesenhar(CHV.dia);
+        }
+        CHV.play = requestAnimationFrame(passo);
+      }
+      CHV.play = requestAnimationFrame(passo);
     };
   }
 
