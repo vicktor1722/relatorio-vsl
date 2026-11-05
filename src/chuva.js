@@ -5,7 +5,7 @@
 import { localDaFazenda } from './mercado.js';
 
 const UA = 'Mozilla/5.0 (compatible; AMVS-Relatorio/1.0)';
-const GRADE = { la0: -34, la1: 5, lo0: -74, lo1: -35, passo: 3 };
+const GRADE = { la0: -35, la1: 7, lo0: -76, lo1: -32, passo: 2, ver: 2 };   // ver: muda quando a grade muda (refaz o guardado)
 const VALIDADE = 8 * 864e5;   // passou disso sem atualizar (cron falhou): refaz quando alguém abrir
 
 async function buscar(url) {
@@ -29,13 +29,18 @@ async function gravar(env, chave, v) {
 export async function mapaChuva() {
   const lats = [], lons = [];
   for (let la = GRADE.la1; la >= GRADE.la0; la -= GRADE.passo) for (let lo = GRADE.lo0; lo <= GRADE.lo1; lo += GRADE.passo) { lats.push(la); lons.push(lo); }
-  const q = 'latitude=' + lats.join(',') + '&longitude=' + lons.join(',') + '&daily=precipitation_sum&forecast_days=15&timezone=America%2FSao_Paulo';
+  const q = (la, lo) => 'latitude=' + la.join(',') + '&longitude=' + lo.join(',') + '&daily=precipitation_sum&forecast_days=15&timezone=America%2FSao_Paulo';
   let lista, fonte;
   try {
-    lista = await buscar('https://api.open-meteo.com/v1/forecast?' + q + '&models=ecmwf_ifs025');
+    lista = await buscar('https://api.open-meteo.com/v1/forecast?' + q(lats, lons) + '&models=ecmwf_ifs025');
     fonte = 'ECMWF';
-  } catch (e) {   // limite da previsão comum: usa a média dos cenários do mesmo modelo
-    lista = await buscar('https://ensemble-api.open-meteo.com/v1/ensemble?' + q + '&models=ecmwf_ifs025');
+  } catch (e) {   // limite da previsão comum: usa a média dos cenários do mesmo modelo, em partes (resposta grande)
+    lista = [];
+    for (let i = 0; i < lats.length; i += 100) {
+      let parte = await buscar('https://ensemble-api.open-meteo.com/v1/ensemble?' + q(lats.slice(i, i + 100), lons.slice(i, i + 100)) + '&models=ecmwf_ifs025');
+      if (!Array.isArray(parte)) parte = [parte];
+      parte.forEach((p) => { const d = p.daily, m = { time: d.time, precipitation_sum: d.time.map((_, k) => { const l = membros(d, k); return l.reduce((a, x) => a + x, 0) / (l.length || 1); }) }; lista.push({ daily: m }); });
+    }
     fonte = 'ECMWF (média dos cenários)';
   }
   if (!Array.isArray(lista)) lista = [lista];
@@ -99,12 +104,13 @@ export async function chuvaDaFazenda(env, f) {
   if (!local) return { erro: 'sem local' };
   const velho = (x) => !x || !x.gerado_em || Date.now() - new Date(x.gerado_em).getTime() > VALIDADE;
   let [mapa, ponto] = await Promise.all([ler(env, 'chuva:mapa'), ler(env, chaveP(local))]);
+  if (mapa && mapa.ver !== GRADE.ver) mapa = null;   // grade antiga
   if (velho(ponto)) {
     try { ponto = Object.assign(await chuvaPonto(Math.round(local.lat * 4) / 4, Math.round(local.lon * 4) / 4), { lat: local.lat, lon: local.lon }); await gravar(env, chaveP(local), ponto); }
     catch (e) { if (!ponto) ponto = null; }
   }
   if (velho(mapa)) {
-    try { mapa = await mapaChuva(); await gravar(env, 'chuva:mapa', mapa); } catch (e) { if (!mapa) mapa = null; }
+    try { mapa = await mapaChuva(); await gravar(env, 'chuva:mapa', mapa); } catch (e) { if (!mapa) mapa = await ler(env, 'chuva:mapa'); }
   }
   return { local, ponto, mapa, proxima: proximoDomingo() };
 }
