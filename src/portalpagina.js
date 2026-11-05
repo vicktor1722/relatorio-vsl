@@ -170,6 +170,14 @@ ${DPG_CSS}
 .ini-ap .sel.at{background:#FDE7E7;color:#C62828}.ini-ap .sel.hj{background:#FFF1DB;color:#8A5300}.ini-ap .sel.pr{background:#EEF2F0;color:var(--fraco)}
 .ini-ap div{flex:1;min-width:0}.ini-ap small{display:block;color:var(--fraco);font-size:12px}
 .ini-cust{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}.ini-cust b{font-size:22px}.ini-cust .dir{text-align:right}.ini-cust .dir b{font-size:17px}.ini-cust span{font-size:12px;color:var(--fraco)}
+.ini-fp>div{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:6px 0;border-top:1px dashed var(--linha);font-size:13.5px}.ini-fp>div:first-child{border-top:0}
+.ini-fp>div span{color:var(--fraco);min-width:0}.ini-fp>div b{white-space:nowrap}.ini-fp em{font-style:normal;font-size:11.5px;background:#FFF1DB;color:#8A5300;border-radius:8px;padding:1px 6px}
+.ini-fp .tot span{color:var(--texto);font-weight:600}.ini-fp .tot{border-top:1px solid var(--linha)}
+.ini-fp .tot.fz{background:#E8F3EC;border:0;border-radius:10px;padding:9px 10px;margin-top:6px}.ini-fp .tot.fz b{font-size:19px;color:var(--verde-escuro)}
+.ini-fed{display:block!important;background:#F6F8F7;border-radius:10px;padding:10px!important;border:0!important}
+.ini-fed label{display:block;font-size:12.5px;color:var(--fraco);margin-bottom:8px}.ini-fed input,.ini-fed select{display:block;width:100%;margin-top:3px;border:1px solid #CFD8D3;border-radius:9px;padding:9px;font-size:15px;background:#fff}
+.ini-fed .btn{padding:10px;font-size:14.5px;margin-bottom:6px}
+.ini-fpc{font-size:13px;line-height:1.5;margin-top:10px;background:#F6F8F7;border-radius:10px;padding:8px 10px}.ini-fpc .dn{color:#C62828}.ini-fpc .up{color:#2F9E5B}
 .ini-al{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:7px 0;border-top:1px dashed var(--linha)}.ini-al:first-of-type{border-top:0}
 
 .caixa.gr{padding:10px 12px 12px;margin-bottom:12px}
@@ -410,6 +418,47 @@ ${DPG_CSS}
     if (!m.soja && !m.milho) h += '<div class="ini-pe">Preço da praça aparece quando a fazenda tiver mapa (KML) ou município cadastrado.</div>';
     return h + '<div class="ini-pe">' + esc(m.fonte) + '. Praça mais perto da fazenda.</div></div>';
   }
+  // formação do preço da soja: Chicago + prêmio do porto × dólar − frete = valor na fazenda
+  var FRETE_ED = false;
+  function cartaoFormacao() {
+    var m = INI.dados && INI.dados.mercado, F = m && m.formacao;
+    if (!F) return '';
+    var sinal = function (v, c) { return (v >= 0 ? '+ ' : '− ') + n(Math.abs(v), c); };
+    var h = '<div class="ini-card"><div class="ini-ct"><h3>🧮 Preço da soja: da bolsa à fazenda</h3><span>' + dataBR(F.porto.em) + '</span></div><div class="ini-fp">' +
+      '<div><span>🏛️ Chicago</span><b>US$ ' + n(F.cbot, 2) + '/bu</b></div>' +
+      '<div><span>⚓ Prêmio no porto (' + esc(F.porto.nome) + ')</span><b>' + sinal(F.premio, 2) + ' US$/bu</b></div>' +
+      '<div><span>💵 Dólar</span><b>× R$ ' + n(F.dolar, 2) + '</b></div>' +
+      '<div class="tot"><span>= Preço no porto de ' + esc(F.porto.nome) + '</span><b>R$ ' + n(F.porto.preco, 2) + '/sc</b></div>' +
+      '<div><span>🚛 Frete até o porto · R$ ' + n(F.frete.rt) + '/t' + (F.frete.estimado ? ' <em>estimado ~' + n(F.frete.km) + ' km</em>' : '') +
+        ' <button class="ini-lk" id="fpEd">' + (FRETE_ED ? 'fechar' : 'alterar') + '</button></span><b>− R$ ' + n(F.frete.sc, 2) + '/sc</b></div>';
+    if (FRETE_ED) {
+      h += '<div class="ini-fed"><label>Frete real (R$ por tonelada)<input id="fpRt" inputmode="decimal" placeholder="ex.: ' + n(F.frete.rt_estimado) + '" value="' + (F.frete.estimado ? '' : n(F.frete.rt, 2)) + '"></label>' +
+        '<label>Porto<select id="fpPorto">' + F.portos.map(function (p) { return '<option' + (p === F.porto.nome ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('') + '</select></label>' +
+        '<button class="btn" id="fpSalva">Salvar frete</button>' + (F.frete.estimado ? '' : '<button class="ini-lk" id="fpEst">voltar ao estimado (R$ ' + n(F.frete.rt_estimado) + '/t)</button>') + '</div>';
+    }
+    h += '<div class="tot fz"><span>= Valor da soja na fazenda</span><b>R$ ' + n(F.fazenda, 2) + '/sc</b></div></div>';
+    if (F.praca) {
+      var d = F.praca.dif;
+      h += '<div class="ini-fpc">📍 Na praça de <b>' + esc(F.praca.nome) + '</b> hoje: <b>R$ ' + n(F.praca.preco, 2) + '/sc</b> · ' +
+        (Math.abs(d) < 0.5 ? 'igual ao valor calculado' : '<b class="' + (d < 0 ? 'dn' : 'up') + '">R$ ' + n(Math.abs(d), 2) + (d < 0 ? ' abaixo' : ' acima') + '</b> do valor calculado') +
+        '<br>Base local: <b>' + sinal(F.praca.base, 2) + ' US$/bu</b> sobre Chicago</div>';
+    }
+    return h + '<div class="ini-pe">1 saca = 60 kg = 2,2046 bushels · 1 t = 16,67 sacas. O prêmio sai do preço do porto do dia. ' +
+      (F.frete.estimado ? 'Frete estimado pela distância (~R$ 0,16 por t·km): toque em "alterar" e coloque o frete real.' : 'Frete informado' + (F.frete.por ? ' por ' + esc(F.frete.por) : '') + (F.frete.em ? ' em ' + dataBR(F.frete.em) : '') + '.') + '</div></div>';
+  }
+  function ligarFormacao() {
+    var ed = document.getElementById('fpEd'); if (ed) ed.onclick = function () { FRETE_ED = !FRETE_ED; pintar(); };
+    var sv = document.getElementById('fpSalva'), es = document.getElementById('fpEst');
+    function salvar(rt) {
+      var fid = INI.dados && INI.dados.fazenda && INI.dados.fazenda.id;
+      api('/api/portal/frete', { id: fid, rt: rt, porto: document.getElementById('fpPorto').value })
+        .then(function () { toast('Frete salvo'); FRETE_ED = false; INI.chave = ''; iniCarregar(); })
+        .catch(function (e) { toast(e.message); });
+    }
+    if (sv) sv.onclick = function () { var v = document.getElementById('fpRt').value.trim(); if (!v) { toast('Informe o frete em R$ por tonelada'); return; } salvar(v); };
+    if (es) es.onclick = function () { salvar(''); };
+  }
+
   function resumoAplic() {
     var hj = hoje(), sem = somaDias(hj, 7), l = [];
     (D.aplicacoes || []).forEach(function (a) {
@@ -437,7 +486,7 @@ ${DPG_CSS}
     var hr = new Date().getHours(), sau = hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
     var dt = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
     var h = abas() + '<div class="ini-ola"><b>' + sau + ' 👋</b>' + esc(nome) + ' · ' + esc(dt) + ' · safra ' + esc(D.safra || '') + '</div>';
-    h += cartaoClima(false) + cartaoMercado();
+    h += cartaoClima(false) + cartaoMercado() + cartaoFormacao();
     // plantio e colheita
     var pv = (g.prev || []), prox = pv.filter(function (x) { return !x.col && x.d >= hj; }).map(function (x) { return x.d; }).sort()[0];
     var semanas = {}; pv.forEach(function (x) { var dd = new Date(x.d + 'T12:00:00Z'); dd.setUTCDate(dd.getUTCDate() - ((dd.getUTCDay() + 6) % 7)); var k = dd.toISOString().slice(0, 10); semanas[k] = (semanas[k] || 0) + x.ha; });
@@ -484,6 +533,7 @@ ${DPG_CSS}
     $('#conteudo').innerHTML = h;
     document.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { aba = b.dataset.ir; pintar(); window.scrollTo(0, 0); }; });
     var sl = document.getElementById('iniLoc'); if (sl) sl.onchange = function () { INI.loc = sl.value; iniCarregar(); };
+    ligarFormacao();
   }
 
   /* ---------- visão da fazenda ---------- */
