@@ -114,3 +114,13 @@ export async function chuvaDaFazenda(env, f) {
   }
   return { local, ponto, mapa, proxima: proximoDomingo() };
 }
+
+// só o mapa (painel do consultor: um mapa único na tela principal)
+export async function mapaGuardado(env) {
+  let mapa = await ler(env, 'chuva:mapa');
+  if (mapa && mapa.ver !== GRADE.ver) mapa = null;
+  if (!mapa || !mapa.gerado_em || Date.now() - new Date(mapa.gerado_em).getTime() > VALIDADE) {
+    try { mapa = await mapaChuva(); await gravar(env, 'chuva:mapa', mapa); } catch (e) { if (!mapa) mapa = await ler(env, 'chuva:mapa'); }
+  }
+  return { mapa, proxima: proximoDomingo() };
+}
