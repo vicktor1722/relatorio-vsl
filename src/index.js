@@ -18,6 +18,7 @@ import { avisarAplicacoes, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
+import { climaDe } from './mercado.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
@@ -393,6 +394,14 @@ export default {
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
+
+      // previsão do tempo no lugar onde o consultor está (app de campo)
+      if (rota === '/api/clima') {
+        const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
+        if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180) || (!lat && !lon)) return json({ erro: 'local inválido' }, 400);
+        try { return json({ ok: true, clima: await climaDe(Math.round(lat * 20) / 20, Math.round(lon * 20) / 20) }); }
+        catch (e) { return json({ erro: 'previsão do tempo indisponível agora' }, 502); }
+      }
 
       // logins da fazenda / operador criados pelo consultor
       if (rota.startsWith('/api/acessos')) return await rotasAcessos(env, req, me, rota);

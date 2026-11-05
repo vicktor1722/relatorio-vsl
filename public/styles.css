@@ -558,3 +558,14 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 /* plantio parcial: outra variedade do talhão */
 .ag-parte{background:#fff;border:1px solid #DCE5DF;border-radius:10px;padding:8px 10px 6px;margin:8px 0}
 .ag-parte .ag-link{margin:2px 0 4px}
+
+/* previsão do tempo no topo da lista de relatórios */
+.cl-card{background:linear-gradient(160deg,#2F80C9,#1E5F9E);color:#fff;border-radius:16px;padding:12px;margin:0 0 12px}
+.cl-top{display:flex;align-items:center;gap:10px}.cl-ic{font-size:40px;line-height:1}.cl-t{font-size:38px;font-weight:300;line-height:1}
+.cl-d{font-size:12.5px;line-height:1.45;opacity:.95;min-width:0}.cl-d b{display:block;font-size:14px}.cl-d small{display:block;opacity:.8;font-size:11px}
+.cl-dias{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:10px;background:rgba(255,255,255,.13);border-radius:12px;padding:7px 2px}
+.cl-dias div{text-align:center;font-size:11px;min-width:0}.cl-dias i{font-style:normal;display:block;font-size:18px;margin:2px 0}.cl-dias b{display:block;font-size:12px}.cl-dias small{display:block;opacity:.85}
+.cl-dias u{display:inline-block;text-decoration:none;margin-top:2px;background:rgba(255,255,255,.22);border-radius:6px;padding:1px 3px;font-size:9.5px;white-space:nowrap}
+.cl-jan{margin-top:9px;background:#fff;color:#1C2B23;border-radius:11px;padding:8px 10px;font-size:12.5px}
+.cl-hrs{display:flex;gap:2px;margin-top:5px}.cl-hrs u{flex:1;height:7px;border-radius:2px;background:#DCE2DE}.cl-hrs u.ok{background:#2F9E5B}.cl-hrs u.md{background:#F2C14E}
+.cl-hx{display:flex;justify-content:space-between;font-size:10px;color:#6B7B72;margin-top:2px}

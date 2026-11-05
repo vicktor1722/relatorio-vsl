@@ -103,6 +103,8 @@
         acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp
       };
       atualizarGPS();
+      // último lugar conhecido: a previsão do tempo abre na hora, mesmo antes do GPS responder
+      try { localStorage.setItem('vsl-ult-pos', JSON.stringify({ lat: st.pos.lat, lon: st.pos.lon, t: Date.now() })); } catch (e) {}
     }, function (err) {
       $('#dotGps').className = 'dot ruim';
       st.gpsNegado = err.code === 1;
@@ -1139,7 +1141,40 @@
   }
 
   /* ---------------- conversas (uma linha por fazenda) ---------------- */
+  /* ---------- previsão do tempo no topo da lista (onde o consultor está) ---------- */
+  const DIAS_CL = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  function climaHtml(c, ondeTxt) {
+    const a = c.agora, j = c.janela;
+    return '<div class="cl-card"><div class="cl-top"><div class="cl-ic">' + a.ic + '</div><div class="cl-t">' + a.temp + '°</div>' +
+      '<div class="cl-d"><b>' + esc(a.txt) + '</b>💧 ' + a.umid + '% · 🌬️ ' + a.vento + ' km/h' + (a.prob != null ? ' · ☔ ' + a.prob + '%' : '') + '<small>' + esc(ondeTxt) + '</small></div></div>' +
+      '<div class="cl-dias">' + c.dias.map(function (d, i) {
+        return '<div><span>' + (i === 0 ? 'hoje' : DIAS_CL[new Date(d.d + 'T12:00:00Z').getUTCDay()]) + '</span><i>' + d.ic + '</i><b>' + d.max + '°</b><small>' + d.min + '°</small><u>' +
+          (d.mm >= 1 ? Math.round(d.mm) + ' mm' : d.prob >= 40 ? d.prob + '%' : '0') + '</u></div>'; }).join('') + '</div>' +
+      (j && j.horas.length ? '<div class="cl-jan">🚜 <b>Pulverização ' + (j.hoje ? 'hoje' : 'amanhã') + ':</b> ' +
+        (j.melhor ? 'boa das ' + ('0' + j.melhor.de).slice(-2) + 'h às ' + ('0' + j.melhor.ate).slice(-2) + 'h' : 'sem horário bom') +
+        '<div class="cl-hrs">' + j.horas.map(function (x) { return '<u class="' + x.st + '"></u>'; }).join('') + '</div>' +
+        '<div class="cl-hx"><span>' + j.horas[0].h + 'h</span><span>' + j.horas[j.horas.length - 1].h + 'h</span></div></div>' : '') + '</div>';
+  }
+  async function climaApp() {
+    const box = document.getElementById('climaApp');
+    if (!box) return;
+    let pos = st.pos, guard = null;
+    if (!pos) { try { pos = JSON.parse(localStorage.getItem('vsl-ult-pos') || 'null'); } catch (e) { pos = null; } }
+    try { guard = JSON.parse(localStorage.getItem('vsl-clima') || 'null'); } catch (e) { guard = null; }
+    if (guard && guard.c) box.innerHTML = climaHtml(guard.c, 'onde você está · ' + new Date(guard.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    if (!pos) { if (!guard) box.innerHTML = ''; return; }
+    // a mesma previsão por 20 min, se o consultor não andou mais de ~5 km
+    if (guard && Date.now() - guard.t < 20 * 60 * 1000 && Math.abs(guard.lat - pos.lat) < 0.05 && Math.abs(guard.lon - pos.lon) < 0.05) return;
+    try {
+      const r = await Sync.clima(pos.lat, pos.lon);
+      if (!r || !r.clima) return;
+      try { localStorage.setItem('vsl-clima', JSON.stringify({ c: r.clima, t: Date.now(), lat: pos.lat, lon: pos.lon })); } catch (e) {}
+      box.innerHTML = climaHtml(r.clima, 'onde você está · agora');
+    } catch (e) { /* sem internet: fica a última previsão guardada */ }
+  }
+
   async function listarRelatorios() {
+    climaApp();
     const rels = await DB.all('relatorios');
     const wrap = $('#listaRelatorios');
     if (!rels.length) {
