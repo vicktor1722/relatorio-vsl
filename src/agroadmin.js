@@ -318,7 +318,10 @@ ${MAPA_CHUVA_JS}
       if (!adm) { box.remove(); return; }   // conta sem os módulos de lavoura: não mostra o bloco
       box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return;
     }
-    if (!(PF.d.fazendas || []).length) { box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso">Nenhuma fazenda com mapa, plantio ou recomendação ainda.</div>'; return; }
+    if (!(PF.d.fazendas || []).length) {
+      if (!PF.d.admin) { box.remove(); return; }   // conta sem fazenda cadastrada: não mostra o bloco
+      box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso">Nenhuma fazenda com mapa, município, plantio ou recomendação ainda.</div>'; return;
+    }
     pfPintar();
     chvAdm();
   }

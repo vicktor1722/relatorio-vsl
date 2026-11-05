@@ -61,13 +61,12 @@ function mediaUF(tab, uf) {
 
 export async function rotasPainelFaz(env, req, me, rota, url) {
   const mod = await modulosDe(env, me.id);
-  const admin = mod.admin && !!me.cf;
-  if (!admin && !mod.plantio && !mod.recomendacoes) return json({ erro: 'módulos de lavoura não liberados para esta conta' }, 403);
+  const admin = mod.admin && !!me.cf;   // admin vê todas as fazendas; as demais contas, só as delas (com ou sem módulo de lavoura)
 
   if (rota === '/api/painel/fazendas') {
     const q = `SELECT f.id, f.nome, f.talhoes, f.municipio, f.uf, f.usuario_id, p.nome AS produtor, u.nome AS conta
                  FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id LEFT JOIN usuarios u ON u.id = f.usuario_id
-                WHERE ` + (admin ? '' : 'f.usuario_id = ? AND ') + `((f.talhoes IS NOT NULL AND f.talhoes != '')
+                WHERE ` + (admin ? '' : 'f.usuario_id = ? AND ') + `((f.talhoes IS NOT NULL AND f.talhoes != '') OR (f.municipio IS NOT NULL AND f.municipio != '')
                    OR EXISTS (SELECT 1 FROM recomendacoes r WHERE r.fazenda_id = f.id) OR EXISTS (SELECT 1 FROM plantio pl WHERE pl.fazenda_id = f.id))
                 ORDER BY f.nome LIMIT 300`;
     const { results } = await (admin ? env.DB.prepare(q) : env.DB.prepare(q).bind(me.id)).all();
