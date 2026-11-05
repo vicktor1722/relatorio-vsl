@@ -4,7 +4,7 @@
 import { modulosDe } from './agro.js';
 import { dadosParaPainel } from './portal.js';
 import { climaVarios, climaDe, localDaFazenda, mercadoDaFazenda, mercadoGeral } from './mercado.js';
-import { chuvaDaFazenda } from './chuva.js';
+import { chuvaDaFazenda, mapaGuardado } from './chuva.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
@@ -122,5 +122,6 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
     return json(Object.assign({ ok: true, fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '', municipio: f.municipio || '', uf: f.uf || '' },
       local, clima, chuva, mercado }, resumo(d || {}, clima)));
   }
+  if (rota === '/api/painel/chuva-mapa') return json(Object.assign({ ok: true }, await mapaGuardado(env)));
   return json({ erro: 'rota não encontrada' }, 404);
 }

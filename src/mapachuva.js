@@ -42,7 +42,8 @@ var MapaChuva = (function () {
     op = op || {};
     if (!window.L || !Camada || !M || !M.v) return null;
     var st = { modo: op.modo || 'dia', t: 0, play: null };
-    var m = L.map(el, { zoomControl: !!op.zoom, attributionControl: false, scrollWheelZoom: false }).setView([P.lat || -14, P.lon || -54], op.nivel || 4);
+    P = P || {};
+    var m = L.map(el, { zoomControl: !!op.zoom, attributionControl: false, scrollWheelZoom: false }).setView([P.lat || op.lat || -14, P.lon || op.lon || -54], op.nivel || 4);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10 }).addTo(m);
     m.createPane('limites'); m.getPane('limites').style.zIndex = 450; m.getPane('limites').style.pointerEvents = 'none';
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, pane: 'limites' }).addTo(m);
@@ -50,7 +51,13 @@ var MapaChuva = (function () {
       .then(function (g) { try { L.geoJSON(g, { pane: 'limites', interactive: false, style: { color: '#FFFFFF', weight: 1.1, opacity: 0.85 } }).addTo(m); } catch (e) {} }).catch(function () {});
     var cv = document.createElement('canvas'); cv.width = 220; cv.height = 240; cv.className = 'mc-cv';
     new Camada(cv, [[M.la0, M.lo0], [M.la1, M.lo1]], { interactive: false }).addTo(m);
-    if (P.lat) L.circleMarker([P.lat, P.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#C62828', fillOpacity: 1 }).addTo(m).bindTooltip(String(P.nome || ''));
+    var grupo = L.layerGroup().addTo(m);
+    function pontos(l) {
+      grupo.clearLayers();
+      (l || []).forEach(function (p) { if (p && p.lat) L.circleMarker([p.lat, p.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#C62828', fillOpacity: 1, pane: 'limites' })
+        .addTo(grupo).bindTooltip(String(p.nome || ''), { permanent: !!op.rotulos, direction: 'top', offset: [0, -6] }); });
+    }
+    if (P && P.lat) pontos([P]);
 
     function desenhar() {
       var np = M.nlat * M.nlon, G = new Array(np), i, d, t = st.t;
@@ -89,7 +96,7 @@ var MapaChuva = (function () {
     function parar() { if (st.play) { cancelAnimationFrame(st.play); st.play = null; } }
     desenhar();
     return {
-      mapa: m, st: st, n: M.v.length,
+      mapa: m, st: st, n: M.v.length, pontos: pontos,
       modo: function (mo) { parar(); st.modo = mo; desenhar(); },
       dia: function (t) { parar(); st.t = t; desenhar(); },
       tocando: function () { return !!st.play; },

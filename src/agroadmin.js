@@ -245,6 +245,16 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 ${DPG_CSS}
 ${MAPA_CHUVA_CSS}
 .pf-qt{font-size:12.5px;color:var(--fraco)}
+.ca-ps{font-size:12.5px;color:var(--fraco);max-width:55%;text-align:right}
+.ca-mapa{position:relative;height:380px;border-radius:12px;overflow:hidden}.ca-mapa #caMapa{position:absolute;inset:0}
+.ca-mapa .t,.ca-mapa .d{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none;font-size:11px;padding:3px 8px}.ca-mapa .t{left:52px}.ca-mapa .d{right:8px;font-weight:800;font-size:15px}
+.ca-fs{position:absolute;z-index:600;right:8px;bottom:8px;width:40px;height:38px;border:0;border-radius:9px;background:#fff;font-size:19px;box-shadow:0 1px 5px rgba(0,0,0,.35);cursor:pointer}
+.ca-pe{font-size:11.5px;color:var(--fraco);margin-top:8px}.ca-pe b{color:var(--texto,#1C2B23)}.pf-pe{font-size:11.5px;color:var(--fraco)}
+.ca-cheia-cab{display:none}
+.ca-bloco.cheia{position:fixed;inset:0;z-index:3000;background:#0B1F14;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px))}
+.ca-bloco.cheia .ca-cheia-cab{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:2px 2px 8px}.ca-bloco.cheia .ca-cheia-cab button{width:38px;height:38px;border-radius:50%;border:0;background:#fff;font-size:16px;cursor:pointer}
+.ca-bloco.cheia .ca-mapa{flex:1;height:auto}.ca-bloco.cheia .mc-escx{color:#DDE7E1}.ca-bloco.cheia .ca-fs{display:none}
+
 .pf-bloco{margin:0 0 16px}.pf-bloco>.cab-caixa{margin:4px 2px 10px}.pf-bloco>.cab-caixa h2{margin:0}
 .pf-mk{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pf-m{border:1px solid var(--linha);border-radius:11px;padding:7px 11px;background:#fff;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
 .pf-m small{font-size:11.5px;color:var(--fraco)}.pf-m b{font-size:15px}.pf-m em,.pf-k4 .dn{font-style:normal;font-size:11.5px;font-weight:700}.pf-m em.up{color:#2F9E5B}.pf-m em.dn,.pf-k4 b.dn{color:#C62828}
@@ -278,6 +288,7 @@ ${MAPA_CHUVA_CSS}
 .pf-mapa .t,.pf-mapa .d{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none;font-size:11px;padding:3px 8px}.pf-mapa .t{left:8px}.pf-mapa .d{right:8px;font-weight:800;font-size:15px}
 .pf-conta{font-size:12.5px;line-height:1.6;background:#F6F8F7;border-radius:10px;padding:8px 10px}
 @media (max-width:979px){
+  .pf-mk{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}.pf-mk::-webkit-scrollbar{display:none}.pf-m{flex:none}
   .pf-lay{display:block}.pf-cab{display:none}
   .pf-row{grid-template-columns:1fr 1fr;row-gap:6px;padding:11px 8px}.pf-row .nm,.pf-row .at{grid-column:1/-1}.pf-row i{display:block;font-style:normal;font-size:10.5px;color:var(--fraco)}
   .pf-det{display:none;position:fixed;inset:0;z-index:2000;max-height:none;border-radius:0;margin:0}.pf-det.aberto{display:block}.pf-x{display:block}
@@ -308,8 +319,62 @@ ${MAPA_CHUVA_JS}
       box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return;
     }
     if (!(PF.d.fazendas || []).length) { box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso">Nenhuma fazenda com mapa, plantio ou recomendação ainda.</div>'; return; }
-    if (!PF.sel && pfLargo()) { var c = pfFiltradas()[0]; PF.sel = c ? c.id : null; }
     pfPintar();
+    chvAdm();
+  }
+
+  /* ---------- mapa da chuva único (abaixo dos gráficos); ponto das fazendas escolhidas ---------- */
+  var CA = { dados: null, mc: null, carregando: false };
+  function chvAdm() {
+    var cx = document.getElementById('caixaChuva');
+    if (!cx) {
+      cx = document.createElement('div'); cx.className = 'caixa'; cx.id = 'caixaChuva';
+      var ref = document.getElementById('caixaPlantio') || document.getElementById('agFazendas') || $('#kpis');
+      ref.insertAdjacentElement('afterend', cx);
+    }
+    if (CA.dados) return chvAdmPintar(cx);
+    if (CA.carregando) return;
+    CA.carregando = true; cx.innerHTML = '<h2>🌧️ Mapa da chuva</h2><div class="aviso">Carregando a previsão…</div>';
+    api('/api/painel/chuva-mapa').then(function (r) { CA.dados = r; }).catch(function (e) { CA.dados = { erro: e.message }; })
+      .then(function () { CA.carregando = false; chvAdmPintar(cx); });
+  }
+  function chvAdmPintar(cx) {
+    var M = CA.dados && CA.dados.mapa;
+    if (!M || !M.v) { cx.innerHTML = '<h2>🌧️ Mapa da chuva</h2><div class="aviso">' + esc((CA.dados && CA.dados.erro) || 'Previsão indisponível agora.') + '</div>'; return; }
+    if (CA.mc) { CA.mc.destruir(); CA.mc = null; }
+    var em = new Date(M.gerado_em);
+    cx.innerHTML = '<div class="cab-caixa"><h2>🌧️ Mapa da chuva</h2><span class="ca-ps" id="caPs"></span></div>' +
+      '<div class="ca-bloco" id="caBloco"><div class="ca-cheia-cab"><b>🌧️ Mapa da chuva</b><button id="caSai" aria-label="Fechar tela cheia">✕</button></div>' +
+      '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-cam="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
+      '<button id="caPlay" class="oculto">▶</button></div>' +
+      '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button></div>' +
+      '<div class="mc-esc"></div><div class="mc-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div></div>' +
+      '<div class="ca-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
+      ' · próxima atualização domingo ' + pfBr(CA.dados.proxima) + ' à noite · escolha uma fazenda na lista ou no gráfico de plantio para ver o ponto dela</div>';
+    var locs = ((PF.d && PF.d.fazendas) || []).filter(function (f) { return f.local; });
+    var lat = locs.length ? locs.reduce(function (a, f) { return a + f.local.lat; }, 0) / locs.length : -14, lon = locs.length ? locs.reduce(function (a, f) { return a + f.local.lon; }, 0) / locs.length : -54;
+    if (typeof MapaChuva === 'undefined') return;
+    CA.mc = MapaChuva.criar(document.getElementById('caMapa'), M, null, { modo: 'a7', zoom: true, rotulos: true, lat: lat, lon: lon, nivel: 4, info: function (t, d) {
+      var a = document.getElementById('caT'), b = document.getElementById('caD'); if (a) a.textContent = t; if (b) b.textContent = d; } });
+    var pl = document.getElementById('caPlay'), bl = document.getElementById('caBloco');
+    cx.querySelectorAll('[data-cam]').forEach(function (b) { b.onclick = function () {
+      cx.querySelectorAll('[data-cam]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      pl.classList.toggle('oculto', b.dataset.cam !== 'dia'); pl.textContent = '▶'; CA.mc.modo(b.dataset.cam);
+    }; });
+    pl.onclick = function () { pl.textContent = CA.mc.play() ? '❚❚' : '▶'; };
+    function cheia(sim) { bl.classList.toggle('cheia', sim); document.body.style.overflow = sim ? 'hidden' : ''; setTimeout(function () { try { CA.mc.mapa.invalidateSize(); } catch (e) {} }, 60); }
+    document.getElementById('caFs').onclick = function () { cheia(!bl.classList.contains('cheia')); };
+    document.getElementById('caSai').onclick = function () { cheia(false); };
+    chvPontos();
+  }
+  // pontos: fazendas escolhidas no gráfico de plantio + a fazenda aberta na lista
+  function chvPontos() {
+    if (!CA.mc || !PF.d) return;
+    var ids = {}; (DP.faz || []).forEach(function (i) { ids[i] = 1; }); if (PF.sel) ids[PF.sel] = 1;
+    var l = (PF.d.fazendas || []).filter(function (f) { return ids[f.id] && f.local; }).map(function (f) { return { lat: f.local.lat, lon: f.local.lon, nome: f.nome }; });
+    CA.mc.pontos(l);
+    var ps = document.getElementById('caPs'); if (ps) ps.textContent = l.length ? '📍 ' + l.map(function (p) { return p.nome; }).join(', ') : '';
+    if (l.length === 1) { try { CA.mc.mapa.panTo([l[0].lat, l[0].lon]); } catch (e) {} }
   }
   function pfAlerta(f) { var a = f.alertas || {}; return a.atrasadas + a.estoque + a.chuva; }
   function pfFiltradas() {
@@ -397,9 +462,7 @@ ${MAPA_CHUVA_JS}
     if (X.chuva && X.chuva.mapa && P) {
       h += '<div class="pf-sec">🌧️ Chuva · próximos 30 dias</div><div class="pf-chips"><span>Acumulado: <b>~' + pfN(P.acc[1]) + ' mm</b> (' + pfN(P.acc[0]) + ' a ' + pfN(P.acc[2]) + ')</span><span>' +
         P.dias.filter(function (x) { return x.p1 >= 70; }).length + ' dias de chuva provável</span></div>' +
-        '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-pfm="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
-        '<button id="pfPlay" class="oculto">▶</button></div><div class="pf-mapa"><div id="pfMapa"></div><span class="t" id="pfMt"></span><span class="d" id="pfMd"></span></div>' +
-        '<div class="mc-esc"></div><div class="mc-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div>';
+        '<div class="pf-pe">O mapa da chuva fica abaixo dos gráficos, com o ponto desta fazenda.</div>';
     }
     if (F) h += '<div class="pf-sec">💰 Preço da soja</div><div class="pf-conta">Porto ' + esc(F.porto.nome) + ' <b>R$ ' + pfN(F.porto.preco, 2) + '</b> − frete <b>R$ ' + pfN(F.frete.sc, 2) + '</b> (R$ ' + pfN(F.frete.rt) + '/t' + (F.frete.estimado ? ', estimado' : '') + ')' +
       (F.custos ? ' − custos da região <b>R$ ' + pfN(F.custos.sc, 2) + '</b>' : '') + ' = <b>R$ ' + pfN(venda, 2) + '/sc</b>' + (F.praca ? '<br>Praça ' + esc(F.praca.nome) + ': R$ ' + pfN(F.praca.preco, 2) : '') + '</div>';
@@ -409,18 +472,8 @@ ${MAPA_CHUVA_JS}
     return h;
   }
   function pfLigarDet() {
-    var fx = document.getElementById('pfFecha'); if (fx) fx.onclick = function () { document.getElementById('pfDet').classList.remove('aberto'); if (PF.mc) { PF.mc.destruir(); PF.mc = null; } };
-    if (PF.mc) { PF.mc.destruir(); PF.mc = null; }
-    var X = PF.det[PF.sel], el = document.getElementById('pfMapa');
-    if (!X || !el || typeof MapaChuva === 'undefined' || !X.chuva || !X.chuva.mapa) return;
-    PF.mc = MapaChuva.criar(el, X.chuva.mapa, { lat: X.local && X.local.lat, lon: X.local && X.local.lon, nome: X.fazenda.nome }, { modo: 'a7', info: function (t, d) {
-      var a = document.getElementById('pfMt'), b = document.getElementById('pfMd'); if (a) a.textContent = t; if (b) b.textContent = d; } });
-    var pl = document.getElementById('pfPlay');
-    document.querySelectorAll('[data-pfm]').forEach(function (b) { b.onclick = function () {
-      document.querySelectorAll('[data-pfm]').forEach(function (x) { x.classList.toggle('on', x === b); });
-      pl.classList.toggle('oculto', b.dataset.pfm !== 'dia'); pl.textContent = '▶'; PF.mc.modo(b.dataset.pfm);
-    }; });
-    if (pl) pl.onclick = function () { pl.textContent = PF.mc.play() ? '❚❚' : '▶'; };
+    var fx = document.getElementById('pfFecha'); if (fx) fx.onclick = function () { document.getElementById('pfDet').classList.remove('aberto'); };
+    chvPontos();
   }
 
   /* ---------- módulos por conta (Plantio e Recomendações) ---------- */
@@ -572,6 +625,7 @@ ${MAPA_CHUVA_JS}
       });
     }
     DPG.ligar(box, DP.g, function () { dpPintar(box); });
+    chvPontos();
     var df = document.getElementById('dpFaz');
     if (df) df.addEventListener('toggle', function () { try { localStorage.setItem('vsl-dp-faz', df.open ? '1' : '0'); } catch (e) {} });
   }

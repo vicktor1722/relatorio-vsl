@@ -721,6 +721,10 @@ main{padding:16px;max-width:1100px;margin:0 auto}
 .painel{display:none}.painel.on{display:block}
 .oculto{display:none!important}
 .cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.kpis-box{margin-bottom:16px}.kpis-box .kpi-cartoes{display:none;margin:10px 0 0}.kpis-box.aberto .kpi-cartoes{display:grid}
+.kpi-cab{display:flex;align-items:center;gap:12px;width:100%;background:#fff;border:1px solid var(--linha);border-radius:14px;padding:10px 14px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.kpi-txt{flex:1;min-width:0}.kpi-txt b{display:block;font-size:19px;color:var(--verde-escuro)}.kpi-txt b small{font-size:13px;font-weight:500;color:var(--fraco)}.kpi-txt>small{font-size:12.5px;color:var(--fraco)}
+.kpi-cab i{font-style:normal;color:var(--verde);font-size:15px}
 .cartao{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:14px}
 .cartao b{display:block;font-size:24px;color:var(--verde-escuro);line-height:1.2}
 .cartao span{font-size:12px;color:var(--fraco)}
@@ -1099,13 +1103,29 @@ ${AGRO_CSS}
     var t = dados.totais;
     var pub = dados.relatorios.filter(function (r) { return r.status === 'publicado'; }).length;
     var adm = !!(dados.eu && dados.eu.admin);
-    $('#kpis').innerHTML =
+    // recolhido: só o círculo do armazenamento; tocando abre os números
+    var pc = t.limite ? Math.min(100, t.bytes / t.limite * 100) : 0, aberto = false;
+    try { aberto = localStorage.getItem('vsl-kpis') === '1'; } catch (e) {}
+    var cor = pc >= 90 ? '#C62828' : pc >= 75 ? '#E08A00' : '#1B7A43';
+    var anel = '<svg width="54" height="54" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#E1E7E3" stroke-width="3.6"/>' +
+      '<circle cx="18" cy="18" r="15.9" fill="none" stroke="' + cor + '" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="' + pc.toFixed(1) + ' 100" transform="rotate(-90 18 18)"/>' +
+      '<text x="18" y="21" text-anchor="middle" font-size="8" font-weight="700" fill="' + cor + '">' + (t.limite ? Math.round(pc) + '%' : '—') + '</text></svg>';
+    $('#kpis').className = 'kpis-box' + (aberto ? ' aberto' : '');
+    $('#kpis').innerHTML = '<button class="kpi-cab" id="kpiAbre" aria-expanded="' + aberto + '">' + anel +
+      '<span class="kpi-txt"><b>' + bytesFmt(t.bytes) + (t.limite ? ' <small>de ' + bytesFmt(t.limite) + '</small>' : '') + '</b><small>armazenamento usado' +
+      (adm ? ' · ' + t.contas + ' contas' : '') + ' · ' + t.relatorios + ' relatórios</small></span><i>' + (aberto ? '▴' : '▾') + '</i></button>' +
+      '<div class="cartoes kpi-cartoes">' +
       (adm ? cartao(t.contas, 'contas') : '') +
       cartao(t.relatorios, 'relatórios') +
       cartao(pub, 'já enviados ao cliente') +
       cartao(t.registros, 'fotos, vídeos e notas') +
       cartao(bytesFmt(t.bytes), 'de mídia guardada' + (t.limite ? ' de ' + bytesFmt(t.limite) + ' (' + Math.round(t.bytes / t.limite * 100) + '%)' : '')) +
-      cartao(tiposTxt(t.porTipo) || '—', 'fotos · vídeos · áudios');
+      cartao(tiposTxt(t.porTipo) || '—', 'fotos · vídeos · áudios') + '</div>';
+    $('#kpiAbre').onclick = function () {
+      var ab = !$('#kpis').classList.contains('aberto');
+      try { localStorage.setItem('vsl-kpis', ab ? '1' : '0'); } catch (e) {}
+      desenharKpis();
+    };
   }
   // "📷 312 MB · 🎥 480 MB · 🎤 12 MB"
   function tiposTxt(pt) {
