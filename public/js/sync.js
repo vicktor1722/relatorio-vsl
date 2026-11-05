@@ -628,6 +628,7 @@
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
     salvarPerfil, baixarPerfil,
     meuId, fixarDono, limparIdentidadeLocal, limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
-    status, autoSync, aoMudar: f => ouvintes.push(f)
+    status, autoSync, aoMudar: f => ouvintes.push(f),
+    clima: (lat, lon) => chamar('/api/clima?lat=' + Number(lat).toFixed(3) + '&lon=' + Number(lon).toFixed(3), { timeout: 12000 })
   };
 })(window);

@@ -15,6 +15,7 @@ import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCic
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
 import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
+import { climaDe, localDaFazenda, mercadoDaFazenda } from './mercado.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -437,6 +438,23 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
     const d = await dadosFazenda(env, a, fid, url.searchParams.get('safra'));
     return d ? json(Object.assign({ ok: true }, d)) : json({ erro: 'fazenda não encontrada' }, 404);
+  }
+
+  // tela Início: tempo na fazenda e mercado (praça mais próxima); com "Todas", a fazenda escolhida em loc
+  if (rota === '/api/portal/inicio') {
+    let fid = txt(url.searchParams.get('loc') || url.searchParams.get('id'), 80);
+    if (!a.lista.includes(fid)) fid = a.lista[0];
+    if (!fid) return json({ erro: 'nenhuma fazenda liberada' }, 404);
+    const f = await env.DB.prepare('SELECT id, nome, talhoes, municipio, uf FROM fazendas WHERE id = ?').bind(fid).first();
+    if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
+    const local = await localDaFazenda(f);
+    const [clima, mercado] = await Promise.all([
+      local ? climaDe(local.lat, local.lon).catch((e) => ({ erro: 'previsão do tempo indisponível agora' })) : null,
+      a.papel === 'operador' ? null : mercadoDaFazenda(env, local).catch(() => null)
+    ]);
+    return new Response(JSON.stringify({ ok: true, fazenda: { id: f.id, nome: f.nome, municipio: f.municipio || '', uf: f.uf || '' }, local, clima, mercado }), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=300' }
+    });
   }
 
   // gerente da fazenda lança a área plantada no dia (ou apaga um lançamento)

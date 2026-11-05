@@ -133,6 +133,45 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .rodape{text-align:center;color:var(--fraco);font-size:12px;margin-top:24px}.rodape a{color:var(--verde)}
 ${AGRO_REL_CSS}
 ${DPG_CSS}
+.ini-ola{font-size:13px;color:var(--fraco);margin:2px 2px 10px}.ini-ola b{color:var(--texto);font-size:17px;display:block}
+.ini-card{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:13px;margin-bottom:12px}
+.ini-ct{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.ini-ct h3{margin:0;font-size:14.5px;color:var(--verde-escuro)}.ini-ct span{font-size:12px;color:var(--fraco)}
+.ini-lk{border:0;background:none;color:var(--verde);font-size:12.5px;font-weight:600;padding:0;cursor:pointer}
+.ini-vz{font-size:13px;color:var(--fraco);padding:4px 0}
+.ini-pe{font-size:11px;color:var(--fraco);margin-top:8px;line-height:1.35}
+.ini-card.clima{background:linear-gradient(160deg,#2F80C9,#1E5F9E);color:#fff;border:0}
+.clima .ini-ct h3,.clima .ini-ct span,.clima .ini-vz,.clima .ini-pe{color:#fff}.clima .ini-ct span,.clima .ini-pe{opacity:.85}
+.clima select{max-width:58%;border:0;border-radius:8px;padding:4px 6px;font-size:13px;background:rgba(255,255,255,.92);color:#1C2B23}
+.ini-agora{display:flex;align-items:center;gap:12px}.ini-agora .ic{font-size:44px;line-height:1}.ini-agora .t{font-size:42px;font-weight:300;line-height:1}.ini-agora .d{font-size:13px;opacity:.92;line-height:1.5}
+.ini-dias{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:12px;background:rgba(255,255,255,.13);border-radius:12px;padding:8px 2px}
+.ini-dias div{text-align:center;font-size:11.5px;min-width:0}.ini-dias i{font-style:normal;display:block;font-size:19px;margin:3px 0}.ini-dias b{display:block;font-size:12.5px}.ini-dias small{display:block;opacity:.85}
+.ini-dias u{display:inline-block;text-decoration:none;margin-top:3px;background:rgba(255,255,255,.22);border-radius:6px;padding:1px 3px;font-size:10px;white-space:nowrap}
+.ini-jan{margin-top:10px;background:#fff;color:var(--texto);border-radius:12px;padding:9px 11px;font-size:13px;display:flex;gap:9px;align-items:center}
+.ini-jan .tr{font-size:22px}.ini-jan .bar{flex:1;min-width:0}.ini-jan small{display:block;font-size:10.5px;color:var(--fraco);margin-top:3px}
+.ini-jan .hrs{display:flex;gap:2px;margin-top:5px}.ini-jan .hrs u{flex:1;height:8px;border-radius:2px;background:#DCE2DE}.ini-jan .hrs u.ok{background:#2F9E5B}.ini-jan .hrs u.md{background:#F2C14E}
+.ini-jan .hx{display:flex;justify-content:space-between;font-size:10px;color:var(--fraco);margin-top:2px}
+.ini-mk{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ini-m{border:1px solid var(--linha);border-radius:12px;padding:9px 10px;min-width:0}
+.ini-m:last-child:nth-child(odd){grid-column:1/-1}
+.ini-m small{font-size:11.5px;color:var(--fraco);display:block}.ini-m small.ini-pr{font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ini-m b{font-size:18px;display:block;margin:2px 0}.ini-m b span{font-size:12px;font-weight:400}
+.ini-m em{font-style:normal;font-size:12px;font-weight:700;color:var(--fraco)}.ini-m em.up{color:#2F9E5B}.ini-m em.dn{color:#C62828}
+.ini-m svg{display:block;width:100%;height:24px;margin-top:4px}
+.ini-k2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.ini-k2 .ini-card{margin:0}
+.ini-anel{display:flex;align-items:center;gap:10px}.ini-anel svg{flex:none}.ini-anel b{font-size:19px;display:block}.ini-anel span{font-size:12px;color:var(--fraco)}
+.cal-ic{flex:none;width:46px;border-radius:9px;border:1px solid var(--linha);text-align:center;font-size:20px;font-weight:700;line-height:1.1;padding-bottom:3px;overflow:hidden}
+.cal-ic small{display:block;background:#C77700;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 0;margin-bottom:2px}
+.ini-mini{font-size:12px;color:var(--fraco);margin-top:8px}.ini-mini b{color:var(--texto)}
+.ini-cont{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px}.ini-cont div{text-align:center;border-radius:10px;padding:7px 4px}
+.ini-cont b{display:block;font-size:20px}.ini-cont span{font-size:11.5px}
+.ini-cont .at{background:#FDE7E7;color:#C62828}.ini-cont .hj{background:#FFF1DB;color:#8A5300}.ini-cont .se{background:#E8F3EC;color:#146034}
+.ini-ap{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px dashed var(--linha);font-size:13.5px}
+.ini-ap .sel{font-size:11.5px;font-weight:700;border-radius:10px;padding:3px 8px;flex:none;white-space:nowrap}
+.ini-ap .sel.at{background:#FDE7E7;color:#C62828}.ini-ap .sel.hj{background:#FFF1DB;color:#8A5300}.ini-ap .sel.pr{background:#EEF2F0;color:var(--fraco)}
+.ini-ap div{flex:1;min-width:0}.ini-ap small{display:block;color:var(--fraco);font-size:12px}
+.ini-cust{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}.ini-cust b{font-size:22px}.ini-cust .dir{text-align:right}.ini-cust .dir b{font-size:17px}.ini-cust span{font-size:12px;color:var(--fraco)}
+.ini-al{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:7px 0;border-top:1px dashed var(--linha)}.ini-al:first-of-type{border-top:0}
+
 .caixa.gr{padding:10px 12px 12px;margin-bottom:12px}
 </style></head><body>
 
@@ -163,7 +202,7 @@ ${DPG_CSS}
 <script>${DPG_JS}</script>
 <script>
 (function () {
-  var CH = 'amvs-portal', tok = '', eu = null, D = null, aba = 'apl', filtro = 'fazer', mapas = [], modoMapa = 'var';
+  var CH = 'amvs-portal', tok = '', eu = null, D = null, aba = 'inicio', filtro = 'fazer', mapas = [], modoMapa = 'var';
   var opAba = 'apl', opMapa = '*', selec = {}, apModo = 'ver';   // apModo: gerente vê a programação ou lança a aplicação
   var GR = { plantio: DPG.estado('p'), colh: DPG.estado('c') };   // gráficos da aba Plantio e da aba Colheita   // operador: aba, aplicação do mapa e talhões que ele marcou
   try { tok = localStorage.getItem(CH) || ''; } catch (e) {}
@@ -304,10 +343,153 @@ ${DPG_CSS}
     }
   }
 
+  /* ---------- Início: tempo na fazenda, mercado e resumo da safra (dono/gerente) ---------- */
+  var INI = { chave: '', dados: null, carregando: false, erro: '', loc: '' };
+  function iniChave() { var f = $('#selFaz').value; return f + '|' + (f === '*' ? INI.loc : ''); }
+  function iniCarregar() {
+    var k = iniChave();
+    if (INI.carregando || INI.chave === k) return;
+    INI.carregando = true; INI.erro = '';
+    var f = $('#selFaz').value;
+    api('/api/portal/inicio?id=' + encodeURIComponent(f) + (f === '*' && INI.loc ? '&loc=' + encodeURIComponent(INI.loc) : ''))
+      .then(function (r) { INI.dados = r; INI.chave = k; })
+      .catch(function (e) { INI.erro = e.message; INI.chave = k; INI.dados = null; })
+      .then(function () { INI.carregando = false; if (D && (eu.papel === 'operador' ? opAba === 'apl' : aba === 'inicio')) pintar(); });
+  }
+  var DIAS_S = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  function diaSem(iso) { return DIAS_S[new Date(iso + 'T12:00:00Z').getUTCDay()]; }
+  function linhaMini(l, cor) {
+    if (!l || l.length < 2) return '';
+    var mn = Math.min.apply(null, l), mx = Math.max.apply(null, l), rg = mx - mn || 1;
+    return '<svg viewBox="0 0 100 26" preserveAspectRatio="none"><polyline fill="none" stroke="' + cor + '" stroke-width="2" vector-effect="non-scaling-stroke" points="' +
+      l.map(function (v, i) { return (i / (l.length - 1) * 100).toFixed(1) + ',' + (23 - (v - mn) / rg * 20).toFixed(1); }).join(' ') + '"/></svg>';
+  }
+  function varTxt(v) { return v == null ? '' : '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : '') + '">' + (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '') + n(Math.abs(v), 1) + '%</em>'; }
+  // cartão do tempo (Início e operador)
+  function cartaoClima(compacto) {
+    var I = INI.dados, c = I && I.clima;
+    var sel = '';
+    if (D && D.todas && eu.fazendas.length > 1) {
+      sel = '<select id="iniLoc" aria-label="Fazenda do tempo">' + eu.fazendas.map(function (f) {
+        return '<option value="' + esc(f.id) + '"' + (I && I.fazenda && I.fazenda.id === f.id ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('') + '</select>';
+    }
+    var h = '<div class="ini-card clima"><div class="ini-ct"><h3>🌦️ Tempo ' + (I && I.fazenda && !sel ? 'na fazenda' : 'em') + '</h3>' + (sel || '<span>' + (c && c.agora ? 'agora ' + esc(c.agora.hora) : '') + '</span>') + '</div>';
+    if (INI.carregando && !I) return h + '<div class="ini-vz">Carregando a previsão…</div></div>';
+    if (!I || !I.local) return h + '<div class="ini-vz">' + (INI.erro ? esc(INI.erro) : 'Para ver o tempo, o consultor precisa cadastrar o mapa (KML) ou o município da fazenda.') + '</div></div>';
+    if (!c || c.erro) return h + '<div class="ini-vz">' + esc((c && c.erro) || 'Previsão do tempo indisponível agora.') + '</div></div>';
+    var a = c.agora;
+    h += '<div class="ini-agora"><div class="ic">' + a.ic + '</div><div class="t">' + a.temp + '°</div><div class="d">' + esc(a.txt) + '<br>💧 ' + a.umid + '% · 🌬️ ' + a.vento + ' km/h' + (a.prob != null ? ' · ☔ ' + a.prob + '%' : '') + '</div></div>';
+    h += '<div class="ini-dias">' + c.dias.map(function (d, i) {
+      return '<div><span>' + (i === 0 ? 'hoje' : diaSem(d.d)) + '</span><i>' + d.ic + '</i><b>' + d.max + '°</b><small>' + d.min + '°</small><u>' + (d.mm >= 1 ? n(d.mm) + ' mm' : d.prob >= 40 ? d.prob + '%' : '0') + '</u></div>'; }).join('') + '</div>';
+    var j = c.janela;
+    if (j && j.horas.length) {
+      h += '<div class="ini-jan"><span class="tr">🚜</span><div class="bar"><b>Pulverização ' + (j.hoje ? 'hoje' : 'amanhã') + ':</b> ' +
+        (j.melhor ? 'boa das ' + ('0' + j.melhor.de).slice(-2) + 'h às ' + ('0' + j.melhor.ate).slice(-2) + 'h' : 'sem horário bom') +
+        '<div class="hrs">' + j.horas.map(function (x) { return '<u class="' + x.st + '" title="' + x.h + 'h · vento ' + x.vento + ' km/h · ' + x.temp + '° · umid. ' + x.umid + '% · chuva ' + x.prob + '%"></u>'; }).join('') + '</div>' +
+        '<div class="hx"><span>' + j.horas[0].h + 'h</span><span>' + j.horas[Math.floor(j.horas.length / 2)].h + 'h</span><span>' + j.horas[j.horas.length - 1].h + 'h</span></div>' +
+        (compacto ? '' : '<small>verde = vento ' + c.limites.ventoMin + '–' + c.limites.vento + ' km/h, até ' + c.limites.temp + '°, umidade ' + c.limites.umid + '%+, sem chuva</small>') + '</div></div>';
+    }
+    if (I.local.fonte === 'municipio' && !compacto) h += '<div class="ini-pe">Local pelo município (' + esc(I.fazenda.municipio) + '). Com o mapa da fazenda fica mais preciso.</div>';
+    return h + '</div>';
+  }
+  function cartaoMercado() {
+    var m = INI.dados && INI.dados.mercado;
+    var h = '<div class="ini-card"><div class="ini-ct"><h3>📈 Mercado</h3><span>' + (m && m.soja ? 'fechamento ' + dataBR(m.soja.em) : '') + '</span></div>';
+    if (INI.carregando && !INI.dados) return h + '<div class="ini-vz">Carregando…</div></div>';
+    if (!m) return h + '<div class="ini-vz">Cotações indisponíveis agora.</div></div>';
+    function caixa(ic, tit, x, pre, suf, casas, sub) {
+      if (!x) return '';
+      var cor = x.var > 0 ? '#2F9E5B' : x.var < 0 ? '#C62828' : '#6B7B72';
+      return '<div class="ini-m"><small>' + ic + ' ' + tit + '</small><b>' + pre + n(x.preco, casas) + (suf ? '<span>' + suf + '</span>' : '') + '</b>' + varTxt(x.var) +
+        (sub ? '<small class="ini-pr">' + sub + '</small>' : '') + linhaMini(x.serie, cor) + '</div>';
+    }
+    h += '<div class="ini-mk">' + caixa('💵', 'Dólar', m.dolar, 'R$ ', '', 2) +
+      caixa('🌱', 'Soja · sc 60 kg', m.soja, 'R$ ', '', 2, m.soja ? '📍 ' + esc(m.soja.praca) + (m.soja.km > 15 ? ' · ' + m.soja.km + ' km' : '') : '') +
+      caixa('🌽', 'Milho · sc 60 kg', m.milho, 'R$ ', '', 2, m.milho ? '📍 ' + esc(m.milho.praca) + (m.milho.km > 15 ? ' · ' + m.milho.km + ' km' : '') : '') +
+      caixa('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', 2) + caixa('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu', 2) + '</div>';
+    if (!m.soja && !m.milho) h += '<div class="ini-pe">Preço da praça aparece quando a fazenda tiver mapa (KML) ou município cadastrado.</div>';
+    return h + '<div class="ini-pe">' + esc(m.fonte) + '. Praça mais perto da fazenda.</div></div>';
+  }
+  function resumoAplic() {
+    var hj = hoje(), sem = somaDias(hj, 7), l = [];
+    (D.aplicacoes || []).forEach(function (a) {
+      if (a.status === 'aplicada') return;
+      l.push({ a: a, d: a.data || '', pend: a.tal.filter(function (t) { return !t.feito; }) });
+    });
+    l.sort(function (x, y) { return (x.d || '9') < (y.d || '9') ? -1 : 1; });
+    var at = l.filter(function (x) { return x.d && x.d < hj; }).length, ho = l.filter(function (x) { return x.d === hj; }).length,
+      se = l.filter(function (x) { return x.d > hj && x.d <= sem; }).length;
+    var feitos = 0, haF = 0, ini7 = somaDias(hj, -6);
+    (D.aplicacoes || []).forEach(function (a) { a.tal.forEach(function (t) { if (t.feito && t.feito >= ini7 && t.feito <= hj) { feitos++; haF += t.ha; } }); });
+    return { lista: l, at: at, ho: ho, se: se, feitos: feitos, haF: haF };
+  }
+  function chuvaNo(d) {
+    var c = INI.dados && INI.dados.clima, x = c && c.dias ? c.dias.filter(function (y) { return y.d === d; })[0] : null;
+    return x && (x.mm >= 5 || x.prob >= 60) ? x : null;
+  }
+  function vistaInicio() {
+    iniCarregar();
+    var g = D.graf || {}, hj = hoje();
+    var pl = (g.linha || []).reduce(function (s, x) { return s + x.ha; }, 0), pc = g.total_ha ? pl / g.total_ha * 100 : 0;
+    var plHoje = (g.linha || []).filter(function (x) { return x.d === hj; }).reduce(function (s, x) { return s + x.ha; }, 0);
+    var nd = (g.linha || []).length;
+    var nome = D.todas ? 'Todas as fazendas' : D.fazenda.nome;
+    var hr = new Date().getHours(), sau = hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite';
+    var dt = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    var h = abas() + '<div class="ini-ola"><b>' + sau + ' 👋</b>' + esc(nome) + ' · ' + esc(dt) + ' · safra ' + esc(D.safra || '') + '</div>';
+    h += cartaoClima(false) + cartaoMercado();
+    // plantio e colheita
+    var pv = (g.prev || []), prox = pv.filter(function (x) { return !x.col && x.d >= hj; }).map(function (x) { return x.d; }).sort()[0];
+    var semanas = {}; pv.forEach(function (x) { var dd = new Date(x.d + 'T12:00:00Z'); dd.setUTCDate(dd.getUTCDate() - ((dd.getUTCDay() + 6) % 7)); var k = dd.toISOString().slice(0, 10); semanas[k] = (semanas[k] || 0) + x.ha; });
+    var pico = Object.keys(semanas).sort(function (a, b) { return semanas[b] - semanas[a]; })[0];
+    var totPv = pv.reduce(function (s, x) { return s + x.ha; }, 0);
+    h += '<div class="ini-k2"><div class="ini-card"><div class="ini-ct"><h3>🌱 Plantio</h3></div>' +
+      (g.total_ha ? '<div class="ini-anel"><svg width="58" height="58" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#E1E7E3" stroke-width="4"/>' +
+        '<circle cx="18" cy="18" r="15.9" fill="none" stroke="#1B7A43" stroke-width="4" stroke-dasharray="' + Math.min(100, pc).toFixed(1) + ' 100" stroke-linecap="round" transform="rotate(-90 18 18)"/>' +
+        '<text x="18" y="21" text-anchor="middle" font-size="8.5" font-weight="700" fill="#146034">' + Math.round(pc) + '%</text></svg><div><b>' + n(pl) + ' ha</b><span>de ' + n(g.total_ha) + ' ha</span></div></div>' +
+        '<div class="ini-mini">' + (plHoje ? 'hoje <b>+' + n(plHoje, 1) + ' ha</b> · ' : '') + (nd ? 'média <b>' + n(pl / nd) + ' ha/dia</b>' : 'sem plantio lançado') + '</div>'
+        : '<div class="ini-vz">Sem área cadastrada.</div>') + '</div>' +
+      '<div class="ini-card"><div class="ini-ct"><h3>🚜 Colheita</h3></div>' +
+      (prox ? '<div class="ini-anel"><div class="cal-ic"><small>' + MESES[Number(prox.slice(5, 7)) - 1].slice(0, 3) + '</small>' + Number(prox.slice(8, 10)) + '</div><div><b>' + dataBR(prox) + '</b><span>' +
+        (dif(prox, hj) === 0 ? 'hoje' : 'em ' + dif(prox, hj) + ' dias') + '</span></div></div><div class="ini-mini">' + (pico ? 'pico <b>' + dataBR(pico) + '–' + dataBR(somaDias(pico, 6)) + '</b> · ' : '') + n(totPv) + ' ha previstos</div>'
+        : '<div class="ini-vz">' + (pv.length ? 'Colheita prevista já passou.' : 'Aparece quando houver plantio lançado.') + '</div>') + '</div></div>';
+    // aplicações
+    var R = resumoAplic();
+    h += '<div class="ini-card"><div class="ini-ct"><h3>💧 Aplicações</h3><button class="ini-lk" data-ir="apl">ver todas ›</button></div>' +
+      '<div class="ini-cont"><div class="at"><b>' + R.at + '</b><span>atrasadas</span></div><div class="hj"><b>' + R.ho + '</b><span>hoje</span></div><div class="se"><b>' + R.se + '</b><span>próx. 7 dias</span></div></div>' +
+      (R.lista.length ? R.lista.slice(0, 3).map(function (x) {
+        var d = x.d, cls = !d ? 'pr' : d < hj ? 'at' : d === hj ? 'hj' : 'pr', tx = !d ? 'sem data' : d < hj ? 'atrasada ' + dif(hj, d) + ' d' : d === hj ? 'hoje' : diaSem(d) + ' ' + dataBR(d);
+        var ha = x.pend.reduce(function (s, t) { return s + Math.max(0, t.ha - (t.feitoHa || 0)); }, 0), ch = d && d >= hj ? chuvaNo(d) : null;
+        return '<div class="ini-ap"><span class="sel ' + cls + '">' + tx + '</span><div><b>' + esc(x.a.titulo) + '</b><small>' + (D.todas && x.a.fazenda ? esc(x.a.fazenda) + ' · ' : '') +
+          esc(x.pend.slice(0, 4).map(function (t) { return t.nome; }).join(', ') + (x.pend.length > 4 ? '…' : '')) + ' · ' + n(ha) + ' ha' + (ch ? ' · ⚠️ chuva ' + (ch.mm >= 1 ? n(ch.mm) + ' mm' : ch.prob + '%') : '') + '</small></div></div>';
+      }).join('') : '<div class="ini-vz">Nenhuma aplicação pendente. 👍</div>') +
+      '<div class="ini-mini">Últimos 7 dias: <b>' + R.feitos + (R.feitos === 1 ? ' talhão' : ' talhões') + '</b> aplicados · <b>' + n(R.haF) + ' ha</b></div></div>';
+    // custo
+    var ct = D.custo && D.custo.talhoes ? D.custo.talhoes : [], cT = 0, cHa = 0;
+    ct.forEach(function (t) { if (t.custo) { cT += t.custo; cHa += t.ha; } });
+    var soja = INI.dados && INI.dados.mercado && INI.dados.mercado.soja;
+    if (cT) {
+      h += '<div class="ini-card"><div class="ini-ct"><h3>💰 Custo da safra</h3><button class="ini-lk" data-ir="est">detalhes ›</button></div>' +
+        '<div class="ini-cust"><div><b>R$ ' + n(cT / (cHa || 1)) + '</b><span> /ha</span><br><span>R$ ' + (cT >= 1e6 ? n(cT / 1e6, 2) + ' mi' : n(cT)) + ' em produtos aplicados</span></div>' +
+        (soja ? '<div class="dir"><b>' + n(cT / (cHa || 1) / soja.preco, 1) + ' sc/ha</b><br><span>em sacas de soja (' + esc(soja.praca.split('/')[0]) + ')</span></div>' : '') + '</div>' +
+        (D.custo.sem_preco && D.custo.sem_preco.length ? '<div class="ini-pe">Sem preço no estoque: ' + esc(D.custo.sem_preco.slice(0, 4).join(', ')) + (D.custo.sem_preco.length > 4 ? '…' : '') + '</div>' : '') + '</div>';
+    }
+    // atenção
+    var al = [];
+    (D.estoque || []).filter(function (e) { return e.sobra < 0 && e.a_aplicar > 0; }).sort(function (a, b) { return a.sobra - b.sobra; }).slice(0, 3).forEach(function (e) {
+      al.push('📦<div><b>' + esc(e.produto) + '</b>: faltam ' + n(-e.sobra, -e.sobra < 10 ? 1 : 0) + ' ' + esc(e.unidade) + ' no estoque para as aplicações programadas</div>'); });
+    R.lista.forEach(function (x) { var ch = x.d && x.d >= hj && x.d <= somaDias(hj, 3) ? chuvaNo(x.d) : null; if (ch && ch.mm >= 10 && al.length < 6) al.push('🌧️<div><b>' + (ch.mm >= 1 ? n(ch.mm) + ' mm' : ch.prob + '% de chuva') + ' ' + (x.d === hj ? 'hoje' : diaSem(x.d) + ' ' + dataBR(x.d)) + '</b>: confira a ' + esc(x.a.titulo) + ' marcada para esse dia</div>'); });
+    if (R.at) al.push('⏰<div><b>' + R.at + (R.at === 1 ? ' aplicação atrasada' : ' aplicações atrasadas') + '</b>: veja na aba Aplicações</div>');
+    if (al.length) h += '<div class="ini-card"><div class="ini-ct"><h3>🔔 Atenção</h3></div>' + al.map(function (x) { return '<div class="ini-al">' + x + '</div>'; }).join('') + '</div>';
+    $('#conteudo').innerHTML = h;
+    document.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { aba = b.dataset.ir; pintar(); window.scrollTo(0, 0); }; });
+    var sl = document.getElementById('iniLoc'); if (sl) sl.onchange = function () { INI.loc = sl.value; iniCarregar(); };
+  }
+
   /* ---------- visão da fazenda ---------- */
   function abas() {
     if (eu.papel === 'operador') return '';
-    return '<div class="abas">' + [['apl', 'Aplicações'], ['mapa', 'Mapas'], ['plantio', 'Plantio'], ['colh', 'Colheita'], ['est', 'Estoque e custos']].map(function (x) {
+    return '<div class="abas">' + [['inicio', 'Início'], ['apl', 'Aplicações'], ['mapa', 'Mapas'], ['plantio', 'Plantio'], ['colh', 'Colheita'], ['est', 'Estoque e custos']].map(function (x) {
       return '<button data-aba="' + x[0] + '" class="' + (aba === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
   }
   function ligarAbas() { document.querySelectorAll('[data-aba]').forEach(function (b) { b.onclick = function () { aba = b.dataset.aba; pintar(); window.scrollTo(0, 0); }; }); }
@@ -315,7 +497,8 @@ ${DPG_CSS}
   function pintar() {
     mapas.forEach(function (m) { try { m.remove(); } catch (e) {} }); mapas = [];
     if (eu.papel === 'operador') return vistaOperador();
-    if (aba === 'mapa') vistaMapas();
+    if (aba === 'inicio') vistaInicio();
+    else if (aba === 'mapa') vistaMapas();
     else if (aba === 'plantio') vistaPlantio();
     else if (aba === 'est') vistaEstoque();
     else if (aba === 'colh') vistaColheita();
@@ -589,7 +772,8 @@ ${DPG_CSS}
   function vistaOperador() {
     if (opAba === 'mapa') return mapaOperador();
     if (opAba === 'cal') return calOperador();
-    listaAplic(abasOp() + cartaoPush());
+    iniCarregar();
+    listaAplic(abasOp() + cartaoPush() + cartaoClima(true));
   }
   // lista das aplicações com os talhões para marcar (operador e gerente da fazenda)
   function listaAplic(topo) {
