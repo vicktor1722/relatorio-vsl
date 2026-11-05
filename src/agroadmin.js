@@ -403,7 +403,10 @@ ${MAPA_CHUVA_JS}
     var h = '<div class="cab-caixa"><h2>🌾 Fazendas hoje</h2><span class="pf-qt">' + all.length + (all.length === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
       '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + reg + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
       m('🌱', 'Soja MT (média das praças)', M.soja_mt, 'R$ ', '', 2) + m('🌽', 'Milho MT', M.milho_mt, 'R$ ', '', 2) +
-      (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') + '</div>';
+      (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') +
+      (M.premio ? (function (P) { var dc = P.dif != null ? Math.round(P.dif * 100) : null;
+        return '<div class="pf-m"><small>⚓ Prêmio ' + esc(P.porto) + '</small><b>' + (P.valor >= 0 ? '+' : '−') + pfN(Math.abs(P.valor), 2) + ' US$/bu</b>' +
+          (dc != null ? '<em class="' + (dc > 0 ? 'up' : dc < 0 ? 'dn' : '') + '">' + (dc > 0 ? '▲' : dc < 0 ? '▼' : '=') + (dc ? Math.abs(dc) + '¢' : '') + '</em>' : '') + '</div>'; })(M.premio) : '') + '</div>';
     var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;
     if (D.admin) h += '<div class="pf-cal"><button class="pf-calb" id="pfCalAbre">⚙️ Cotações da região (calibração do preço da soja) ' + (PF.calAb ? '▴' : '▾') + '</button>' + (PF.calAb ? pfCalHtml() : '') + '</div>';
     h += '<div class="pf-filtros"><input id="pfBusca" placeholder="🔍 Buscar fazenda ou produtor" value="' + esc(PF.busca) + '">' +

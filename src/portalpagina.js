@@ -446,7 +446,15 @@ body.sem-rolar{overflow:hidden}
     var dAno2 = function (i) { return i.slice(8, 10) + '/' + i.slice(5, 7) + '/' + i.slice(2, 4); };
     var hReg = (cd ? caixa('🌱', 'Soja disponível', cd, 'R$ ', '', 2, '📍 ' + esc(cd.municipio) + (cd.km > 15 ? ' · ' + cd.km + ' km' : '')) : '') +
       (cf ? caixa('🗓️', 'Soja futuro ' + dAno2(cf.venc), { preco: cf.usd, var: cf.var, serie: cf.serie }, 'US$ ', '', 2, cf.brl ? '<b>R$ ' + n(cf.brl, 2) + '</b>/sc' : '') : '');
-    h += '<div class="ini-mk">' + caixa('💵', 'Dólar', m.dolar, 'R$ ', '', 2) + hReg +
+    // prêmio no porto: sobe ou desce (em centavos de dólar por bushel)
+    var Pr = m.premio, hPr = '';
+    if (Pr) {
+      var dc = Pr.dif != null ? Math.round(Pr.dif * 100) : null, corP = dc > 0 ? '#2F9E5B' : dc < 0 ? '#C62828' : '#6B7B72';
+      hPr = '<div class="ini-m"><small>⚓ Prêmio ' + esc(Pr.porto) + '</small><b>' + (Pr.valor >= 0 ? '+' : '−') + n(Math.abs(Pr.valor), 2) + '<span> US$/bu</span></b>' +
+        (dc != null ? '<em class="' + (dc > 0 ? 'up' : dc < 0 ? 'dn' : '') + '">' + (dc > 0 ? '▲ subiu ' : dc < 0 ? '▼ caiu ' : '= ') + (dc ? Math.abs(dc) + ' ¢' : 'igual') + '</em>' : '') +
+        '<small class="ini-pr">porto R$ ' + n(Pr.preco_porto, 2) + ' · ' + dataBR(Pr.em) + '</small>' + linhaMini(Pr.serie, corP) + '</div>';
+    }
+    h += '<div class="ini-mk">' + caixa('💵', 'Dólar', m.dolar, 'R$ ', '', 2) + hReg + hPr +
       caixa('🌱', 'Soja · sc 60 kg', m.soja, 'R$ ', '', 2, m.soja ? '📍 ' + esc(m.soja.praca) + (m.soja.km > 15 ? ' · ' + m.soja.km + ' km' : '') : '') +
       caixa('🌽', 'Milho · sc 60 kg', m.milho, 'R$ ', '', 2, m.milho ? '📍 ' + esc(m.milho.praca) + (m.milho.km > 15 ? ' · ' + m.milho.km + ' km' : '') : '') +
       caixa('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', 2) + caixa('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu', 2) + '</div>';

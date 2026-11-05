@@ -104,6 +104,7 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
       mercado: mg ? { dolar: mg.dolar, cbot_soja: mg.cbot_soja, cbot_milho: mg.cbot_milho,
         soja_mt: mediaUF(mg.pracas && mg.pracas.soja, 'MT'), milho_mt: mediaUF(mg.pracas && mg.pracas.milho, 'MT'),
         paranagua: mg.portos && mg.portos.soja && mg.portos.soja['Paranaguá'] ? mg.portos.soja['Paranaguá'].slice(-1)[0] : null,
+        premio: mg.premio || null,
         regiao: Object.values(regDisp).map((x) => ({ municipio: x.municipio, preco: x.preco, var: x.var })), futuro: regFut } : null,
       fazendas: linhas
     });
