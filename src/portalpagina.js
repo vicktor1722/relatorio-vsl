@@ -5,6 +5,7 @@
    ============================================================ */
 
 import { AGRO_REL_CSS, AGRO_REL_JS } from './agrorel.js';
+import { DPG_CSS, DPG_JS } from './graficodp.js';
 
 export function paginaPortal() {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
@@ -130,6 +131,8 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;max-width:90%}
 .rodape{text-align:center;color:var(--fraco);font-size:12px;margin-top:24px}.rodape a{color:var(--verde)}
 ${AGRO_REL_CSS}
+${DPG_CSS}
+.caixa.gr{padding:10px 12px 12px;margin-bottom:12px}
 </style></head><body>
 
 <div class="login" id="telaLogin">
@@ -156,10 +159,12 @@ ${AGRO_REL_CSS}
 </div>
 
 <script>${AGRO_REL_JS}</script>
+<script>${DPG_JS}</script>
 <script>
 (function () {
   var CH = 'amvs-portal', tok = '', eu = null, D = null, aba = 'apl', filtro = 'fazer', mapas = [], modoMapa = 'var';
-  var opAba = 'apl', opMapa = '*', selec = {};   // operador: aba, aplicação do mapa e talhões que ele marcou
+  var opAba = 'apl', opMapa = '*', selec = {};
+  var GR = { plantio: DPG.estado('p'), colh: DPG.estado('c') };   // gráficos da aba Plantio e da aba Colheita   // operador: aba, aplicação do mapa e talhões que ele marcou
   try { tok = localStorage.getItem(CH) || ''; } catch (e) {}
   var $ = function (s) { return document.querySelector(s); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -228,6 +233,7 @@ ${AGRO_REL_CSS}
   async function carregar(safra) {
     var fid = $('#selFaz').value;
     if (!D) $('#conteudo').innerHTML = '<div class="vazio">Carregando…</div>';
+    DPG.limpar(GR.plantio); DPG.limpar(GR.colh);
     try { D = await api('/api/portal/fazenda?id=' + encodeURIComponent(fid) + (safra ? '&safra=' + encodeURIComponent(safra) : '')); }
     catch (e) { $('#conteudo').innerHTML = '<div class="vazio">' + esc(e.rede ? 'Sem internet e esta fazenda ainda não foi aberta neste celular. Abra uma vez com sinal para ela ficar guardada.' : e.message) + '</div>'; return; }
     await sobreporFila();
@@ -422,7 +428,8 @@ ${AGRO_REL_CSS}
       var prox = pv.filter(function (x) { return !x.colhido && x.data >= hoje(); })[0], base = prox ? prox.data : hoje();
       CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
     }
-    var h = abas() + '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' + calendario(ev, true);
+    var h = abas() + (D.graf && D.graf.prev && D.graf.prev.length ? grafHtml(GR.colh) : '') +
+      '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' + calendario(ev, true);
 
     if (!pv.length) {
       h += '<div class="vazio">A previsão de colheita aparece quando o consultor lançar a data de plantio dos talhões.</div>';
@@ -470,12 +477,15 @@ ${AGRO_REL_CSS}
         '<div class="sem" style="font-size:12.5px;margin:0 2px">Previsão = data de plantio + ciclo do material, com janela de ± 5 dias (clima e chuva mexem na colheita). Na soja o ciclo sai do grupo de maturação (GMR) da cultivar; "estimado" = ciclo padrão da cultura.</div>';
     }
     $('#conteudo').innerHTML = h;
+    DPG.ligar($('#conteudo'), GR.colh, pintar);
     ligarCal();
   }
 
   /* ---------- plantio: evolução, talhões e lançamento da área plantada no dia (gerente) ---------- */
   function areasMapa() { var o = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) o[q.nome] = Number(q.area_ha) || 0; }); return o; }
   function porNome(a, b) { return String(a).localeCompare(String(b), 'pt-BR', { numeric: true }); }
+  // gráfico com troca para o lado (plantio ⇄ previsão de colheita); st = estado da aba
+  function grafHtml(st) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true }) + '</div>' : ''; }
   function vistaPlantio() {
     var areas = areasMapa(), pl = {}, lanc = [];
     (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por }); }); });
@@ -491,13 +501,14 @@ ${AGRO_REL_CSS}
     var gerente = eu.papel !== 'operador';
     var h = abas() + (gerente && !D.todas ? '<button class="btn" id="btnLancPl">🌱 Lançar plantio do dia</button>' : '') +
       (gerente && D.todas ? '<div class="sem" style="margin:0 2px 10px">Para lançar o plantio do dia, escolha uma fazenda no topo.</div>' : '') +
-      (D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
+      (D.graf && D.graf.linha && D.graf.linha.length ? grafHtml(GR.plantio) : D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
       (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura / variedade</th><th>Plantado</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
     if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
       return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + esc(x.por || 'lançado') + '</small></div>' +
         (gerente && !D.todas ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
     }).join('');
     $('#conteudo').innerHTML = h;
+    DPG.ligar($('#conteudo'), GR.plantio, pintar);
     var bl = document.getElementById('btnLancPl'); if (bl) bl.onclick = function () { folhaPlantio(); };
     document.querySelectorAll('[data-apl]').forEach(function (b) { b.onclick = function () {
       var p = b.dataset.apl.split('|');

@@ -11,6 +11,7 @@
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
 import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
+import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
 
 let pronta = null;
@@ -327,6 +328,18 @@ export async function plantioGeral(env, uid) {
        WHERE f.talhoes IS NOT NULL AND f.talhoes != ''` + (uid ? ' AND f.usuario_id = ?' : '') + ' LIMIT 1000').bind(...(uid ? [uid] : [])).all(),
     env.DB.prepare('SELECT usuario_id FROM modulos_usuario WHERE plantio = 1').all()
   ]);
+  // para a previsão de colheita: ciclo dos materiais, regra do GMR e talhões já colhidos
+  const ondeU = uid ? ' WHERE usuario_id = ?' : '', argU = uid ? [uid] : [];
+  const [cic, reg, colh] = await Promise.all([
+    env.DB.prepare('SELECT usuario_id, variedade, dias, gmr FROM ciclos' + ondeU).bind(...argU).all().catch(() => ({ results: [] })),
+    env.DB.prepare('SELECT usuario_id, gmr, dias, ponto FROM ciclo_regra' + ondeU).bind(...argU).all().catch(() => ({ results: [] })),
+    env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0' + (uid ? ' AND usuario_id = ?' : '')).bind(...argU).all().catch(() => ({ results: [] }))
+  ]);
+  const linhasCic = {}, regras = {}, cicloConta = {}, colhidos = {};
+  ((cic && cic.results) || []).forEach((c) => { (linhasCic[c.usuario_id] = linhasCic[c.usuario_id] || []).push(c); });
+  ((reg && reg.results) || []).forEach((r) => { regras[r.usuario_id] = r; });
+  const cicloDe = (conta) => cicloConta[conta] || (cicloConta[conta] = cicloDaConta(linhasCic[conta] || [], regraValida(regras[conta] || REGRA_PADRAO)));
+  ((colh && colh.results) || []).forEach((c) => { colhidos[c.fazenda_id + '|' + safraPadrao(c.safra || '') + '|' + c.talhao] = 1; });
   const geral = await liberadoGeral(env);
   const comModulo = {};
   ((mu && mu.results) || []).forEach((m) => { if (geral) comModulo[m.usuario_id] = 1; });
@@ -342,7 +355,7 @@ export async function plantioGeral(env, uid) {
       if (nome) { areas[nome] = ha; total += ha; }
     });
     if (!total) return;
-    faz[f.id] = { id: f.id, nome: f.nome || '', produtor: f.produtor || '', conta: f.conta_nome || f.conta || '',
+    faz[f.id] = { id: f.id, nome: f.nome || '', produtor: f.produtor || '', conta: f.conta_nome || f.conta || '', dono: f.usuario_id,
       areas, total, ativa: !!uid || Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
   });
 
@@ -378,9 +391,11 @@ export async function plantioGeral(env, uid) {
       const F = faz[fid], rs = porFaz[fid];
       let naoPlanta = 0, plant = 0, primeira = '', ultima = '', comCultura = 0;
       const vs = {}, cultsFaz = {}, fl = {}, fc = {}, fv = {};   // por fazenda: o painel filtra as fazendas sem voltar ao servidor
+      const prev = [];
       rs.forEach((r) => {
         const ha = F.areas[r.talhao] || 0;
         if (SEM_PLANTIO[r.cultura]) { naoPlanta += ha; return; }
+        prev.push(...previsaoTalhao(r, ha, cicloDe(F.dono), colhidos[fid + '|' + safraPadrao(r.safra || '') + '|' + r.talhao]));
         const dias = plantioPorDia(r, ha), hp = dias.reduce((s, x) => s + x.ha, 0);
         if (r.cultura) {
           const c = cult[r.cultura] = cult[r.cultura] || { cultura: r.cultura, ha: 0, plantado: 0 };
@@ -417,7 +432,8 @@ export async function plantioGeral(env, uid) {
         primeira, ultima, variedades: Object.keys(vs).sort(), fora_ha: r1(naoPlanta),
         linha: Object.keys(fl).sort().map((d) => ({ d, ha: r1(fl[d]) })),
         culturas: Object.values(fc).map((c) => ({ cultura: c.cultura, ha: r1(c.ha), plantado: r1(c.plantado) })),
-        vars: Object.values(fv).map((v) => ({ cultura: v.cultura, variedade: v.variedade, ha: r1(v.ha), plantado: r1(v.plantado) })) });
+        vars: Object.values(fv).map((v) => ({ cultura: v.cultura, variedade: v.variedade, ha: r1(v.ha), plantado: r1(v.plantado) })),
+        prev: juntarPrevisao(prev) });
     });
     fazendas.sort((a, b) => (b.plantado_ha / (b.total_ha || 1)) - (a.plantado_ha / (a.total_ha || 1)) || a.nome.localeCompare(b.nome));
     // fazendas de contas com o módulo que ainda não têm nada lançado nesta safra

@@ -1,3 +1,4 @@
+import { DPG_CSS, DPG_JS } from './graficodp.js';
 /* ============================================================
    agroadmin.js — pedaços do painel /admin ligados a Plantio e Recomendações.
    O admin.js só encaixa estes textos em lugares marcados; aqui ficam
@@ -213,13 +214,6 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .dp-det>summary em{font-style:normal;font-size:12.5px;font-weight:600;color:var(--verde);white-space:nowrap}
 .dp-det>summary em::after{content:"▸ Expandir"}.dp-det[open]>summary em::after{content:"▾ Recolher"}
 .dp-t span{font-weight:400;color:var(--fraco);font-size:12px;margin-left:6px}
-.dp-graf svg{display:block;width:100%;max-width:760px;height:auto}
-.dp-gl{stroke:var(--linha);stroke-width:1}
-.dp-ax{font-size:11px;fill:var(--fraco)}
-.dp-ar{fill:var(--verde-claro);stroke:none}
-.dp-ln{fill:none;stroke:var(--verde);stroke-width:2.5}
-.dp-pt{fill:#fff;stroke:var(--verde);stroke-width:2.5}
-.dp-tot{stroke:var(--fraco);stroke-width:1;stroke-dasharray:4 4}
 .dp-vars{display:flex;flex-direction:column;gap:8px}
 .dp-v{display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(80px,2fr) minmax(86px,.8fr);gap:10px;align-items:center}
 .dp-vn{min-width:0}
@@ -234,14 +228,13 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .dp-fz{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 12px;font-size:13px}.dp-fz>span{color:var(--fraco)}
 .dp-fc{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:5px 11px;font-size:13px;cursor:pointer;color:inherit}
 .dp-fc.on{background:var(--verde);border-color:var(--verde);color:#fff}
-.dp-sel{fill:rgba(27,122,67,.14)}.dp-mk{stroke:#14532D;stroke-width:1.6;stroke-dasharray:4 3}
-.dp-entre{background:#E8F3EC;border-radius:10px;padding:9px 12px;margin:6px 0 4px;font-size:14px;line-height:1.45}
-.dp-limpa{border:0;background:none;color:var(--verde);text-decoration:underline;cursor:pointer;font-size:13px}
+${DPG_CSS}
 @media (max-width:620px){.dp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dp-v{grid-template-columns:1fr 1fr}.dp-vb{grid-column:1/-1;order:3}}
 `;
 
 // String.raw: o código abaixo tem expressões regulares com barra invertida
 export const AGRO_JS = String.raw`
+${DPG_JS}
   /* ---------- módulos por conta (Plantio e Recomendações) ---------- */
   function agroAposPainel(adm) {
     $('#abaModulos').style.display = adm ? '' : 'none';
@@ -251,13 +244,11 @@ export const AGRO_JS = String.raw`
   }
 
   /* ---------- Dashboard: evolução do plantio e variedades de todas as contas ---------- */
-  var DP = { dados: null, safra: '', faz: null, pts: [] };   // faz: null = todas; senão lista de ids. pts: datas tocadas no gráfico
+  var DP = { dados: null, safra: '', faz: null, g: DPG.estado('p') };   // faz: null = todas; senão lista de ids. g: gráfico (plantio/colheita e datas tocadas)
   var DP_CULT = { soja: 'Soja', milho: 'Milho', algodao: 'Algodão', feijao: 'Feijão', sorgo: 'Sorgo', outra: 'Outra cultura' };
   var DP_COR = { soja: '#1B7A43', milho: '#D9A21B', algodao: '#4A86C5', feijao: '#A5603B', sorgo: '#B5483A', outra: '#7A8A80' };
   function dpN(n, d) { return Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
   function dpData(i) { var p = String(i || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : '—'; }
-  function dpDias(a, b) { return Math.round((new Date(a + 'T12:00:00Z') - new Date(b + 'T12:00:00Z')) / 864e5); }
-  function dpSoma(iso, n) { var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   function dpCult(c) { return DP_CULT[c] || c || '—'; }
 
   // administrador: todas as contas; conta comum com o módulo de plantio: as fazendas dela
@@ -282,7 +273,7 @@ export const AGRO_JS = String.raw`
 
   // junta só as fazendas escolhidas (o servidor manda cada fazenda com a linha, culturas e variedades dela)
   function dpFiltrado(S) {
-    if (!DP.faz) return S;
+    if (!DP.faz) return Object.assign({}, S, { prev: [].concat.apply([], S.fazendas.map(function (f) { return f.prev || []; })) });
     var ids = {}; DP.faz.forEach(function (i) { ids[i] = 1; });
     var fz = S.fazendas.filter(function (f) { return ids[f.id]; });
     var R = { safra: S.safra, total_ha: 0, plantado_ha: 0, fora_ha: 0, culturas: [], variedades: [], linha: [], fazendas: fz,
@@ -295,57 +286,12 @@ export const AGRO_JS = String.raw`
       (f.vars || []).forEach(function (v) { var k = v.cultura + '|' + v.variedade, o = va[k] || (va[k] = { cultura: v.cultura, variedade: v.variedade, ha: 0, plantado: 0, fazendas: 0 }); o.ha += v.ha; o.plantado += v.plantado; o.fazendas++; });
     });
     R.sem_lancamento.forEach(function (f) { R.total_ha += f.total_ha; });
+    R.prev = [].concat.apply([], fz.map(function (f) { return f.prev || []; }));
     R.linha = Object.keys(lin).sort().map(function (d) { return { d: d, ha: lin[d] }; });
     R.culturas = Object.keys(cu).map(function (k) { return cu[k]; }).sort(function (a, b) { return b.ha - a.ha; });
     R.variedades = Object.keys(va).map(function (k) { return va[k]; }).sort(function (a, b) { return b.ha - a.ha; });
     return R;
   }
-  // área plantada entre dois dias tocados no gráfico (os dois dias inclusive)
-  function dpEntre(S) {
-    if (DP.pts.length < 2) return '';
-    var a = DP.pts[0] < DP.pts[1] ? DP.pts[0] : DP.pts[1], b = DP.pts[0] < DP.pts[1] ? DP.pts[1] : DP.pts[0], ha = 0, dias = 0;
-    (S.linha || []).forEach(function (e) { if (e.d >= a && e.d <= b) { ha += e.ha; dias++; } });
-    return '<div class="dp-entre"><b>' + dpN(ha, 1) + ' ha</b> plantados de <b>' + dpData(a) + '</b> a <b>' + dpData(b) + '</b>' +
-      (S.total_ha ? ' · ' + dpN(ha / S.total_ha * 100, 1) + '% da área' : '') + (dias ? ' · ' + dias + (dias === 1 ? ' dia com plantio' : ' dias com plantio') + ' · média ' + dpN(ha / dias, 1) + ' ha/dia' : '') +
-      ' <button class="dp-limpa" id="dpLimpa">limpar</button></div>';
-  }
-
-  function dpGrafico(S) {
-    var ev = S.linha || [];
-    if (!ev.length || !S.total_ha) return '<div class="nota">Ainda não há data de plantio lançada nesta safra.</div>';
-    var hojeIso = new Date().toISOString().slice(0, 10);
-    var W = 640, H = 230, L = 52, R = 16, T = 16, B = 28;
-    var x0 = dpSoma(ev[0].d, -1), x1 = hojeIso > ev[ev.length - 1].d ? hojeIso : ev[ev.length - 1].d;
-    var rg = Math.max(1, dpDias(x1, x0));
-    var X = function (d) { return L + dpDias(d, x0) / rg * (W - L - R); };
-    var step = Math.max(1, Math.ceil(S.total_ha / 3 / 100) * 100), ym = step * 3;
-    var Y = function (v) { return T + (1 - v / ym) * (H - T - B); };
-    DP.eixo = { x0: x0, rg: rg, L: L, R: R, W: W };
-    var g = '<svg id="dpSvg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Área plantada acumulada por dia" style="cursor:crosshair">';
-    if (DP.pts.length) {
-      var pa = DP.pts.slice().sort(), xa = X(pa[0]), xb = X(pa[pa.length - 1]);
-      if (pa.length > 1) g += '<rect x="' + Math.min(xa, xb) + '" y="' + T + '" width="' + Math.max(2, Math.abs(xb - xa)) + '" height="' + (H - T - B) + '" class="dp-sel"/>';
-      pa.forEach(function (d) { g += '<line x1="' + X(d) + '" x2="' + X(d) + '" y1="' + T + '" y2="' + (H - B) + '" class="dp-mk"/>'; });
-    }
-    for (var k = 0; k <= 3; k++) {
-      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(k * step) + '" y2="' + Y(k * step) + '" class="dp-gl"/>' +
-        '<text x="' + (L - 6) + '" y="' + (Y(k * step) + 4) + '" text-anchor="end" class="dp-ax">' + dpN(k * step) + '</text>';
-    }
-    var tk = Math.max(1, Math.ceil(rg / 6));
-    for (var d = 0; d <= rg; d += tk) { var di = dpSoma(x0, d); g += '<text x="' + X(di) + '" y="' + (H - 8) + '" text-anchor="middle" class="dp-ax">' + dpData(di) + '</text>'; }
-    var cum = 0, ln = 'M' + X(x0) + ',' + Y(0), pts = '';
-    ev.forEach(function (e, i) {
-      cum += e.ha; ln += ' H' + X(e.d) + ' V' + Y(cum);
-      pts += '<circle cx="' + X(e.d) + '" cy="' + Y(cum) + '" r="' + (i === ev.length - 1 ? 5 : 3.5) + '" class="dp-pt"><title>' +
-        dpData(e.d) + ': +' + dpN(e.ha, 1) + ' ha · acumulado ' + dpN(cum) + ' ha (' + dpN(cum / S.total_ha * 100, 1) + '%)</title></circle>';
-    });
-    ln += ' H' + X(x1);
-    g += '<path d="' + ln + ' V' + Y(0) + ' Z" class="dp-ar"/><path d="' + ln + '" class="dp-ln"/>' + pts;
-    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(S.total_ha) + '" y2="' + Y(S.total_ha) + '" class="dp-tot"/>' +
-      '<text x="' + (L + 4) + '" y="' + (Y(S.total_ha) - 5) + '" class="dp-ax">área total ' + dpN(S.total_ha) + ' ha</text></svg>';
-    return g;
-  }
-
   function dpPintar(box) {
     var S0 = DP.dados.safras.filter(function (s) { return s.safra === DP.safra; })[0];
     var todasF = S0.fazendas.concat(S0.sem_lancamento || []);
@@ -372,9 +318,7 @@ export const AGRO_JS = String.raw`
       h += '<div class="dp-chips">' + S.culturas.map(function (c) {
         return '<span class="dp-chip"><i style="background:' + (DP_COR[c.cultura] || DP_COR.outra) + '"></i>' + esc(dpCult(c.cultura)) + ' <b>' + dpN(c.plantado) + '</b> de ' + dpN(c.ha) + ' ha</span>'; }).join('') + '</div>';
     }
-    h += '<h3 class="dp-t">Evolução do plantio</h3><div class="dp-graf">' + dpGrafico(S) + '</div>' +
-      (S.linha && S.linha.length ? (dpEntre(S) || '<p class="nota">👆 Toque em dois pontos do gráfico para ver a área plantada entre as duas datas.' +
-        (DP.pts.length === 1 ? ' Início: <b>' + dpData(DP.pts[0]) + '</b> — agora toque no fim.' : '') + '</p>') : '');
+    h += DPG.html(DP.g, S);
 
     var mx = S.variedades.reduce(function (m, v) { return Math.max(m, v.ha); }, 0) || 1;
     h += '<h3 class="dp-t">Variedades <span>' + dpN(S.variedades.reduce(function (a, v) { return a + v.ha; }, 0)) + ' ha com variedade informada</span></h3>';
@@ -398,24 +342,16 @@ export const AGRO_JS = String.raw`
       h += '<p class="nota">Sem plantio lançado nesta safra: ' + S.sem_lancamento.map(function (f) { return esc(f.nome) + ' (' + dpN(f.total_ha) + ' ha)'; }).join(', ') + '.</p>';
     }
     box.innerHTML = h;
-    $('#dpSafra').onchange = function () { DP.safra = this.value; DP.pts = []; dpPintar(box); };
+    $('#dpSafra').onchange = function () { DP.safra = this.value; DPG.limpar(DP.g); dpPintar(box); };
     box.querySelectorAll('[data-dpf]').forEach(function (b) { b.onclick = function () {
       var id = b.dataset.dpf;
       if (id === '*') DP.faz = null;
       else if (!DP.faz) DP.faz = [id];
       else if (DP.faz.indexOf(id) >= 0) DP.faz = DP.faz.filter(function (x) { return x !== id; });
       else DP.faz.push(id);
-      DP.pts = []; dpPintar(box);
+      DPG.limpar(DP.g); dpPintar(box);
     }; });
-    var sv = document.getElementById('dpSvg');
-    if (sv) sv.addEventListener('click', function (ev) {
-      var r = sv.getBoundingClientRect(), E = DP.eixo, xs = (ev.clientX - r.left) / r.width * E.W;
-      var n = Math.round((xs - E.L) / (E.W - E.L - E.R) * E.rg); n = Math.max(0, Math.min(E.rg, n));
-      var d = dpSoma(E.x0, n);
-      DP.pts = DP.pts.length >= 2 ? [d] : DP.pts.concat(d);
-      dpPintar(box);
-    });
-    var lp = document.getElementById('dpLimpa'); if (lp) lp.onclick = function () { DP.pts = []; dpPintar(box); };
+    DPG.ligar(box, DP.g, function () { dpPintar(box); });
     var df = document.getElementById('dpFaz');
     if (df) df.addEventListener('toggle', function () { try { localStorage.setItem('vsl-dp-faz', df.open ? '1' : '0'); } catch (e) {} });
   }

@@ -13,7 +13,8 @@ import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } fr
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo, variedadePadrao } from './agro.js';
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
-import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe } from './plantiodia.js';
+import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe, plantioPorDia } from './plantiodia.js';
+import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -256,7 +257,14 @@ async function dadosTodas(env, acesso, safraPedida) {
       sem_preco: [...new Set(custos.flatMap((d) => d.custo.sem_preco || []))] } : null,
     colheita: lista.flatMap((d) => (d.colheita || []).map((c) => Object.assign({}, c, { talhao: pre(d) + c.talhao }))),
     mapaPartes: lista.flatMap((d) => (d.mapaPartes || []).map((x) => Object.assign({}, x, { properties: Object.assign({}, x.properties, { talhao: pre(d) + x.properties.talhao }) }))),
-    ciclos: Object.values(ciclos)
+    ciclos: Object.values(ciclos),
+    graf: (() => {   // todas as fazendas juntas: soma as áreas e os dias
+      const lin = {};
+      lista.forEach((d) => ((d.graf && d.graf.linha) || []).forEach((x) => { lin[x.d] = (lin[x.d] || 0) + x.ha; }));
+      return { total_ha: Math.round(lista.reduce((s, d) => s + ((d.graf && d.graf.total_ha) || 0), 0) * 10) / 10,
+        linha: Object.keys(lin).sort().map((d) => ({ d, ha: Math.round(lin[d] * 100) / 100 })),
+        prev: juntarPrevisao(lista.flatMap((d) => (d.graf && d.graf.prev) || [])) };
+    })()
   };
 }
 
@@ -337,8 +345,26 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
     custo: custo ? { talhoes: custo.talhoes, sem_preco: custo.sem_preco } : null,
     colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
     mapaPartes: partesDoMapa(mapa, plantio, areas),
-    ciclos: await ciclosDoPlantio(env, dono, plantio, ci.results || [])
+    ciclos: await ciclosDoPlantio(env, dono, plantio, ci.results || []),
+    graf: await grafPlantio(env, dono, plantio, areas, (co.results || []).filter(daSafra), ci.results || [])
   });
+}
+
+// dados dos gráficos (evolução do plantio ⇄ previsão de colheita), iguais aos do painel
+async function grafPlantio(env, dono, plantio, areas, colheita, linhasCiclo) {
+  const fora = { pastagem: 1, pousio: 1 }, naoPl = {}, lin = {}, colhido = {};
+  plantio.forEach((p) => { if (fora[p.cultura]) naoPl[p.talhao] = 1; });
+  colheita.forEach((c) => { if (Number(c.sc_ha) > 0) colhido[c.talhao] = 1; });
+  const total = Object.keys(areas).filter((t) => !naoPl[t]).reduce((s, t) => s + areas[t], 0);
+  const cicloDe = cicloDaConta(linhasCiclo, await regraCiclo(env, dono));
+  const prev = [];
+  plantio.forEach((p) => {
+    if (!p.cultura || fora[p.cultura]) return;
+    const ha = areas[p.talhao] || 0;
+    plantioPorDia(p, ha).forEach((x) => { lin[x.d] = (lin[x.d] || 0) + x.ha; });
+    prev.push(...previsaoTalhao(p, ha, cicloDe, colhido[p.talhao]));
+  });
+  return { total_ha: Math.round(total * 10) / 10, linha: Object.keys(lin).sort().map((d) => ({ d, ha: Math.round(lin[d] * 100) / 100 })), prev: juntarPrevisao(prev) };
 }
 
 /* ---------------- rotas públicas do portal (/api/portal/*) ---------------- */
