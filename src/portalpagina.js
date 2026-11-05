@@ -985,8 +985,7 @@ ${DPG_CSS}
   function vistaOperador() {
     if (opAba === 'mapa') return mapaOperador();
     if (opAba === 'cal') return calOperador();
-    iniCarregar();
-    listaAplic(abasOp() + cartaoPush() + cartaoClima(true));
+    listaAplic(abasOp() + cartaoPush());
   }
   // lista das aplicações com os talhões para marcar (operador e gerente da fazenda)
   function listaAplic(topo) {
