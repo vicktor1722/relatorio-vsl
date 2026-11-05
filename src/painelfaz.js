@@ -92,7 +92,7 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
       if (F && F.calib && F.calib.disp && !regDisp[F.calib.disp.municipio]) regDisp[F.calib.disp.municipio] = F.calib.disp;
       if (F && F.calib && F.calib.futuro && !regFut) regFut = F.calib.futuro;
       linhas.push(Object.assign({
-        id: f.id, nome: f.nome, produtor: f.produtor || '', conta: f.conta || '', municipio: f.municipio || '', uf: f.uf || '', local: l,
+        id: f.id, nome: f.nome, produtor: f.produtor || '', conta: f.conta || '', municipio: String(f.municipio || '').replace(/\s*\/\s*[A-Za-z]{2}$/, ''), uf: f.uf || (l && l.uf) || '', local: l,
         chuva7: c && c.dias ? r1(c.dias.slice(0, 7).reduce((s, x) => s + (x.mm || 0), 0)) : null,
         janela: c && c.janela ? { melhor: c.janela.melhor, hoje: c.janela.hoje, horas: c.janela.horas.map((h) => h.st) } : null,
         tempo: c && c.agora ? { ic: c.agora.ic, temp: c.agora.temp } : null,

@@ -261,7 +261,14 @@ ${MAPA_CHUVA_CSS}
 .ca-bloco.cheia .ca-mapa{flex:1;height:auto}.ca-bloco.cheia .mc-escx{color:#DDE7E1}.ca-bloco.cheia .ca-fs{display:none}
 
 .pf-bloco{margin:0 0 16px}.pf-bloco>.cab-caixa{margin:4px 2px 10px}.pf-bloco>.cab-caixa h2{margin:0}
-.pf-mk{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pf-m{border:1px solid var(--linha);border-radius:11px;padding:7px 11px;background:#fff;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+.pf-mk{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.pf-tk{overflow:hidden;margin-bottom:10px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
+.pf-tk-in{display:flex;width:max-content;animation:pfTk 40s linear infinite}.pf-tk:hover .pf-tk-in,.pf-tk:active .pf-tk-in{animation-play-state:paused}
+.pf-tk-g{display:flex;gap:8px;padding-right:8px}.pf-tk-g .pf-m{flex:none;white-space:nowrap}
+@keyframes pfTk{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.pf-tk{overflow-x:auto}.pf-tk-in{animation:none}.pf-tk-g[aria-hidden]{display:none}}
+.pf-tg{display:block;width:100%;text-align:left;border:1px solid var(--linha);background:#fff;border-radius:11px;padding:9px 12px;margin:0 0 10px;font-size:13.5px;font-weight:700;color:var(--verde-escuro);cursor:pointer}
+.pf-row .pf-mais,.pf-row .pf-seta{display:none}.pf-m{border:1px solid var(--linha);border-radius:11px;padding:7px 11px;background:#fff;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
 .pf-m small{font-size:11.5px;color:var(--fraco)}.pf-m b{font-size:15px}.pf-m em,.pf-k4 .dn{font-style:normal;font-size:11.5px;font-weight:700}.pf-m em.up{color:#2F9E5B}.pf-m em.dn,.pf-k4 b.dn{color:#C62828}
 .pf-filtros{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.pf-filtros input{border:1px solid var(--linha);border-radius:9px;padding:8px 10px;font-size:13.5px;min-width:230px;flex:0 1 260px}
 .pf-filtros button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:6px 12px;font-size:13px;cursor:pointer;color:inherit}.pf-filtros button.on{background:var(--verde);border-color:var(--verde);color:#fff}
@@ -293,7 +300,10 @@ ${MAPA_CHUVA_CSS}
 .pf-mapa .t,.pf-mapa .d{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none;font-size:11px;padding:3px 8px}.pf-mapa .t{left:8px}.pf-mapa .d{right:8px;font-weight:800;font-size:15px}
 .pf-conta{font-size:12.5px;line-height:1.6;background:#F6F8F7;border-radius:10px;padding:8px 10px}
 @media (max-width:979px){
-  .pf-mk{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}.pf-mk::-webkit-scrollbar{display:none}.pf-m{flex:none}
+  .pf-row{position:relative;padding-right:30px!important}.pf-row .pf-seta{display:block;position:absolute;right:10px;top:12px;font-style:normal;color:var(--verde);transition:transform .15s}
+  .pf-row:not(.aberta)>span:not(.nm):not(.at){display:none}
+  .pf-row.aberta .pf-seta{transform:rotate(180deg)}.pf-row.aberta .pf-mais{display:block;grid-column:1/-1}
+  .pf-ver{width:100%;border:0;border-radius:9px;background:var(--verde);color:#fff;font-weight:700;font-size:13.5px;padding:9px;cursor:pointer}
   .pf-lay{display:block}.pf-cab{display:none}
   .pf-row{grid-template-columns:1fr 1fr;row-gap:6px;padding:11px 8px}.pf-row .nm,.pf-row .at{grid-column:1/-1}.pf-row i{display:block;font-style:normal;font-size:10.5px;color:var(--fraco)}
   .pf-det{display:none;position:fixed;inset:0;z-index:2000;max-height:none;border-radius:0;margin:0}.pf-det.aberto{display:block}.pf-x{display:block}
@@ -401,23 +411,37 @@ ${MAPA_CHUVA_JS}
     var reg = (M.regiao || []).map(function (x) { return m('🌱', 'Soja disponível · ' + esc(x.municipio), x, 'R$ ', '', 2); }).join('') +
       (M.futuro ? '<div class="pf-m"><small>🗓️ Soja futuro ' + pfBr(M.futuro.venc) + '/' + M.futuro.venc.slice(2, 4) + '</small><b>US$ ' + pfN(M.futuro.usd, 2) + (M.futuro.brl ? ' · R$ ' + pfN(M.futuro.brl, 2) : '') + '</b>' + pfVar(M.futuro.var) + '</div>' : '');
     var h = '<div class="cab-caixa"><h2>🌾 Fazendas hoje</h2><span class="pf-qt">' + all.length + (all.length === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
-      '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + reg + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
+      pfLetreiro(m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + reg + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
       m('🌱', 'Soja MT (média das praças)', M.soja_mt, 'R$ ', '', 2) + m('🌽', 'Milho MT', M.milho_mt, 'R$ ', '', 2) +
       (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') +
       (M.premio ? (function (P) { var dc = P.dif != null ? Math.round(P.dif * 100) : null;
         return '<div class="pf-m"><small>⚓ Prêmio ' + esc(P.porto) + '</small><b>' + (P.valor >= 0 ? '+' : '−') + pfN(Math.abs(P.valor), 2) + ' US$/bu</b>' +
-          (dc != null ? '<em class="' + (dc > 0 ? 'up' : dc < 0 ? 'dn' : '') + '">' + (dc > 0 ? '▲' : dc < 0 ? '▼' : '=') + (dc ? Math.abs(dc) + '¢' : '') + '</em>' : '') + '</div>'; })(M.premio) : '') + '</div>';
+          (dc != null ? '<em class="' + (dc > 0 ? 'up' : dc < 0 ? 'dn' : '') + '">' + (dc > 0 ? '▲' : dc < 0 ? '▼' : '=') + (dc ? Math.abs(dc) + '¢' : '') + '</em>' : '') + '</div>'; })(M.premio) : ''));
     var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;
     if (D.admin) h += '<div class="pf-cal"><button class="pf-calb" id="pfCalAbre">⚙️ Cotações da região (calibração do preço da soja) ' + (PF.calAb ? '▴' : '▾') + '</button>' + (PF.calAb ? pfCalHtml() : '') + '</div>';
+    var fechada = false; try { fechada = localStorage.getItem('vsl-pf-lista') === '0'; } catch (e) {}
+    h += '<button class="pf-tg" id="pfTg" aria-expanded="' + !fechada + '">' + (fechada ? '▸ Ver as ' + all.length + ' fazendas' + (nAl ? ' · ⚠️ ' + nAl + ' com alerta' : '') : '▾ Recolher a lista de fazendas') + '</button>';
+    if (fechada) { box.innerHTML = h; pfLigarTopo(); return; }
     h += '<div class="pf-filtros"><input id="pfBusca" placeholder="🔍 Buscar fazenda ou produtor" value="' + esc(PF.busca) + '">' +
       [['todas', 'Todas (' + all.length + ')'], ['alertas', '⚠️ Com alertas (' + nAl + ')'], ['chuva', '🌧️ Chuva forte na semana (' + nCh + ')'], ['pulv', '🚜 Pulverizar amanhã (' + nPu + ')']].map(function (x) {
         return '<button data-pff="' + x[0] + '" class="' + (PF.filtro === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
     h += '<div class="pf-lay"><div class="pf-lista caixa" id="pfLista">' + pfLista() + '</div><div class="pf-det caixa" id="pfDet">' + pfDetalhe() + '</div></div>';
     box.innerHTML = h;
+    pfLigarTopo();
     var bu = document.getElementById('pfBusca');
     bu.oninput = function () { PF.busca = bu.value; document.getElementById('pfLista').innerHTML = pfLista(); pfLigarLista(); };
     box.querySelectorAll('[data-pff]').forEach(function (b) { b.onclick = function () { PF.filtro = b.dataset.pff; pfPintar(); }; });
-    pfLigarLista(); pfLigarDet(); pfLigarCal();
+    pfLigarLista(); pfLigarDet();
+  }
+  function pfLigarTopo() {
+    var tg = document.getElementById('pfTg');
+    if (tg) tg.onclick = function () { var f = tg.getAttribute('aria-expanded') === 'true'; try { localStorage.setItem('vsl-pf-lista', f ? '0' : '1'); } catch (e) {} pfPintar(); };
+    pfLigarCal();
+  }
+  // cotações passando sozinhas (letreiro); toque ou mouse em cima para parar
+  function pfLetreiro(itens) {
+    var n = (itens.match(/class="pf-m"/g) || []).length;
+    return '<div class="pf-tk" aria-label="Cotações"><div class="pf-tk-in" style="animation-duration:' + Math.max(20, n * 7) + 's"><div class="pf-tk-g">' + itens + '</div><div class="pf-tk-g" aria-hidden="true">' + itens + '</div></div></div>';
   }
   function pfCalHtml() {
     var C = PF.cal;
@@ -464,22 +488,34 @@ ${MAPA_CHUVA_JS}
       if (a.estoque) ch.push('<span class="pf-c am">estoque</span>');
       if (!ch.length) ch.push('<span class="pf-c ok">tudo em dia</span>');
       var j = f.janela && f.janela.melhor;
-      return '<button class="pf-row' + (PF.sel === f.id ? ' sel' : '') + '" data-pfs="' + esc(f.id) + '">' +
+      var ab = PF.abertas && PF.abertas[f.id];
+      return '<div class="pf-row' + (PF.sel === f.id ? ' sel' : '') + (ab ? ' aberta' : '') + '" data-pfs="' + esc(f.id) + '" role="button" tabindex="0" aria-expanded="' + !!ab + '">' +
         '<span class="nm"><b>' + esc(f.nome) + '</b><small>' + esc([f.produtor || f.conta, f.municipio ? f.municipio + (f.uf ? '/' + f.uf : '') : ''].filter(Boolean).join(' · ')) + '</small></span>' +
         '<span class="at">' + ch.join('') + '</span>' +
         '<span class="pl"><i>Plantio</i>' + pfN(f.plantio.pct) + '%<u><b style="width:' + Math.min(100, f.plantio.pct) + '%"></b></u></span>' +
         '<span><i>Chuva 7 dias</i>' + (f.chuva7 == null ? '—' : '<span class="pf-c az">' + (f.chuva7 >= 20 ? '🌧️ ' : f.chuva7 >= 5 ? '🌦️ ' : '☀️ ') + pfN(f.chuva7) + ' mm</span>') + '</span>' +
         '<span><i>Pulverizar ' + (f.janela && f.janela.hoje ? 'hoje' : 'amanhã') + '</i>' + (f.janela ? (j ? ('0' + j.de).slice(-2) + 'h–' + ('0' + j.ate).slice(-2) + 'h' : 'sem janela') : '—') + '</span>' +
-        '<span class="vd"><i>Soja na fazenda</i>' + (f.venda != null ? '<b>R$ ' + pfN(f.venda, 2) + '</b>' : '—') + '</span></button>';
+        '<span class="vd"><i>Soja na fazenda</i>' + (f.venda != null ? '<b>R$ ' + pfN(f.venda, 2) + '</b>' : '—') + '</span>' +
+        '<span class="pf-mais"><button class="pf-ver" data-pfv="' + esc(f.id) + '">Ver resumo completo ›</button></span><i class="pf-seta">▾</i></div>';
     }).join('');
   }
   function pfLigarLista() {
-    document.querySelectorAll('[data-pfs]').forEach(function (b) { b.onclick = function () {
+    function abrirResumo(b) {
       PF.sel = b.dataset.pfs;
       document.querySelectorAll('.pf-row').forEach(function (x) { x.classList.toggle('sel', x === b); });
       document.getElementById('pfDet').innerHTML = pfDetalhe(); pfLigarDet();
       if (!pfLargo()) document.getElementById('pfDet').classList.add('aberto');
-    }; });
+    }
+    document.querySelectorAll('[data-pfs]').forEach(function (b) {
+      b.onclick = function (ev) {
+        if (ev.target.closest('[data-pfv]')) { abrirResumo(b); return; }
+        if (pfLargo()) { abrirResumo(b); return; }   // computador: a linha já mostra tudo; abre o resumo ao lado
+        PF.abertas = PF.abertas || {};   // celular: abre/fecha os números da fazenda
+        var ab = !PF.abertas[b.dataset.pfs]; PF.abertas[b.dataset.pfs] = ab;
+        b.classList.toggle('aberta', ab); b.setAttribute('aria-expanded', ab);
+      };
+      b.onkeydown = function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); b.click(); } };
+    });
   }
   function pfDetalhe() {
     if (!PF.sel) return '<div class="aviso">Escolha uma fazenda na lista para ver o resumo.</div>';
