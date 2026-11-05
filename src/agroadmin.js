@@ -245,6 +245,11 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 ${DPG_CSS}
 ${MAPA_CHUVA_CSS}
 .pf-qt{font-size:12.5px;color:var(--fraco)}
+.pf-cal{margin:0 0 10px}.pf-calb{border:1px solid var(--linha);background:#fff;border-radius:10px;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--verde-escuro);font-weight:600}
+.pf-calc{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:10px 12px;margin-top:8px;max-width:760px}
+.pf-calr{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px dashed var(--linha);font-size:13px}.pf-calr span{flex:1;min-width:0}.pf-calr small{display:block;color:var(--fraco);font-size:11.5px}
+.pf-calf{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.pf-calf input{border:1px solid var(--linha);border-radius:8px;padding:7px 9px;font-size:13px;min-width:0;flex:1 1 110px}
+
 .ca-ps{font-size:12.5px;color:var(--fraco);max-width:55%;text-align:right}
 .ca-mapa{position:relative;height:380px;border-radius:12px;overflow:hidden}.ca-mapa #caMapa{position:absolute;inset:0}
 .ca-mapa .t,.ca-mapa .d{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none;font-size:11px;padding:3px 8px}.ca-mapa .t{left:52px}.ca-mapa .d{right:8px;font-weight:800;font-size:15px}
@@ -398,6 +403,7 @@ ${MAPA_CHUVA_JS}
       m('🌱', 'Soja MT (média das praças)', M.soja_mt, 'R$ ', '', 2) + m('🌽', 'Milho MT', M.milho_mt, 'R$ ', '', 2) +
       (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') + '</div>';
     var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;
+    if (D.admin) h += '<div class="pf-cal"><button class="pf-calb" id="pfCalAbre">⚙️ Cotações da região (calibração do preço da soja) ' + (PF.calAb ? '▴' : '▾') + '</button>' + (PF.calAb ? pfCalHtml() : '') + '</div>';
     h += '<div class="pf-filtros"><input id="pfBusca" placeholder="🔍 Buscar fazenda ou produtor" value="' + esc(PF.busca) + '">' +
       [['todas', 'Todas (' + all.length + ')'], ['alertas', '⚠️ Com alertas (' + nAl + ')'], ['chuva', '🌧️ Chuva forte na semana (' + nCh + ')'], ['pulv', '🚜 Pulverizar amanhã (' + nPu + ')']].map(function (x) {
         return '<button data-pff="' + x[0] + '" class="' + (PF.filtro === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
@@ -406,7 +412,42 @@ ${MAPA_CHUVA_JS}
     var bu = document.getElementById('pfBusca');
     bu.oninput = function () { PF.busca = bu.value; document.getElementById('pfLista').innerHTML = pfLista(); pfLigarLista(); };
     box.querySelectorAll('[data-pff]').forEach(function (b) { b.onclick = function () { PF.filtro = b.dataset.pff; pfPintar(); }; });
-    pfLigarLista(); pfLigarDet();
+    pfLigarLista(); pfLigarDet(); pfLigarCal();
+  }
+  function pfCalHtml() {
+    var C = PF.cal;
+    if (!C) {
+      api('/api/painel/calibracao').then(function (r) { PF.cal = r.calibracao; pfPintar(); }).catch(function (e) { PF.cal = { erro: e.message }; pfPintar(); });
+      return '<div class="aviso">Carregando…</div>';
+    }
+    if (C.erro) return '<div class="aviso ruim">' + esc(C.erro) + '</div>';
+    var f = C.futuro;
+    return '<div class="pf-calc"><div class="pf-sec">Disponível (R$/sc) por município</div>' +
+      (C.pontos || []).map(function (p) {
+        return '<div class="pf-calr"><span><b>' + esc(p.municipio) + '/' + esc(p.uf) + '</b><small>informado em ' + pfBr(p.data) + ' · porto ' + esc(p.ref.porto) + ' R$ ' + pfN(p.ref.porto_preco, 2) + ' · diferença ' + pfN(p.disp - p.ref.porto_preco, 2) + '</small></span>' +
+          '<b>R$ ' + pfN(p.disp, 2) + '</b><button class="ini-lk" data-calx="' + esc(p.municipio) + '">remover</button></div>'; }).join('') +
+      '<div class="pf-calf"><input id="calMun" placeholder="Município (ex.: Vila Bela)"><input id="calUf" value="MT" maxlength="2" style="width:52px"><input id="calDisp" inputmode="decimal" placeholder="R$/sc hoje"><button class="btn-mini" id="calSalvaD">Salvar disponível</button></div>' +
+      '<div class="pf-sec">Futuro</div>' +
+      (f ? '<div class="pf-calr"><span><b>Entrega ' + pfBr(f.venc) + '/' + f.venc.slice(2, 4) + '</b><small>informado em ' + pfBr(f.data) + ' · Chicago ' + esc(f.contrato.replace('.CBT', '')) + ' US$ ' + pfN(f.ref.cbot, 3) + '/bu · dólar ' + pfN(f.ref.dolar, 4) + '</small></span><b>US$ ' + pfN(f.usd_sc, 2) + (f.brl_sc ? ' · R$ ' + pfN(f.brl_sc, 2) : '') + '</b></div>' : '') +
+      '<div class="pf-calf"><input id="calVenc" type="date" value="' + (f ? f.venc : '') + '"><input id="calUsd" inputmode="decimal" placeholder="US$/sc"><input id="calBrl" inputmode="decimal" placeholder="R$/sc"><button class="btn-mini" id="calSalvaF">Salvar futuro</button></div>' +
+      '<div class="pf-pe">Ao salvar, o painel guarda junto o preço do porto, Chicago e o dólar do dia. Daí em diante o preço de cada fazenda (até 150 km do município) acompanha o mercado mantendo essa diferença; o futuro vale para as fazendas até 250 km.</div></div>';
+  }
+  function pfLigarCal() {
+    var ab = document.getElementById('pfCalAbre'); if (ab) ab.onclick = function () { PF.calAb = !PF.calAb; pfPintar(); };
+    function salvar(corpo, msg) {
+      api('/api/painel/calibracao', corpo).then(function (r) { PF.cal = r.calibracao; alert(msg); return agroFazendas(true); }).catch(function (e) { alert(e.message); });
+    }
+    var sd = document.getElementById('calSalvaD'); if (sd) sd.onclick = function () {
+      var mu = document.getElementById('calMun').value.trim(), dp = document.getElementById('calDisp').value.trim();
+      if (!mu || !dp) { alert('Informe o município e o preço disponível'); return; }
+      salvar({ municipio: mu, uf: document.getElementById('calUf').value.trim() || 'MT', disp: dp }, 'Cotação de ' + mu + ' salva');
+    };
+    var sf = document.getElementById('calSalvaF'); if (sf) sf.onclick = function () {
+      var vc = document.getElementById('calVenc').value, us = document.getElementById('calUsd').value.trim();
+      if (!vc || !us) { alert('Informe a data de entrega e o preço em US$/sc'); return; }
+      salvar({ futuro: { venc: vc, usd_sc: us, brl_sc: document.getElementById('calBrl').value.trim() } }, 'Futuro salvo');
+    };
+    document.querySelectorAll('[data-calx]').forEach(function (b) { b.onclick = function () { if (confirm('Remover a cotação de ' + b.dataset.calx + '?')) salvar({ apagar: b.dataset.calx }, 'Removida'); }; });
   }
   function pfLista() {
     var l = pfFiltradas();
@@ -467,7 +508,11 @@ ${MAPA_CHUVA_JS}
         P.dias.filter(function (x) { return x.p1 >= 70; }).length + ' dias de chuva provável</span></div>' +
         '<div class="pf-pe">O mapa da chuva fica abaixo dos gráficos, com o ponto desta fazenda.</div>';
     }
-    if (F) h += '<div class="pf-sec">💰 Preço da soja</div><div class="pf-conta">Porto ' + esc(F.porto.nome) + ' <b>R$ ' + pfN(F.porto.preco, 2) + '</b> − frete <b>R$ ' + pfN(F.frete.sc, 2) + '</b> (R$ ' + pfN(F.frete.rt) + '/t' + (F.frete.estimado ? ', estimado' : '') + ')' +
+    var CC = F && F.calib;
+    if (CC && CC.disp) h += '<div class="pf-sec">💰 Preço da soja (calibrado)</div><div class="pf-conta">Porto ' + esc(CC.disp.porto) + ' hoje <b>R$ ' + pfN(CC.disp.porto_hoje, 2) + '</b> ' +
+      (CC.disp.dif < 0 ? '−' : '+') + ' diferença da região <b>R$ ' + pfN(Math.abs(CC.disp.dif), 2) + '</b> = <b>R$ ' + pfN(CC.disp.preco, 2) + '/sc</b> disponível<br>Calibrado com ' + esc(CC.disp.municipio) + ' (R$ ' + pfN(CC.disp.preco_ref, 2) + ' em ' + pfBr(CC.disp.data) + ')' +
+      (CC.futuro ? '<br>🗓️ Futuro ' + pfBr(CC.futuro.venc) + '/' + CC.futuro.venc.slice(2, 4) + ': <b>US$ ' + pfN(CC.futuro.usd, 2) + '</b>' + (CC.futuro.brl ? ' · <b>R$ ' + pfN(CC.futuro.brl, 2) + '</b>' : '') + '/sc' : '') + '</div>';
+    else if (F) h += '<div class="pf-sec">💰 Preço da soja</div><div class="pf-conta">Porto ' + esc(F.porto.nome) + ' <b>R$ ' + pfN(F.porto.preco, 2) + '</b> − frete <b>R$ ' + pfN(F.frete.sc, 2) + '</b> (R$ ' + pfN(F.frete.rt) + '/t' + (F.frete.estimado ? ', estimado' : '') + ')' +
       (F.custos ? ' − custos da região <b>R$ ' + pfN(F.custos.sc, 2) + '</b>' : '') + ' = <b>R$ ' + pfN(venda, 2) + '/sc</b>' + (F.praca ? '<br>Praça ' + esc(F.praca.nome) + ': R$ ' + pfN(F.praca.preco, 2) : '') + '</div>';
     if (X.pendentes.length) h += '<div class="pf-sec">💧 Próximas aplicações</div>' + X.pendentes.map(function (a) {
       var hj = PF.d.hoje, cls = !a.data ? '' : a.data < hj ? 'at' : a.data === hj ? 'am' : '';

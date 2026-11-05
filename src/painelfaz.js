@@ -3,7 +3,7 @@
    Usa os mesmos cálculos da tela Início do dono (portal). */
 import { modulosDe } from './agro.js';
 import { dadosParaPainel } from './portal.js';
-import { climaVarios, climaDe, localDaFazenda, mercadoDaFazenda, mercadoGeral } from './mercado.js';
+import { calibracao, climaVarios, climaDe, localDaFazenda, mercadoDaFazenda, mercadoGeral, salvarCalibracao } from './mercado.js';
 import { chuvaDaFazenda, mapaGuardado } from './chuva.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
@@ -120,6 +120,15 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
     ]);
     return json(Object.assign({ ok: true, fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '', municipio: f.municipio || '', uf: f.uf || '' },
       local, clima, chuva, mercado }, resumo(d || {}, clima)));
+  }
+  // cotações reais da região (calibração do preço da soja): só o admin muda; todos usam
+  if (rota === '/api/painel/calibracao') {
+    if (req.method === 'POST') {
+      if (!admin) return json({ erro: 'só o administrador atualiza as cotações da região' }, 403);
+      try { return json({ ok: true, calibracao: await salvarCalibracao(env, await req.json()) }); }
+      catch (e) { return json({ erro: e.message }, 400); }
+    }
+    return json({ ok: true, admin, calibracao: await calibracao(env) });
   }
   if (rota === '/api/painel/chuva-mapa') return json(Object.assign({ ok: true }, await mapaGuardado(env)));
   return json({ erro: 'rota não encontrada' }, 404);
