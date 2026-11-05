@@ -449,14 +449,20 @@ ${DPG_CSS}
         '<label>Porto<select id="fpPorto">' + F.portos.map(function (p) { return '<option' + (p === F.porto.nome ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('') + '</select></label>' +
         '<button class="btn" id="fpSalva">Salvar frete</button>' + (F.frete.estimado ? '' : '<button class="ini-lk" id="fpEst">voltar ao estimado (R$ ' + n(F.frete.rt_estimado) + '/t)</button>') + '</div>';
     }
-    h += '<div class="tot fz"><span>= Valor da soja na fazenda</span><b>R$ ' + n(F.fazenda, 2) + '/sc</b></div></div>';
+    if (F.venda != null) {
+      h += '<div class="tot"><span>= Paridade de exportação na fazenda</span><b>R$ ' + n(F.fazenda, 2) + '/sc</b></div>' +
+        '<div><span>🏢 Custos e margem da região <em>porto, impostos, armazém, trade</em></span><b>− R$ ' + n(F.custos.sc, 2) + '/sc</b></div>' +
+        '<div class="tot fz"><span>= Preço estimado de venda na fazenda</span><b>R$ ' + n(F.venda, 2) + '/sc</b></div></div>';
+    } else h += '<div class="tot fz"><span>= Paridade de exportação na fazenda</span><b>R$ ' + n(F.fazenda, 2) + '/sc</b></div></div>';
     if (F.praca) {
       var d = F.praca.dif;
-      h += '<div class="ini-fpc">📍 Na praça de <b>' + esc(F.praca.nome) + '</b> hoje: <b>R$ ' + n(F.praca.preco, 2) + '/sc</b> · ' +
-        (Math.abs(d) < 0.5 ? 'igual ao valor calculado' : '<b class="' + (d < 0 ? 'dn' : 'up') + '">R$ ' + n(Math.abs(d), 2) + (d < 0 ? ' abaixo' : ' acima') + '</b> do valor calculado') +
+      h += '<div class="ini-fpc">📍 Praça de <b>' + esc(F.praca.nome) + '</b>' + (F.praca.km > 15 ? ' (' + n(F.praca.km) + ' km)' : '') + ' hoje: <b>R$ ' + n(F.praca.preco, 2) + '/sc</b>' +
+        (F.custos ? '<br>Paridade lá: R$ ' + n(F.custos.paridade_praca, 2) + ' − R$ ' + n(F.praca.preco, 2) + ' pagos = <b>R$ ' + n(F.custos.sc, 2) + '/sc</b> de custos e margem' : '') +
+        (F.venda != null && Math.abs(d) >= 0.5 ? '<br>A praça paga <b class="' + (d < 0 ? 'dn' : 'up') + '">R$ ' + n(Math.abs(d), 2) + (d < 0 ? ' a menos' : ' a mais') + '</b> que o estimado para a fazenda' + (d > 0 ? ' (está mais perto do porto)' : '') : '') +
         '<br>Base local: <b>' + sinal(F.praca.base, 2) + ' US$/bu</b> sobre Chicago</div>';
     }
     return h + '<div class="ini-pe">1 saca = 60 kg = 2,2046 bushels · 1 t = 16,67 sacas. O prêmio sai do preço do porto do dia. ' +
+      (F.custos ? 'Os custos e a margem da região saem da praça: o que ela paga a menos que a paridade de exportação dela. ' : '') +
       (F.frete.estimado ? 'Frete estimado pela distância (~R$ 0,16 por t·km): toque em "alterar" e coloque o frete real.' : 'Frete informado' + (F.frete.por ? ' por ' + esc(F.frete.por) : '') + (F.frete.em ? ' em ' + dataBR(F.frete.em) : '') + '.') + '</div></div>';
   }
   function ligarFormacao() {
