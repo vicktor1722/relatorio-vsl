@@ -263,11 +263,21 @@ function formacao(m, local, praca, frete) {
   const conv = usd.preco * BU_SC, premio = u.p / conv - cbot.preco;
   const est = freteEstimado(local, porto);
   const rt = frete && frete.rt > 0 ? frete.rt : est.rt, freteSc = rt / SC_T, naFaz = u.p - freteSc;
+  // custos e margem da região (porto, impostos como o Fethab, armazém, trade): paridade na praça − preço que a praça paga.
+  // O frete da praça usa a mesma tarifa por km do frete da fazenda (se o real foi informado, a praça segue a mesma proporção).
+  let custos = null;
+  const cp = praca && PRACAS[praca.praca];
+  if (cp) {
+    const fp = freteEstimado({ lat: cp[0], lon: cp[1] }, porto), escala = est.rt ? rt / est.rt : 1;
+    const parPraca = u.p - fp.rt * escala / SC_T;
+    custos = { sc: r2(Math.max(0, parPraca - praca.preco)), paridade_praca: r2(parPraca), frete_praca_rt: Math.round(fp.rt * escala) };
+  }
+  const venda = custos ? naFaz - custos.sc : null;
   return {
     cbot: cbot.preco, dolar: usd.preco, porto: { nome: porto, preco: u.p, em: u.d }, premio: r2(premio),
     frete: { rt, estimado: !(frete && frete.rt > 0), km: est.km, rt_estimado: est.rt, sc: r2(freteSc), em: frete && frete.em, por: frete && frete.por },
-    fazenda: r2(naFaz),
-    praca: praca ? { nome: praca.praca, preco: praca.preco, base: r2(praca.preco / conv - cbot.preco), dif: r2(praca.preco - naFaz) } : null,
+    fazenda: r2(naFaz), custos, venda: venda != null ? r2(venda) : null,
+    praca: praca ? { nome: praca.praca, preco: praca.preco, km: praca.km, base: r2(praca.preco / conv - cbot.preco), dif: r2(praca.preco - (venda != null ? venda : naFaz)) } : null,
     portos: nomes
   };
 }
