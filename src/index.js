@@ -21,6 +21,7 @@ import { paginaPortal } from './portalpagina.js';
 import { climaDe } from './mercado.js';
 import { UFS_LINHAS } from './ufs.js';
 import { atualizarChuva } from './chuva.js';
+import { rotasPainelFaz } from './painelfaz.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
@@ -417,6 +418,7 @@ export default {
       if (rota.startsWith('/api/push/')) return await rotasPush(env, req, me, rota);
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
+      if (rota.startsWith('/api/painel/')) return await rotasPainelFaz(env, req, me, rota, url);   // aba Fazendas do painel
       if (rota === '/api/modulos' || rota.startsWith('/api/agro/')) return await rotasAgro(env, req, me, rota, url);
 
       /* ---------- administração ---------- */
