@@ -27,6 +27,7 @@ const json = (o, status) => new Response(JSON.stringify(o), {
 });
 const txt = (v, max) => String(v == null ? '' : v).trim().slice(0, max || 200);
 const dia = (v) => { const s = String(v || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+const EMERG_DIAS = 4;   // germinação/emergência: dias depois do plantio
 const hojeMT = () => new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);
 const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const FEM = /^(Dessecação|Adubação|Outra)/;
@@ -310,6 +311,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
   const porTal = {}; plantio.forEach((p) => { porTal[safraPadrao(p.safra) + '|' + p.talhao] = p; });
   const base = { fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '' }, safra, safras, mapa,
     plantio: plantio.map((p) => ({ talhao: p.talhao, cultura: p.cultura, variedade: p.variedade, data_plantio: p.data_plantio, data_emerg: p.data_emerg,
+      sem_m: Number(p.sem_m) || 0, espac_cm: Number(p.espac_cm) || 0, sem_ha: Number(p.sem_ha) || 0,
       partes: (() => { const l = partesDe(p, areas[p.talhao] || 0); return l.length > 1 || (l[0] && l[0].ha < (areas[p.talhao] || 0) - 0.05) ? l : []; })(),
       lanc: lerLanc(p), ha_plantada: Math.round(haPlantada(p, areas[p.talhao] || 0) * 100) / 100 })) };
 
@@ -512,24 +514,37 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     const area = areas[talhao] || 0;
     let ha = Math.round(Number(String(b.ha || '').replace(',', '.')) * 100) / 100;
     if (!(ha > 0) && !b.apagar) return json({ erro: 'informe os hectares plantados' }, 400);
+    // sementes por metro e espaçamento da plantadeira (cm)
+    const nb = (v) => Math.round(Number(String(v == null ? '' : v).replace(',', '.')) * 10) / 10;
+    const sem = nb(b.sem_m), esp = nb(b.espac_cm);
+    if (!b.apagar && !(sem > 0 && sem < 80)) return json({ erro: 'informe as sementes por metro' }, 400);
+    if (!b.apagar && !(esp >= 10 && esp <= 150)) return json({ erro: 'informe o espaçamento da plantadeira em cm (ex.: 45 ou 50)' }, 400);
     // um lançamento por dia: lançar de novo no mesmo dia corrige o valor
     let l = lerLanc(ant).filter((x) => x.d !== data);
     if (!b.apagar) {
       const outros = l.reduce((s, x) => s + x.ha, 0);
       if (area && outros + ha > area + 0.05) return json({ erro: 'passa da área do talhão: faltam ' + (Math.round((area - outros) * 10) / 10).toString().replace('.', ',') + ' ha' }, 400);
-      l.push({ d: data, ha, por: (a.nome || a.login) + ' (fazenda)' });
+      l.push({ d: data, ha, por: (a.nome || a.login) + ' (fazenda)', sem, esp });
     }
     l.sort((x, y) => (x.d < y.d ? -1 : 1));
     const cultura = txt(b.cultura, 20) || (ant && ant.cultura) || 'soja';
     const variedade = variedadePadrao(txt(b.variedade, 80) || (ant && ant.variedade) || '', cultura);
     // data de plantio do talhão = primeiro dia lançado (é dela que sai a previsão de colheita)
     const dp = l.length ? l[0].d : (ant ? ant.data_plantio || '' : '');
-    await env.DB.prepare(`INSERT INTO plantio (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, lanc, atualizado_em)
-        VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+    // germinação (emergência) automática: 4 dias depois do plantio; se o consultor mudou a data à mão, fica a dele
+    const manual = ant && ant.data_emerg && ant.data_plantio && ant.data_emerg !== somaDias(ant.data_plantio, EMERG_DIAS);
+    const emerg = manual ? ant.data_emerg : (dp ? somaDias(dp, EMERG_DIAS) : '');
+    // sementes do talhão = as do último lançamento (o app do consultor e o relatório usam estas)
+    const ult = l.filter((x) => x.sem && x.esp).slice(-1)[0];
+    const semM = ult ? ult.sem : (ant && Number(ant.sem_m)) || 0, espCm = ult ? ult.esp : (ant && Number(ant.espac_cm)) || 0;
+    const semHa = semM && espCm ? Math.round(semM * 1000000 / espCm) : (ant && Number(ant.sem_ha)) || 0;
+    await env.DB.prepare(`INSERT INTO plantio (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, data_emerg, espac_cm, sem_m, sem_ha, lanc, atualizado_em)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
         ON CONFLICT(fazenda_id, safra, talhao) DO UPDATE SET cultura = excluded.cultura, variedade = excluded.variedade,
-          data_plantio = excluded.data_plantio, lanc = excluded.lanc, atualizado_em = datetime('now')
+          data_plantio = excluded.data_plantio, data_emerg = excluded.data_emerg, espac_cm = excluded.espac_cm, sem_m = excluded.sem_m,
+          sem_ha = excluded.sem_ha, lanc = excluded.lanc, atualizado_em = datetime('now')
         WHERE plantio.usuario_id = excluded.usuario_id`)
-      .bind(fid, safra, talhao, a.dono_id, cultura, variedade, dp, JSON.stringify(l)).run();
+      .bind(fid, safra, talhao, a.dono_id, cultura, variedade, dp, emerg, espCm, semM, semHa, JSON.stringify(l)).run();
     return json({ ok: true });
   }
 

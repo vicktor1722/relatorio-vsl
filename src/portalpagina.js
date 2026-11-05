@@ -204,6 +204,8 @@ ${DPG_CSS}
 .chv-bloco.cheia .chv-mapa{flex:1;height:auto}.chv-bloco.cheia .chv-escx{color:#DDE7E1}.chv-bloco.cheia .chv-fs{display:none}
 body.sem-rolar{overflow:hidden}
 .chv-pe b{color:var(--texto)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g2 .campo{min-width:0}
+.pl-calc{font-size:12.5px;line-height:1.55;color:#1C2B23;background:#EEF6F0;border-radius:10px;padding:7px 10px;margin:-2px 0 10px}.pl-calc:empty{display:none}
 .ini-al{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:7px 0;border-top:1px dashed var(--linha)}.ini-al:first-of-type{border-top:0}
 
 .caixa.gr{padding:10px 12px 12px;margin-bottom:12px}
@@ -920,7 +922,7 @@ body.sem-rolar{overflow:hidden}
   function grafHtml(st, so) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true, so: so }) + '</div>' : ''; }
   function vistaPlantio() {
     var areas = areasMapa(), pl = {}, lanc = [];
-    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por }); }); });
+    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por, sem: x.sem, esp: x.esp }); }); });
     lanc.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : porNome(a.t, b.t); });
     var nomes = Object.keys(areas).concat(Object.keys(pl).filter(function (t) { return !(t in areas); })).sort(porNome);
     var lin = nomes.map(function (t) {
@@ -936,7 +938,8 @@ body.sem-rolar{overflow:hidden}
       (D.graf && D.graf.linha && D.graf.linha.length ? grafHtml(GR.plantio, 'p') : D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
       (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura / variedade</th><th>Plantado</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
     if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
-      return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + esc(x.por || 'lançado') + '</small></div>' +
+      return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' +
+        (x.sem ? '🌱 ' + n(x.sem, 1) + ' sem/m · ' + n(x.esp) + ' cm · ' + n(x.sem * 1000000 / x.esp) + ' sem/ha · ' : '') + esc(x.por || 'lançado') + '</small></div>' +
         (gerente && !D.todas ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
     }).join('');
     $('#conteudo').innerHTML = h;
@@ -969,6 +972,9 @@ body.sem-rolar{overflow:hidden}
       '<div class="campo"><label class="l">Talhão *</label><select id="pTal"><option value="">— escolher —</option>' + nomes.map(function (t) {
         var r = resta(t); return '<option value="' + esc(t) + '">' + esc(t) + ' · ' + (r > 0.05 ? 'faltam ' + n(r, 1) + ' ha' : 'completo') + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo"><label class="l">Hectares plantados neste dia *</label><input id="pHa" inputmode="decimal" placeholder="ex.: 45,5"></div>' +
+      '<div class="g2"><div class="campo"><label class="l">Sementes por metro *</label><input id="pSem" inputmode="decimal" placeholder="ex.: 14"></div>' +
+      '<div class="campo"><label class="l">Espaçamento da plantadeira (cm) *</label><input id="pEsp" inputmode="decimal" placeholder="ex.: 45"></div></div>' +
+      '<div class="pl-calc" id="pCalc"></div>' +
       '<div class="campo"><label class="l">Cultura</label><select id="pCult">' + ['soja', 'milho', 'algodao', 'feijao', 'sorgo', 'trigo', 'outra'].map(function (c) { return '<option value="' + c + '">' + NC[c] + '</option>'; }).join('') + '</select></div>' +
       '<div id="pVarBox"></div>' +
       '<button class="btn" id="pOk">✔ Salvar</button><button class="btn sec" id="pNao">Cancelar</button></div>';
@@ -991,8 +997,29 @@ body.sem-rolar{overflow:hidden}
       var s2 = box.querySelector('#pVar'); if (s2) s2.onchange = function () { st.vari = s2.value; };
       var tx = box.querySelector('#pVarTxt'); if (tx) tx.oninput = function () { st.vari = tx.value; };
     }
+    // sementes e espaçamento: começa com os do talhão (ou do último plantio lançado na fazenda)
+    var ultL = null;
+    (D.plantio || []).forEach(function (p) { (p.lanc || []).forEach(function (x) { if (x.sem && x.esp && (!ultL || x.d >= ultL.d)) ultL = x; }); });
+    function preencher(t) {
+      var p = pl[t] || {}, sem = p.sem_m || (ultL && ultL.sem), esp = p.espac_cm || (ultL && ultL.esp);
+      if (sem && !v.querySelector('#pSem').value) v.querySelector('#pSem').value = String(sem).replace('.', ',');
+      if (esp && !v.querySelector('#pEsp').value) v.querySelector('#pEsp').value = String(esp).replace('.', ',');
+      calc();
+    }
+    function num2(id) { return Number(String(v.querySelector(id).value || '').replace(',', '.')); }
+    function calc() {
+      var sem = num2('#pSem'), esp = num2('#pEsp'), d = v.querySelector('#pData').value, t = v.querySelector('#pTal').value, p = pl[t] || {};
+      var ds = (p.lanc || []).map(function (x) { return x.d; }).filter(function (x) { return x !== d; }).concat(d ? [d] : []).sort(), dp = ds[0] || '';   // igual ao servidor: 1º dia lançado
+      v.querySelector('#pCalc').innerHTML = (sem > 0 && esp > 0 ? '🌱 <b>' + n(sem * 1000000 / esp) + ' sementes/ha</b> (' + n(sem, 1) + ' por metro a ' + n(esp) + ' cm)<br>' : '') +
+        (dp ? '🌿 Germinação (emergência) automática: <b>' + dataBR(somaDias(dp, 4)) + '</b> · 4 dias após o plantio' : '');
+    }
+    v.querySelector('#pSem').oninput = calc; v.querySelector('#pEsp').oninput = calc; v.querySelector('#pData').onchange = calc;
+    preencher('');
     v.querySelector('#pTal').onchange = function () {
       var t = this.value, p = pl[t] || {}, r = resta(t);
+      if (p.sem_m) v.querySelector('#pSem').value = String(p.sem_m).replace('.', ',');
+      if (p.espac_cm) v.querySelector('#pEsp').value = String(p.espac_cm).replace('.', ',');
+      preencher(t);
       if (p.cultura) v.querySelector('#pCult').value = p.cultura;
       if (r > 0.05) v.querySelector('#pHa').placeholder = 'até ' + n(r, 1) + ' ha';
       pintarVar();
@@ -1005,8 +1032,11 @@ body.sem-rolar{overflow:hidden}
       if (!d) { toast('Informe a data'); return; }
       if (!t) { toast('Escolha o talhão'); return; }
       if (!(ha > 0)) { toast('Informe os hectares plantados'); return; }
+      var sem = num2('#pSem'), esp = num2('#pEsp');
+      if (!(sem > 0)) { toast('Informe as sementes por metro'); return; }
+      if (!(esp >= 10 && esp <= 150)) { toast('Informe o espaçamento da plantadeira em cm (ex.: 45)'); return; }
       this.disabled = true;
-      var ok = await enviarPlantio({ talhao: t, data: d, ha: ha, cultura: v.querySelector('#pCult').value, variedade: st.vari }, '✔ Plantio lançado: ' + t + ' · ' + n(ha, 1) + ' ha');
+      var ok = await enviarPlantio({ talhao: t, data: d, ha: ha, cultura: v.querySelector('#pCult').value, variedade: st.vari, sem_m: sem, espac_cm: esp }, '✔ Plantio lançado: ' + t + ' · ' + n(ha, 1) + ' ha');
       if (ok) v.remove(); else this.disabled = false;
     };
   }
