@@ -225,9 +225,22 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .dp-mini{height:7px;border-radius:4px;background:var(--linha);overflow:hidden;min-width:90px;margin-bottom:3px}
 .dp-mini i{display:block;height:100%;background:var(--verde)}
 .dp-tab td{vertical-align:top}
-.dp-fz{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 12px;font-size:13px}.dp-fz>span{color:var(--fraco)}
-.dp-fc{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:5px 11px;font-size:13px;cursor:pointer;color:inherit}
-.dp-fc.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.dp-fz{position:relative;margin:2px 0 12px}
+.dp-fzb{display:flex;align-items:center;gap:8px;width:100%;max-width:420px;border:1px solid var(--linha);background:#fff;border-radius:12px;padding:7px 12px;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.dp-fzb small{font-size:11.5px;color:var(--fraco);flex:none}
+.dp-fzb b{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-fzb b span{font-weight:400;color:var(--fraco);font-size:12.5px}
+.dp-fzb i{font-style:normal;color:var(--verde);transition:transform .15s}.dp-fz.aberto .dp-fzb i{transform:rotate(180deg)}
+.dp-fz.aberto .dp-fzb{border-color:var(--verde)}
+.dp-fzl{display:none;position:absolute;z-index:30;left:0;top:calc(100% + 4px);width:100%;max-width:420px;background:#fff;border:1px solid var(--linha);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:8px}
+.dp-fz.aberto .dp-fzl{display:block}
+.dp-fzl input[type=search]{width:100%;box-sizing:border-box;border:1px solid var(--linha);border-radius:9px;padding:7px 10px;font-size:14px;margin-bottom:6px}
+.dp-fzo{max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.dp-fzo label{display:flex;align-items:center;gap:9px;padding:8px 6px;border-radius:8px;font-size:14px;cursor:pointer}
+.dp-fzo label:active{background:var(--verde-claro)}
+.dp-fzo label.todas{font-weight:700;border-bottom:1px solid var(--linha);border-radius:0;margin-bottom:2px}
+.dp-fzo input{width:18px;height:18px;accent-color:var(--verde);flex:none;margin:0}
+.dp-fzok{display:block;width:100%;margin-top:8px;border:0;border-radius:9px;background:var(--verde);color:#fff;font-weight:700;font-size:14px;padding:9px;cursor:pointer}
 ${DPG_CSS}
 @media (max-width:620px){.dp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dp-v{grid-template-columns:1fr 1fr}.dp-vb{grid-column:1/-1;order:3}}
 `;
@@ -304,9 +317,17 @@ ${DPG_JS}
     var h = '<div class="cab-caixa"><h2>' + (DP.dados.propria ? 'Evolução do plantio' : 'Plantio das áreas') + '</h2>' + sel + '</div>';
     // escolha das fazendas: todas, uma ou algumas
     if (todasF.length > 1) {
-      h += '<div class="dp-fz"><span>Fazendas:</span><button class="dp-fc' + (DP.faz ? '' : ' on') + '" data-dpf="*">Todas (' + todasF.length + ')</button>' +
-        todasF.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).map(function (f) {
-          return '<button class="dp-fc' + (DP.faz && DP.faz.indexOf(f.id) >= 0 ? ' on' : '') + '" data-dpf="' + esc(f.id) + '">' + esc(f.nome) + '</button>'; }).join('') + '</div>';
+      var ord = todasF.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+      var marc = DP.faz ? ord.filter(function (f) { return DP.faz.indexOf(f.id) >= 0; }) : [];
+      var resumo = !DP.faz ? 'Todas as fazendas <span>(' + todasF.length + ')</span>'
+        : marc.length === 1 ? esc(marc[0].nome) : marc.length + ' fazendas <span>' + esc(marc.map(function (f) { return f.nome; }).join(', ')) + '</span>';
+      h += '<div class="dp-fz' + (DP.fzAberto ? ' aberto' : '') + '" id="dpFzBox"><button type="button" class="dp-fzb" id="dpFzBtn" aria-expanded="' + (DP.fzAberto ? 'true' : 'false') + '">' +
+        '<small>Fazendas</small><b>' + resumo + '</b><i>▾</i></button>' +
+        '<div class="dp-fzl">' + (todasF.length > 6 ? '<input type="search" id="dpFzBusca" placeholder="Buscar fazenda…" autocomplete="off">' : '') +
+        '<div class="dp-fzo" id="dpFzOps"><label class="todas"><input type="checkbox" data-dpf="*"' + (DP.faz ? '' : ' checked') + '> Todas as fazendas</label>' +
+        ord.map(function (f) {
+          return '<label data-nome="' + esc(f.nome.toLowerCase()) + '"><input type="checkbox" data-dpf="' + esc(f.id) + '"' + (DP.faz && DP.faz.indexOf(f.id) >= 0 ? ' checked' : '') + '> ' + esc(f.nome) + '</label>'; }).join('') +
+        '</div><button type="button" class="dp-fzok" id="dpFzOk">Pronto</button></div></div>';
     }
     h += '<div class="dp-kpis"><div class="dp-k"><b>' + dpN(pc, 1) + '%</b><span>plantado</span></div>' +
       '<div class="dp-k"><b>' + dpN(S.plantado_ha) + ' <small>ha</small></b><span>de ' + dpN(S.total_ha) + ' ha</span></div>' +
@@ -343,14 +364,37 @@ ${DPG_JS}
     }
     box.innerHTML = h;
     $('#dpSafra').onchange = function () { DP.safra = this.value; DPG.limpar(DP.g); dpPintar(box); };
-    box.querySelectorAll('[data-dpf]').forEach(function (b) { b.onclick = function () {
-      var id = b.dataset.dpf;
-      if (id === '*') DP.faz = null;
-      else if (!DP.faz) DP.faz = [id];
-      else if (DP.faz.indexOf(id) >= 0) DP.faz = DP.faz.filter(function (x) { return x !== id; });
-      else DP.faz.push(id);
-      DPG.limpar(DP.g); dpPintar(box);
-    }; });
+    // caixa das fazendas: abre a lista para marcar; marcar já atualiza os números (a lista continua aberta)
+    var fzBtn = document.getElementById('dpFzBtn');
+    if (fzBtn) {
+      var ops = document.getElementById('dpFzOps');
+      if (ops && DP.fzRolagem) ops.scrollTop = DP.fzRolagem;
+      fzBtn.onclick = function () { DP.fzAberto = !DP.fzAberto; dpPintar(box); };
+      document.getElementById('dpFzOk').onclick = function () { DP.fzAberto = false; dpPintar(box); };
+      var bus = document.getElementById('dpFzBusca');
+      if (bus) bus.oninput = function () {
+        var q = bus.value.trim().toLowerCase();
+        ops.querySelectorAll('label[data-nome]').forEach(function (l) { l.style.display = !q || l.dataset.nome.indexOf(q) >= 0 ? '' : 'none'; });
+      };
+      ops.querySelectorAll('[data-dpf]').forEach(function (b) { b.onchange = function () {
+        var id = b.dataset.dpf;
+        if (id === '*') DP.faz = null;
+        else if (!DP.faz) DP.faz = [id];
+        else if (DP.faz.indexOf(id) >= 0) DP.faz = DP.faz.filter(function (x) { return x !== id; });
+        else DP.faz.push(id);
+        DP.fzRolagem = ops.scrollTop;
+        DPG.limpar(DP.g); dpPintar(box);
+        var b2 = document.getElementById('dpFzBusca');
+        if (b2 && bus && bus.value) { b2.value = bus.value; b2.oninput(); }
+      }; });
+    }
+    if (!DP.fora) {   // tocar fora da caixa fecha a lista
+      DP.fora = true;
+      document.addEventListener('click', function (ev) {
+        var bx = document.getElementById('dpFzBox');
+        if (DP.fzAberto && bx && document.body.contains(ev.target) && !bx.contains(ev.target)) { DP.fzAberto = false; var cx = document.getElementById('caixaPlantio'); if (cx) dpPintar(cx); }
+      });
+    }
     DPG.ligar(box, DP.g, function () { dpPintar(box); });
     var df = document.getElementById('dpFaz');
     if (df) df.addEventListener('toggle', function () { try { localStorage.setItem('vsl-dp-faz', df.open ? '1' : '0'); } catch (e) {} });

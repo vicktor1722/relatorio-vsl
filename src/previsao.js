@@ -1,6 +1,6 @@
 /* Previsão de colheita = dia plantado + ciclo do material.
    Usada no painel (quadro de evolução) e no login da fazenda (portal), para os dois mostrarem a mesma curva. */
-import { partesDe, plantioPorDia } from './plantiodia.js';
+import { lerLanc, partesDe, plantioPorDia } from './plantiodia.js';
 import { chaveCult, cicloMaterial } from './cultivares.js';
 
 // ciclo padrão quando o material não tem ciclo informado nem GMR (mesmo valor do portal e do app)
@@ -27,11 +27,18 @@ export function cicloDaConta(linhas, regra) {
    talhão em partes → cada parte na data dela; senão → cada dia plantado (lançamento do dia) + ciclo */
 export function previsaoTalhao(p, area, cicloDe, colhido) {
   if (!p || !p.cultura || SEM_PLANTIO[p.cultura]) return [];
-  const pt = partesDe(p, area);
-  const dia1 = plantioPorDia(p, area).map((x) => x.d).sort()[0] || '';
-  const itens = pt.length > 1
-    ? pt.map((x) => ({ v: x.variedade, d: x.data_plantio || p.data_plantio || dia1, ha: x.ha }))
-    : plantioPorDia(p, area).map((x) => ({ v: (pt[0] && pt[0].variedade) || p.variedade || '', d: x.d, ha: x.ha }));
+  const pt = partesDe(p, area), dias = plantioPorDia(p, area);
+  const dia1 = dias.map((x) => x.d).sort()[0] || '';
+  let itens;
+  if (pt.length > 1 && !lerLanc(p).length) {
+    // sem lançamento por dia: cada parte com data de plantio (igual à evolução do plantio)
+    itens = pt.filter((x) => x.data_plantio).map((x) => ({ v: x.variedade, d: x.data_plantio, ha: x.ha }));
+  } else if (pt.length > 1) {
+    // com lançamento por dia: só a área já plantada entra; as partes ficam na proporção dela
+    const plantado = dias.reduce((s, x) => s + x.ha, 0), soma = pt.reduce((s, x) => s + x.ha, 0);
+    const f = soma > 0 ? Math.min(1, plantado / soma) : 0;
+    itens = pt.map((x) => ({ v: x.variedade, d: x.data_plantio || p.data_plantio || dia1, ha: x.ha * f }));
+  } else itens = dias.map((x) => ({ v: (pt[0] && pt[0].variedade) || p.variedade || '', d: x.d, ha: x.ha }));
   const out = [];
   itens.forEach((x) => {
     if (!x.d || !(x.ha > 0)) return;
