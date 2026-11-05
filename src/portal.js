@@ -412,7 +412,6 @@ export async function rotasPortal(env, req, rota, url, ctx) {
 
   /* ----- foto do registro da aplicação ----- */
   if (rota === '/api/portal/foto' && req.method === 'POST') {
-    if (a.papel !== 'operador') return json({ erro: 'só o operador envia foto da aplicação' }, 403);
     const tipo = String(req.headers.get('Content-Type') || '').split(';')[0];
     if (!/^image\/(jpeg|png|webp)$/.test(tipo)) return json({ erro: 'envie a foto em JPEG' }, 400);
     const dados = await req.arrayBuffer();
@@ -486,9 +485,8 @@ export async function rotasPortal(env, req, rota, url, ctx) {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=86400' } });
   }
 
-  // operador / encarregado marca (ou desfaz) a aplicação de talhões
+  // operador ou gerente da fazenda marca (ou desfaz) a aplicação de talhões
   if (rota === '/api/portal/aplicar' && req.method === 'POST') {
-    if (a.papel !== 'operador') return json({ erro: 'este acesso só acompanha; quem marca aplicação é o operador' }, 403);
     const b = await req.json().catch(() => ({}));
     const r = await env.DB.prepare('SELECT * FROM recomendacoes WHERE id = ? AND usuario_id = ?').bind(txt(b.rec_id, 60), a.dono_id).first();
     if (!r || !a.lista.includes(r.fazenda_id)) return json({ erro: 'aplicação não encontrada' }, 404);
