@@ -8,7 +8,6 @@ import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
    ============================================================ */
 
 export const AGRO_ABAS =
-  '<button data-aba="fazendas" id="abaFazendas" style="display:none">🌾 Fazendas</button>' +
   '<button data-aba="plantio" id="abaPlantio" style="display:none">Plantio</button>' +
   '<button data-aba="recs" id="abaRecs" style="display:none">Recomendações</button>' +
   '<button data-aba="custo" id="abaCusto" style="display:none">Custo × produção</button>' +
@@ -16,7 +15,6 @@ export const AGRO_ABAS =
   '<button data-aba="modulos" id="abaModulos" style="display:none">Módulos</button>';
 
 export const AGRO_PAINEIS = `
-    <section class="painel" id="pFazendas"><div id="agFazendas"><div class="aviso">Carregando…</div></div></section>
     <section class="painel" id="pPlantio"><div id="agPlantio" class="ag-tela"></div></section>
     <section class="painel" id="pRecs"><div id="agRecs" class="ag-tela"></div></section>
     <section class="painel" id="pCusto"><div id="agCusto"><div class="aviso">Carregando…</div></div></section>
@@ -246,6 +244,8 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .dp-fzok{display:block;width:100%;margin-top:8px;border:0;border-radius:9px;background:var(--verde);color:#fff;font-weight:700;font-size:14px;padding:9px;cursor:pointer}
 ${DPG_CSS}
 ${MAPA_CHUVA_CSS}
+.pf-qt{font-size:12.5px;color:var(--fraco)}
+.pf-bloco{margin:0 0 16px}.pf-bloco>.cab-caixa{margin:4px 2px 10px}.pf-bloco>.cab-caixa h2{margin:0}
 .pf-mk{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pf-m{border:1px solid var(--linha);border-radius:11px;padding:7px 11px;background:#fff;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
 .pf-m small{font-size:11.5px;color:var(--fraco)}.pf-m b{font-size:15px}.pf-m em,.pf-k4 .dn{font-style:normal;font-size:11.5px;font-weight:700}.pf-m em.up{color:#2F9E5B}.pf-m em.dn,.pf-k4 b.dn{color:#C62828}
 .pf-filtros{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.pf-filtros input{border:1px solid var(--linha);border-radius:9px;padding:8px 10px;font-size:13.5px;min-width:230px;flex:0 1 260px}
@@ -295,11 +295,19 @@ ${MAPA_CHUVA_JS}
   function pfBr(i) { return i ? i.slice(8, 10) + '/' + i.slice(5, 7) : '—'; }
   function pfVar(v) { return v == null ? '' : '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : '') + '">' + (v > 0 ? '▲' : v < 0 ? '▼' : '') + pfN(Math.abs(v), 1) + '%</em>'; }
   function pfLargo() { return window.matchMedia('(min-width: 980px)').matches; }
-  async function agroFazendas() {
-    var box = document.getElementById('agFazendas'); if (!box) return;
-    if (!PF.d) box.innerHTML = '<div class="aviso">Carregando as fazendas, o tempo e o mercado…</div>';
+  async function agroFazendas(adm) {
+    var box = document.getElementById('agFazendas');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'agFazendas'; box.className = 'pf-bloco';
+      $('#kpis').insertAdjacentElement('afterend', box);
+    }
+    if (!PF.d) box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso">Carregando as fazendas, o tempo e o mercado…</div>';
     try { PF.d = await api('/api/painel/fazendas'); }
-    catch (e) { box.innerHTML = '<div class="aviso ruim">' + esc(e.message) + '</div>'; return; }
+    catch (e) {
+      if (!adm) { box.remove(); return; }   // conta sem os módulos de lavoura: não mostra o bloco
+      box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return;
+    }
+    if (!(PF.d.fazendas || []).length) { box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso">Nenhuma fazenda com mapa, plantio ou recomendação ainda.</div>'; return; }
     if (!PF.sel && pfLargo()) { var c = pfFiltradas()[0]; PF.sel = c ? c.id : null; }
     pfPintar();
   }
@@ -317,7 +325,8 @@ ${MAPA_CHUVA_JS}
   function pfPintar() {
     var box = document.getElementById('agFazendas'), D = PF.d, M = D.mercado || {}, all = D.fazendas || [];
     var m = function (ic, t, x, pre, suf, c) { return x ? '<div class="pf-m"><small>' + ic + ' ' + t + '</small><b>' + pre + pfN(x.preco, c) + (suf || '') + '</b>' + pfVar(x.var) + '</div>' : ''; };
-    var h = '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
+    var h = '<div class="cab-caixa"><h2>🌾 Fazendas hoje</h2><span class="pf-qt">' + all.length + (all.length === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
+      '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
       m('🌱', 'Soja MT (média das praças)', M.soja_mt, 'R$ ', '', 2) + m('🌽', 'Milho MT', M.milho_mt, 'R$ ', '', 2) +
       (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') + '</div>';
     var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;
@@ -432,16 +441,17 @@ ${MAPA_CHUVA_JS}
 
   // administrador: todas as contas; conta comum com o módulo de plantio: as fazendas dela
   async function agroDash(adm) {
+    agroFazendas(adm);   // bloco "Fazendas hoje" na mesma tela (não espera)
     var box = document.getElementById('caixaPlantio'), d = null;
     try { d = await api('/api/agro/admin/plantio'); }
     catch (e) {
       if (!adm) { if (box) box.remove(); return; }   // conta sem o módulo de plantio: não mostra a caixa
-      if (!box) { box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio'; $('#kpis').insertAdjacentElement('afterend', box); }
+      if (!box) { box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio'; (document.getElementById('agFazendas') || $('#kpis')).insertAdjacentElement('afterend', box); }
       box.innerHTML = '<h2>Plantio das áreas</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return;
     }
     if (!box) {
       box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio';
-      $('#kpis').insertAdjacentElement('afterend', box);
+      (document.getElementById('agFazendas') || $('#kpis')).insertAdjacentElement('afterend', box);
     }
     DP.dados = d;
     var ss = DP.dados.safras || [];
@@ -693,7 +703,6 @@ ${MAPA_CHUVA_JS}
     if (b) b.style.display = ST.mod.recomendacoes ? '' : 'none';
     var c = document.getElementById('abaCusto'); if (c) c.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
     var ab = document.getElementById('abaAcessos'); if (ab) ab.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
-    var af = document.getElementById('abaFazendas'); if (af) af.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
   }
 
   async function baixar() {
@@ -1766,7 +1775,6 @@ ${MAPA_CHUVA_JS}
       if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
       var ac = document.getElementById('abaCusto'); if (ac) ac.addEventListener('click', function () { agroCusto(); });
       var aa = document.getElementById('abaAcessos'); if (aa) aa.addEventListener('click', function () { agroAcessos(); });
-      var afz = document.getElementById('abaFazendas'); if (afz) afz.addEventListener('click', function () { agroFazendas(); });
     }
     zoomIniciar();
     await atualizarModulos();

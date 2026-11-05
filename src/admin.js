@@ -1006,7 +1006,7 @@ ${AGRO_CSS}
     gestao: SVG('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .6 3.2 2.3 3.5 5.2"/>')
   };
   var AREAS = [
-    { id: 'visao', nome: 'Visão geral', abas: ['dash', 'fazendas'] },
+    { id: 'visao', nome: 'Visão geral', abas: ['dash'] },
     { id: 'campo', nome: 'Campo', abas: ['rels'] },
     { id: 'lavoura', nome: 'Lavoura', abas: ['plantio', 'recs', 'custo', 'acessos'] },
     { id: 'gestao', nome: 'Gestão', abas: ['contas', 'modulos'] }
