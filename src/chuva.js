@@ -8,7 +8,16 @@ const UA = 'Mozilla/5.0 (compatible; AMVS-Relatorio/1.0)';
 const GRADE = { la0: -35, la1: 7, lo0: -76, lo1: -32, passo: 2, ver: 2 };   // ver: muda quando a grade muda (refaz o guardado)
 const VALIDADE = 8 * 864e5;   // passou disso sem atualizar (cron falhou): refaz quando alguém abrir
 
-async function buscar(url) {
+// limite por minuto do Open-Meteo: na atualização de domingo (sem pressa) espera 1 minuto e tenta de novo
+let PACIENTE = false;
+async function buscar(url, tentou) {
+  try { return await buscar1(url); }
+  catch (e) {
+    if (PACIENTE && !tentou && /minut/i.test(e.message)) { await new Promise((r) => setTimeout(r, 61000)); return buscar(url, true); }
+    throw e;
+  }
+}
+async function buscar1(url) {
   const r = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
   const j = await r.json().catch(() => null);
   if (!r.ok || !j || j.error) throw new Error((j && j.reason) || ('HTTP ' + r.status));
@@ -75,6 +84,10 @@ const chaveP = (l) => 'chuva:p:' + (Math.round(l.lat * 4) / 4).toFixed(2) + ',' 
 
 // cron de domingo à noite: o mapa e o ponto de cada fazenda que tem acesso de dono/gerente
 export async function atualizarChuva(env) {
+  PACIENTE = true;
+  try { await atualizarChuva1(env); } finally { PACIENTE = false; }
+}
+async function atualizarChuva1(env) {
   try { await gravar(env, 'chuva:mapa', await mapaChuva()); } catch (e) { console.log('mapa da chuva:', e.message); }
   let ids = [];
   try {
