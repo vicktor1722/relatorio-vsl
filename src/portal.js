@@ -16,6 +16,7 @@ import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
 import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { climaDe, localDaFazenda, mercadoDaFazenda } from './mercado.js';
+import { chuvaDaFazenda } from './chuva.js';
 import { safraPadrao } from './safras.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -457,6 +458,16 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     return new Response(JSON.stringify({ ok: true, fazenda: { id: f.id, nome: f.nome, municipio: f.municipio || '', uf: f.uf || '' }, local, clima, mercado }), {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
     });
+  }
+
+  // chuva dos próximos 30 dias e mapa da chuva (só dono/gerente); atualiza no domingo à noite
+  if (rota === '/api/portal/chuva') {
+    if (a.papel === 'operador') return json({ erro: 'disponível para o acesso da fazenda' }, 403);
+    let fid = txt(url.searchParams.get('loc') || url.searchParams.get('id'), 80);
+    if (!a.lista.includes(fid)) fid = a.lista[0];
+    const f = fid ? await env.DB.prepare('SELECT id, nome, talhoes, municipio, uf FROM fazendas WHERE id = ?').bind(fid).first() : null;
+    if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
+    return json(Object.assign({ ok: true, fazenda: { id: f.id, nome: f.nome } }, await chuvaDaFazenda(env, f)));
   }
 
   // frete da fazenda até o porto (R$/t), usado na formação do preço da soja; rt vazio = volta ao estimado
