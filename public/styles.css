@@ -560,7 +560,12 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-parte .ag-link{margin:2px 0 4px}
 
 /* previsão do tempo no topo da lista de relatórios */
-.cl-card{background:linear-gradient(160deg,#2F80C9,#1E5F9E);color:#fff;border-radius:16px;padding:12px;margin:0 0 12px}
+.cl-btn{color:#fff;display:flex;align-items:center;gap:1px;font-size:14px;font-weight:700;line-height:1;padding:0 4px}.cl-btn .ic{font-size:21px}
+.cl-veu{position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:calc(56px + env(safe-area-inset-top,0px)) 12px 12px}
+.cl-folha{width:100%;max-width:440px;background:#fff;border-radius:18px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.cl-cab{display:flex;justify-content:space-between;align-items:center;padding:2px 4px 8px}.cl-cab b{font-size:15px;color:#146034}
+.cl-cab button{border:0;background:#EEF2F0;border-radius:50%;width:32px;height:32px;font-size:15px;color:#333}
+.cl-card{background:linear-gradient(160deg,#2F80C9,#1E5F9E);color:#fff;border-radius:16px;padding:12px;margin:0}
 .cl-top{display:flex;align-items:center;gap:10px}.cl-ic{font-size:40px;line-height:1}.cl-t{font-size:38px;font-weight:300;line-height:1}
 .cl-d{font-size:12.5px;line-height:1.45;opacity:.95;min-width:0}.cl-d b{display:block;font-size:14px}.cl-d small{display:block;opacity:.8;font-size:11px}
 .cl-dias{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:10px;background:rgba(255,255,255,.13);border-radius:12px;padding:7px 2px}
