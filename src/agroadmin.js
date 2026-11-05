@@ -363,11 +363,11 @@ ${MAPA_CHUVA_JS}
     var em = new Date(M.gerado_em);
     cx.innerHTML = '<div class="cab-caixa"><h2>🌧️ Mapa da chuva</h2><span class="ca-ps" id="caPs"></span></div>' +
       '<div class="ca-bloco" id="caBloco"><div class="ca-cheia-cab"><b>🌧️ Mapa da chuva</b><button id="caSai" aria-label="Fechar tela cheia">✕</button></div>' +
-      '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-cam="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
+      '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias']].concat(M.v1630 ? [['a30', '30 dias']] : []).concat([['dia', 'Dia a dia']]).map(function (x, i) { return '<button data-cam="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
       '<button id="caPlay" class="oculto">▶</button></div>' +
       '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button></div>' +
       '<div class="mc-esc"></div><div class="mc-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div></div>' +
-      '<div class="ca-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
+      '<div class="ca-pe">🌍 <b>Modelo europeu (ECMWF)</b>' + (M.v1630 ? ' até 15 dias; de 16 a 30 dias, tendência do modelo americano (GFS)' : '') + ' · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
       ' · próxima atualização domingo ' + pfBr(CA.dados.proxima) + ' à noite · escolha uma fazenda na lista ou no gráfico de plantio para ver o ponto dela</div>';
     var locs = ((PF.d && PF.d.fazendas) || []).filter(function (f) { return f.local; });
     var lat = locs.length ? locs.reduce(function (a, f) { return a + f.local.lat; }, 0) / locs.length : -14, lon = locs.length ? locs.reduce(function (a, f) { return a + f.local.lon; }, 0) / locs.length : -54;
