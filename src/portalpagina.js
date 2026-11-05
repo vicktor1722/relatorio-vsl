@@ -433,8 +433,8 @@ ${DPG_CSS}
       var prox = pv.filter(function (x) { return !x.colhido && x.data >= hoje(); })[0], base = prox ? prox.data : hoje();
       CAL.y = Number(base.slice(0, 4)); CAL.m = Number(base.slice(5, 7)) - 1; CAL.sel = base;
     }
-    var h = abas() + (D.graf && D.graf.prev && D.graf.prev.length ? grafHtml(GR.colh) : '') +
-      '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' + calendario(ev, true);
+    var h = abas() + '<h2 class="talhao">Calendário<small>aplicações e colheita prevista</small></h2>' + calendario(ev, true) +
+      (D.graf && D.graf.prev && D.graf.prev.length ? grafHtml(GR.colh, 'c') : '');
 
     if (!pv.length) {
       h += '<div class="vazio">A previsão de colheita aparece quando o consultor lançar a data de plantio dos talhões.</div>';
@@ -490,7 +490,7 @@ ${DPG_CSS}
   function areasMapa() { var o = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) o[q.nome] = Number(q.area_ha) || 0; }); return o; }
   function porNome(a, b) { return String(a).localeCompare(String(b), 'pt-BR', { numeric: true }); }
   // gráfico com troca para o lado (plantio ⇄ previsão de colheita); st = estado da aba
-  function grafHtml(st) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true }) + '</div>' : ''; }
+  function grafHtml(st, so) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true, so: so }) + '</div>' : ''; }
   function vistaPlantio() {
     var areas = areasMapa(), pl = {}, lanc = [];
     (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por }); }); });
@@ -506,7 +506,7 @@ ${DPG_CSS}
     var gerente = eu.papel !== 'operador';
     var h = abas() + (gerente && !D.todas ? '<button class="btn" id="btnLancPl">🌱 Lançar plantio do dia</button>' : '') +
       (gerente && D.todas ? '<div class="sem" style="margin:0 2px 10px">Para lançar o plantio do dia, escolha uma fazenda no topo.</div>' : '') +
-      (D.graf && D.graf.linha && D.graf.linha.length ? grafHtml(GR.plantio) : D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
+      (D.graf && D.graf.linha && D.graf.linha.length ? grafHtml(GR.plantio, 'p') : D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
       (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura / variedade</th><th>Plantado</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
     if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
       return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + esc(x.por || 'lançado') + '</small></div>' +
