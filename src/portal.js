@@ -284,7 +284,9 @@ function partesDoMapa(mapa, plantio, areas) {
   return out;
 }
 
-async function dadosFazenda(env, acesso, fid, safraPedida) {
+// op.leve: sem custo, blocos do relatório e mapa (resumo do painel do consultor); op.todas: inclui aplicações ocultas da fazenda
+async function dadosFazenda(env, acesso, fid, safraPedida, op) {
+  op = op || {};
   const f = await env.DB.prepare('SELECT f.id, f.nome, f.talhoes, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
     .bind(fid, acesso.dono_id).first();
   if (!f) return null;
@@ -313,7 +315,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
 
   // aplicações em formato de lista (as duas visões usam)
   const hoje = hojeMT();
-  const aplicacoes = recs.filter(daSafra).filter((r) => acesso.papel === 'operador' || r.mostrar).map((r) => {
+  const aplicacoes = recs.filter(daSafra).filter((r) => acesso.papel === 'operador' || op.todas || r.mostrar).map((r) => {
     const d = r.dados, num = Number(d.num) || 1, datas = datasTal(r, porTal), feito = d.feito || {};
     const tal = (d.tal || []).map((t) => {
       const tot = areas[t] || 0, p = Number((d.parte || {})[t]), ha = p > 0 && p < tot ? p : tot;
@@ -334,20 +336,22 @@ async function dadosFazenda(env, acesso, fid, safraPedida) {
 
   if (acesso.papel === 'operador') return Object.assign(base, { aplicacoes });
 
-  const bl = blocosAgro({ plantio, recs: recs.filter(daSafra).filter((r) => r.mostrar), mapa }) || {};
+  const bl = op.leve ? {} : blocosAgro({ plantio, recs: recs.filter(daSafra).filter((r) => r.mostrar), mapa }) || {};
   let custo = null;
-  try {
-    const cp = await comparativo(env, { id: dono }, false, safra);
-    custo = (cp.fazendas || []).filter((x) => x.id === fid)[0] || null;
-  } catch (e) { custo = null; }
+  if (op.custo !== false && !op.leve) {
+    try {
+      const cp = await comparativo(env, { id: dono }, false, safra);
+      custo = (cp.fazendas || []).filter((x) => x.id === fid)[0] || null;
+    } catch (e) { custo = null; }
+  }
   return Object.assign(base, {
     aplicacoes,
     blocos: { evolucao: bl.evolucao || '', mapaVar: bl.mapaVar || '', proximas: bl.topo || '', aplicacoes: bl.fim || '' },
     estoque: estoqueDe(es.results || [], recs, areas),
     custo: custo ? { talhoes: custo.talhoes, sem_preco: custo.sem_preco } : null,
     colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
-    mapaPartes: partesDoMapa(mapa, plantio, areas),
-    ciclos: await ciclosDoPlantio(env, dono, plantio, ci.results || []),
+    mapaPartes: op.leve ? [] : partesDoMapa(mapa, plantio, areas),
+    ciclos: op.leve ? [] : await ciclosDoPlantio(env, dono, plantio, ci.results || []),
     graf: await grafPlantio(env, dono, plantio, areas, (co.results || []).filter(daSafra), ci.results || [])
   });
 }
@@ -380,6 +384,11 @@ async function acessoDaRequisicao(req, env) {
   if (!mod.plantio && !mod.recomendacoes) return null;   // a conta do consultor perdeu os módulos
   a.lista = lerJson(a.fazendas, []);
   return a;
+}
+
+// painel do consultor (aba Fazendas): os mesmos números que o dono vê no Início
+export async function dadosParaPainel(env, dono, fid, op) {
+  return dadosFazenda(env, { id: '__painel', dono_id: dono, papel: 'fazenda', nome: 'Consultor', lista: [fid] }, fid, '', Object.assign({ todas: true }, op || {}));
 }
 
 export async function rotasPortal(env, req, rota, url, ctx) {

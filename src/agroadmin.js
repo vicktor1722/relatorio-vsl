@@ -1,4 +1,5 @@
 import { DPG_CSS, DPG_JS } from './graficodp.js';
+import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
 /* ============================================================
    agroadmin.js — pedaços do painel /admin ligados a Plantio e Recomendações.
    O admin.js só encaixa estes textos em lugares marcados; aqui ficam
@@ -7,6 +8,7 @@ import { DPG_CSS, DPG_JS } from './graficodp.js';
    ============================================================ */
 
 export const AGRO_ABAS =
+  '<button data-aba="fazendas" id="abaFazendas" style="display:none">🌾 Fazendas</button>' +
   '<button data-aba="plantio" id="abaPlantio" style="display:none">Plantio</button>' +
   '<button data-aba="recs" id="abaRecs" style="display:none">Recomendações</button>' +
   '<button data-aba="custo" id="abaCusto" style="display:none">Custo × produção</button>' +
@@ -14,6 +16,7 @@ export const AGRO_ABAS =
   '<button data-aba="modulos" id="abaModulos" style="display:none">Módulos</button>';
 
 export const AGRO_PAINEIS = `
+    <section class="painel" id="pFazendas"><div id="agFazendas"><div class="aviso">Carregando…</div></div></section>
     <section class="painel" id="pPlantio"><div id="agPlantio" class="ag-tela"></div></section>
     <section class="painel" id="pRecs"><div id="agRecs" class="ag-tela"></div></section>
     <section class="painel" id="pCusto"><div id="agCusto"><div class="aviso">Carregando…</div></div></section>
@@ -242,12 +245,175 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .dp-fzo input{width:18px;height:18px;accent-color:var(--verde);flex:none;margin:0}
 .dp-fzok{display:block;width:100%;margin-top:8px;border:0;border-radius:9px;background:var(--verde);color:#fff;font-weight:700;font-size:14px;padding:9px;cursor:pointer}
 ${DPG_CSS}
+${MAPA_CHUVA_CSS}
+.pf-mk{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pf-m{border:1px solid var(--linha);border-radius:11px;padding:7px 11px;background:#fff;display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+.pf-m small{font-size:11.5px;color:var(--fraco)}.pf-m b{font-size:15px}.pf-m em,.pf-k4 .dn{font-style:normal;font-size:11.5px;font-weight:700}.pf-m em.up{color:#2F9E5B}.pf-m em.dn,.pf-k4 b.dn{color:#C62828}
+.pf-filtros{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.pf-filtros input{border:1px solid var(--linha);border-radius:9px;padding:8px 10px;font-size:13.5px;min-width:230px;flex:0 1 260px}
+.pf-filtros button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:6px 12px;font-size:13px;cursor:pointer;color:inherit}.pf-filtros button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.pf-lay{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:14px;align-items:start}
+.pf-lista{padding:4px 6px!important}
+.pf-cab,.pf-row{display:grid;grid-template-columns:minmax(130px,1.7fr) minmax(104px,1.3fr) 78px 86px 78px 92px;gap:8px;align-items:center}
+.pf-cab{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--fraco);font-weight:700;padding:8px 8px;border-bottom:1px solid var(--linha)}
+.pf-row{width:100%;border:0;border-bottom:1px solid #EEF2F0;background:none;text-align:left;padding:9px 8px;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+.pf-row:hover{background:#F7FAF8}.pf-row.sel{background:#EEF7F1;box-shadow:inset 3px 0 0 var(--verde)}
+.pf-row .nm b{display:block}.pf-row small{display:block;color:var(--fraco);font-size:11.5px}.pf-row i{display:none}
+.pf-row .pl u{display:block;height:6px;border-radius:4px;background:var(--linha);overflow:hidden;margin-top:3px;width:70px}.pf-row .pl u b{display:block;height:100%;background:var(--verde)}
+.pf-c{display:inline-block;font-size:11.5px;font-weight:700;border-radius:10px;padding:2px 8px;margin:1px 3px 1px 0;white-space:nowrap}
+.pf-c.at{background:#FDE7E7;color:#C62828}.pf-c.am{background:#FFF1DB;color:#8A5300}.pf-c.ok{background:#E8F3EC;color:#146034}.pf-c.az{background:#E6F0FA;color:#134A7C}.pf-c.cz{background:#EEF2F0;color:var(--fraco)}
+.pf-det{position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+.pf-dh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}.pf-dh h3{margin:0;font-size:17px}.pf-dh small{color:var(--fraco);font-size:12px}
+.pf-x{display:none;border:0;background:#EEF2F0;border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer}
+.pf-heroi{background:linear-gradient(135deg,#14532D,#1B7A43);color:#fff;border-radius:12px;padding:11px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pf-heroi small{display:block;font-size:11px;opacity:.85}.pf-heroi b{font-size:22px}.pf-heroi b span{font-size:13px;font-weight:500}.pf-heroi .tp{text-align:right}
+.pf-k4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:9px 0}.pf-k4 div{background:#F6F8F7;border-radius:10px;padding:7px 4px;text-align:center}.pf-k4 b{display:block;font-size:15px}.pf-k4 span{font-size:10.5px;color:var(--fraco)}
+.pf-sec{font-size:12.5px;font-weight:700;color:var(--verde-escuro);margin:12px 0 6px}
+.pf-al,.pf-ap{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:6px 0;border-top:1px dashed var(--linha)}.pf-al small,.pf-ap small{display:block;color:var(--fraco);font-size:11.5px}.pf-ap{align-items:center}
+.pf-dias{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;background:linear-gradient(160deg,#2F80C9,#1E5F9E);color:#fff;border-radius:10px;padding:6px 2px}
+.pf-dias div{text-align:center;font-size:10.5px}.pf-dias i{font-style:normal;display:block;font-size:16px}.pf-dias b{display:block;font-size:11px}.pf-dias u{display:inline-block;text-decoration:none;background:rgba(255,255,255,.22);border-radius:5px;padding:0 3px;font-size:9.5px}
+.pf-jan{font-size:12.5px;background:#F6F8F7;border-radius:10px;padding:7px 9px;margin-top:6px}.pf-jan .hrs{display:flex;gap:2px;margin-top:5px}.pf-jan .hrs u{flex:1;height:7px;border-radius:2px;background:#DCE2DE}.pf-jan .hrs u.ok{background:#2F9E5B}.pf-jan .hrs u.md{background:#F2C14E}
+.pf-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}.pf-chips span{font-size:12px;background:#E6F0FA;color:#134A7C;border-radius:11px;padding:3px 9px}
+.pf-seg{display:flex;gap:4px;background:#EEF2F0;border-radius:10px;padding:3px;margin-bottom:7px}.pf-seg button{flex:1;border:0;background:none;font-size:12.5px;padding:6px 2px;border-radius:8px;color:var(--fraco);font-weight:600;cursor:pointer}
+.pf-seg button.on{background:#fff;color:#134A7C;box-shadow:0 1px 3px rgba(0,0,0,.12)}.pf-seg #pfPlay{flex:0 0 40px;background:#134A7C;color:#fff}
+.pf-mapa{position:relative;height:250px;border-radius:12px;overflow:hidden}.pf-mapa #pfMapa{position:absolute;inset:0}
+.pf-mapa .t,.pf-mapa .d{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none;font-size:11px;padding:3px 8px}.pf-mapa .t{left:8px}.pf-mapa .d{right:8px;font-weight:800;font-size:15px}
+.pf-conta{font-size:12.5px;line-height:1.6;background:#F6F8F7;border-radius:10px;padding:8px 10px}
+@media (max-width:979px){
+  .pf-lay{display:block}.pf-cab{display:none}
+  .pf-row{grid-template-columns:1fr 1fr;row-gap:6px;padding:11px 8px}.pf-row .nm,.pf-row .at{grid-column:1/-1}.pf-row i{display:block;font-style:normal;font-size:10.5px;color:var(--fraco)}
+  .pf-det{display:none;position:fixed;inset:0;z-index:2000;max-height:none;border-radius:0;margin:0}.pf-det.aberto{display:block}.pf-x{display:block}
+}
 @media (max-width:620px){.dp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dp-v{grid-template-columns:1fr 1fr}.dp-vb{grid-column:1/-1;order:3}}
 `;
 
 // String.raw: o código abaixo tem expressões regulares com barra invertida
 export const AGRO_JS = String.raw`
 ${DPG_JS}
+${MAPA_CHUVA_JS}
+  /* ---------- aba Fazendas: uma linha por fazenda + resumo ao lado (Opção A) ---------- */
+  var PF = { d: null, sel: null, filtro: 'todas', busca: '', det: {}, mc: null, carregando: false };
+  function pfN(v, c) { return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: c || 0, maximumFractionDigits: c || 0 }); }
+  function pfBr(i) { return i ? i.slice(8, 10) + '/' + i.slice(5, 7) : '—'; }
+  function pfVar(v) { return v == null ? '' : '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : '') + '">' + (v > 0 ? '▲' : v < 0 ? '▼' : '') + pfN(Math.abs(v), 1) + '%</em>'; }
+  function pfLargo() { return window.matchMedia('(min-width: 980px)').matches; }
+  async function agroFazendas() {
+    var box = document.getElementById('agFazendas'); if (!box) return;
+    if (!PF.d) box.innerHTML = '<div class="aviso">Carregando as fazendas, o tempo e o mercado…</div>';
+    try { PF.d = await api('/api/painel/fazendas'); }
+    catch (e) { box.innerHTML = '<div class="aviso ruim">' + esc(e.message) + '</div>'; return; }
+    if (!PF.sel && pfLargo()) { var c = pfFiltradas()[0]; PF.sel = c ? c.id : null; }
+    pfPintar();
+  }
+  function pfAlerta(f) { var a = f.alertas || {}; return a.atrasadas + a.estoque + a.chuva; }
+  function pfFiltradas() {
+    var q = PF.busca.trim().toLowerCase();
+    return (PF.d.fazendas || []).filter(function (f) {
+      if (q && (f.nome + ' ' + f.produtor + ' ' + f.municipio + ' ' + f.conta).toLowerCase().indexOf(q) < 0) return false;
+      if (PF.filtro === 'alertas') return pfAlerta(f) > 0;
+      if (PF.filtro === 'chuva') return f.chuva7 >= 40;
+      if (PF.filtro === 'pulv') return !!(f.janela && f.janela.melhor);
+      return true;
+    }).sort(function (a, b) { return pfAlerta(b) - pfAlerta(a) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+  }
+  function pfPintar() {
+    var box = document.getElementById('agFazendas'), D = PF.d, M = D.mercado || {}, all = D.fazendas || [];
+    var m = function (ic, t, x, pre, suf, c) { return x ? '<div class="pf-m"><small>' + ic + ' ' + t + '</small><b>' + pre + pfN(x.preco, c) + (suf || '') + '</b>' + pfVar(x.var) + '</div>' : ''; };
+    var h = '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
+      m('🌱', 'Soja MT (média das praças)', M.soja_mt, 'R$ ', '', 2) + m('🌽', 'Milho MT', M.milho_mt, 'R$ ', '', 2) +
+      (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') + '</div>';
+    var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;
+    h += '<div class="pf-filtros"><input id="pfBusca" placeholder="🔍 Buscar fazenda ou produtor" value="' + esc(PF.busca) + '">' +
+      [['todas', 'Todas (' + all.length + ')'], ['alertas', '⚠️ Com alertas (' + nAl + ')'], ['chuva', '🌧️ Chuva forte na semana (' + nCh + ')'], ['pulv', '🚜 Pulverizar amanhã (' + nPu + ')']].map(function (x) {
+        return '<button data-pff="' + x[0] + '" class="' + (PF.filtro === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
+    h += '<div class="pf-lay"><div class="pf-lista caixa" id="pfLista">' + pfLista() + '</div><div class="pf-det caixa" id="pfDet">' + pfDetalhe() + '</div></div>';
+    box.innerHTML = h;
+    var bu = document.getElementById('pfBusca');
+    bu.oninput = function () { PF.busca = bu.value; document.getElementById('pfLista').innerHTML = pfLista(); pfLigarLista(); };
+    box.querySelectorAll('[data-pff]').forEach(function (b) { b.onclick = function () { PF.filtro = b.dataset.pff; pfPintar(); }; });
+    pfLigarLista(); pfLigarDet();
+  }
+  function pfLista() {
+    var l = pfFiltradas();
+    if (!l.length) return '<div class="aviso">Nenhuma fazenda neste filtro.</div>';
+    return '<div class="pf-cab"><span>Fazenda</span><span>Atenção</span><span>Plantio</span><span>Chuva 7 dias</span><span>Pulverizar</span><span>Soja na fazenda</span></div>' + l.map(function (f) {
+      var a = f.alertas || {}, ch = [];
+      if (a.atrasadas) ch.push('<span class="pf-c at">' + a.atrasadas + (a.atrasadas === 1 ? ' atrasada' : ' atrasadas') + '</span>');
+      if (a.chuva) ch.push('<span class="pf-c am">chuva no dia</span>');
+      if (a.estoque) ch.push('<span class="pf-c am">estoque</span>');
+      if (!ch.length) ch.push('<span class="pf-c ok">tudo em dia</span>');
+      var j = f.janela && f.janela.melhor;
+      return '<button class="pf-row' + (PF.sel === f.id ? ' sel' : '') + '" data-pfs="' + esc(f.id) + '">' +
+        '<span class="nm"><b>' + esc(f.nome) + '</b><small>' + esc([f.produtor || f.conta, f.municipio ? f.municipio + (f.uf ? '/' + f.uf : '') : ''].filter(Boolean).join(' · ')) + '</small></span>' +
+        '<span class="at">' + ch.join('') + '</span>' +
+        '<span class="pl"><i>Plantio</i>' + pfN(f.plantio.pct) + '%<u><b style="width:' + Math.min(100, f.plantio.pct) + '%"></b></u></span>' +
+        '<span><i>Chuva 7 dias</i>' + (f.chuva7 == null ? '—' : '<span class="pf-c az">' + (f.chuva7 >= 20 ? '🌧️ ' : f.chuva7 >= 5 ? '🌦️ ' : '☀️ ') + pfN(f.chuva7) + ' mm</span>') + '</span>' +
+        '<span><i>Pulverizar ' + (f.janela && f.janela.hoje ? 'hoje' : 'amanhã') + '</i>' + (f.janela ? (j ? ('0' + j.de).slice(-2) + 'h–' + ('0' + j.ate).slice(-2) + 'h' : 'sem janela') : '—') + '</span>' +
+        '<span class="vd"><i>Soja na fazenda</i>' + (f.venda != null ? '<b>R$ ' + pfN(f.venda, 2) + '</b>' : '—') + '</span></button>';
+    }).join('');
+  }
+  function pfLigarLista() {
+    document.querySelectorAll('[data-pfs]').forEach(function (b) { b.onclick = function () {
+      PF.sel = b.dataset.pfs;
+      document.querySelectorAll('.pf-row').forEach(function (x) { x.classList.toggle('sel', x === b); });
+      document.getElementById('pfDet').innerHTML = pfDetalhe(); pfLigarDet();
+      if (!pfLargo()) document.getElementById('pfDet').classList.add('aberto');
+    }; });
+  }
+  function pfDetalhe() {
+    if (!PF.sel) return '<div class="aviso">Escolha uma fazenda na lista para ver o resumo.</div>';
+    var X = PF.det[PF.sel], f = (PF.d.fazendas || []).filter(function (x) { return x.id === PF.sel; })[0];
+    if (!X) {
+      if (!PF.carregando) {
+        PF.carregando = true; var id = PF.sel;
+        api('/api/painel/fazenda?id=' + encodeURIComponent(id)).then(function (r) { PF.det[id] = r; }).catch(function (e) { PF.det[id] = { erro: e.message }; })
+          .then(function () { PF.carregando = false; var el = document.getElementById('pfDet'); if (el && PF.sel === id) { el.innerHTML = pfDetalhe(); pfLigarDet(); } });
+      }
+      return '<div class="pf-dh"><div><h3>' + esc(f ? f.nome : '') + '</h3></div><button class="pf-x" id="pfFecha">✕</button></div><div class="aviso">Carregando o resumo…</div>';
+    }
+    if (X.erro) return '<div class="aviso ruim">' + esc(X.erro) + '</div>';
+    var F = X.mercado && X.mercado.formacao, c = X.clima, P = X.chuva && X.chuva.ponto, venda = F ? (F.venda != null ? F.venda : F.fazenda) : null;
+    var h = '<div class="pf-dh"><div><h3>' + esc(X.fazenda.nome) + '</h3><small>' + esc([X.fazenda.produtor, X.fazenda.municipio ? X.fazenda.municipio + (X.fazenda.uf ? '/' + X.fazenda.uf : '') : ''].filter(Boolean).join(' · ')) + '</small></div><button class="pf-x" id="pfFecha">✕</button></div>';
+    h += '<div class="pf-heroi"><div><small>Soja na fazenda (venda estimada)</small><b>' + (venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b></div>' +
+      (c && c.agora ? '<div class="tp"><small>agora</small><b>' + c.agora.ic + ' ' + c.agora.temp + '°</b></div>' : '') + '</div>';
+    h += '<div class="pf-k4"><div><b>' + pfN(X.plantio.pct) + '%</b><span>plantado</span></div><div><b' + (X.alertas.atrasadas ? ' class="dn"' : '') + '>' + X.alertas.atrasadas + '</b><span>atrasadas</span></div>' +
+      '<div><b>' + (P ? pfN(P.acc[1]) + ' mm' : '—') + '</b><span>chuva 30 dias</span></div><div><b>' + pfBr(X.colheita) + '</b><span>1ª colheita</span></div></div>';
+    if (X.atencao.length) h += '<div class="pf-sec">⚠️ Precisa de atenção</div>' + X.atencao.map(function (a) { return '<div class="pf-al"><span>' + a.ic + '</span><div><b>' + esc(a.t) + '</b><small>' + esc(a.s) + '</small></div></div>'; }).join('');
+    if (c && c.dias) {
+      var dw = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+      h += '<div class="pf-sec">🌦️ Tempo na fazenda</div><div class="pf-dias">' + c.dias.map(function (d, i) {
+        return '<div><span>' + (i ? dw[new Date(d.d + 'T12:00:00Z').getUTCDay()] : 'hoje') + '</span><i>' + d.ic + '</i><b>' + d.max + '°</b><u>' + (d.mm >= 1 ? pfN(d.mm) + ' mm' : '0') + '</u></div>'; }).join('') + '</div>';
+      var j = c.janela;
+      if (j && j.horas.length) h += '<div class="pf-jan">🚜 <b>Pulverização ' + (j.hoje ? 'hoje' : 'amanhã') + ':</b> ' + (j.melhor ? 'boa das ' + ('0' + j.melhor.de).slice(-2) + 'h às ' + ('0' + j.melhor.ate).slice(-2) + 'h' : 'sem horário bom') +
+        '<div class="hrs">' + j.horas.map(function (x) { return '<u class="' + x.st + '"></u>'; }).join('') + '</div></div>';
+    }
+    if (X.chuva && X.chuva.mapa && P) {
+      h += '<div class="pf-sec">🌧️ Chuva · próximos 30 dias</div><div class="pf-chips"><span>Acumulado: <b>~' + pfN(P.acc[1]) + ' mm</b> (' + pfN(P.acc[0]) + ' a ' + pfN(P.acc[2]) + ')</span><span>' +
+        P.dias.filter(function (x) { return x.p1 >= 70; }).length + ' dias de chuva provável</span></div>' +
+        '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-pfm="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
+        '<button id="pfPlay" class="oculto">▶</button></div><div class="pf-mapa"><div id="pfMapa"></div><span class="t" id="pfMt"></span><span class="d" id="pfMd"></span></div>' +
+        '<div class="mc-esc"></div><div class="mc-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div>';
+    }
+    if (F) h += '<div class="pf-sec">💰 Preço da soja</div><div class="pf-conta">Porto ' + esc(F.porto.nome) + ' <b>R$ ' + pfN(F.porto.preco, 2) + '</b> − frete <b>R$ ' + pfN(F.frete.sc, 2) + '</b> (R$ ' + pfN(F.frete.rt) + '/t' + (F.frete.estimado ? ', estimado' : '') + ')' +
+      (F.custos ? ' − custos da região <b>R$ ' + pfN(F.custos.sc, 2) + '</b>' : '') + ' = <b>R$ ' + pfN(venda, 2) + '/sc</b>' + (F.praca ? '<br>Praça ' + esc(F.praca.nome) + ': R$ ' + pfN(F.praca.preco, 2) : '') + '</div>';
+    if (X.pendentes.length) h += '<div class="pf-sec">💧 Próximas aplicações</div>' + X.pendentes.map(function (a) {
+      var hj = PF.d.hoje, cls = !a.data ? '' : a.data < hj ? 'at' : a.data === hj ? 'am' : '';
+      return '<div class="pf-ap"><span class="pf-c ' + (cls || 'cz') + '">' + (!a.data ? 'sem data' : a.data < hj ? 'atrasada' : a.data === hj ? 'hoje' : pfBr(a.data)) + '</span><div><b>' + esc(a.titulo) + '</b><small>' + esc(a.tal.slice(0, 5).join(', ') + (a.tal.length > 5 ? '…' : '')) + ' · ' + pfN(a.ha) + ' ha</small></div></div>'; }).join('');
+    return h;
+  }
+  function pfLigarDet() {
+    var fx = document.getElementById('pfFecha'); if (fx) fx.onclick = function () { document.getElementById('pfDet').classList.remove('aberto'); if (PF.mc) { PF.mc.destruir(); PF.mc = null; } };
+    if (PF.mc) { PF.mc.destruir(); PF.mc = null; }
+    var X = PF.det[PF.sel], el = document.getElementById('pfMapa');
+    if (!X || !el || typeof MapaChuva === 'undefined' || !X.chuva || !X.chuva.mapa) return;
+    PF.mc = MapaChuva.criar(el, X.chuva.mapa, { lat: X.local && X.local.lat, lon: X.local && X.local.lon, nome: X.fazenda.nome }, { modo: 'a7', info: function (t, d) {
+      var a = document.getElementById('pfMt'), b = document.getElementById('pfMd'); if (a) a.textContent = t; if (b) b.textContent = d; } });
+    var pl = document.getElementById('pfPlay');
+    document.querySelectorAll('[data-pfm]').forEach(function (b) { b.onclick = function () {
+      document.querySelectorAll('[data-pfm]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      pl.classList.toggle('oculto', b.dataset.pfm !== 'dia'); pl.textContent = '▶'; PF.mc.modo(b.dataset.pfm);
+    }; });
+    if (pl) pl.onclick = function () { pl.textContent = PF.mc.play() ? '❚❚' : '▶'; };
+  }
+
   /* ---------- módulos por conta (Plantio e Recomendações) ---------- */
   function agroAposPainel(adm) {
     $('#abaModulos').style.display = adm ? '' : 'none';
@@ -527,6 +693,7 @@ ${DPG_JS}
     if (b) b.style.display = ST.mod.recomendacoes ? '' : 'none';
     var c = document.getElementById('abaCusto'); if (c) c.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
     var ab = document.getElementById('abaAcessos'); if (ab) ab.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
+    var af = document.getElementById('abaFazendas'); if (af) af.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
   }
 
   async function baixar() {
@@ -1599,6 +1766,7 @@ ${DPG_JS}
       if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
       var ac = document.getElementById('abaCusto'); if (ac) ac.addEventListener('click', function () { agroCusto(); });
       var aa = document.getElementById('abaAcessos'); if (aa) aa.addEventListener('click', function () { agroAcessos(); });
+      var afz = document.getElementById('abaFazendas'); if (afz) afz.addEventListener('click', function () { agroFazendas(); });
     }
     zoomIniciar();
     await atualizarModulos();

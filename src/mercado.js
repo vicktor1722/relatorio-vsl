@@ -58,13 +58,28 @@ function situacaoHora(v, t, u, prob, mm) {
   return 'ok';
 }
 
+const CLIMA_Q = '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code' +
+  '&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation' +
+  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max' +
+  '&timezone=auto&forecast_days=7&wind_speed_unit=kmh';
 export async function climaDe(lat, lon) {
-  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat.toFixed(2) + '&longitude=' + lon.toFixed(2) +
-    '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code' +
-    '&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,precipitation' +
-    '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max' +
-    '&timezone=auto&forecast_days=7&wind_speed_unit=kmh';
-  const j = await buscar(url, 1200);
+  return montarClima(await buscar('https://api.open-meteo.com/v1/forecast?latitude=' + lat.toFixed(2) + '&longitude=' + lon.toFixed(2) + CLIMA_Q, 1200));
+}
+// várias fazendas numa consulta só (painel do consultor): devolve na mesma ordem; null onde não deu
+export async function climaVarios(locais) {
+  const ok = locais.map((l, i) => (l ? i : -1)).filter((i) => i >= 0), out = locais.map(() => null);
+  for (let k = 0; k < ok.length; k += 50) {
+    const parte = ok.slice(k, k + 50);
+    try {
+      let j = await buscar('https://api.open-meteo.com/v1/forecast?latitude=' + parte.map((i) => locais[i].lat.toFixed(2)).join(',') +
+        '&longitude=' + parte.map((i) => locais[i].lon.toFixed(2)).join(',') + CLIMA_Q, 1200);
+      if (!Array.isArray(j)) j = [j];
+      parte.forEach((i, n) => { try { out[i] = montarClima(j[n]); } catch (e) { out[i] = null; } });
+    } catch (e) { /* fica sem tempo nessas */ }
+  }
+  return out;
+}
+function montarClima(j) {
   const c = j.current || {}, h = j.hourly || {}, d = j.daily || {};
   const agoraIso = String(c.time || '').slice(0, 13);   // "2026-11-05T23"
   const iH = (h.time || []).findIndex((t) => t.slice(0, 13) === agoraIso);
