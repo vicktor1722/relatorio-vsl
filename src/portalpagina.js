@@ -481,7 +481,9 @@ body.sem-rolar{overflow:hidden}
         '<div><span>📍 Diferença da região <em>calibrada</em></span><b>' + sinal(D2.dif, 2) + '/sc</b></div>' +
         '<div class="tot fz"><span>= Disponível na fazenda</span><b>R$ ' + n(D2.preco, 2) + '/sc</b></div>' + linhaFut + '</div>' +
         '<div class="ini-fpc">📍 Calibrado com a cotação de <b>' + esc(D2.municipio) + '</b>: R$ ' + n(D2.preco_ref, 2) + ' em ' + dataBR(D2.data) + ' (porto R$ ' + n(D2.porto_ref, 2) + ' naquele dia)' +
-        (D2.km > 15 ? ' · fazenda a ' + n(D2.km) + ' km' : '') + '.<br>O preço acompanha o porto todo dia mantendo essa diferença' + (fut ? '; o futuro acompanha Chicago e o dólar mantendo a base' : '') + '.' +
+        (D2.km > 15 ? ' · fazenda a ' + n(D2.km) + ' km' : '') + '.' +
+        (D2.ajuste_frete ? '<br>Ajuste pela distância até o porto: <b>' + sinal(D2.ajuste_frete, 2) + '/sc</b> (' + (D2.ajuste_frete > 0 ? 'fazenda mais perto do porto' : 'fazenda mais longe do porto') + ' que ' + esc(D2.municipio) + ')' : '') +
+        '<br>O preço acompanha o porto todo dia mantendo essa diferença' + (fut ? '; o futuro acompanha Chicago e o dólar mantendo a base' : '') + '.' +
         (F.praca ? '<br>Praça de ' + esc(F.praca.nome) + ' hoje: R$ ' + n(F.praca.preco, 2) + '/sc' : '') + '</div>' +
         '<div class="ini-pe">Chicago US$ ' + n(F.cbot, 2) + '/bu · prêmio do porto ' + sinal(F.premio, 2) + ' US$/bu · dólar R$ ' + n(F.dolar, 2) + '. Com a cotação real da região, frete, custos e margem já estão dentro da diferença calibrada.</div></div>';
     }

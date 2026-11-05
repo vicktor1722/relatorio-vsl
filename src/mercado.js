@@ -34,10 +34,23 @@ const UF_NOME = { AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: '
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 export async function geocodificar(cidade, uf) {
-  const j = await buscar('https://geocoding-api.open-meteo.com/v1/search?count=10&language=pt&country=BR&name=' + encodeURIComponent(cidade), 7 * 86400);
-  const est = semAcento(UF_NOME[String(uf || '').toUpperCase()] || '');
-  const l = (j.results || []).filter((x) => !est || semAcento(x.admin1) === est || semAcento(x.admin1).startsWith(est));
-  const x = l[0] || (est ? null : (j.results || [])[0]);
+  // "Vila Bela da Santissima Trindade/MT", "Cáceres - MT": separa a UF do nome
+  let nome = String(cidade || '').trim(), u = String(uf || '').trim().toUpperCase();
+  const m = nome.match(/^(.*?)\s*[\/\-–,]\s*([A-Za-z]{2})$/);
+  if (m && UF_NOME[m[2].toUpperCase()]) { nome = m[1].trim(); if (!u) u = m[2].toUpperCase(); }
+  nome = nome.replace(/\bS\.\s*/gi, 'Santíssima ').replace(/\bSta\.?\s+/gi, 'Santa ').replace(/\bSto\.?\s+/gi, 'Santo ').replace(/\s+/g, ' ').trim();
+  const est = semAcento(UF_NOME[u] || '');
+  const tenta = async (q) => {
+    const j = await buscar('https://geocoding-api.open-meteo.com/v1/search?count=20&language=pt&countryCode=BR&name=' + encodeURIComponent(q), 7 * 86400);
+    const br = (j.results || []).filter((x) => x.country_code === 'BR');   // só Brasil (antes caía em Cáceres da Espanha)
+    const l = est ? br.filter((x) => semAcento(x.admin1) === est || semAcento(x.admin1).startsWith(est)) : br;
+    return l[0] || null;
+  };
+  // nome inteiro; se não achar, as primeiras palavras ("Vila Bela da Santíssima Trindade" → "Vila Bela")
+  let x = await tenta(nome);
+  if (!x && /\bd[oa]s?\s+[AEIOUÁÉÍÓÚ]/i.test(nome)) x = await tenta(nome.replace(/\bd[oa]s?\s+(?=[AEIOUÁÉÍÓÚ])/i, "D'"));   // Conquista do Oeste → Conquista D'Oeste
+  const pal = nome.split(' ');
+  for (let n = Math.min(pal.length - 1, 3); !x && n >= 2; n--) x = await tenta(pal.slice(0, n).join(' '));
   return x ? { lat: x.latitude, lon: x.longitude } : null;
 }
 
@@ -63,7 +76,46 @@ const CLIMA_Q = '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wea
   '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max' +
   '&timezone=auto&forecast_days=7&wind_speed_unit=kmh';
 export async function climaDe(lat, lon) {
-  return montarClima(await buscar('https://api.open-meteo.com/v1/forecast?latitude=' + lat.toFixed(2) + '&longitude=' + lon.toFixed(2) + CLIMA_Q, 1200));
+  try { return montarClima(await buscar('https://api.open-meteo.com/v1/forecast?latitude=' + lat.toFixed(2) + '&longitude=' + lon.toFixed(2) + CLIMA_Q, 1200)); }
+  catch (e) { return climaMetno(lat, lon); }   // reserva quando o Open-Meteo recusa (limite diário)
+}
+
+/* ---- reserva: met.no (Instituto Meteorológico da Noruega), grátis, mundo todo ---- */
+const METNO_IC = [['thunder', 95], ['sleet', 66], ['snow', 71], ['heavyrain', 65], ['rainshowers', 80], ['lightrain', 61], ['rain', 63], ['drizzle', 53], ['fog', 45], ['cloudy', 3], ['partlycloudy', 2], ['fair', 1], ['clearsky', 0]];
+const codMetno = (sim) => { const s2 = String(sim || ''); for (const [k, c] of METNO_IC) if (s2.indexOf(k) >= 0) return c; return 2; };
+async function climaMetno(lat, lon) {
+  const r = await fetch('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat.toFixed(2) + '&lon=' + lon.toFixed(2),
+    { headers: { 'User-Agent': 'AMVS-Relatorio/1.0 (+https://amvs.ia.br)', Accept: 'application/json' }, cf: { cacheTtl: 1800, cacheEverything: true } });
+  if (!r.ok) throw new Error('met.no HTTP ' + r.status);
+  const ts = ((await r.json()).properties || {}).timeseries || [];
+  if (!ts.length) throw new Error('met.no sem dados');
+  const fuso = Math.max(-5, Math.min(-2, Math.round(lon / 15)));   // hora local aproximada pela longitude
+  const loc = (t) => new Date(new Date(t).getTime() + fuso * 3600e3).toISOString();
+  const dias = {}, horas = {};
+  ts.forEach((x) => {
+    const L = loc(x.time), d = L.slice(0, 10), hr = Number(L.slice(11, 13)), det = x.data.instant.details;
+    const n1 = x.data.next_1_hours, n6 = x.data.next_6_hours, mm = n1 ? n1.details.precipitation_amount || 0 : n6 ? n6.details.precipitation_amount || 0 : 0;
+    const D = dias[d] || (dias[d] = { max: -99, min: 99, mm: 0, cods: [] });
+    D.max = Math.max(D.max, det.air_temperature); D.min = Math.min(D.min, det.air_temperature); D.mm += mm;
+    const sim = (n1 || n6 || x.data.next_12_hours || { summary: {} }).summary.symbol_code; if (hr >= 9 && hr <= 18) D.cods.push(codMetno(sim));
+    if (n1) horas[d + 'T' + ('0' + hr).slice(-2)] = { v: det.wind_speed * 3.6, t: det.air_temperature, u: det.relative_humidity, mm: n1.details.precipitation_amount || 0 };
+  });
+  const a = ts[0], ad = a.data.instant.details, aSim = ((a.data.next_1_hours || a.data.next_6_hours || {}).summary || {}).symbol_code;
+  const hojeL = loc(a.time).slice(0, 10), horaL = Number(loc(a.time).slice(11, 13));
+  const lista = Object.keys(dias).sort().slice(0, 7);
+  const diaJ = horaL < 10 ? hojeL : lista[1] || hojeL;
+  const hs = [];
+  for (let h = 5; h <= 18; h++) { const x = horas[diaJ + 'T' + ('0' + h).slice(-2)]; if (x) hs.push({ h, st: situacaoHora(x.v, x.t, x.u, 0, x.mm), vento: Math.round(x.v), temp: Math.round(x.t), umid: Math.round(x.u), prob: null }); }
+  let melhor = null, ini = -1;
+  hs.concat({ st: 'fim' }).forEach((x, i) => { if (x.st === 'ok') { if (ini < 0) ini = i; return; } if (ini >= 0 && (!melhor || i - ini > melhor[1] - melhor[0])) melhor = [ini, i]; ini = -1; });
+  const pior = (l) => (l.length ? l.sort((p, q) => q - p)[Math.floor(l.length / 3)] : 2);   // o tempo que mais aparece no dia, puxando para o pior
+  return {
+    agora: { temp: Math.round(ad.air_temperature), umid: Math.round(ad.relative_humidity), vento: Math.round(ad.wind_speed * 3.6), cod: codMetno(aSim),
+      ic: tempo(codMetno(aSim))[0], txt: tempo(codMetno(aSim))[1], prob: null, hora: loc(a.time).slice(11, 16) },
+    dias: lista.map((d) => { const D = dias[d]; let c = pior(D.cods); if (D.mm >= 5 && c < 61) c = 63; else if (D.mm >= 1 && c < 51) c = 80; return { d, cod: c, ic: tempo(c)[0], txt: tempo(c)[1], max: Math.round(D.max), min: Math.round(D.min), mm: Math.round(D.mm * 10) / 10, prob: D.mm >= 1 ? 60 : 0 }; }),
+    janela: { dia: diaJ, hoje: diaJ === hojeL, horas: hs, melhor: melhor ? { de: hs[melhor[0]].h, ate: hs[melhor[1] - 1].h + 1 } : null },
+    limites: LIM_PULV, fonte: 'met.no'
+  };
 }
 // várias fazendas numa consulta só (painel do consultor): devolve na mesma ordem; null onde não deu
 export async function climaVarios(locais) {
@@ -75,7 +127,12 @@ export async function climaVarios(locais) {
         '&longitude=' + parte.map((i) => locais[i].lon.toFixed(2)).join(',') + CLIMA_Q, 1200);
       if (!Array.isArray(j)) j = [j];
       parte.forEach((i, n) => { try { out[i] = montarClima(j[n]); } catch (e) { out[i] = null; } });
-    } catch (e) { /* fica sem tempo nessas */ }
+    } catch (e) {
+      // Open-Meteo recusou: busca na reserva (met.no), de 5 em 5
+      for (let q = 0; q < parte.length; q += 5) {
+        await Promise.all(parte.slice(q, q + 5).map(async (i) => { try { out[i] = await climaMetno(locais[i].lat, locais[i].lon); } catch (e2) { out[i] = null; } }));
+      }
+    }
   }
   return out;
 }
@@ -310,19 +367,25 @@ function calibrado(m, cal, local) {
   let pt = null, dmin = Infinity;
   (cal.pontos || []).forEach((p) => { const d = km([local.lat, local.lon], [p.lat, p.lon]); if (d < dmin) { dmin = d; pt = p; } });
   const out = {};
-  if (pt && dmin <= 150) {
+  if (pt && dmin <= 400) {
     const ps = m.portos && m.portos.soja && m.portos.soja[pt.ref.porto];
     const porto = ps ? ps[ps.length - 1] : null;
     if (porto) {
-      const dif = pt.disp - pt.ref.porto_preco;   // diferença da região para o porto (frete, custos, margem, logística)
+      let dif = pt.disp - pt.ref.porto_preco;   // diferença da região para o porto (frete, custos, margem, logística)
+      // passou de 150 km do município calibrado: soma a diferença de frete até o porto (mais perto do porto = paga mais)
+      let ajuste = 0;
+      if (dmin > 150) {
+        const fp = freteEstimado({ lat: pt.lat, lon: pt.lon }, pt.ref.porto), ff = freteEstimado(local, pt.ref.porto);
+        ajuste = r2((fp.rt - ff.rt) / SC_T * 0.5); dif += ajuste;   // metade: na região o frete muda menos que a tarifa média por km
+      }
       const ant = ps.length > 1 ? ps[ps.length - 2].p + dif : null, hoje = porto.p + dif;
       out.disp = { municipio: pt.municipio, uf: pt.uf, km: Math.round(dmin), preco_ref: pt.disp, data: pt.data, porto: pt.ref.porto,
-        porto_ref: pt.ref.porto_preco, porto_hoje: porto.p, porto_em: porto.d, dif: r2(dif), preco: r2(hoje),
+        porto_ref: pt.ref.porto_preco, porto_hoje: porto.p, porto_em: porto.d, dif: r2(dif), preco: r2(hoje), ajuste_frete: ajuste,
         var: ant ? r2((hoje - ant) / ant * 100) : null, serie: ps.slice(-15).map((x) => r2(x.p + dif)) };
     }
   }
   const f = cal.futuro;
-  if (f && m.cbot_fut && dmin <= 250) {
+  if (f && m.cbot_fut && dmin <= 400) {
     const base = f.usd_sc / BU_SC - f.ref.cbot;   // base da região sobre o contrato de Chicago (US$/bu)
     const usd = (m.cbot_fut.preco + base) * BU_SC;
     const prem = f.brl_sc ? f.brl_sc / (f.usd_sc * f.ref.dolar) - 1 : 0;   // dólar a termo implícito no preço em reais
