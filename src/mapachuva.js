@@ -65,8 +65,8 @@ var MapaChuva = (function () {
         var d0 = Math.floor(t), d1 = Math.min(M.v.length - 1, d0 + 1), f = t - d0;
         for (i = 0; i < np; i++) G[i] = (M.v[d0][i] || 0) * (1 - f) + (M.v[d1][i] || 0) * f;
       } else {
-        var nd = Math.min(M.v.length, st.modo === 'a7' ? 7 : 15);
-        for (i = 0; i < np; i++) { var s = 0; for (d = 0; d < nd; d++) s += M.v[d][i] || 0; G[i] = s; }
+        var nd = Math.min(M.v.length, st.modo === 'a7' ? 7 : 15), mais = st.modo === 'a30' && M.v1630;   // 30 dias: 15 do europeu + 16 a 30 do americano
+        for (i = 0; i < np; i++) { var s = 0; for (d = 0; d < nd; d++) s += M.v[d][i] || 0; G[i] = s + (mais ? M.v1630[i] || 0 : 0); }
       }
       var cw = cv.width, ch = cv.height, cx = cv.getContext('2d'), im = cx.createImageData(cw, ch);
       var m1 = merc(M.la1), m0 = merc(M.la0), dx = st.modo === 'dia' ? t * 2.2 : 0, dy = st.modo === 'dia' ? -t * 1.3 : 0;
@@ -89,8 +89,9 @@ var MapaChuva = (function () {
       cx.putImageData(im, 0, 0);
       if (op.info) {
         var di = Math.min(M.v.length - 1, Math.round(t)), nd2 = Math.min(M.v.length, st.modo === 'a7' ? 7 : 15), br = function (i) { return i.slice(8, 10) + '/' + i.slice(5, 7); };
-        op.info(st.modo === 'dia' ? 'Chuva prevista no dia (mm)' : 'Acumulado ' + br(M.datas[0]) + ' a ' + br(M.datas[nd2 - 1]),
-          st.modo === 'dia' ? br(M.datas[di]) : (st.modo === 'a7' ? '7 dias' : '15 dias'), Math.floor(t));
+        var fim = st.modo === 'a30' && M.ate30 ? M.ate30 : M.datas[nd2 - 1];
+        op.info(st.modo === 'dia' ? 'Chuva prevista no dia (mm)' : 'Acumulado ' + br(M.datas[0]) + ' a ' + br(fim) + (st.modo === 'a30' ? ' · 16 a 30 dias: tendência' : ''),
+          st.modo === 'dia' ? br(M.datas[di]) : (st.modo === 'a7' ? '7 dias' : st.modo === 'a30' ? '30 dias' : '15 dias'), Math.floor(t));
       }
     }
     function parar() { if (st.play) { cancelAnimationFrame(st.play); st.play = null; } }

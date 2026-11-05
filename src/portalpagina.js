@@ -562,7 +562,7 @@ body.sem-rolar{overflow:hidden}
     var M = C.mapa;
     if (M && M.v && M.v.length) {
       h += '<div class="chv-bloco" id="chvBloco"><div class="chv-cheia-cab"><b>🌧️ Mapa da chuva</b><button id="chvSai" aria-label="Fechar tela cheia">✕</button></div>' +
-        '<div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) {
+        '<div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].concat(M.v1630 ? [['a30', '30 dias']] : []).map(function (x) {
         return '<button data-chvm="' + x[0] + '" class="' + (CHV.modo === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="chv-mapa"><div id="chvMapa"></div><div class="chv-tit" id="chvTit"></div><div class="chv-dia" id="chvDia"></div>' +
         '<button class="chv-fs" id="chvFs" aria-label="Tela cheia" title="Tela cheia">⛶</button></div>' +
@@ -570,7 +570,7 @@ body.sem-rolar{overflow:hidden}
         '<div class="chv-ctrl' + (CHV.modo === 'dia' ? '' : ' oculto') + '" id="chvCtrl"><button id="chvPlay" aria-label="Animar">▶</button><input type="range" id="chvSl" min="0" max="' + (M.v.length - 1) + '" value="' + CHV.dia + '"></div></div>';
     }
     var em = new Date(P.gerado_em);
-    return h + '<div class="ini-pe chv-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
+    return h + '<div class="ini-pe chv-pe">🌍 <b>Modelo europeu (ECMWF)</b>' + (M && M.v1630 ? ' até 15 dias; de 16 a 30 dias, tendência do modelo americano (GFS)' : '') + ' · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
       ' · próxima atualização domingo ' + dataBR(C.proxima) + ' à noite</div></div>';
   }
   // camada da chuva: canvas no mapa (projeção do mapa), bordas que somem, textura de nuvem que anda com o tempo
@@ -597,8 +597,8 @@ body.sem-rolar{overflow:hidden}
       var d0 = Math.floor(t), d1 = Math.min(M.v.length - 1, d0 + 1), f = t - d0;
       for (i = 0; i < np; i++) G[i] = (M.v[d0][i] || 0) * (1 - f) + (M.v[d1][i] || 0) * f;
     } else {
-      var nd = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15);
-      for (i = 0; i < np; i++) { var s = 0; for (d = 0; d < nd; d++) s += M.v[d][i] || 0; G[i] = s; }
+      var nd = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15), mais = CHV.modo === 'a30' && M.v1630;   // 30 dias: 15 do europeu + 16 a 30 do americano
+      for (i = 0; i < np; i++) { var s = 0; for (d = 0; d < nd; d++) s += M.v[d][i] || 0; G[i] = s + (mais ? M.v1630[i] || 0 : 0); }
     }
     var cw = cv.width, ch = cv.height, cx = cv.getContext('2d'), im = cx.createImageData(cw, ch);
     var m1 = merc(M.la1), m0 = merc(M.la0), dx = CHV.modo === 'dia' ? t * 2.2 : 0, dy = CHV.modo === 'dia' ? -t * 1.3 : 0;
@@ -620,9 +620,9 @@ body.sem-rolar{overflow:hidden}
       }
     }
     cx.putImageData(im, 0, 0);
-    var di = Math.min(M.v.length - 1, Math.round(t)), nd2 = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15);
-    $('#chvTit').innerHTML = CHV.modo === 'dia' ? 'Chuva prevista<br>no dia (mm)' : 'Acumulado<br>' + dataBR(M.datas[0]) + ' a ' + dataBR(M.datas[nd2 - 1]);
-    $('#chvDia').textContent = CHV.modo === 'dia' ? dataBR(M.datas[di]) : (CHV.modo === 'a7' ? '7 dias' : '15 dias');
+    var di = Math.min(M.v.length - 1, Math.round(t)), nd2 = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15), fim = CHV.modo === 'a30' && M.ate30 ? M.ate30 : M.datas[nd2 - 1];
+    $('#chvTit').innerHTML = CHV.modo === 'dia' ? 'Chuva prevista<br>no dia (mm)' : 'Acumulado<br>' + dataBR(M.datas[0]) + ' a ' + dataBR(fim) + (CHV.modo === 'a30' ? '<br><small>16 a 30 dias: tendência</small>' : '');
+    $('#chvDia').textContent = CHV.modo === 'dia' ? dataBR(M.datas[di]) : (CHV.modo === 'a7' ? '7 dias' : CHV.modo === 'a30' ? '30 dias' : '15 dias');
   }
   function chvParar() { if (CHV.play) { cancelAnimationFrame(CHV.play); CHV.play = null; } var pl = document.getElementById('chvPlay'); if (pl) pl.textContent = '▶'; }
   function ligarChuva() {
