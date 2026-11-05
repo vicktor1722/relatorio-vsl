@@ -220,7 +220,7 @@
   function semTxt(r) { return r.sem_ha ? fmt(r.sem_m, 1) + ' sem/m · ' + fmt(r.sem_ha, 0) + ' sem/ha' : ''; }
   // DAE: cada talhão tem a sua data = emergência dele + DAE. Sem emergência informada, usa o plantio + 5 dias.
   // Calculado na hora a partir do plantio (se a emergência mudar, a data acompanha).
-  var EMERG_APOS_PLANTIO = 5;
+  var EMERG_APOS_PLANTIO = 4;   // germinação/emergência: 4 dias depois do plantio
   function baseDae(fid, safra, t) {
     var p = linhaPlantio(fid, safra, t); if (!p) return '';
     return p.data_emerg || (p.data_plantio ? addDias(p.data_plantio, EMERG_APOS_PLANTIO) : '');
@@ -625,7 +625,7 @@
   function lancTxt(t) {
     var l = lancDe(linhaPlantio(P.faz, P.safra, P.nome)); if (!l.length) return '';
     var tot = l.reduce(function (s, x) { return s + Number(x.ha); }, 0);
-    return '<div class="ag-dica">🌱 <b>Plantio por dia (lançado pela fazenda):</b> ' + l.map(function (x) { return curta(x.d) + ' ' + fmt(x.ha) + ' ha'; }).join(' · ') +
+    return '<div class="ag-dica">🌱 <b>Plantio por dia (lançado pela fazenda):</b> ' + l.map(function (x) { return curta(x.d) + ' ' + fmt(x.ha) + ' ha' + (x.sem ? ' (' + fmt(x.sem, 1) + ' sem/m' + (x.esp ? ' a ' + fmt(x.esp) + ' cm' : '') + ')' : ''); }).join(' · ') +
       ' = ' + fmt(tot) + (t.ha ? ' de ' + fmt(t.ha) + ' ha' : ' ha') + '</div>';
   }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }

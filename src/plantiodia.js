@@ -8,7 +8,8 @@ export function lerLanc(p) {
   let l = [];
   try { l = JSON.parse((p && p.lanc) || '[]'); } catch (e) { l = []; }
   return (Array.isArray(l) ? l : []).filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.d) && Number(x.ha) > 0)
-    .map((x) => ({ d: x.d, ha: Number(x.ha), por: x.por || '' })).sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    .map((x) => Object.assign({ d: x.d, ha: Number(x.ha), por: x.por || '' }, Number(x.sem) > 0 ? { sem: Number(x.sem) } : {}, Number(x.esp) > 0 ? { esp: Number(x.esp) } : {}))
+    .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
 }
 
 // hectares plantados por dia num talhão (nunca passa da área do talhão)
