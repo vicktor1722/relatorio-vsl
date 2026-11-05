@@ -254,16 +254,20 @@ export const AGRO_JS = String.raw`
   function dpSoma(iso, n) { var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   function dpCult(c) { return DP_CULT[c] || c || '—'; }
 
+  // administrador: todas as contas; conta comum com o módulo de plantio: as fazendas dela
   async function agroDash(adm) {
-    var box = document.getElementById('caixaPlantio');
-    if (!adm) { if (box) box.remove(); return; }
+    var box = document.getElementById('caixaPlantio'), d = null;
+    try { d = await api('/api/agro/admin/plantio'); }
+    catch (e) {
+      if (!adm) { if (box) box.remove(); return; }   // conta sem o módulo de plantio: não mostra a caixa
+      if (!box) { box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio'; $('#kpis').insertAdjacentElement('afterend', box); }
+      box.innerHTML = '<h2>Plantio das áreas</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return;
+    }
     if (!box) {
       box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio';
       $('#kpis').insertAdjacentElement('afterend', box);
-      box.innerHTML = '<h2>Plantio das áreas</h2><div class="nota">Carregando…</div>';
     }
-    try { DP.dados = await api('/api/agro/admin/plantio'); }
-    catch (e) { box.innerHTML = '<h2>Plantio das áreas</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return; }
+    DP.dados = d;
     var ss = DP.dados.safras || [];
     if (!ss.length) { box.innerHTML = '<h2>Plantio das áreas</h2><div class="nota">Nenhum plantio lançado ainda. Lance na aba Plantio.</div>'; return; }
     if (!DP.safra || !ss.some(function (s) { return s.safra === DP.safra; })) DP.safra = ss[0].safra;
@@ -305,7 +309,7 @@ export const AGRO_JS = String.raw`
     var pc = S.total_ha ? S.plantado_ha / S.total_ha * 100 : 0;
     var sel = '<select id="dpSafra" aria-label="Safra">' + DP.dados.safras.map(function (s) {
       return '<option value="' + esc(s.safra) + '"' + (s.safra === DP.safra ? ' selected' : '') + '>Safra ' + esc(s.safra) + '</option>'; }).join('') + '</select>';
-    var h = '<div class="cab-caixa"><h2>Plantio das áreas</h2>' + sel + '</div>';
+    var h = '<div class="cab-caixa"><h2>' + (DP.dados.propria ? 'Evolução do plantio' : 'Plantio das áreas') + '</h2>' + sel + '</div>';
     h += '<div class="dp-kpis"><div class="dp-k"><b>' + dpN(pc, 1) + '%</b><span>plantado</span></div>' +
       '<div class="dp-k"><b>' + dpN(S.plantado_ha) + ' <small>ha</small></b><span>de ' + dpN(S.total_ha) + ' ha</span></div>' +
       '<div class="dp-k"><b>' + S.fazendas.length + '</b><span>' + (S.fazendas.length === 1 ? 'fazenda com plantio' : 'fazendas com plantio') + '</span></div>' +
