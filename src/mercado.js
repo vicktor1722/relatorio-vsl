@@ -299,8 +299,10 @@ function calibrado(m, cal, local) {
     const porto = ps ? ps[ps.length - 1] : null;
     if (porto) {
       const dif = pt.disp - pt.ref.porto_preco;   // diferença da região para o porto (frete, custos, margem, logística)
+      const ant = ps.length > 1 ? ps[ps.length - 2].p + dif : null, hoje = porto.p + dif;
       out.disp = { municipio: pt.municipio, uf: pt.uf, km: Math.round(dmin), preco_ref: pt.disp, data: pt.data, porto: pt.ref.porto,
-        porto_ref: pt.ref.porto_preco, porto_hoje: porto.p, porto_em: porto.d, dif: r2(dif), preco: r2(porto.p + dif) };
+        porto_ref: pt.ref.porto_preco, porto_hoje: porto.p, porto_em: porto.d, dif: r2(dif), preco: r2(hoje),
+        var: ant ? r2((hoje - ant) / ant * 100) : null, serie: ps.slice(-15).map((x) => r2(x.p + dif)) };
     }
   }
   const f = cal.futuro;
@@ -308,7 +310,9 @@ function calibrado(m, cal, local) {
     const base = f.usd_sc / BU_SC - f.ref.cbot;   // base da região sobre o contrato de Chicago (US$/bu)
     const usd = (m.cbot_fut.preco + base) * BU_SC;
     const prem = f.brl_sc ? f.brl_sc / (f.usd_sc * f.ref.dolar) - 1 : 0;   // dólar a termo implícito no preço em reais
-    out.futuro = { venc: f.venc, contrato: f.contrato, data: f.data, usd_ref: f.usd_sc, brl_ref: f.brl_sc, base: r2(base),
+    const se = (m.cbot_fut.serie || []).map((c) => r2((c + base) * BU_SC));
+    out.futuro = { venc: f.venc, contrato: f.contrato, data: f.data, usd_ref: f.usd_sc, brl_ref: f.brl_sc, base: r2(base), serie: se,
+      var: se.length > 1 ? r2((se[se.length - 1] - se[se.length - 2]) / se[se.length - 2] * 100) : null,
       cbot_ref: f.ref.cbot, cbot_hoje: m.cbot_fut.preco, usd: r2(usd), brl: f.brl_sc && m.dolar ? r2(usd * m.dolar.preco * (1 + prem)) : null, prem: r2(prem * 100) };
   }
   return out.disp || out.futuro ? out : null;

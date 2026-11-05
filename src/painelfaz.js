@@ -82,12 +82,15 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
       parte.forEach((x) => { dados.push(x[0]); locais.push(x[1]); });
     }
     const climas = await climaVarios(locais).catch(() => locais.map(() => null));
-    const linhas = [];
+    const linhas = [], regDisp = {};
+    let regFut = null;
     for (let i = 0; i < faz.length; i++) {
       const f = faz[i], d = dados[i] || {}, c = climas[i], l = locais[i];
       const r = resumo(d, c);
       const m = l ? await mercadoDaFazenda(env, l, fr[f.id]).catch(() => null) : null;
       const F = m && m.formacao;
+      if (F && F.calib && F.calib.disp && !regDisp[F.calib.disp.municipio]) regDisp[F.calib.disp.municipio] = F.calib.disp;
+      if (F && F.calib && F.calib.futuro && !regFut) regFut = F.calib.futuro;
       linhas.push(Object.assign({
         id: f.id, nome: f.nome, produtor: f.produtor || '', conta: f.conta || '', municipio: f.municipio || '', uf: f.uf || '', local: l,
         chuva7: c && c.dias ? r1(c.dias.slice(0, 7).reduce((s, x) => s + (x.mm || 0), 0)) : null,
@@ -100,7 +103,8 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
       ok: true, hoje: hojeMT(), admin,
       mercado: mg ? { dolar: mg.dolar, cbot_soja: mg.cbot_soja, cbot_milho: mg.cbot_milho,
         soja_mt: mediaUF(mg.pracas && mg.pracas.soja, 'MT'), milho_mt: mediaUF(mg.pracas && mg.pracas.milho, 'MT'),
-        paranagua: mg.portos && mg.portos.soja && mg.portos.soja['Paranaguá'] ? mg.portos.soja['Paranaguá'].slice(-1)[0] : null } : null,
+        paranagua: mg.portos && mg.portos.soja && mg.portos.soja['Paranaguá'] ? mg.portos.soja['Paranaguá'].slice(-1)[0] : null,
+        regiao: Object.values(regDisp).map((x) => ({ municipio: x.municipio, preco: x.preco, var: x.var })), futuro: regFut } : null,
       fazendas: linhas
     });
   }

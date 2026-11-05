@@ -398,8 +398,10 @@ ${MAPA_CHUVA_JS}
   function pfPintar() {
     var box = document.getElementById('agFazendas'), D = PF.d, M = D.mercado || {}, all = D.fazendas || [];
     var m = function (ic, t, x, pre, suf, c) { return x ? '<div class="pf-m"><small>' + ic + ' ' + t + '</small><b>' + pre + pfN(x.preco, c) + (suf || '') + '</b>' + pfVar(x.var) + '</div>' : ''; };
+    var reg = (M.regiao || []).map(function (x) { return m('🌱', 'Soja disponível · ' + esc(x.municipio), x, 'R$ ', '', 2); }).join('') +
+      (M.futuro ? '<div class="pf-m"><small>🗓️ Soja futuro ' + pfBr(M.futuro.venc) + '/' + M.futuro.venc.slice(2, 4) + '</small><b>US$ ' + pfN(M.futuro.usd, 2) + (M.futuro.brl ? ' · R$ ' + pfN(M.futuro.brl, 2) : '') + '</b>' + pfVar(M.futuro.var) + '</div>' : '');
     var h = '<div class="cab-caixa"><h2>🌾 Fazendas hoje</h2><span class="pf-qt">' + all.length + (all.length === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
-      '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
+      '<div class="pf-mk">' + m('💵', 'Dólar', M.dolar, 'R$ ', '', 2) + reg + m('🏛️', 'Soja Chicago', M.cbot_soja, 'US$ ', '', 2) +
       m('🌱', 'Soja MT (média das praças)', M.soja_mt, 'R$ ', '', 2) + m('🌽', 'Milho MT', M.milho_mt, 'R$ ', '', 2) +
       (M.paranagua ? '<div class="pf-m"><small>⚓ Paranaguá</small><b>R$ ' + pfN(M.paranagua.p, 2) + '</b></div>' : '') + '</div>';
     var nAl = all.filter(function (f) { return pfAlerta(f) > 0; }).length, nCh = all.filter(function (f) { return f.chuva7 >= 40; }).length, nPu = all.filter(function (f) { return f.janela && f.janela.melhor; }).length;

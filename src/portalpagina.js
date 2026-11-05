@@ -153,7 +153,8 @@ ${DPG_CSS}
 .ini-mk{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ini-m{border:1px solid var(--linha);border-radius:12px;padding:9px 10px;min-width:0}
 .ini-m:last-child:nth-child(odd){grid-column:1/-1}
-.ini-m small{font-size:11.5px;color:var(--fraco);display:block}.ini-m small.ini-pr{font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ini-m small{font-size:11.5px;color:var(--fraco);display:block}.ini-m small.ini-pr b{color:var(--texto);font-size:16px;display:inline;margin:0}
+.ini-m small.ini-pr{font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ini-m b{font-size:18px;display:block;margin:2px 0}.ini-m b span{font-size:12px;font-weight:400}
 .ini-m em{font-style:normal;font-size:12px;font-weight:700;color:var(--fraco)}.ini-m em.up{color:#2F9E5B}.ini-m em.dn{color:#C62828}
 .ini-m svg{display:block;width:100%;height:24px;margin-top:4px}
@@ -440,7 +441,12 @@ body.sem-rolar{overflow:hidden}
       return '<div class="ini-m"><small>' + ic + ' ' + tit + '</small><b>' + pre + n(x.preco, casas) + (suf ? '<span>' + suf + '</span>' : '') + '</b>' + varTxt(x.var) +
         (sub ? '<small class="ini-pr">' + sub + '</small>' : '') + linhaMini(x.serie, cor) + '</div>';
     }
-    h += '<div class="ini-mk">' + caixa('💵', 'Dólar', m.dolar, 'R$ ', '', 2) +
+    // preço da região (calibrado com cotação real): disponível e futuro junto das cotações
+    var Cb = m.formacao && m.formacao.calib, cd = Cb && Cb.disp, cf = Cb && Cb.futuro;
+    var dAno2 = function (i) { return i.slice(8, 10) + '/' + i.slice(5, 7) + '/' + i.slice(2, 4); };
+    var hReg = (cd ? caixa('🌱', 'Soja disponível', cd, 'R$ ', '', 2, '📍 ' + esc(cd.municipio) + (cd.km > 15 ? ' · ' + cd.km + ' km' : '')) : '') +
+      (cf ? caixa('🗓️', 'Soja futuro ' + dAno2(cf.venc), { preco: cf.usd, var: cf.var, serie: cf.serie }, 'US$ ', '', 2, cf.brl ? '<b>R$ ' + n(cf.brl, 2) + '</b>/sc' : '') : '');
+    h += '<div class="ini-mk">' + caixa('💵', 'Dólar', m.dolar, 'R$ ', '', 2) + hReg +
       caixa('🌱', 'Soja · sc 60 kg', m.soja, 'R$ ', '', 2, m.soja ? '📍 ' + esc(m.soja.praca) + (m.soja.km > 15 ? ' · ' + m.soja.km + ' km' : '') : '') +
       caixa('🌽', 'Milho · sc 60 kg', m.milho, 'R$ ', '', 2, m.milho ? '📍 ' + esc(m.milho.praca) + (m.milho.km > 15 ? ' · ' + m.milho.km + ' km' : '') : '') +
       caixa('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', 2) + caixa('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu', 2) + '</div>';
