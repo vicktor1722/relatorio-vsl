@@ -98,6 +98,7 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .folha .g3 .campo input{padding:8px;height:40px}
 .seg{display:flex;gap:6px;margin:2px 0 8px}.seg button{flex:1;border:1px solid #CFD8D3;background:#fff;border-radius:10px;padding:9px 6px;font-size:14px;font-weight:600;color:var(--fraco)}
 .seg button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.seg.apmodo{margin:0 0 12px}
 .parc{font-size:12.5px;color:#9A6400;margin-top:2px}.parc button{border:0;background:none;color:#C0392B;text-decoration:underline;font-size:12px;padding:0 4px}
 .folha .campo input,.folha .campo textarea{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;font-family:inherit}
 .folha .campo select{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;background:#fff;font-family:inherit}
@@ -163,7 +164,7 @@ ${DPG_CSS}
 <script>
 (function () {
   var CH = 'amvs-portal', tok = '', eu = null, D = null, aba = 'apl', filtro = 'fazer', mapas = [], modoMapa = 'var';
-  var opAba = 'apl', opMapa = '*', selec = {};
+  var opAba = 'apl', opMapa = '*', selec = {}, apModo = 'ver';   // apModo: gerente vê a programação ou lança a aplicação
   var GR = { plantio: DPG.estado('p'), colh: DPG.estado('c') };   // gráficos da aba Plantio e da aba Colheita   // operador: aba, aplicação do mapa e talhões que ele marcou
   try { tok = localStorage.getItem(CH) || ''; } catch (e) {}
   var $ = function (s) { return document.querySelector(s); };
@@ -319,7 +320,11 @@ ${DPG_CSS}
     else if (aba === 'est') vistaEstoque();
     else if (aba === 'colh') vistaColheita();
     else {
-      $('#conteudo').innerHTML = abas() + ((D.blocos.proximas || '') + (D.blocos.aplicacoes || '') || '<div class="vazio">Nenhuma aplicação nesta safra ainda.</div>');
+      var seg = '<div class="seg apmodo"><button data-apm="ver" class="' + (apModo === 'ver' ? 'on' : '') + '">📋 Programação</button>' +
+        '<button data-apm="lancar" class="' + (apModo === 'lancar' ? 'on' : '') + '">✔ Lançar aplicação</button></div>';
+      if (apModo === 'lancar') listaAplic(abas() + seg);
+      else $('#conteudo').innerHTML = abas() + seg + ((D.blocos.proximas || '') + (D.blocos.aplicacoes || '') || '<div class="vazio">Nenhuma aplicação nesta safra ainda.</div>');
+      document.querySelectorAll('[data-apm]').forEach(function (b) { b.onclick = function () { apModo = b.dataset.apm; pintar(); }; });
     }
     ligarAbas();
   }
@@ -584,10 +589,14 @@ ${DPG_CSS}
   function vistaOperador() {
     if (opAba === 'mapa') return mapaOperador();
     if (opAba === 'cal') return calOperador();
+    listaAplic(abasOp() + cartaoPush());
+  }
+  // lista das aplicações com os talhões para marcar (operador e gerente da fazenda)
+  function listaAplic(topo) {
     var l = (D.aplicacoes || []).filter(function (a) { return filtro === 'fazer' ? a.status !== 'aplicada' : a.tal.some(function (t) { return t.feito; }); });
     l.sort(function (a, b) { return filtro === 'fazer' ? (a.data < b.data ? -1 : 1) : (a.data > b.data ? -1 : 1); });
     var nFazer = (D.aplicacoes || []).filter(function (a) { return a.status !== 'aplicada'; }).length;
-    var h = abasOp() + cartaoPush() + '<div class="chips"><button data-f="fazer" class="' + (filtro === 'fazer' ? 'on' : '') + '">A fazer (' + nFazer + ')</button><button data-f="feitas" class="' + (filtro === 'feitas' ? 'on' : '') + '">Aplicadas</button></div>';
+    var h = topo + '<div class="chips"><button data-f="fazer" class="' + (filtro === 'fazer' ? 'on' : '') + '">A fazer (' + nFazer + ')</button><button data-f="feitas" class="' + (filtro === 'feitas' ? 'on' : '') + '">Aplicadas</button></div>';
     if (!l.length) h += '<div class="vazio">' + (filtro === 'fazer' ? 'Nenhuma aplicação pendente. 👍' : 'Nenhuma aplicação marcada ainda.') + '</div>';
     h += l.map(cartao).join('');
     $('#conteudo').innerHTML = h;
@@ -922,8 +931,8 @@ ${DPG_CSS}
   if (/[?&]aba=fazer/.test(location.search)) { filtro = 'fazer'; try { history.replaceState(null, '', '/portal'); } catch (e) {} }
   // sessão guardada: abre mesmo sem internet (dados do aparelho); só sai se o servidor recusar o login
   if (tok) iniciar().then(function () {
+    if (eu) enviarFila();   // o que ficou guardado sem internet (operador ou gerente)
     if (eu && eu.papel === 'operador') {
-      enviarFila();
       if (pushPossivel() && Notification.permission === 'granted' && navigator.onLine) assinarPush().catch(function () {});
     }
   }).catch(function (e) {
