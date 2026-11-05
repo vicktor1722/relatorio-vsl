@@ -136,6 +136,31 @@ export function lerPracas(html) {
   return out;
 }
 
+// preço no porto (exportação), linhas "Porto Paranaguá (disponível)" da mesma tabela: { 'Paranaguá': [{d, p}] }
+const PORTOS = { 'Paranaguá': [-25.52, -48.51], 'Rio Grande': [-32.03, -52.10], 'Santos': [-23.96, -46.33] };
+export function lerPortos(html) {
+  const out = {};
+  String(html).split('<div class="fechamento">').slice(1, 16).forEach((bl) => {
+    const m = bl.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) return;
+    const d = m[3] + '-' + m[2] + '-' + m[1];
+    const re = /<tr>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>/g;
+    let x;
+    const tab = bl.split('</table>')[0];
+    while ((x = re.exec(tab))) {
+      const txt = x[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (!/^porto/i.test(txt) || !/dispon/i.test(txt)) continue;   // só o disponível (entrega imediata)
+      const nome = Object.keys(PORTOS).filter((k) => semAcento(txt).indexOf(semAcento(k)) >= 0)[0];
+      const p = num(x[2]);
+      if (!nome || !p) continue;
+      (out[nome] = out[nome] || []);
+      if (!out[nome].some((y) => y.d === d)) out[nome].push({ d, p });
+    }
+  });
+  Object.keys(out).forEach((k) => out[k].sort((a, b) => (a.d < b.d ? -1 : 1)));
+  return out;
+}
+
 async function yahoo(simbolo, div) {
   const j = await buscar('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(simbolo) + '?range=1mo&interval=1d', 1200);
   const r = j.chart && j.chart.result && j.chart.result[0];
@@ -166,13 +191,15 @@ export async function mercadoGeral(env) {
   const pega = (p) => p.then((v) => v, () => null);
   const [usd, zs, zc, hs, hm] = await Promise.all([pega(dolar()), pega(yahoo('ZS=F', 100)), pega(yahoo('ZC=F', 100)),
     pega(buscar(NA.soja, 1800, true)), pega(buscar(NA.milho, 1800, true))]);
-  let dados = { dolar: usd, cbot_soja: zs, cbot_milho: zc, pracas: { soja: hs ? lerPracas(hs) : null, milho: hm ? lerPracas(hm) : null }, em: new Date().toISOString() };
+  let dados = { dolar: usd, cbot_soja: zs, cbot_milho: zc, pracas: { soja: hs ? lerPracas(hs) : null, milho: hm ? lerPracas(hm) : null },
+    portos: { soja: hs ? lerPortos(hs) : null, milho: hm ? lerPortos(hm) : null }, em: new Date().toISOString() };
   // o que não veio agora sai do último guardado
   let guardado = null;
   try { const r = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'mercado_ultimo'").first(); guardado = r ? JSON.parse(r.valor) : null; } catch (e) { guardado = null; }
   if (guardado) {
     ['dolar', 'cbot_soja', 'cbot_milho'].forEach((k) => { if (!dados[k] && guardado[k]) dados[k] = Object.assign({}, guardado[k], { antigo: true }); });
     ['soja', 'milho'].forEach((k) => { if ((!dados.pracas[k] || !Object.keys(dados.pracas[k]).length) && guardado.pracas && guardado.pracas[k]) dados.pracas[k] = guardado.pracas[k]; });
+    ['soja', 'milho'].forEach((k) => { if ((!dados.portos[k] || !Object.keys(dados.portos[k]).length) && guardado.portos && guardado.portos[k]) dados.portos[k] = guardado.portos[k]; });
   }
   const completo = dados.dolar && !dados.dolar.antigo && dados.pracas.soja && Object.keys(dados.pracas.soja).length;
   if (completo) {
@@ -216,11 +243,42 @@ async function pracaPerto(tab, local) {
   return { praca: best.praca, km: best.km, preco: u.p, em: u.d, var: a ? r2((u.p - a.p) / a.p * 100) : null, serie: s.map((x) => x.p) };
 }
 
-export async function mercadoDaFazenda(env, local) {
+/* Formação do preço da soja na fazenda (paridade de exportação):
+   porto (R$/sc) = (Chicago + prêmio) × 2,2046 bu/sc × dólar  → o prêmio sai do preço do porto do dia
+   fazenda (R$/sc) = porto − frete (R$/t ÷ 16,667 sc/t)
+   base local (US$/bu) = preço da praça ÷ (dólar × 2,2046) − Chicago */
+const BU_SC = 2.20462, SC_T = 1000 / 60;
+export function freteEstimado(local, porto) {
+  const kmRod = Math.round(km([local.lat, local.lon], PORTOS[porto]) * 1.3);   // estrada ≈ 30% mais que a linha reta
+  return { km: kmRod, rt: Math.round(kmRod * 0.16) };                       // ~R$ 0,16 por tonelada·km (granel, longa distância)
+}
+function formacao(m, local, praca, frete) {
+  const cbot = m.cbot_soja, usd = m.dolar, portos = (m.portos && m.portos.soja) || {};
+  if (!cbot || !usd || !local) return null;
+  const nomes = Object.keys(portos);
+  if (!nomes.length) return null;
+  let porto = frete && frete.porto && portos[frete.porto] ? frete.porto : null;
+  if (!porto) porto = nomes.sort((a, b) => km([local.lat, local.lon], PORTOS[a]) - km([local.lat, local.lon], PORTOS[b]))[0];
+  const s = portos[porto], u = s[s.length - 1];
+  const conv = usd.preco * BU_SC, premio = u.p / conv - cbot.preco;
+  const est = freteEstimado(local, porto);
+  const rt = frete && frete.rt > 0 ? frete.rt : est.rt, freteSc = rt / SC_T, naFaz = u.p - freteSc;
+  return {
+    cbot: cbot.preco, dolar: usd.preco, porto: { nome: porto, preco: u.p, em: u.d }, premio: r2(premio),
+    frete: { rt, estimado: !(frete && frete.rt > 0), km: est.km, rt_estimado: est.rt, sc: r2(freteSc), em: frete && frete.em, por: frete && frete.por },
+    fazenda: r2(naFaz),
+    praca: praca ? { nome: praca.praca, preco: praca.preco, base: r2(praca.preco / conv - cbot.preco), dif: r2(praca.preco - naFaz) } : null,
+    portos: nomes
+  };
+}
+
+export async function mercadoDaFazenda(env, local, frete) {
   const m = await mercadoGeral(env);
+  const soja = await pracaPerto(m.pracas.soja, local);
   return {
     dolar: m.dolar, cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho,
-    soja: await pracaPerto(m.pracas.soja, local), milho: await pracaPerto(m.pracas.milho, local),
+    soja, milho: await pracaPerto(m.pracas.milho, local),
+    formacao: formacao(m, local, soja, frete),
     fonte: 'Dólar e Chicago: Yahoo Finance · Físico: Notícias Agrícolas (sindicatos e cooperativas)'
   };
 }

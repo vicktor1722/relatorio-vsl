@@ -448,13 +448,29 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     const f = await env.DB.prepare('SELECT id, nome, talhoes, municipio, uf FROM fazendas WHERE id = ?').bind(fid).first();
     if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
     const local = await localDaFazenda(f);
+    let frete = null;
+    try { const r = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind('frete:' + fid).first(); frete = r ? JSON.parse(r.valor) : null; } catch (e) { frete = null; }
     const [clima, mercado] = await Promise.all([
       local ? climaDe(local.lat, local.lon).catch((e) => ({ erro: 'previsão do tempo indisponível agora' })) : null,
-      a.papel === 'operador' ? null : mercadoDaFazenda(env, local).catch(() => null)
+      a.papel === 'operador' ? null : mercadoDaFazenda(env, local, frete).catch(() => null)
     ]);
     return new Response(JSON.stringify({ ok: true, fazenda: { id: f.id, nome: f.nome, municipio: f.municipio || '', uf: f.uf || '' }, local, clima, mercado }), {
-      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=300' }
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
     });
+  }
+
+  // frete da fazenda até o porto (R$/t), usado na formação do preço da soja; rt vazio = volta ao estimado
+  if (rota === '/api/portal/frete' && req.method === 'POST') {
+    if (a.papel === 'operador') return json({ erro: 'só o acesso da fazenda informa o frete' }, 403);
+    const b = await req.json().catch(() => ({}));
+    const fid = txt(b.id, 80);
+    if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
+    const rt = Math.round(Number(String(b.rt == null ? '' : b.rt).replace(',', '.')) * 100) / 100;
+    const porto = ['Paranaguá', 'Rio Grande', 'Santos'].includes(b.porto) ? b.porto : '';
+    if (b.rt !== '' && b.rt != null && !(rt > 0 && rt < 2000)) return json({ erro: 'frete inválido (R$ por tonelada)' }, 400);
+    const v = JSON.stringify({ rt: rt > 0 ? rt : 0, porto, em: hojeMT(), por: a.nome || a.login });
+    await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind('frete:' + fid, v).run();
+    return json({ ok: true });
   }
 
   // gerente da fazenda lança a área plantada no dia (ou apaga um lançamento)
