@@ -19,6 +19,7 @@ import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
 import { climaDe } from './mercado.js';
+import { atualizarChuva } from './chuva.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
@@ -816,8 +817,9 @@ export default {
     }
   },
 
-  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor
+  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; domingo 21h a chuva da semana
   async scheduled(evento, env, ctx) {
+    if (evento.cron === '0 1 * * 1') { ctx.waitUntil(atualizarChuva(env)); return; }   // domingo 21h de MT: chuva dos próximos 30 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };
