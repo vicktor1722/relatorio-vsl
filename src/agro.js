@@ -317,13 +317,14 @@ const SEM_PLANTIO = { pastagem: 1, pousio: 1 };
 
 // junta o plantio de todas as contas: por safra, área plantada x área total, evolução por data,
 // variedades e andamento de cada fazenda. Só entram fazendas com KML (precisa da área de cada talhão).
-export async function plantioGeral(env) {
+// uid: só as fazendas daquela conta (painel da conta comum); sem uid, todas (administrador)
+export async function plantioGeral(env, uid) {
   await garantir(env);
   const [pl, fz, mu] = await Promise.all([
-    env.DB.prepare('SELECT * FROM plantio LIMIT 30000').all(),
+    uid ? env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? LIMIT 30000').bind(uid).all() : env.DB.prepare('SELECT * FROM plantio LIMIT 30000').all(),
     env.DB.prepare(`SELECT f.id, f.nome, f.talhoes, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
         FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id LEFT JOIN produtores p ON p.id = f.produtor_id
-       WHERE f.talhoes IS NOT NULL AND f.talhoes != '' LIMIT 1000`).all(),
+       WHERE f.talhoes IS NOT NULL AND f.talhoes != ''` + (uid ? ' AND f.usuario_id = ?' : '') + ' LIMIT 1000').bind(...(uid ? [uid] : [])).all(),
     env.DB.prepare('SELECT usuario_id FROM modulos_usuario WHERE plantio = 1').all()
   ]);
   const geral = await liberadoGeral(env);
@@ -342,7 +343,7 @@ export async function plantioGeral(env) {
     });
     if (!total) return;
     faz[f.id] = { id: f.id, nome: f.nome || '', produtor: f.produtor || '', conta: f.conta_nome || f.conta || '',
-      areas, total, ativa: Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
+      areas, total, ativa: !!uid || Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
   });
 
   // junta as grafias da mesma variedade (ex.: "Olimpo" e "BMX Olimpo IPRO"): vale o nome mais completo
@@ -535,8 +536,10 @@ export async function rotasAgro(env, req, me, rota, url) {
 
   /* ----- visão geral para o painel do administrador ----- */
   if (rota === '/api/agro/admin/plantio' && req.method === 'GET') {
-    if (!mod.admin) return json({ erro: 'somente o administrador vê todas as contas' }, 403);
-    return json(await plantioGeral(env));
+    // administrador vê todas as contas; conta com o módulo de plantio vê a evolução das fazendas dela
+    if (mod.admin) return json(await plantioGeral(env));
+    if (mod.plantio) return json(Object.assign(await plantioGeral(env, me.id), { propria: true }));
+    return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   }
 
   /* ----- plantio ----- */
