@@ -1155,21 +1155,44 @@
         '<div class="cl-hrs">' + j.horas.map(function (x) { return '<u class="' + x.st + '"></u>'; }).join('') + '</div>' +
         '<div class="cl-hx"><span>' + j.horas[0].h + 'h</span><span>' + j.horas[j.horas.length - 1].h + 'h</span></div></div>' : '') + '</div>';
   }
+  // ícone do tempo no topo da tela inicial (igual ao 📅): mostra o tempo de agora e abre a previsão ao tocar
+  let climaAtual = null;
+  function botaoClima() {
+    const acoes = document.querySelector('#telaLista .acoes'); if (!acoes) return null;
+    let b = document.getElementById('btnClima');
+    if (!b) {
+      b = document.createElement('button'); b.id = 'btnClima'; b.className = 'cl-btn'; b.title = 'Previsão do tempo';
+      b.onclick = abrirClima;
+      acoes.insertBefore(b, acoes.firstChild);
+    }
+    return b;
+  }
+  function mostrarClima(c, quando) {
+    climaAtual = { c: c, quando: quando };
+    const b = botaoClima(); if (!b) return;
+    b.innerHTML = '<span class="ic">' + c.agora.ic + '</span><span>' + c.agora.temp + '°</span>';
+    b.title = c.agora.txt + ' · ' + c.agora.temp + '° · toque para ver a previsão';
+  }
+  function abrirClima() {
+    if (!climaAtual) return;
+    const v = document.createElement('div'); v.className = 'cl-veu';
+    v.innerHTML = '<div class="cl-folha"><div class="cl-cab"><b>Previsão do tempo</b><button aria-label="Fechar">✕</button></div>' + climaHtml(climaAtual.c, climaAtual.quando) + '</div>';
+    v.onclick = function (e) { if (e.target === v || e.target.closest('.cl-cab button')) v.remove(); };
+    document.body.appendChild(v);
+  }
   async function climaApp() {
-    const box = document.getElementById('climaApp');
-    if (!box) return;
     let pos = st.pos, guard = null;
     if (!pos) { try { pos = JSON.parse(localStorage.getItem('vsl-ult-pos') || 'null'); } catch (e) { pos = null; } }
     try { guard = JSON.parse(localStorage.getItem('vsl-clima') || 'null'); } catch (e) { guard = null; }
-    if (guard && guard.c) box.innerHTML = climaHtml(guard.c, 'onde você está · ' + new Date(guard.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-    if (!pos) { if (!guard) box.innerHTML = ''; return; }
+    if (guard && guard.c) mostrarClima(guard.c, 'onde você está · ' + new Date(guard.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    if (!pos) return;
     // a mesma previsão por 20 min, se o consultor não andou mais de ~5 km
     if (guard && Date.now() - guard.t < 20 * 60 * 1000 && Math.abs(guard.lat - pos.lat) < 0.05 && Math.abs(guard.lon - pos.lon) < 0.05) return;
     try {
       const r = await Sync.clima(pos.lat, pos.lon);
       if (!r || !r.clima) return;
       try { localStorage.setItem('vsl-clima', JSON.stringify({ c: r.clima, t: Date.now(), lat: pos.lat, lon: pos.lon })); } catch (e) {}
-      box.innerHTML = climaHtml(r.clima, 'onde você está · agora');
+      mostrarClima(r.clima, 'onde você está · agora');
     } catch (e) { /* sem internet: fica a última previsão guardada */ }
   }
 
