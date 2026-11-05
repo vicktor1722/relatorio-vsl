@@ -660,15 +660,18 @@ ${MAPA_CHUVA_JS}
     h += DPG.html(DP.g, S);
 
     var mx = S.variedades.reduce(function (m, v) { return Math.max(m, v.ha); }, 0) || 1;
-    h += '<h3 class="dp-t">Variedades <span>' + dpN(S.variedades.reduce(function (a, v) { return a + v.ha; }, 0)) + ' ha com variedade informada</span></h3>';
+    // variedades: sempre começa recolhido (abre ao tocar), igual ao "Por fazenda"
+    h += '<details class="dp-det" id="dpVar"' + (DP.varAberto ? ' open' : '') + '><summary><h3 class="dp-t">Variedades <span>' + S.variedades.length + (S.variedades.length === 1 ? ' variedade · ' : ' variedades · ') +
+      dpN(S.variedades.reduce(function (a, v) { return a + v.ha; }, 0)) + ' ha</span></h3><em></em></summary>';
     h += S.variedades.length ? '<div class="dp-vars">' + S.variedades.map(function (v) {
       return '<div class="dp-v"><div class="dp-vn"><b>' + esc(v.variedade) + '</b><span>' + esc(dpCult(v.cultura)) + ' · ' + v.fazendas + (v.fazendas === 1 ? ' fazenda' : ' fazendas') + '</span></div>' +
         '<div class="dp-vb"><i style="width:' + (v.ha / mx * 100).toFixed(1) + '%;background:' + (DP_COR[v.cultura] || DP_COR.outra) + '"></i></div>' +
         '<div class="dp-vh"><b>' + dpN(v.ha) + ' ha</b><span>plantado ' + dpN(v.plantado) + '</span></div></div>'; }).join('') + '</div>'
       : '<div class="nota">Nenhuma variedade informada nesta safra.</div>';
+    h += '</details>';
 
     // "Por fazenda" fica recolhido (a lista é longa); o painel lembra se a pessoa deixou aberto
-    var fzAberto = false; try { fzAberto = localStorage.getItem('vsl-dp-faz') === '1'; } catch (e) {}
+    var fzAberto = !!DP.fazAberto;   // ao abrir o painel vem recolhido
     h += '<details class="dp-det" id="dpFaz"' + (fzAberto ? ' open' : '') + '><summary><h3 class="dp-t">Por fazenda <span>' + S.fazendas.length + (S.fazendas.length === 1 ? ' fazenda' : ' fazendas') + '</span></h3><em></em></summary>' +
       '<div class="rolagem"><table class="dp-tab"><tr><th>Fazenda</th><th>Andamento</th><th>Período</th><th>Variedades</th></tr>' +
       S.fazendas.map(function (f) {
@@ -715,8 +718,10 @@ ${MAPA_CHUVA_JS}
     }
     DPG.ligar(box, DP.g, function () { dpPintar(box); });
     chvPontos();
+    var dv = document.getElementById('dpVar');   // lembra só enquanto o painel está aberto (ao abrir de novo vem recolhido)
+    if (dv) dv.addEventListener('toggle', function () { DP.varAberto = dv.open; });
     var df = document.getElementById('dpFaz');
-    if (df) df.addEventListener('toggle', function () { try { localStorage.setItem('vsl-dp-faz', df.open ? '1' : '0'); } catch (e) {} });
+    if (df) df.addEventListener('toggle', function () { DP.fazAberto = df.open; });
   }
 
   async function agroModulos() {
