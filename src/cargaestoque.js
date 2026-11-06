@@ -165,3 +165,37 @@ export async function trocarGlifosatoSantaPaula(env) {
   console.log('troca Glifosato 720 → ROUNDUP WG:', JSON.stringify(res));
   return res;
 }
+
+/* Troca única (07/11): nas recomendações da Santa Paula, "Lasting" vira o Karate Zeon do estoque
+   (mesmo produto, mesma dose e unidade), para a baixa das aplicações sair dele. */
+const CHAVE_KZ = 'carga:sp_karate';
+
+export async function trocarLastingSantaPaula(env) {
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_KZ).first().catch(() => null);
+  if (feito) return JSON.parse(feito.valor);
+  const c = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE).first().catch(() => null);
+  const fid = c && JSON.parse(c.valor).fazenda;
+  if (!fid) return null;
+  const f = await env.DB.prepare('SELECT id, usuario_id FROM fazendas WHERE id = ?').bind(fid).first();
+  if (!f) return null;
+  // nome do Karate Zeon como está no estoque da fazenda (a carga pode ter usado o nome das recomendações)
+  const es = await env.DB.prepare("SELECT produto FROM estoque_agro WHERE id = 'es-sp2627-karatezeon' AND fazenda_id = ?").bind(fid).first();
+  const novo = (es && es.produto) || 'KARATE ZEON';
+  const { results } = await env.DB.prepare('SELECT id, dados FROM recomendacoes WHERE fazenda_id = ?').bind(fid).all();
+  const cmds = [];
+  let recs = 0, linhas = 0;
+  (results || []).forEach((r) => {
+    let d; try { d = JSON.parse(r.dados || '{}'); } catch (e) { return; }
+    let mudou = false;
+    (d.prods || []).forEach((p) => { if (p && p[0] && solto(p[0]).startsWith('lasting')) { p[0] = novo; mudou = true; linhas++; } });
+    if (mudou) { recs++; cmds.push(env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id)); }
+  });
+  const tem = await env.DB.prepare("SELECT 1 FROM produtos_agro WHERE usuario_id = ? AND REPLACE(LOWER(nome), ' ', '') = ?").bind(f.usuario_id, solto(novo)).first();
+  if (!tem) cmds.push(env.DB.prepare(`INSERT OR IGNORE INTO produtos_agro (id, usuario_id, nome, tipo, ingrediente, dose, unidade, intervalo_dias)
+      VALUES (?, ?, ?, 'Inseticida', 'Lambda-cialotrina 250 g/L', 0, 'L/ha', 0)`).bind('pd-karatezeon-' + f.usuario_id.slice(-8), f.usuario_id, novo));
+  if (cmds.length) await env.DB.batch(cmds);
+  const res = { ok: true, fazenda: fid, nome: novo, recomendacoes: recs, linhas, em: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_KZ, JSON.stringify(res)).run();
+  console.log('troca Lasting → Karate Zeon:', JSON.stringify(res));
+  return res;
+}
