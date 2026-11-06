@@ -131,7 +131,7 @@ function registroCampo(regs) {
   }).join('') + '</div>';
 }
 
-function aplicacoes(recs, areas, hoje, plantio, out) {
+function aplicacoes(recs, areas, hoje, plantio, out, semAplicadas) {
   const porTal = {};
   (plantio || []).forEach((p) => { porTal[p.talhao] = p; });
   const grupos = {}, ordem = [];
@@ -157,13 +157,16 @@ function aplicacoes(recs, areas, hoje, plantio, out) {
     });
     Object.keys(dt).forEach((t) => { if (dt[t] && (!g.data || dt[t] < g.data)) g.data = dt[t]; });
   });
-  const lista = ordem.map((k) => grupos[k]).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
-  if (!lista.length) return '';
+  const todas = ordem.map((k) => grupos[k]).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
   const cont = {};
-  lista.forEach((g) => { cont[g.op] = Math.max(cont[g.op] || 0, g.num); });
+  todas.forEach((g) => { cont[g.op] = Math.max(cont[g.op] || 0, g.num); });   // numeração (1ª, 2ª…) conta todas
+  // relatório: as já aplicadas em todos os talhões ficam de fora (o portal da fazenda mostra todas)
+  const aplicada = (g) => g.tal.length > 0 && g.tal.every((t) => g.feito[t]);
+  const lista = semAplicadas ? todas.filter((g) => !aplicada(g)) : todas;
+  if (!lista.length) return '';
   const haDe = (g) => g.tal.reduce((s, t) => s + (g.ha[t] || 0), 0);
 
-  let h = '<h2 class="talhao">Aplicações<small>' + lista.length + ' no total</small></h2>' +
+  let h = '<h2 class="talhao">Aplicações<small>' + (semAplicadas ? lista.length + ' a fazer ou em andamento' : lista.length + ' no total') + '</small></h2>' +
     '<div class="ap-sub">Dose por hectare e quantidade total para a área de cada aplicação.</div>';
   lista.forEach((g) => {
     const feitos = g.tal.filter((t) => g.feito[t]), datas = feitos.map((t) => g.feito[t]).sort(), ha = haDe(g);
@@ -413,7 +416,9 @@ function chipsDoTalhao(nome, plantio, hoje) {
 
 /* ---------------- junta tudo ---------------- */
 
-export function blocosAgro(agro) {
+// op.semAplicadas: no relatório não entram as aplicações já feitas (fica mais curto)
+export function blocosAgro(agro, op) {
+  op = op || {};
   if (!agro) return null;
   const hoje = hojeMT();
   const areas = areasDoMapa(agro.mapa);
@@ -424,7 +429,7 @@ export function blocosAgro(agro) {
   const evolucao = evolucaoPlantio(agro.mapa, plantio, hoje);   // vai antes das observações gerais
   const topo = proximas(recs, hoje);
   const apl = [];
-  const fim = aplicacoes(recs, areas, hoje, plantio, apl);
+  const fim = aplicacoes(recs, areas, hoje, plantio, apl, !!op.semAplicadas);
   if (!evolucao && !topo && !fim && !plantio.length) return null;
   return { evolucao, topo, mapaVar, fim, apl, talhao: (nome) => chipsDoTalhao(nome, plantio, hoje) };
 }

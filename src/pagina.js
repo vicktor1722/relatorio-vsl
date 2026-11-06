@@ -720,7 +720,7 @@ const SCRIPT_IDIOMA = String.raw`
 `;
 
 export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
-  const ag = blocosAgro(agro);   // plantio e recomendações (null quando não há)
+  const ag = blocosAgro(agro, { semAplicadas: true });   // plantio e recomendações (null quando não há); aplicações já feitas ficam de fora
   const p = perfil || {};
   const empresa = p.empresa || env.EMPRESA || 'AMVS';
   const cidade = p.cidade || env.CIDADE || '';
