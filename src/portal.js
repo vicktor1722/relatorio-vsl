@@ -523,7 +523,11 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     let l = lerLanc(ant).filter((x) => x.d !== data);
     if (!b.apagar) {
       const outros = l.reduce((s, x) => s + x.ha, 0);
-      if (area && outros + ha > area + 0.05) return json({ erro: 'passa da área do talhão: faltam ' + (Math.round((area - outros) * 10) / 10).toString().replace('.', ',') + ' ha' }, 400);
+      const falta = Math.max(0, area - outros);
+      // o celular mostra o que falta arredondado (ex.: 2,15 → "2,2"): passou só um pouco, lança exatamente o que faltava
+      if (area && ha > falta && ha <= falta + 0.1) ha = Math.round(falta * 100) / 100;
+      if (area && outros + ha > area + 0.05) return json({ erro: 'passa da área do talhão: faltam ' + (Math.round(falta * 100) / 100).toString().replace('.', ',') + ' ha' }, 400);
+      if (!(ha > 0)) return json({ erro: 'este talhão já está todo plantado' }, 400);
       l.push({ d: data, ha, por: (a.nome || a.login) + ' (fazenda)', sem, esp });
     }
     l.sort((x, y) => (x.d < y.d ? -1 : 1));
