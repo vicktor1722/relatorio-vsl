@@ -368,7 +368,7 @@ ${MAPA_CHUVA_JS}
       '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button></div>' +
       '<div class="mc-esc"></div><div class="mc-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div></div>' +
       '<div class="ca-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
-      ' · próxima atualização domingo ' + pfBr(CA.dados.proxima) + ' à noite · escolha uma fazenda na lista ou no gráfico de plantio para ver o ponto dela</div>';
+      ' · atualiza todo dia de manhã cedo · escolha uma fazenda na lista ou no gráfico de plantio para ver o ponto dela</div>';
     var locs = ((PF.d && PF.d.fazendas) || []).filter(function (f) { return f.local; });
     var lat = locs.length ? locs.reduce(function (a, f) { return a + f.local.lat; }, 0) / locs.length : -14, lon = locs.length ? locs.reduce(function (a, f) { return a + f.local.lon; }, 0) / locs.length : -54;
     if (typeof MapaChuva === 'undefined') return;
@@ -534,7 +534,7 @@ ${MAPA_CHUVA_JS}
     h += '<div class="pf-heroi"><div><small>Soja na fazenda (venda estimada)</small><b>' + (venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b></div>' +
       (c && c.agora ? '<div class="tp"><small>agora</small><b>' + c.agora.ic + ' ' + c.agora.temp + '°</b></div>' : '') + '</div>';
     h += '<div class="pf-k4"><div><b>' + pfN(X.plantio.pct) + '%</b><span>plantado</span></div><div><b' + (X.alertas.atrasadas ? ' class="dn"' : '') + '>' + X.alertas.atrasadas + '</b><span>atrasadas</span></div>' +
-      '<div><b>' + (P ? pfN(P.acc[1]) + ' mm' : '—') + '</b><span>chuva 30 dias</span></div><div><b>' + pfBr(X.colheita) + '</b><span>1ª colheita</span></div></div>';
+      '<div><b>' + (P ? pfN(P.acc[1]) + ' mm' : '—') + '</b><span>chuva 15 dias</span></div><div><b>' + pfBr(X.colheita) + '</b><span>1ª colheita</span></div></div>';
     if (X.atencao.length) h += '<div class="pf-sec">⚠️ Precisa de atenção</div>' + X.atencao.map(function (a) { return '<div class="pf-al"><span>' + a.ic + '</span><div><b>' + esc(a.t) + '</b><small>' + esc(a.s) + '</small></div></div>'; }).join('');
     if (c && c.dias) {
       var dw = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -545,7 +545,7 @@ ${MAPA_CHUVA_JS}
         '<div class="hrs">' + j.horas.map(function (x) { return '<u class="' + x.st + '"></u>'; }).join('') + '</div></div>';
     }
     if (X.chuva && X.chuva.mapa && P) {
-      h += '<div class="pf-sec">🌧️ Chuva · próximos 30 dias</div><div class="pf-chips"><span>Acumulado: <b>~' + pfN(P.acc[1]) + ' mm</b> (' + pfN(P.acc[0]) + ' a ' + pfN(P.acc[2]) + ')</span><span>' +
+      h += '<div class="pf-sec">🌧️ Chuva · próximos 15 dias</div><div class="pf-chips"><span>Acumulado: <b>~' + pfN(P.acc[1]) + ' mm</b> (' + pfN(P.acc[0]) + ' a ' + pfN(P.acc[2]) + ')</span><span>' +
         P.dias.filter(function (x) { return x.p1 >= 70; }).length + ' dias de chuva provável</span></div>' +
         '<div class="pf-pe">O mapa da chuva fica abaixo dos gráficos, com o ponto desta fazenda.</div>';
     }
