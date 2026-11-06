@@ -1,12 +1,14 @@
 /* Carga única: estoque da Fazenda Santa Paula (Geraldo Perri), safra 2026/27.
    Fonte: planilha "Geraldo Perri_2 _COMPARATIVO.xlsx" (Drive · Santa Paula · SAFRA_2026_27 · PLANEJAMENTO),
    preço a prazo do Grupo de Compra VSL; produtos em dólar convertidos a R$ 5,50 (06/11/2026).
-   Sintronela = CT Green (planilha de planejamento: 980 L a R$ 46,00).
+   Sintronela = CT Green (planilha de planejamento: 980 L a R$ 46,00); Kant pHós 219 L a R$ 54,00 (Vieira Junior).
+   Versão 2 (07/11): Climur 135 kg (era 45) e entra o Kant pHós; edições feitas no app não são mexidas.
    Roda uma vez (marca em config); o nome de cada produto segue o usado nas recomendações da fazenda,
    para a baixa automática das aplicações casar com a entrada. */
 import { baseUnidade } from './agro.js';
 
 const CHAVE = 'carga:estoque_sp2627';
+const VERSAO = 2;
 const DOLAR = 5.5;
 
 // [produto, fornecedor, moeda ('US' ou 'R'), quantidade, unidade, preço a prazo, preço à vista, entrega, vencimento, outros nomes]
@@ -24,7 +26,7 @@ const ITENS = [
   ['SCORE FLEXI', 'SYNGENTA', 'US', 219, 'L', 30.37, 27.02, '2026-10-15', '2027-09-05', []],
   ['2,4-D', 'AMAGGI', 'US', 1460, 'L', 3.68, 3.32, '2026-09-01', '2027-09-30', ['2,4D', '2,4 D', '24D']],
   ['ROUNDUP WG', 'BAYER', 'US', 6570, 'kg', 5.00, 4.65, '2026-09-01', '2027-09-30', ['Zapp 720', 'Zapp', 'Roundup', 'Glifosato']],
-  ['CLIMUR', 'RAINBOW', 'US', 45, 'kg', 9.80, 9.45, '2026-09-01', '2027-05-20', ['Clorim 750', 'Clorim', 'Clorimurom', 'Clorimuron']],
+  ['CLIMUR', 'RAINBOW', 'US', 135, 'kg', 9.80, 9.45, '2026-09-01', '2027-05-20', ['Clorim 750', 'Clorim', 'Clorimurom', 'Clorimuron']],
   ['GLUFOSINATO 850 WG', 'Origeo (UPL)', 'US', 2920, 'kg', 8.45, 8.14, '2026-09-01', '2027-09-01', ['Glufosinato']],
   ['KENNOX', 'Origeo (UPL)', 'US', 400, 'L', 13.00, 12.53, '2026-09-01', '2027-09-01', []],
   ['ZETHAMAXX EVO', 'SUMITOMO', 'US', 2920, 'L', 10.00, 10.00, '2026-09-01', '2027-09-20', ['Zethamaxx']],
@@ -48,6 +50,7 @@ const ITENS = [
   ['BRAVE K', 'GRAN7', 'R', 2190, 'L', 15.99, 15.99, '2026-10-15', '2027-05-30', []],
   ['MAGMILL COMPLEX', 'GRAN7', 'R', 880, 'L', 22.00, 17.22, '2026-10-15', '2027-05-30', ['Magmill']],
   ['MAX RAIZ', 'GRAN7', 'R', 220, 'L', 178.00, 135.94, '2026-10-15', '2027-05-30', []],
+  ['Kant pHós', 'VIEIRA JUNIOR', 'R', 219, 'L', 54.00, 54.00, '2026-09-01', '', ['Kant Phos', 'Kant pHos', 'Kant']],
   ['Sintronela', 'CT GREEN', 'R', 980, 'L', 46.00, 46.00, '2026-10-15', '', ['CT Green', 'CT-Green', 'Citronela']]
 ];
 
@@ -95,8 +98,10 @@ async function nomesUsados(env, f) {
 
 export async function cargaEstoqueSantaPaula(env) {
   const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE).first().catch(() => null);
-  if (feito) return JSON.parse(feito.valor);
-  const f = await acharFazenda(env);
+  const antes = feito ? JSON.parse(feito.valor) : null;
+  if (antes && (antes.v || 1) >= VERSAO) return antes;
+  // já carregada antes (versão 1): mesma fazenda; senão procura
+  const f = antes && antes.fazenda ? await env.DB.prepare('SELECT id, usuario_id, nome FROM fazendas WHERE id = ?').bind(antes.fazenda).first() : await acharFazenda(env);
   if (!f) { console.log('carga do estoque Santa Paula: fazenda não encontrada (ou mais de uma)'); return null; }
   const usados = await nomesUsados(env, f);
   const lista = [];
@@ -112,8 +117,12 @@ export async function cargaEstoqueSantaPaula(env) {
   }
   const st = env.DB.prepare(`INSERT OR IGNORE INTO estoque_agro (id, usuario_id, fazenda_id, produto, unidade, qtd, valor, data, obs)
       VALUES (?,?,?,?,?,?,?,?,?)`);
-  await env.DB.batch(lista.map((x) => st.bind(x.id, f.usuario_id, f.id, x.nome, x.un, x.qtd, x.valor, x.data, x.obs)));
-  const res = { ok: true, fazenda: f.id, itens: lista.length, total: Math.round(lista.reduce((s, x) => s + x.valor, 0) * 100) / 100, em: new Date().toISOString() };
+  const cmds = lista.map((x) => st.bind(x.id, f.usuario_id, f.id, x.nome, x.un, x.qtd, x.valor, x.data, x.obs));
+  // versão 1 lançou o Climur com 45 kg: corrige para 135 kg (só se ninguém mexeu na quantidade)
+  const cl = lista.find((x) => x.id === 'es-sp2627-climur');
+  cmds.push(env.DB.prepare('UPDATE estoque_agro SET qtd = ?, valor = ? WHERE id = ? AND fazenda_id = ? AND qtd = 45').bind(cl.qtd, cl.valor, cl.id, f.id));
+  await env.DB.batch(cmds);
+  const res = { ok: true, v: VERSAO, fazenda: f.id, itens: lista.length, total: Math.round(lista.reduce((s, x) => s + x.valor, 0) * 100) / 100, em: new Date().toISOString() };
   await marcar(env, res);
   console.log('carga do estoque Santa Paula:', JSON.stringify(res));
   return res;
