@@ -547,9 +547,9 @@ body.sem-rolar{overflow:hidden}
   }
   var ESC_CHUVA = [[1, [189, 189, 189]], [5, [155, 226, 155]], [10, [46, 170, 60]], [13, [11, 107, 43]], [17, [30, 63, 216]], [20, [46, 123, 255]], [30, [143, 214, 255]],
     [40, [247, 243, 194]], [50, [255, 176, 0]], [70, [255, 106, 0]], [120, [227, 26, 28]], [180, [255, 179, 217]], [270, [142, 92, 255]]];
-  // acumulado de 15 dias: mesmas cores numa escala até 500 mm (senão fica tudo vermelho na época das chuvas)
+  // acumulado (7 e 15 dias): mesmas cores numa escala até 500 mm (senão fica tudo vermelho na época das chuvas)
   var LIM_15 = [3, 10, 20, 30, 45, 60, 80, 110, 150, 200, 280, 380, 500];
-  function limites() { return CHV.modo === 'a15' ? LIM_15 : ESC_CHUVA.map(function (x) { return x[0]; }); }
+  function limites() { return CHV.modo !== 'dia' ? LIM_15 : ESC_CHUVA.map(function (x) { return x[0]; }); }   // 7 e 15 dias: até 500 mm
   function rotulosEscala() {   // números da régua embaixo do mapa, cada um embaixo da sua cor (cor k em k×8%, a última em 100%)
     var l = limites();
     return [0, 2, 4, 6, 8, 10, 12].map(function (k, i, a) {
