@@ -803,7 +803,7 @@ body.sem-rolar{overflow:hidden}
     var ord = e.slice().sort(function (a, b) { return ((a.ordem < 0 ? 99 : a.ordem) - (b.ordem < 0 ? 99 : b.ordem)) || a.produto.localeCompare(b.produto, 'pt-BR'); });
     var gv = {}, gn = {}; ord.forEach(function (x) { var g = x.grupo || 'Outros'; gv[g] = (gv[g] || 0) + x.valor_saldo; gn[g] = (gn[g] || 0) + 1; });
     var gAt = null;
-    h += '<h2 class="talhao">Estoque de produtos</h2>' + (e.length ? '<div class="tab"><table class="estq"><tr><th>Produto</th><th>Entradas</th><th>Aplicado</th><th>A aplicar</th><th>Saldo</th><th>Sobra após recomendações</th><th>Preço médio</th></tr>' +
+    h += '<h2 class="talhao">Estoque de produtos</h2>' + (D.estoque_grupo && D.estoque_grupo.fazendas ? '<div class="obs">Estoque compartilhado: ' + esc(D.estoque_grupo.fazendas.join(', ')) + ' (a compra é geral e todas dão baixa nele)</div>' : '') + (e.length ? '<div class="tab"><table class="estq"><tr><th>Produto</th><th>Entradas</th><th>Aplicado</th><th>A aplicar</th><th>Saldo</th><th>Sobra após recomendações</th><th>Preço médio</th></tr>' +
       ord.map(function (x) { var u = x.unidade, g = x.grupo || 'Outros', cab = '';
         if (g !== gAt) { gAt = g; cab = '<tr class="grp"><td colspan="7"><div class="grp-c"><span class="grp-n">' + esc(g) + '</span><span class="grp-i">' + gn[g] + (gn[g] > 1 ? ' produtos' : ' produto') + ' · ' + brl(gv[g]) + ' em estoque</span></div></td></tr>'; }
         return cab + '<tr><td><b>' + esc(x.produto) + '</b></td><td>' + n(x.entradas, 1) + ' ' + u + '</td><td>' + n(x.aplicado, 1) + ' ' + u + '</td><td>' + n(x.a_aplicar, 1) + ' ' + u + '</td>' +
