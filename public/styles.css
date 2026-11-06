@@ -580,5 +580,7 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .fmt-barra button{min-width:44px;height:38px;border:1px solid #D5DED8;background:#F6F8F7;border-radius:10px;font-size:16px;color:#1F2A22;padding:0 10px}
 .fmt-barra button:active{background:#1E7B45;color:#fff}
 .fmt-barra span{font-size:11.5px;color:#7A8A80;margin-left:4px}
-.fmt-prev{margin:-4px 0 10px;background:#F3F8F4;border:1px dashed #BFD8C7;border-radius:12px;padding:8px 12px;font-size:14.5px;line-height:1.45;white-space:pre-wrap}
-.fmt-prev small{display:block;color:#7A8A80;font-size:11px;margin-bottom:2px}
+/* campo que já mostra negrito/itálico/riscado */
+.campo .rico{min-height:110px;max-height:42vh;overflow-y:auto;padding:11px 12px;border:1px solid var(--linha);border-radius:10px;background:#fff;outline:none;
+  white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;-webkit-user-select:text;user-select:text;cursor:text}
+.campo .rico:focus{border-color:var(--verde)}
