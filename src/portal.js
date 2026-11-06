@@ -505,30 +505,31 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
     const areas = areasDe(f.talhoes), talhao = txt(b.talhao, 80), data = dia(b.data);
     if (!(talhao in areas)) return json({ erro: 'talhão não encontrado no mapa da fazenda' }, 400);
-    if (!data) return json({ erro: 'informe a data' }, 400);
-    if (data > somaDias(hojeMT(), 1)) return json({ erro: 'a data não pode ser no futuro' }, 400);
+    // o que vier errado é corrigido aqui em vez de recusar (o gerente não vê aviso de erro)
+    const dataOk = data && data <= somaDias(hojeMT(), 1) ? data : hojeMT();   // sem data ou no futuro → hoje
     await garantirAgro(env);
     const safra = safraPadrao(txt(b.safra, 40));
     const ant = await env.DB.prepare('SELECT * FROM plantio WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?')
       .bind(fid, safra, talhao, a.dono_id).first();
     const area = areas[talhao] || 0;
     let ha = Math.round(Number(String(b.ha || '').replace(',', '.')) * 100) / 100;
-    if (!(ha > 0) && !b.apagar) return json({ erro: 'informe os hectares plantados' }, 400);
-    // sementes por metro e espaçamento da plantadeira (cm)
-    const nb = (v) => Math.round(Number(String(v == null ? '' : v).replace(',', '.')) * 10) / 10;
-    const sem = nb(b.sem_m), esp = nb(b.espac_cm);
-    if (!b.apagar && !(sem > 0 && sem < 80)) return json({ erro: 'informe as sementes por metro' }, 400);
-    if (!b.apagar && !(esp >= 10 && esp <= 150)) return json({ erro: 'informe o espaçamento da plantadeira em cm (ex.: 45 ou 50)' }, 400);
+    // sementes por metro e espaçamento (cm): corrige unidade trocada; vazio → os do talhão
+    const nb = (v) => Number(String(v == null ? '' : v).replace(',', '.')) || 0;
+    let sem = Math.round(nb(b.sem_m) * 10) / 10, esp = nb(b.espac_cm);
+    if (esp > 0 && esp < 2) esp = esp * 100;                // 0,45 (metro) → 45 cm
+    else if (esp > 150 && esp <= 1500) esp = esp / 10;      // 450 (mm) → 45 cm
+    esp = Math.round(esp * 10) / 10;
+    if (!(esp >= 10 && esp <= 150)) esp = (ant && Number(ant.espac_cm)) || 0;
+    if (!(sem > 0 && sem < 80)) sem = (ant && Number(ant.sem_m)) || 0;
     // um lançamento por dia: lançar de novo no mesmo dia corrige o valor
-    let l = lerLanc(ant).filter((x) => x.d !== data);
+    let l = lerLanc(ant).filter((x) => x.d !== dataOk);
     if (!b.apagar) {
       const outros = l.reduce((s, x) => s + x.ha, 0);
-      const falta = Math.max(0, area - outros);
-      // o celular mostra o que falta arredondado (ex.: 2,15 → "2,2"): passou só um pouco, lança exatamente o que faltava
-      if (area && ha > falta && ha <= falta + 0.1) ha = Math.round(falta * 100) / 100;
-      if (area && outros + ha > area + 0.05) return json({ erro: 'passa da área do talhão: faltam ' + (Math.round(falta * 100) / 100).toString().replace('.', ',') + ' ha' }, 400);
-      if (!(ha > 0)) return json({ erro: 'este talhão já está todo plantado' }, 400);
-      l.push({ d: data, ha, por: (a.nome || a.login) + ' (fazenda)', sem, esp });
+      const falta = Math.round(Math.max(0, area - outros) * 100) / 100;
+      if (!(ha > 0)) ha = falta;                       // sem hectares → o que falta do talhão
+      if (area && ha > falta) ha = falta;              // passou da área → lança só o que faltava
+      if (ha > 0) l.push(Object.assign({ d: dataOk, ha, por: (a.nome || a.login) + ' (fazenda)' }, sem ? { sem } : {}, esp ? { esp } : {}));
+      // talhão já todo plantado: nada a somar (salva o resto normalmente)
     }
     l.sort((x, y) => (x.d < y.d ? -1 : 1));
     const cultura = txt(b.cultura, 20) || (ant && ant.cultura) || 'soja';
@@ -549,7 +550,7 @@ export async function rotasPortal(env, req, rota, url, ctx) {
           sem_ha = excluded.sem_ha, lanc = excluded.lanc, atualizado_em = datetime('now')
         WHERE plantio.usuario_id = excluded.usuario_id`)
       .bind(fid, safra, talhao, a.dono_id, cultura, variedade, dp, emerg, espCm, semM, semHa, JSON.stringify(l)).run();
-    return json({ ok: true });
+    return json({ ok: true, ha: b.apagar ? 0 : ha, data: dataOk, completo: !b.apagar && !(ha > 0) });
   }
 
   // lista de cultivares de soja (para o gerente escolher a variedade ao lançar o plantio)

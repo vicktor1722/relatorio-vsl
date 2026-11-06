@@ -989,10 +989,11 @@ body.sem-rolar{overflow:hidden}
     return api('/api/portal/cultivares').then(function (r) { CULT = r.catalogo || []; return CULT; }).catch(function () { return []; });
   }
   async function enviarPlantio(corpo, msg) {
+    var r = null;
     try {
-      await api('/api/portal/plantio', Object.assign({ fazenda: $('#selFaz').value, safra: D.safra }, corpo));
-    } catch (e) { toast(e.message || 'Não foi possível salvar (sem internet?)'); return false; }
-    toast(msg);
+      r = await api('/api/portal/plantio', Object.assign({ fazenda: $('#selFaz').value, safra: D.safra }, corpo));
+    } catch (e) { toast(e.rede ? 'Sem internet agora: tente salvar de novo com sinal' : 'Não foi possível salvar agora, tente de novo'); return false; }
+    toast(typeof msg === 'function' ? msg(r) : msg);
     try { await carregar(D.safra); } catch (e) { /* salvou; a tela atualiza na próxima vez */ }
     return true;
   }
@@ -1063,15 +1064,12 @@ body.sem-rolar{overflow:hidden}
     pintarVar(); carregarCult().then(pintarVar);
     v.querySelector('#pNao').onclick = function () { v.remove(); };
     v.querySelector('#pOk').onclick = async function () {
+      // sem avisos de erro: o servidor corrige (data, hectares acima do que falta, unidade do espaçamento)
       var t = v.querySelector('#pTal').value, d = v.querySelector('#pData').value, ha = Number(String(v.querySelector('#pHa').value || '').replace(',', '.'));
-      if (!d) { toast('Informe a data'); return; }
-      if (!t) { toast('Escolha o talhão'); return; }
-      if (!(ha > 0)) { toast('Informe os hectares plantados'); return; }
-      var sem = num2('#pSem'), esp = num2('#pEsp');
-      if (!(sem > 0)) { toast('Informe as sementes por metro'); return; }
-      if (!(esp >= 10 && esp <= 150)) { toast('Informe o espaçamento da plantadeira em cm (ex.: 45)'); return; }
+      if (!t) { v.querySelector('#pTal').focus(); return; }   // só o talhão precisa ser escolhido
       this.disabled = true;
-      var ok = await enviarPlantio({ talhao: t, data: d, ha: ha, cultura: v.querySelector('#pCult').value, variedade: st.vari, sem_m: sem, espac_cm: esp }, '✔ Plantio lançado: ' + t + ' · ' + n(ha, 1) + ' ha');
+      var ok = await enviarPlantio({ talhao: t, data: d, ha: ha > 0 ? ha : '', cultura: v.querySelector('#pCult').value, variedade: st.vari, sem_m: num2('#pSem'), espac_cm: num2('#pEsp') },
+        function (r) { return r && r.completo ? '✔ ' + t + ' já está todo plantado' : '✔ Plantio lançado: ' + t + ' · ' + nHa(r && r.ha ? r.ha : ha) + ' ha'; });
       if (ok) v.remove(); else this.disabled = false;
     };
   }
