@@ -48,6 +48,11 @@ h2.talhao small{float:right;font-weight:400;color:var(--fraco);font-size:12px;pa
 .vazio{background:#fff;border:1px dashed #CFD8D3;border-radius:12px;padding:18px;text-align:center;color:var(--fraco);font-size:14px}
 .kpis{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.kpis div{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:10px 12px;flex:1;min-width:140px}
 .kpis b{display:block;font-size:18px;color:var(--verde-escuro)}.kpis span{font-size:12px;color:var(--fraco)}
+.estq tr.grp td{background:#EEF6F0;border-top:2px solid #CFE3D5;padding:9px 12px;text-align:left;white-space:nowrap}
+.estq tr.grp:first-child td,.estq tr:first-child+tr.grp td{border-top:0}
+.grp-c{position:sticky;left:12px;display:inline-block}
+.grp-n{font-weight:800;color:#145A32;font-size:14px}
+.grp-i{color:#5D7066;font-size:12px;margin-left:10px}
 .tab{overflow-x:auto;background:#fff;border:1px solid var(--linha);border-radius:12px;margin-bottom:14px}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
 th{font-size:11.5px;color:var(--fraco);text-align:right;padding:8px;border-bottom:1px solid var(--linha);white-space:nowrap}
@@ -794,8 +799,14 @@ body.sem-rolar{overflow:hidden}
     var e = D.estoque || [], val = 0, gasto = 0;
     e.forEach(function (x) { val += x.valor_saldo; gasto += x.gasto; });
     var h = abas() + '<div class="kpis"><div><b>' + brl(val) + '</b><span>valor em estoque</span></div><div><b>' + brl(gasto) + '</b><span>gasto em produtos aplicados</span></div></div>';
-    h += '<h2 class="talhao">Estoque de produtos</h2>' + (e.length ? '<div class="tab"><table><tr><th>Produto</th><th>Entradas</th><th>Aplicado</th><th>A aplicar</th><th>Saldo</th><th>Sobra após recomendações</th><th>Preço médio</th></tr>' +
-      e.map(function (x) { var u = x.unidade; return '<tr><td><b>' + esc(x.produto) + '</b></td><td>' + n(x.entradas, 1) + ' ' + u + '</td><td>' + n(x.aplicado, 1) + ' ' + u + '</td><td>' + n(x.a_aplicar, 1) + ' ' + u + '</td>' +
+    // por categoria (herbicidas, fungicidas, inseticidas…), cada uma com o valor em estoque dela
+    var ord = e.slice().sort(function (a, b) { return ((a.ordem < 0 ? 99 : a.ordem) - (b.ordem < 0 ? 99 : b.ordem)) || a.produto.localeCompare(b.produto, 'pt-BR'); });
+    var gv = {}, gn = {}; ord.forEach(function (x) { var g = x.grupo || 'Outros'; gv[g] = (gv[g] || 0) + x.valor_saldo; gn[g] = (gn[g] || 0) + 1; });
+    var gAt = null;
+    h += '<h2 class="talhao">Estoque de produtos</h2>' + (e.length ? '<div class="tab"><table class="estq"><tr><th>Produto</th><th>Entradas</th><th>Aplicado</th><th>A aplicar</th><th>Saldo</th><th>Sobra após recomendações</th><th>Preço médio</th></tr>' +
+      ord.map(function (x) { var u = x.unidade, g = x.grupo || 'Outros', cab = '';
+        if (g !== gAt) { gAt = g; cab = '<tr class="grp"><td colspan="7"><div class="grp-c"><span class="grp-n">' + esc(g) + '</span><span class="grp-i">' + gn[g] + (gn[g] > 1 ? ' produtos' : ' produto') + ' · ' + brl(gv[g]) + ' em estoque</span></div></td></tr>'; }
+        return cab + '<tr><td><b>' + esc(x.produto) + '</b></td><td>' + n(x.entradas, 1) + ' ' + u + '</td><td>' + n(x.aplicado, 1) + ' ' + u + '</td><td>' + n(x.a_aplicar, 1) + ' ' + u + '</td>' +
         '<td' + (x.saldo < 0 ? ' class="neg"' : '') + '>' + n(x.saldo, 1) + ' ' + u + '</td><td' + (x.sobra < 0 ? ' class="neg"' : '') + '>' + (x.sobra < 0 ? 'faltam ' + n(-x.sobra, 1) : n(x.sobra, 1)) + ' ' + u + '</td>' +
         '<td>' + (x.custo_unit ? brl(x.custo_unit) + '/' + u : '<span class="sem">—</span>') + '</td></tr>'; }).join('') + '</table></div>' : '<div class="vazio">Nenhum produto lançado no estoque desta fazenda.</div>');
     var c = D.custo, col = {}; (D.colheita || []).forEach(function (x) { col[x.talhao] = x.sc_ha; });
