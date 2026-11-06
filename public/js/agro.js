@@ -152,7 +152,7 @@
       if (tudo[0]) ST.plantio = tudo[0].plantio || [];
       if (tudo[1]) ST.recs = tudo[1].recs || [];
       if (tudo[2]) ST.produtos = tudo[2].produtos || [];
-      if (tudo[3]) ST.estoque = tudo[3].estoque || [];
+      if (tudo[3]) { ST.estoque = tudo[3].estoque || []; ST.grupos = tudo[3].grupos || {}; }
       if (tudo[4]) ST.colheita = tudo[4].colheita || [];
       if (tudo[5]) { ST.ciclos = tudo[5].ciclos || []; if (tudo[5].regra) ST.regra = tudo[5].regra; IDX = null; }
       gravar(); atualizarSino();
@@ -874,17 +874,20 @@
   }
   function chaveProd(n) { return String(n || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
   function brl(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  // estoque compartilhado (compra geral do produtor): as fazendas do grupo usam um estoque só
+  function grupoIds(fid) { return (ST.grupos && ST.grupos[fid]) || [fid]; }
   function saldoFaz(fid) {
-    var f = fazDe(fid), tl = talhoesDe(f), m = {};
+    var ids = grupoIds(fid), tls = {}, m = {};
+    var tlDe = function (id) { return tls[id] || (tls[id] = talhoesDe(fazDe(id))); };
     var item = function (nome, un) { var k = chaveProd(nome) + '|' + un; return m[k] || (m[k] = { nome: nome, un: un, ent: 0, val: 0, qv: 0, apl: 0, prev: 0 }); };
     (ST.estoque || []).forEach(function (e) {
-      if (e.fazenda_id !== fid) return;
+      if (ids.indexOf(e.fazenda_id) < 0) return;
       var x = item(e.produto, e.unidade || 'L'); x.ent += Number(e.qtd) || 0;
       if (Number(e.qtd) > 0 && Number(e.valor) > 0) { x.val += Number(e.valor); x.qv += Number(e.qtd); }
     });
     ST.recs.forEach(function (r) {
-      if (r.fazenda_id !== fid) return;
-      var d = dd(r);
+      if (ids.indexOf(r.fazenda_id) < 0) return;
+      var d = dd(r), tl = tlDe(r.fazenda_id);
       talDe(r).forEach(function (t) {
         var tt = tl.filter(function (x) { return x.nome === t; })[0]; if (!tt) return;
         var ha = haUsada(tt.ha, d.parte && d.parte[t]), hf = haFeitaDe(d, t, ha);
@@ -910,12 +913,14 @@
         '<div class="ag-est-l"><span class="' + (falta ? 'neg' : '') + '">' + (falta ? '⚠️ Faltam ' + qtdTxt(-x.sobra, x.un) + ' para as recomendações' : 'Sobra depois das recomendações: ' + qtdTxt(x.sobra, x.un)) + '</span>' +
         '<span>' + (x.custo ? brl(x.custo) + '/' + x.un : 'sem preço') + '</span></div></div>';
     }).join('');
-    var hist = (ST.estoque || []).filter(function (e) { return e.fazenda_id === R.faz; }).slice().sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; }).map(function (e) {
+    var gIds = grupoIds(R.faz), comp = gIds.length > 1 ? gIds.map(function (id) { var x = fazDe(id); return x ? x.nome : ''; }).filter(Boolean) : [];
+    var hist = (ST.estoque || []).filter(function (e) { return gIds.indexOf(e.fazenda_id) >= 0; }).slice().sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; }).map(function (e) {
       return '<div class="lista-item" data-a="editent" data-v="' + esc(e.id) + '"><div class="txt"><b>' + esc(e.produto) + '</b><span>' + dataBR(e.data) + (e.obs ? ' · ' + esc(e.obs) : '') + '</span></div>' +
         '<span class="badge">' + (Number(e.qtd) < 0 ? '' : '+') + qtdTxt(Number(e.qtd) || 0, e.unidade || 'L') + (Number(e.valor) ? ' · ' + brl(e.valor) : '') + '</span></div>';
     }).join('');
     pintar(tR, 'Estoque', f ? f.nome : '—', '',
       abasRec('estoque') + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
+      (comp.length ? '<div class="ag-dica">Estoque compartilhado: ' + esc(comp.join(', ')) + '. A compra é geral e as recomendações de todas dão baixa nele.</div>' : '') +
       '<button class="btn" data-a="entrada">+ Entrada de produto</button>' +
       (l.length ? '<div class="ag-resumo-ha">Valor em estoque: <b>' + brl(valor) + '</b><br>Gasto em produtos aplicados: <b>' + brl(gasto) + '</b></div>' + cards
         : '<div class="aviso" style="margin-top:10px">Nenhum produto ainda. Lance as entradas (compras) desta fazenda; as recomendações aplicadas dão baixa sozinhas.</div>') +

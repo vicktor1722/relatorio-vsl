@@ -8,6 +8,7 @@
        estiver ligada E (2) o administrador marcou o módulo para aquela conta.
    ============================================================ */
 
+import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
 import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
@@ -496,14 +497,15 @@ export async function comparativo(env, me, adm, safraPedida) {
   if (!safra) safra = [...comColheita].sort().reverse()[0] || safras[0] || '';
   const daSafra = (x) => !safra || safraPadrao(x.safra) === safra;
 
-  // custo médio de cada produto em cada fazenda (R$ por L ou kg)
+  // custo médio de cada produto em cada fazenda (R$ por L ou kg); estoque compartilhado: o do grupo
+  const G = await mapaGrupos(env), gid = (fid) => (G[fid] ? G[fid][0] : fid);
   const custo = {};
   (ent.results || []).forEach((e) => {
-    const k = e.fazenda_id + '|' + chaveProd(e.produto) + '|' + (e.unidade || 'L');
+    const k = gid(e.fazenda_id) + '|' + chaveProd(e.produto) + '|' + (e.unidade || 'L');
     const c = custo[k] || (custo[k] = { q: 0, v: 0 });
     if (Number(e.qtd) > 0 && Number(e.valor) > 0) { c.q += Number(e.qtd); c.v += Number(e.valor); }
   });
-  const preco = (fid, nome, un) => { const c = custo[fid + '|' + chaveProd(nome) + '|' + un]; return c && c.q ? c.v / c.q : 0; };
+  const preco = (fid, nome, un) => { const c = custo[gid(fid) + '|' + chaveProd(nome) + '|' + un]; return c && c.q ? c.v / c.q : 0; };
 
   const porFaz = {};
   (faz.results || []).forEach((f) => {
@@ -685,8 +687,14 @@ export async function rotasAgro(env, req, me, rota, url) {
 
   /* ----- estoque de produtos por fazenda ----- */
   if (rota === '/api/agro/estoque' && req.method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? ORDER BY data, criado_em').bind(me.id).all();
-    return json({ ok: true, estoque: results || [] });
+    const [{ results }, fz, G] = await Promise.all([
+      env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? ORDER BY data, criado_em').bind(me.id).all(),
+      env.DB.prepare('SELECT id FROM fazendas WHERE usuario_id = ?').bind(me.id).all(),
+      mapaGrupos(env)
+    ]);
+    const minhas = new Set((fz.results || []).map((x) => x.id)), grupos = {};
+    Object.keys(G).forEach((fid) => { if (minhas.has(fid)) grupos[fid] = G[fid].filter((x) => minhas.has(x)); });
+    return json({ ok: true, estoque: results || [], grupos });
   }
   if (rota === '/api/agro/estoque' && req.method === 'POST') {
     const b = await req.json();

@@ -6,6 +6,7 @@
    Roda uma vez (marca em config); o nome de cada produto segue o usado nas recomendações da fazenda,
    para a baixa automática das aplicações casar com a entrada. */
 import { baseUnidade } from './agro.js';
+import { salvarGrupo } from './estoquegrupo.js';
 
 const CHAVE = 'carga:estoque_sp2627';
 const VERSAO = 2;
@@ -259,4 +260,160 @@ export async function tiposSantaPaula(env) {
   await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_TP, JSON.stringify(res)).run();
   console.log('tipos no catálogo:', JSON.stringify(res));
   return res;
+}
+
+/* ===== Compra geral do produtor (estoque compartilhado entre as fazendas dele) =====
+   Lança as compras da aba GERAL do planejamento 26/27 na fazenda principal e junta as fazendas do mesmo
+   produtor num grupo de estoque (todas dão baixa nele). Preço em US$ convertido a R$ 5,50. Sementes (bags) ficam fora. */
+const SUPER = ['SUPER TRIPLO', 'Super Triplo', 'Superfosfato triplo', 'SFT'];
+const KCL = ['KCL', 'Cloreto de potássio', 'Cloreto de potassio'];
+// [produto, fornecedor, moeda ('US', 'R' ou '' sem preço), quantidade, unidade, preço unitário, outros nomes]
+const COMPRA_CATARINENSE = [
+  ['NitroBiot', 'CASA DO PRODUTOR', 'US', 470, 'L', 3.46, []],
+  ['Nuello Azo', 'CASA DO PRODUTOR', 'US', 96, 'L', 6.23, []],
+  ['Rizoderma', 'CASA DO PRODUTOR', 'US', 47, 'L', 51.16, []],
+  ['SUPER TRIPLO (00-46-00)', 'AMAGGI', '', 184000, 'kg', 0, SUPER],
+  ['KCL (00-00-60)', 'AMAGGI', '', 166380, 'kg', 0, KCL],
+  ['TEBURAZ', 'CASA DO PRODUTOR', 'US', 470, 'L', 8.23, ['Azimut']],
+  ['Bravonil 720', 'CASA DO PRODUTOR', 'US', 1880, 'L', 6.30, ['Bravonil', 'Clorotalonil']],
+  ['VESSARYA', 'AMAGGI', 'US', 564, 'L', 22.80, []],
+  ['ELATUS', 'CASA DO PRODUTOR', 'US', 140, 'kg', 60.42, []],
+  ['Evolution', 'SINOVA', 'US', 1880, 'kg', 14.70, []],
+  ['Mitrion', 'CASA DO PRODUTOR', 'US', 420, 'L', 50.20, []],
+  ['Score Flexi', 'CASA DO PRODUTOR', 'US', 141, 'L', 38.09, []],
+  ['UNIZEB GOLD', 'CASA DO PRODUTOR', 'US', 1410, 'kg', 6.31, ['Unizeb', 'Mancozeb']],
+  ['2,4D', 'CASA DO PRODUTOR', 'US', 640, 'L', 4.53, ['2,4-D', '24D']],
+  ['Clorim 750', 'CASA DO PRODUTOR', 'US', 28, 'kg', 28.14, ['Clorim', 'Clorimurom', 'Climur']],
+  ['Flumyzin', 'CASA DO PRODUTOR', 'US', 95, 'kg', 18.72, []],
+  ['CLETODIM', 'CASA DO PRODUTOR', 'US', 80, 'L', 6.73, ['Cletodim 240', 'Select']],
+  ['Reglone', 'CASA DO PRODUTOR', 'US', 940, 'L', 5.92, ['Diquat', 'Diquate']],
+  ['Glufosinato', 'CASA DO PRODUTOR', 'US', 90, 'L', 10.76, []],
+  ['DUAL GOLD', 'CASA DO PRODUTOR', 'US', 1350, 'L', 7.15, []],
+  ['Zapp 720', 'CASA DO PRODUTOR', 'US', 3760, 'L', 7.48, ['Zapp', 'Glifosato 720']],
+  ['Abamectina', 'CASA DO PRODUTOR', 'US', 100, 'L', 15.11, ['Vertimec']],
+  ['Ampligo', 'CASA DO PRODUTOR', 'US', 80, 'L', 36.78, []],
+  ['Clofenapir', 'CASA DO PRODUTOR', 'US', 760, 'L', 9.00, ['Clorfenapir']],
+  ['PIRIPROXIFEM', 'AMAGGI', '', 235, 'L', 0, ['Epingle', 'Piriproxifen']],
+  ['ETIPROLE', 'CASA DO PRODUTOR', 'US', 940, 'L', 14.00, ['Ethiprole']],
+  ['Karate Zeon', 'CASA DO PRODUTOR', 'US', 200, 'L', 13.40, ['Karate']],
+  ['VERDAVIS', 'CASA DO PRODUTOR', 'US', 235, 'L', 88.00, []],
+  ['Perito (Acefato)', 'CASA DO PRODUTOR', 'US', 1500, 'kg', 10.11, ['Perito', 'Acefato']],
+  ['YARA NRHIZO', 'CASA DO PRODUTOR', '', 94, 'L', 0, ['NRhizo', 'Yara NRhizo']],
+  ['BORTRAC', 'CASA DO PRODUTOR', '', 940, 'L', 0, []],
+  ['Brave K', 'GRAN7', '', 1410, 'L', 0, []],
+  ['Brave Max Up', 'GRAN7', '', 1598, 'L', 0, []],
+  ['Magmill Complex', 'GRAN7', '', 564, 'L', 0, ['Magmill']],
+  ['GLYTREL', 'CASA DO PRODUTOR', '', 470, 'L', 0, []],
+  ['Sallvare Complex', 'GRAN7', '', 188, 'L', 0, ['Sallvare']],
+  ['Óleo', 'SINOVA', '', 1037, 'L', 0, ['Óleo Mineral']],
+  ['Anti-espuma', 'CT-GREEN', '', 18.8, 'L', 0, ['Antiespuma']],
+  ['Sintronela', 'CT-GREEN', 'R', 980, 'L', 46.00, ['CT-Green', 'CT Green', 'Citronela']],
+  ['Kant pHÓS', 'KIMBERLIT', 'R', 141, 'L', 54.00, ['Kant Phos', 'Kant']]
+];
+const COMPRA_PINDAITUBA = [
+  ['SOLUNAT JAPONICUM', 'VIEIRA JUNIOR', 'R', 20000, 'L', 1.30, ['Solunat']],
+  ['SOLUNAT BRASILIENSE', 'VIEIRA JUNIOR', 'R', 2000, 'L', 4.30, []],
+  ['Habitat', 'VIEIRA JUNIOR', 'R', 40, 'kg', 890.00, ['Habtat']],
+  ['SUPER TRIPLO (00-46-00)', 'AMAGGI', 'US', 440000, 'kg', 0.80, SUPER],
+  ['KCL (00-00-60)', 'AMAGGI', 'US', 400000, 'kg', 0.54, KCL],
+  ['TEBURAZ', 'AMAGGI', 'US', 1000, 'L', 7.50, ['Azimut']],
+  ['Bravonil 720', 'AMAGGI', 'US', 4000, 'L', 5.05, ['Bravonil', 'Clorotalonil']],
+  ['VESSARYA', 'AMAGGI', 'US', 1200, 'L', 22.40, []],
+  ['ELATUS', 'TECNOMYL', 'US', 400, 'kg', 51.60, ['Desali']],
+  ['Evolution', 'AMAGGI', 'US', 4000, 'kg', 8.90, []],
+  ['Mitrion', 'AMAGGI', 'US', 900, 'L', 37.50, []],
+  ['Score Flexi', 'AMAGGI', 'US', 300, 'L', 33.60, []],
+  ['UNIZEB GOLD', 'AMAGGI', 'US', 3000, 'kg', 5.35, ['Unizeb', 'Mancozeb']],
+  ['Decorum', 'AMAGGI', 'US', 2000, 'L', 3.55, ['2,4-D', '2,4D', '24D']],
+  ['Climur', 'AMAGGI', 'US', 180, 'kg', 9.50, ['Clorim 750', 'Clorim', 'Clorimurom']],
+  ['CLETODIM', 'AMAGGI', 'US', 400, 'L', 6.20, ['Cletodim 240', 'Select']],
+  ['Lubraquat 200', 'AMAGGI', 'US', 2000, 'L', 4.35, ['Lubraquat', 'Reglone', 'Diquat']],
+  ['Glufosinato', 'AMAGGI', 'US', 300, 'L', 2.65, []],
+  ['ZETHAMAXX EVO', 'SUMITOMO', 'US', 4000, 'L', 10.50, ['Zethamaxx']],
+  ['Wipe Out 720', 'AMAGGI', 'US', 6800, 'kg', 5.85, ['Wipe Out', 'Glifosato 720', 'Zapp 720']],
+  ['Abamectina', 'AMAGGI', 'US', 500, 'L', 12.50, ['Vertimec']],
+  ['Ampligo', 'AMAGGI', 'US', 160, 'L', 33.60, []],
+  ['Clofenapir', 'TECNOMYL', 'US', 1600, 'L', 7.66, ['Clorfenapir']],
+  ['PIRIPROXIFEM', 'SUMITOMO', 'US', 500, 'L', 11.80, ['Epingle', 'Piriproxifen']],
+  ['ETIPROLE', 'TECNOMYL', 'US', 2000, 'L', 10.00, ['Ethiprole']],
+  ['EXPEDITION', 'AMAGGI', 'US', 600, 'L', 18.90, []],
+  ['Lasting CS', 'AMAGGI', 'US', 400, 'L', 9.00, ['Lasting']],
+  ['Metomil 215', 'AMAGGI', 'US', 2000, 'L', 3.60, ['Metomil']],
+  ['VERDAVIS', 'AMAGGI', 'US', 500, 'L', 72.00, []],
+  ['Perito (Acefato)', 'AMAGGI', 'US', 1600, 'kg', 7.90, ['Perito', 'Acefato']],
+  ['Max Raiz', 'GRAN7', 'R', 300, 'L', 165.70, []],
+  ['Boro 10%', 'VIEIRA JUNIOR', 'R', 2600, 'L', 19.70, ['Boro 10', 'Boro']],
+  ['Brave K', 'GRAN7', 'R', 2500, 'L', 18.06, []],
+  ['Brave Max Up', 'GRAN7', 'R', 2800, 'L', 18.06, []],
+  ['Magmill Complex', 'GRAN7', 'R', 1200, 'L', 20.07, ['Magmill']],
+  ['Polyamine Mn Complex', 'GRAN7', 'R', 1000, 'L', 28.23, ['Polyamine']],
+  ['Sallvare Complex', 'GRAN7', 'R', 400, 'L', 79.90, ['Sallvare']],
+  ['Óleo', 'TECNOMYL', 'US', 2350, 'L', 2.23, ['Óleo Mineral']],
+  ['Sintronela', 'CT GREEN', 'R', 2000, 'L', 46.00, ['CT-Green', 'CT Green', 'Citronela']],
+  ['Kant pHÓS', 'VIEIRA JUNIOR', 'R', 300, 'L', 54.00, ['Kant Phos', 'Kant']]
+];
+const COMPRAS = [
+  { chave: 'carga:compra_catarinense', tag: 'cat2627', fazenda: 'CATARINENSE', produtor: /carlos|giustina|aladio/i, itens: COMPRA_CATARINENSE,
+    fonte: 'planejamento geral 26/27 (Catarinense)' },
+  { chave: 'carga:compra_pindaituba', tag: 'rp2627', fazenda: 'PINDAITUBA', produtor: /zigomar|franco|capivary/i, itens: COMPRA_PINDAITUBA,
+    fonte: 'planejamento geral 26/27 (Capivary/Recanto do Pindaituba)' }
+];
+
+async function acharFazendaPor(env, termo, re) {
+  const { results } = await env.DB.prepare(`SELECT f.id, f.usuario_id, f.nome, f.produtor_id, p.nome AS produtor FROM fazendas f
+      LEFT JOIN produtores p ON p.id = f.produtor_id WHERE UPPER(f.nome) LIKE ?`).bind('%' + termo + '%').all();
+  let l = results || [];
+  if (l.length > 1) { const x = l.filter((f) => re.test(f.produtor || '')); if (x.length) l = x; }
+  if (l.length > 1) {
+    const com = [];
+    for (const f of l) {
+      const r = await env.DB.prepare(`SELECT 1 FROM recomendacoes WHERE fazenda_id = ? AND safra LIKE '%2026%27%' UNION ALL
+          SELECT 1 FROM plantio WHERE fazenda_id = ? AND safra LIKE '%2026%27%' LIMIT 1`).bind(f.id, f.id).first().catch(() => null);
+      if (r) com.push(f);
+    }
+    if (com.length) l = com;
+  }
+  return l.length === 1 ? l[0] : null;
+}
+
+async function cargaCompra(env, cfg) {
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(cfg.chave).first().catch(() => null);
+  if (feito) return JSON.parse(feito.valor);
+  const f = await acharFazendaPor(env, cfg.fazenda, cfg.produtor);
+  if (!f) { console.log('compra geral ' + cfg.fazenda + ': fazenda não encontrada (ou mais de uma)'); return null; }
+  // grupo de estoque: as fazendas do mesmo produtor (na mesma conta)
+  let ids = [f.id];
+  if (f.produtor_id) {
+    const { results } = await env.DB.prepare('SELECT id FROM fazendas WHERE usuario_id = ? AND produtor_id = ?').bind(f.usuario_id, f.produtor_id).all();
+    ids = [f.id].concat((results || []).map((x) => x.id).filter((x) => x !== f.id));
+  }
+  if (ids.length > 1) await salvarGrupo(env, f.id, ids);
+  // nomes já usados nas recomendações das fazendas do grupo (e no catálogo), para a baixa casar
+  const usados = [];
+  for (const id of ids) (await nomesUsados(env, { id, usuario_id: f.usuario_id })).forEach((u) => usados.push(u));
+  const lista = [];
+  for (const [prod, forn, moeda, qtd, unPadrao, preco, outros] of cfg.itens) {
+    const nomes = outros.map(solto);   // o nome exato do produto vale antes dos outros nomes
+    const achou = usados.find((u) => solto(u.nome) === solto(prod)) || usados.find((u) => nomes.indexOf(solto(u.nome)) >= 0);
+    const nome = achou ? achou.nome : prod, un = achou ? achou.un : unPadrao;
+    const pu = moeda === 'US' ? preco * DOLAR : moeda === 'R' ? preco : 0;
+    const obs = ('Compra safra 26/27 · ' + forn + (achou && solto(achou.nome) !== solto(prod) ? ' · ' + prod : '') + ' · ' +
+      (moeda === 'US' ? 'US$ ' + br2(preco) + '/' + un + ' × dólar ' + br2(DOLAR) : moeda === 'R' ? 'R$ ' + br2(preco) + '/' + un : 'sem preço na planilha') +
+      ' · ' + cfg.fonte).slice(0, 200);
+    lista.push({ id: 'es-' + cfg.tag + '-' + solto(prod).slice(0, 30), nome, un, qtd, valor: Math.round(qtd * pu * 100) / 100, obs });
+  }
+  const st = env.DB.prepare(`INSERT OR IGNORE INTO estoque_agro (id, usuario_id, fazenda_id, produto, unidade, qtd, valor, data, obs)
+      VALUES (?,?,?,?,?,?,?,?,?)`);
+  await env.DB.batch(lista.map((x) => st.bind(x.id, f.usuario_id, f.id, x.nome, x.un, x.qtd, x.valor, '2026-11-06', x.obs)));
+  const res = { ok: true, fazenda: f.id, fazendas_grupo: ids.length, itens: lista.length, sem_preco: lista.filter((x) => !x.valor).length,
+    total: Math.round(lista.reduce((s, x) => s + x.valor, 0) * 100) / 100, em: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(cfg.chave, JSON.stringify(res)).run();
+  console.log('compra geral ' + cfg.fazenda + ':', JSON.stringify(res));
+  return res;
+}
+
+export async function cargaComprasGerais(env) {
+  const out = {};
+  for (const c of COMPRAS) { try { out[c.tag] = await cargaCompra(env, c); } catch (e) { console.log('compra geral ' + c.fazenda + ':', e.message); } }
+  return out;
 }
