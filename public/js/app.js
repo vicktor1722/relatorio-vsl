@@ -1303,9 +1303,11 @@
     if (!document.body.contains(box)) return null;
     const br = function (d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) : ''; };
     const em = M.gerado_em ? new Date(M.gerado_em).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '';
-    box.innerHTML = '<div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span></div>' +
+    box.innerHTML = '<div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span><button class="cl-sai" aria-label="Sair da tela cheia">✕</button></div>' +
       '<div class="cl-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) { return '<button data-clm="' + x[0] + '" class="' + (x[0] === 'a7' ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
-      '<div class="cl-mapa"><div class="cl-mapa-in"></div><span class="t"></span><span class="d"></span></div>' +
+      '<div class="cl-mapa"><div class="cl-mapa-in"></div><span class="t"></span><span class="d"></span>' +
+        '<button class="cl-fs" aria-label="Tela cheia" title="Tela cheia">⛶</button>' +
+        '<span class="cl-marca"><svg width="20" height="20" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="9" fill="#17703D"></rect><path d="M9 23c0-6 4-10 11-10h5c0 7-4 11-10 11-2 0-4 0-6-1z" fill="#FFFFFF"></path><path d="M9 25c3-5 6-8 11-10" stroke="#17703D" stroke-width="1.6" fill="none" stroke-linecap="round"></path></svg><b>AMVS</b></span></div>' +
       '<div class="cl-ctrl oculto"><button class="cl-play" aria-label="Animar">▶</button><input type="range" min="0" max="' + (M.v.length - 1) + '" value="0"></div>' +
       '<div class="mc-esc"></div><div class="mc-escx"></div>' +
       '<div class="cl-chuva-pe">🌍 Modelo europeu (ECMWF) · atualizado ' + esc(em) + ' · atualiza todo dia de manhã cedo</div>';
@@ -1327,6 +1329,10 @@
       };
     });
     sl.oninput = function () { pl.textContent = '▶'; mc.dia(Number(sl.value)); };
+    // tela cheia: o quadro do mapa ocupa a tela toda; ✕ volta
+    const cheia = function (on) { box.classList.toggle('cheia', on); setTimeout(function () { try { mc.mapa.invalidateSize(); } catch (e) {} }, 60); };
+    box.querySelector('.cl-fs').onclick = function () { cheia(true); };
+    box.querySelector('.cl-sai').onclick = function (e) { e.stopPropagation(); cheia(false); };
     pl.onclick = function () { pl.textContent = mc.play() ? '⏸' : '▶'; };
     setTimeout(function () { try { mc.mapa.invalidateSize(); } catch (e) {} }, 150);
     return mc;

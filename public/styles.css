@@ -575,6 +575,17 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .cl-ctrl{display:flex;align-items:center;gap:8px;margin-top:8px}.cl-ctrl.oculto{display:none}
 .cl-ctrl input{flex:1}.cl-play{width:38px;height:38px;border-radius:50%;border:0;background:#1A4E85;color:#fff;font-size:15px}
 .cl-chuva-pe{font-size:11.5px;color:#6B7B72;margin-top:8px}
+.cl-fs{position:absolute;left:8px;bottom:8px;z-index:500;width:40px;height:40px;border:0;border-radius:10px;background:rgba(255,255,255,.92);font-size:19px;color:#1F2A22;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.cl-marca{position:absolute;right:8px;bottom:8px;z-index:500;display:flex;align-items:center;gap:5px;pointer-events:none;color:#fff;font-size:13px;letter-spacing:.5px;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.cl-marca svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.cl-sai{display:none;margin-left:auto;border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:34px;height:34px;font-size:16px}
+/* tela cheia */
+.cl-chuva.cheia{position:fixed;inset:0;z-index:9995;margin:0;border:0;border-radius:0;background:#0F1F16;display:flex;flex-direction:column;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px))}
+.cl-chuva.cheia .cl-chuva-cab{color:#fff;align-items:center}.cl-chuva.cheia .cl-chuva-cab span{color:#B9CCC1}
+.cl-chuva.cheia .cl-sai{display:block}.cl-chuva.cheia .cl-fs{display:none}
+.cl-chuva.cheia .cl-mapa{flex:1;height:auto}
+.cl-chuva.cheia .mc-escx,.cl-chuva.cheia .cl-chuva-pe{color:#DDE7E1}
 .cl-cab{display:flex;justify-content:space-between;align-items:center;padding:2px 4px 8px}.cl-cab b{font-size:15px;color:#146034}
 .cl-cab button{border:0;background:#EEF2F0;border-radius:50%;width:32px;height:32px;font-size:15px;color:#333}
 .cl-card{background:linear-gradient(160deg,#2F80C9,#1E5F9E);color:#fff;border-radius:16px;padding:12px;margin:0}
