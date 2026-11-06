@@ -508,7 +508,7 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     });
   }
 
-  // chuva dos próximos 30 dias e mapa da chuva (só dono/gerente); atualiza no domingo à noite
+  // chuva dos próximos 15 dias e mapa da chuva (só dono/gerente); atualiza todo dia às 4h30 de MT
   if (rota === '/api/portal/chuva') {
     if (a.papel === 'operador') return json({ erro: 'disponível para o acesso da fazenda' }, 403);
     let fid = txt(url.searchParams.get('loc') || url.searchParams.get('id'), 80);

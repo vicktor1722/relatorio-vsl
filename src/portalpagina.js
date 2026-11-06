@@ -534,7 +534,7 @@ body.sem-rolar{overflow:hidden}
     if (es) es.onclick = function () { salvar(''); };
   }
 
-  /* ---------- chuva dos próximos 30 dias + mapa da chuva (dono/gerente; atualiza no domingo à noite) ---------- */
+  /* ---------- chuva dos próximos 15 dias + mapa da chuva (dono/gerente; atualiza todo dia às 4h30 de MT) ---------- */
   var CHV = { chave: '', dados: null, carregando: false, aberto: false, modo: 'dia', dia: 0, play: null, mapa: null, canvas: null };
   function chvCarregar() {
     var k = iniChave();
@@ -559,10 +559,10 @@ body.sem-rolar{overflow:hidden}
     chvCarregar();
     var C = CHV.dados, P = C && C.ponto;
     if (!C || C.erro === 'sem local') return '';
-    if (!P) return CHV.carregando ? '<div class="ini-card"><div class="ini-ct"><h3>🌧️ Chuva nos próximos 30 dias</h3></div><div class="ini-vz">Carregando…</div></div>' : '';
+    if (!P) return CHV.carregando ? '<div class="ini-card"><div class="ini-ct"><h3>🌧️ Chuva nos próximos 15 dias</h3></div><div class="ini-vz">Carregando…</div></div>' : '';
     var prov = P.dias.filter(function (x) { return x.p1 >= 70; }).length, prox = P.dias.filter(function (x) { return x.p5 >= 50; })[0];
-    var h = '<div class="ini-card chv aberto"><div class="ini-ct"><h3>🌧️ Chuva e mapa · próximos 30 dias</h3></div>';
-    h += '<div class="chv-chips"><span>Acumulado 30 dias: <b>~' + n(P.acc[1]) + ' mm</b> (' + n(P.acc[0]) + ' a ' + n(P.acc[2]) + ')</span><span>' + prov + ' dias com chuva provável</span>' +
+    var h = '<div class="ini-card chv aberto"><div class="ini-ct"><h3>🌧️ Chuva e mapa · próximos 15 dias</h3></div>';
+    h += '<div class="chv-chips"><span>Acumulado 15 dias: <b>~' + n(P.acc[1]) + ' mm</b> (' + n(P.acc[0]) + ' a ' + n(P.acc[2]) + ')</span><span>' + prov + ' dias com chuva provável</span>' +
       (prox ? '<span>1ª chuva ≥ 5 mm: <b>' + dataBR(prox.d) + '</b> (' + prox.p5 + '%)</span>' : '<span>sem chuva ≥ 5 mm provável</span>') + '</div>';
     var M = C.mapa;
     if (M && M.v && M.v.length) {
@@ -576,7 +576,7 @@ body.sem-rolar{overflow:hidden}
     }
     var em = new Date(P.gerado_em);
     return h + '<div class="ini-pe chv-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
-      ' · próxima atualização domingo ' + dataBR(C.proxima) + ' à noite</div></div>';
+      ' · atualiza todo dia de manhã cedo</div></div>';
   }
   // camada da chuva: canvas no mapa (projeção do mapa), bordas que somem, textura de nuvem que anda com o tempo
   var CanvasCamada = window.L && L.ImageOverlay.extend({

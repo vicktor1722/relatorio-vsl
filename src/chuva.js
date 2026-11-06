@@ -1,14 +1,15 @@
-/* Chuva dos próximos 30 dias (fazenda) e mapa da chuva (Brasil), para o dono/gerente.
-   Atualiza uma vez por semana, domingo à noite (cron), e fica guardado no banco (tabela config):
-   - "chuva:mapa": grade do Brasil (3°), chuva de cada dia nos próximos 15 dias (modelo europeu ECMWF)
-   - "chuva:p:<lat>,<lon>": 30 dias no ponto da fazenda: 1–15 ECMWF (50 cenários), 16–30 GFS (tendência, 30 cenários) */
+/* Chuva dos próximos 15 dias (fazenda) e mapa da chuva (Brasil), para o dono/gerente. Modelo europeu (ECMWF).
+   Atualiza todo dia às 4h30 de MT (cron) e fica guardado no banco (tabela config):
+   - "chuva:mapa": grade do Brasil, chuva de cada dia nos próximos 15 dias
+   - "chuva:p:<lat>,<lon>": 15 dias no ponto da fazenda (50 cenários do ECMWF) */
 import { localDaFazenda } from './mercado.js';
 
 const UA = 'Mozilla/5.0 (compatible; AMVS-Relatorio/1.0)';
 const GRADE = { la0: -35, la1: 7, lo0: -76, lo1: -32, passo: 2, ver: 2 };   // ver: muda quando a grade muda (refaz o guardado)
-const VALIDADE = 8 * 864e5;   // passou disso sem atualizar (cron falhou): refaz quando alguém abrir
+const VALIDADE = 26 * 3600e3;   // passou disso sem atualizar (cron falhou): refaz quando alguém abrir
+const VER_PONTO = 2;            // 2: só os 15 dias do ECMWF (antes: 30 dias com o GFS no fim)
 
-// limite por minuto do Open-Meteo: na atualização de domingo (sem pressa) espera 1 minuto e tenta de novo
+// limite por minuto do Open-Meteo: na atualização da madrugada (sem pressa) espera 1 minuto e tenta de novo
 let PACIENTE = false;
 async function buscar(url, tentou) {
   try { return await buscar1(url); }
@@ -59,30 +60,25 @@ export async function mapaChuva() {
   return Object.assign({}, GRADE, { nlat, nlon, datas, v, fonte, gerado_em: new Date().toISOString() });
 }
 
-// 30 dias no ponto da fazenda: chuva do dia (mediana dos cenários), chance de ≥1 mm e ≥5 mm, acumulado (10%, 50%, 90%)
+// 15 dias no ponto da fazenda: chuva do dia (mediana dos cenários), chance de ≥1 mm e ≥5 mm, acumulado (10%, 50%, 90%)
 export async function chuvaPonto(lat, lon) {
   const q = 'latitude=' + lat + '&longitude=' + lon + '&daily=precipitation_sum&timezone=America%2FSao_Paulo';
-  const [ec, gf] = await Promise.all([
-    buscar('https://ensemble-api.open-meteo.com/v1/ensemble?' + q + '&models=ecmwf_ifs025&forecast_days=15'),
-    buscar('https://ensemble-api.open-meteo.com/v1/ensemble?' + q + '&models=gfs05&forecast_days=35')
-  ]);
-  const te = ec.daily.time, tg = gf.daily.time, dias = [], cen = [];
-  for (let i = 0; i < 30; i++) {
-    let m, mod, d;
-    if (i < te.length) { m = membros(ec.daily, i); mod = 'ECMWF'; d = te[i]; }
-    else { d = new Date(new Date(te[0] + 'T12:00:00Z').getTime() + i * 864e5).toISOString().slice(0, 10); const j = tg.indexOf(d); if (j < 0) break; m = membros(gf.daily, j); mod = 'GFS'; }
+  const ec = await buscar('https://ensemble-api.open-meteo.com/v1/ensemble?' + q + '&models=ecmwf_ifs025&forecast_days=15');
+  const te = ec.daily.time, dias = [], cen = [];
+  for (let i = 0; i < Math.min(15, te.length); i++) {
+    const m = membros(ec.daily, i);
     cen.push(m);
-    dias.push({ d, med: r1(mediana(m)), p1: Math.round(100 * m.filter((x) => x >= 1).length / m.length), p5: Math.round(100 * m.filter((x) => x >= 5).length / m.length), mod });
+    dias.push({ d: te[i], med: r1(mediana(m)), p1: Math.round(100 * m.filter((x) => x >= 1).length / m.length), p5: Math.round(100 * m.filter((x) => x >= 5).length / m.length), mod: 'ECMWF' });
   }
-  // acumulado de cada cenário: cenário k do ECMWF nos 15 primeiros dias + cenário k do GFS no resto
-  const tot = (cen[0] || []).map((_, k) => cen.reduce((s, m) => s + m[k % m.length], 0)).sort((a, b) => a - b);
+  // acumulado de cada cenário nos 15 dias
+  const tot = (cen[0] || []).map((_, k) => cen.reduce((s, m) => s + (m[k] || 0), 0)).sort((a, b) => a - b);
   const pct = (p) => (tot.length ? Math.round(tot[Math.min(tot.length - 1, Math.floor(p * tot.length))]) : 0);
-  return { dias, acc: [pct(0.1), pct(0.5), pct(0.9)], gerado_em: new Date().toISOString() };
+  return { ver: VER_PONTO, dias, acc: [pct(0.1), pct(0.5), pct(0.9)], gerado_em: new Date().toISOString() };
 }
 
 const chaveP = (l) => 'chuva:p:' + (Math.round(l.lat * 4) / 4).toFixed(2) + ',' + (Math.round(l.lon * 4) / 4).toFixed(2);
 
-// cron de domingo à noite: o mapa e o ponto de cada fazenda que tem acesso de dono/gerente
+// cron de todo dia (4h30 de MT): o mapa e o ponto de cada fazenda que tem acesso de dono/gerente
 export async function atualizarChuva(env) {
   PACIENTE = true;
   try { await atualizarChuva1(env); } finally { PACIENTE = false; }
@@ -108,24 +104,29 @@ async function atualizarChuva1(env) {
   }
 }
 
-// próximo domingo (dia da atualização)
-function proximoDomingo() { const d = new Date(Date.now() - 4 * 3600e3); d.setUTCDate(d.getUTCDate() + ((7 - d.getUTCDay()) % 7 || 7)); return d.toISOString().slice(0, 10); }
+// próxima atualização: hoje às 4h30 de MT se ainda não passou; senão amanhã
+function proximaAtualizacao() {
+  const mt = new Date(Date.now() - 4 * 3600e3), passou = mt.getUTCHours() * 60 + mt.getUTCMinutes() >= 4 * 60 + 30;
+  if (passou) mt.setUTCDate(mt.getUTCDate() + 1);
+  return mt.toISOString().slice(0, 10);
+}
 
 // para a tela Início: o que estiver guardado; sem nada (ou vencido), busca agora e guarda
 export async function chuvaDaFazenda(env, f) {
   const local = await localDaFazenda(f);
   if (!local) return { erro: 'sem local' };
   const velho = (x) => !x || !x.gerado_em || Date.now() - new Date(x.gerado_em).getTime() > VALIDADE;
+  const pontoVelho = (x) => velho(x) || (x.ver || 1) !== VER_PONTO;
   let [mapa, ponto] = await Promise.all([ler(env, 'chuva:mapa'), ler(env, chaveP(local))]);
   if (mapa && mapa.ver !== GRADE.ver) mapa = null;   // grade antiga
-  if (velho(ponto)) {
+  if (pontoVelho(ponto)) {
     try { ponto = Object.assign(await chuvaPonto(Math.round(local.lat * 4) / 4, Math.round(local.lon * 4) / 4), { lat: local.lat, lon: local.lon }); await gravar(env, chaveP(local), ponto); }
     catch (e) { if (!ponto) ponto = null; }
   }
   if (velho(mapa)) {
     try { mapa = await mapaChuva(); await gravar(env, 'chuva:mapa', mapa); } catch (e) { if (!mapa) mapa = await ler(env, 'chuva:mapa'); }
   }
-  return { local, ponto, mapa, proxima: proximoDomingo() };
+  return { local, ponto, mapa, proxima: proximaAtualizacao() };
 }
 
 // só o mapa (painel do consultor: um mapa único na tela principal)
@@ -135,5 +136,5 @@ export async function mapaGuardado(env) {
   if (!mapa || !mapa.gerado_em || Date.now() - new Date(mapa.gerado_em).getTime() > VALIDADE) {
     try { mapa = await mapaChuva(); await gravar(env, 'chuva:mapa', mapa); } catch (e) { if (!mapa) mapa = await ler(env, 'chuva:mapa'); }
   }
-  return { mapa, proxima: proximoDomingo() };
+  return { mapa, proxima: proximaAtualizacao() };
 }

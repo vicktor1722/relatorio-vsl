@@ -834,9 +834,9 @@ export default {
     }
   },
 
-  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; domingo 21h a chuva da semana
+  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; 4h30 a chuva dos próximos 15 dias
   async scheduled(evento, env, ctx) {
-    if (evento.cron === '0 1 * * 1') { ctx.waitUntil(atualizarChuva(env)); return; }   // domingo 21h de MT: chuva dos próximos 30 dias
+    if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env)); return; }   // todo dia 4h30 de MT: chuva dos próximos 15 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };
