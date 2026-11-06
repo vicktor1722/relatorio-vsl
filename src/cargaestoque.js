@@ -352,11 +352,50 @@ const COMPRA_PINDAITUBA = [
   ['Sintronela', 'CT GREEN', 'R', 2000, 'L', 46.00, ['CT-Green', 'CT Green', 'Citronela']],
   ['Kant pHÓS', 'VIEIRA JUNIOR', 'R', 300, 'L', 54.00, ['Kant Phos', 'Kant']]
 ];
+const COMPRA_PANTANEIRA = [
+  ['KCL (00-00-60)', 'AMAGGI', 'US', 80276, 'kg', 0.54, KCL],
+  ['TEBURAZ', 'AMAGGI', 'US', 213.5, 'L', 7.50, ['Azimut']],
+  ['Bravonil 720', 'AMAGGI', 'US', 854, 'L', 5.05, ['Bravonil', 'Clorotalonil']],
+  ['VESSARYA', 'AMAGGI', 'US', 256.2, 'L', 22.40, []],
+  ['ELATUS', 'TECNOMYL', 'US', 85.4, 'kg', 51.60, ['Desali']],
+  ['Evolution', 'AMAGGI', 'US', 854, 'kg', 8.90, []],
+  ['Mitrion', 'AMAGGI', 'US', 192.15, 'L', 37.50, []],
+  ['Score Flexi', 'AMAGGI', 'US', 64.05, 'L', 33.60, []],
+  ['UNIZEB GOLD', 'AMAGGI', 'US', 640.5, 'kg', 5.35, ['Unizeb', 'Mancozeb']],
+  ['2,4D', 'AMAGGI', 'US', 247, 'L', 3.55, ['2,4-D', '24D']],
+  ['Clorim 750', 'AMAGGI', 'US', 12.81, 'kg', 9.50, ['Clorim', 'Clorimurom', 'Climur']],
+  ['CLETODIM', 'AMAGGI', 'US', 400, 'L', 6.20, ['Cletodim 240', 'Select']],
+  ['Reglone', 'AMAGGI', 'US', 427, 'L', 4.35, ['Diquat', 'Diquate']],
+  ['ZETHAMAXX EVO', 'SUMITOMO', 'US', 854, 'L', 10.50, ['Zethamaxx']],
+  ['Zapp 720', 'AMAGGI', 'US', 1708, 'L', 5.85, ['Zapp', 'Glifosato 720']],
+  ['Abamectina', 'AMAGGI', 'US', 106.75, 'L', 12.50, ['Vertimec']],
+  ['Ampligo', 'AMAGGI', 'US', 34.16, 'L', 33.60, []],
+  ['Clofenapir', 'TECNOMYL', 'US', 341.6, 'L', 7.66, ['Clorfenapir']],
+  ['PIRIPROXIFEM', 'SUMITOMO', 'US', 106.75, 'L', 11.80, ['Epingle', 'Piriproxifen']],
+  ['ETIPROLE', 'TECNOMYL', 'US', 427, 'L', 10.00, ['Ethiprole']],
+  ['EXPEDITION', 'AMAGGI', 'US', 128.1, 'L', 18.90, []],
+  ['Karate Zeon', 'AMAGGI', 'US', 85.4, 'L', 9.00, ['Karate']],
+  ['Metomil 215', 'AMAGGI', 'US', 427, 'L', 3.60, ['Metomil']],
+  ['VERDAVIS', 'AMAGGI', 'US', 106.75, 'L', 72.00, []],
+  ['Perito (Acefato)', 'AMAGGI', 'US', 341.6, 'kg', 7.90, ['Perito', 'Acefato']],
+  ['Max Raiz', 'GRAN7', 'R', 427, 'L', 165.70, []],
+  ['Boro 10%', 'VIEIRA JUNIOR', 'R', 555.1, 'L', 19.70, ['Boro 10', 'Boro']],
+  ['Brave K', 'GRAN7', 'R', 140.5, 'L', 18.06, []],
+  ['Brave Max Up', 'GRAN7', 'R', 125.9, 'L', 18.06, []],
+  ['Magmill Complex', 'GRAN7', 'R', 256.2, 'L', 20.07, ['Magmill']],
+  ['Polyamine Mn Complex', 'GRAN7', 'R', 213.5, 'L', 28.23, ['Polyamine']],
+  ['Sallvare Complex', 'GRAN7', 'R', 85.4, 'L', 79.90, ['Sallvare']],
+  ['Óleo', 'TECNOMYL', 'US', 698.35, 'L', 2.23, ['Óleo Mineral']],
+  ['Sintronela', 'CT GREEN', 'R', 427, 'L', 46.00, ['CT-Green', 'CT Green', 'Citronela']],
+  ['Kant pHÓS', 'VIEIRA JUNIOR', 'R', 64.05, 'L', 54.00, ['Kant Phos', 'Kant']]
+];
 const COMPRAS = [
   { chave: 'carga:compra_catarinense', tag: 'cat2627', fazenda: 'CATARINENSE', produtor: /carlos|giustina|aladio/i, itens: COMPRA_CATARINENSE,
     fonte: 'planejamento geral 26/27 (Catarinense)' },
   { chave: 'carga:compra_pindaituba', tag: 'rp2627', fazenda: 'PINDAITUBA', produtor: /zigomar|franco|capivary/i, itens: COMPRA_PINDAITUBA,
-    fonte: 'planejamento geral 26/27 (Capivary/Recanto do Pindaituba)' }
+    fonte: 'planejamento geral 26/27 (Capivary/Recanto do Pindaituba)' },
+  { chave: 'carga:compra_pantaneira', tag: 'pt2627', fazenda: 'PANTANEIRA', produtor: /marcos/i, itens: COMPRA_PANTANEIRA,
+    fonte: 'planejamento geral 26/27 (Pantaneira)' }
 ];
 
 async function acharFazendaPor(env, termo, re) {
