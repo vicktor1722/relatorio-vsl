@@ -129,7 +129,7 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .sems{display:flex;align-items:flex-end;gap:4px;height:110px;border-bottom:1px solid var(--linha);padding:0 2px}
 .sems .c{flex:1;display:flex;flex-direction:column-reverse;gap:1px;min-width:0}.sems u{display:block;border-radius:2px}
 .semr{display:flex;gap:4px;font-size:10.5px;color:var(--fraco);padding:3px 2px 0}.semr span{flex:1;text-align:center;min-width:0;overflow:hidden}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;max-width:90%}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;max-width:90%}
 .rodape{text-align:center;color:var(--fraco);font-size:12px;margin-top:24px}.rodape a{color:var(--verde)}
 ${AGRO_REL_CSS}
 ${DPG_CSS}
@@ -251,7 +251,7 @@ body.sem-rolar{overflow:hidden}
   function dataBR(i) { var p = String(i || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : '—'; }
   function hoje() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function dif(a, b) { return Math.round((new Date(a + 'T12:00:00Z') - new Date(b + 'T12:00:00Z')) / 864e5); }
-  function toast(m) { var t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3200); }
+  function toast(m) { var t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 4500); }
   // total para o tanque: mL vira L e g vira kg (o operador mede em litro/quilo)
   function total(q, u) { var x = String(u || '').split('/')[0]; if (x === 'mL') return [q / 1000, 'L']; if (x === 'g') return [q / 1000, 'kg']; if (x === 't') return [q, 't']; return [q, x || 'L']; }
 
@@ -991,9 +991,12 @@ body.sem-rolar{overflow:hidden}
   async function enviarPlantio(corpo, msg) {
     try {
       await api('/api/portal/plantio', Object.assign({ fazenda: $('#selFaz').value, safra: D.safra }, corpo));
-      toast(msg); await carregar(D.safra); return true;
     } catch (e) { toast(e.message || 'Não foi possível salvar (sem internet?)'); return false; }
+    toast(msg);
+    try { await carregar(D.safra); } catch (e) { /* salvou; a tela atualiza na próxima vez */ }
+    return true;
   }
+  function nHa(v) { return n(v, Math.abs(v * 10 - Math.round(v * 10)) > 0.001 ? 2 : 1); }   // 2,15 ha (não "2,2") quando precisa
   function folhaPlantio() {
     var areas = areasMapa(), pl = {}; (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; });
     var nomes = Object.keys(areas).sort(porNome);
@@ -1002,7 +1005,7 @@ body.sem-rolar{overflow:hidden}
     v.innerHTML = '<div class="folha"><h3>Lançar plantio do dia</h3><div class="q">A área entra na evolução do plantio do relatório e no app do consultor.</div>' +
       '<div class="campo"><label class="l">Data *</label><input type="date" id="pData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
       '<div class="campo"><label class="l">Talhão *</label><select id="pTal"><option value="">— escolher —</option>' + nomes.map(function (t) {
-        var r = resta(t); return '<option value="' + esc(t) + '">' + esc(t) + ' · ' + (r > 0.05 ? 'faltam ' + n(r, 1) + ' ha' : 'completo') + '</option>'; }).join('') + '</select></div>' +
+        var r = resta(t); return '<option value="' + esc(t) + '">' + esc(t) + ' · ' + (r > 0.005 ? 'faltam ' + nHa(r) + ' ha' : 'completo') + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo"><label class="l">Hectares plantados neste dia *</label><input id="pHa" inputmode="decimal" placeholder="ex.: 45,5"></div>' +
       '<div class="g2"><div class="campo"><label class="l">Sementes por metro *</label><input id="pSem" inputmode="decimal" placeholder="ex.: 14"></div>' +
       '<div class="campo"><label class="l">Espaçamento da plantadeira (cm) *</label><input id="pEsp" inputmode="decimal" placeholder="ex.: 45"></div></div>' +
@@ -1053,7 +1056,7 @@ body.sem-rolar{overflow:hidden}
       if (p.espac_cm) v.querySelector('#pEsp').value = String(p.espac_cm).replace('.', ',');
       preencher(t);
       if (p.cultura) v.querySelector('#pCult').value = p.cultura;
-      if (r > 0.05) v.querySelector('#pHa').placeholder = 'até ' + n(r, 1) + ' ha';
+      if (r > 0.005) v.querySelector('#pHa').placeholder = 'até ' + nHa(r) + ' ha';
       pintarVar();
     };
     v.querySelector('#pCult').onchange = pintarVar;
