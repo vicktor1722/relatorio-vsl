@@ -423,7 +423,7 @@
 
     if (it.tipo === 'texto') {
       return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha so-texto">' +
-        '<div class="legenda">' + esc(it.legenda) + '</div>' +
+        '<div class="legenda">' + ZAP.html(esc(it.legenda)) + '</div>' +
         '<div class="rodape">' + lapis + '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
     }
 
@@ -431,7 +431,7 @@
       return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
         '<div class="audio" data-midia="' + it.id + '"><span>🎤</span></div>' +
         chip +
-        (it.legenda ? '<div class="legenda">' + esc(it.legenda) + '</div>' : '') +
+        (it.legenda ? '<div class="legenda">' + ZAP.html(esc(it.legenda)) + '</div>' : '') +
         '<div class="rodape">' + lapis + (it.duracao_s ? '<span>' + mmss(it.duracao_s) + '</span>' : '') +
         '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
     }
@@ -439,7 +439,7 @@
     return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
       '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '"></div>' +
       chip +
-      (it.legenda ? '<div class="legenda">' + esc(it.legenda) + '</div>' : '') +
+      (it.legenda ? '<div class="legenda">' + ZAP.html(esc(it.legenda)) + '</div>' : '') +
       '<div class="rodape">' + lapis + (it.bytes ? '<span>' + bytesFmt(it.bytes) + '</span>' : '') +
       '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
   }
@@ -1833,6 +1833,44 @@
     }
   }
 
+  /* ---------------- negrito / itálico / riscado (igual ao WhatsApp) ---------------- */
+  // botão: põe (ou tira) o marcador em volta do texto selecionado; sem seleção, abre o par e deixa o cursor no meio
+  function ligarFormatacao(campo, barra, prev) {
+    const mostrar = function () {
+      const v = campo.value, temMarca = ZAP.html(esc(v)) !== esc(v);
+      prev.hidden = !temMarca;
+      if (temMarca) prev.querySelector('div').innerHTML = ZAP.html(esc(v));
+    };
+    barra.querySelectorAll('[data-fmt]').forEach(function (b) {
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });   // não tira o foco nem a seleção do campo
+      b.addEventListener('touchstart', function (e) { e.preventDefault(); b.click(); }, { passive: false });
+      b.addEventListener('click', function () {
+        const m = b.dataset.fmt, v = campo.value;
+        let i = campo.selectionStart, f = campo.selectionEnd;
+        // seleção com espaço nas pontas: o marcador encosta no texto (regra do WhatsApp)
+        while (i < f && /\s/.test(v[i])) i++;
+        while (f > i && /\s/.test(v[f - 1])) f--;
+        const dentro = v.slice(i, f);
+        if (dentro.length > 1 && dentro[0] === m && dentro[dentro.length - 1] === m) {          // selecionou com os marcadores: tira
+          campo.value = v.slice(0, i) + dentro.slice(1, -1) + v.slice(f);
+          campo.setSelectionRange(i, f - 2);
+        } else if (v[i - 1] === m && v[f] === m && f > i) {                                    // já formatado em volta: tira
+          campo.value = v.slice(0, i - 1) + dentro + v.slice(f + 1);
+          campo.setSelectionRange(i - 1, f - 1);
+        } else if (f > i) {                                                                     // formata a seleção
+          campo.value = v.slice(0, i) + m + dentro + m + v.slice(f);
+          campo.setSelectionRange(i + 1, f + 1);
+        } else {                                                                                // sem seleção: abre o par
+          campo.value = v.slice(0, i) + m + m + v.slice(i);
+          campo.setSelectionRange(i + 1, i + 1);
+        }
+        campo.focus(); mostrar();
+      });
+    });
+    campo.addEventListener('input', mostrar);
+    mostrar();
+  }
+
   /* ---------------- editar registro ---------------- */
 
   function relFinalizado() {
@@ -1852,13 +1890,19 @@
       '<div class="alca"></div>' +
       '<h2 style="margin-top:0">' + titulo + '</h2>' +
       (item.talhao ? '<div style="font-size:12.5px;color:#667781;margin-bottom:6px">📍 ' + esc(item.talhao) + '</div>' : '') +
+      '<div class="fmt-barra"><button type="button" data-fmt="*" aria-label="Negrito"><b>B</b></button>' +
+      '<button type="button" data-fmt="_" aria-label="Itálico"><i>I</i></button>' +
+      '<button type="button" data-fmt="~" aria-label="Riscado"><s>S</s></button>' +
+      '<span>selecione o texto e toque</span></div>' +
       '<div class="campo"><textarea id="edTxt" rows="4"></textarea></div>' +
+      '<div class="fmt-prev" id="edPrev" hidden><small>Como vai ficar</small><div></div></div>' +
       '<button class="btn" id="edOk">Salvar</button>' +
       '<button class="btn perigo" id="edApagar">Apagar registro</button>' +
       '<button class="btn secundario" id="edCancel">Cancelar</button>';
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const campo = folha.querySelector('#edTxt');
     campo.value = item.legenda || '';
+    ligarFormatacao(campo, folha.querySelector('.fmt-barra'), folha.querySelector('#edPrev'));
     const sair = function () { veu.remove(); folha.remove(); };
     veu.onclick = function (e) { if (e.target === veu) sair(); };
     folha.querySelector('#edCancel').onclick = sair;

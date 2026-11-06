@@ -5,8 +5,11 @@
 
 import { AGRO_REL_CSS, AGRO_REL_JS, blocosAgro } from './agrorel.js';
 import { safraPadrao } from './safras.js';
+import { ZAP_JS, semZap, zap } from './zap.js';
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// texto traduzível com *negrito*, _itálico_ e ~riscado~ (o original fica em data-raw para a tradução)
+const trz = (t, cls) => `<span${cls ? ` class="${cls}"` : ''} data-tr data-raw="${esc(t)}">${zap(esc(t))}</span>`;
 
 const CSS = `
 :root{--verde:#1B7A43;--verde-escuro:#146034;--verde-claro:#E8F4EC;--texto:#1B2B22;--fraco:#6B7B72;--linha:#E4E9E6}
@@ -278,7 +281,7 @@ function celulaMidia(i) {
   const dl = src + '?baixar=1&n=' + encodeURIComponent(nomeArq);
   return `<div class="item"><figure>` +
     (i.tipo === 'foto'
-      ? `<img loading="lazy" src="${src}" data-dl="${esc(dl)}" alt="${esc(i.legenda || '')}">`
+      ? `<img loading="lazy" src="${src}" data-dl="${esc(dl)}" alt="${esc(semZap(i.legenda || ''))}">`
       : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
     `</figure><div class="meta">` +
     `<span class="tag cinza">${hora(i.capturado_em)}</span>` +
@@ -295,7 +298,7 @@ function blocoAudio(i) {
   const src = '/img/' + encodeURIComponent(i.midia);
   const dl = src + '?baixar=1&n=' + encodeURIComponent('audio-' + noFuso(i.capturado_em).replace(/[^0-9]/g, '').slice(0, 12));
   return `<div class="audio-item"><div class="audio-topo"><span class="audio-ico">🎤</span>` +
-    (i.legenda ? `<span class="audio-leg" data-tr>${esc(i.legenda)}</span>` : `<span class="audio-leg" data-i="audio">Áudio</span>`) +
+    (i.legenda ? trz(i.legenda, 'audio-leg') : `<span class="audio-leg" data-i="audio">Áudio</span>`) +
     `</div><audio controls preload="metadata" src="${src}"></audio><div class="meta">` +
     `<span class="tag cinza">${hora(i.capturado_em)}</span>` +
     (i.duracao_s ? `<span class="tag cinza">${Math.floor(i.duracao_s / 60)}:${String(Math.round(i.duracao_s % 60)).padStart(2, '0')}</span>` : '') +
@@ -641,6 +644,12 @@ const SCRIPT_IDIOMA = String.raw`
 
   function aplicarTraducao(mapa){
     document.querySelectorAll('[data-tr]').forEach(function(e){
+      var raw = e.getAttribute('data-raw');
+      if (raw != null) {   // texto com negrito/itálico/riscado: traduz o original e formata de novo
+        var tz = mapa[norm(raw)], v = (atual !== 'pt' && tz) ? tz : raw;
+        e.innerHTML = ZAP.html(String(v).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }));
+        return;
+      }
       guardar(e);
       var o = e.getAttribute('data-o'), tr = mapa[norm(o)];
       e.textContent = (atual !== 'pt' && tr) ? tr : o;
@@ -734,8 +743,8 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
 
   // observações gerais (texto solto) sobem para logo depois do mapa
   const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
-  const notasTopo = (rel.observacoes ? `<div class="nota"><span data-tr>${esc(rel.observacoes)}</span></div>` : '') +
-    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${dataSpan(noFuso(i.capturado_em))}</b> · ` : ''}<span data-tr>${esc(i.legenda)}</span></div>`).join('') : '');
+  const notasTopo = (rel.observacoes ? `<div class="nota">${trz(rel.observacoes)}</div>` : '') +
+    (gNotas ? gNotas.itens.map(i => `<div class="nota">${rel._n > 1 ? `<b>${dataSpan(noFuso(i.capturado_em))}</b> · ` : ''}${trz(i.legenda)}</div>`).join('') : '');
   const obsGerais = notasTopo ? `<h2 class="talhao"><span data-i="obs_gerais">Observações gerais</span></h2>${notasTopo}` : '';
 
   let corpo = '';
@@ -756,7 +765,7 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
     });
     segmentos.forEach(seg => {
       if (g.varioDia) corpo += `<h3 class="dia" data-dia="${esc(seg.iso)}">${esc(diaLongo(seg.iso))}</h3>`;
-      seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="nota"><span data-tr>${esc(i.legenda)}</span></div>`; });
+      seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="nota">${trz(i.legenda)}</div>`; });
       seg.lista.filter(i => i.tipo === 'audio').forEach(i => { corpo += blocoAudio(i); });
       corpo += blocoGrupos(seg.lista.filter(i => i.tipo !== 'texto' && i.tipo !== 'audio'));
     });
@@ -771,12 +780,12 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
     area: areaTotal ? areaTotal.toFixed(0) + ' ha mapeados' : '',
     periodo: rel.data_inicio ? fmtData(rel.data_inicio) + (rel.data_fim && rel.data_fim !== rel.data_inicio ? ' a ' + fmtData(rel.data_fim) : '') : '',
     publicado: rel.publicado_em ? fmtData(noFuso(rel.publicado_em)) : '',
-    obs: [rel.observacoes].concat(gNotas ? gNotas.itens.map(i => i.legenda) : []).map(t => String(t || '').trim()).filter(Boolean),
+    obs: [rel.observacoes].concat(gNotas ? gNotas.itens.map(i => i.legenda) : []).map(t => semZap(String(t || '').trim())).filter(Boolean),
     grupos: grupos.filter(g => g.chave !== '\u0000notas').map(g => ({
       titulo: g.chave === '\u0000fora' ? 'Fora dos talhões' : g.titulo,
       area: g.area ? g.area.toFixed(1).replace('.', ',') + ' ha' : '',
       itens: g.itens.filter(i => i.tipo === 'foto' || i.tipo === 'texto').map(i => ({
-        tipo: i.tipo, legenda: String(i.legenda || '').trim(), quando: quando(i.capturado_em),
+        tipo: i.tipo, legenda: semZap(String(i.legenda || '').trim()), quando: quando(i.capturado_em),
         src: i.tipo === 'foto' && i.midia ? '/img/' + encodeURIComponent(i.midia) : ''
       }))
     })),
@@ -921,7 +930,7 @@ ${BANDEIRA}</footer>
 })();
 </script>
 ${ag ? '<script>' + AGRO_REL_JS + '</script>' : ''}
-<script>${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
+<script>${ZAP_JS}${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
 <script type="application/json" id="pptDados">${JSON.stringify(pptDados).replace(/</g, '\\u003c')}</script>
 <script>${SCRIPT_PPT}</script>
 </div></body></html>`;
