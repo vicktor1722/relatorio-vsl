@@ -13,7 +13,8 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 
 // onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
-import { dadosParaRelatorio, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
+import { dadosParaRelatorio, garantir as garantirAgro, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
+import { cargaEstoqueSantaPaula } from './cargaestoque.js';
 import { avisarAplicacoes, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
@@ -173,6 +174,8 @@ async function pngIcone(tipo) {
   return new Response(out, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
 }
 
+let cargaTentada = false;
+
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
@@ -180,6 +183,8 @@ export default {
     const origem = url.origin;
 
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
+    // carga única do estoque da Santa Paula (safra 26/27): tenta uma vez por instância até ficar feita
+    if (!cargaTentada) { cargaTentada = true; ctx.waitUntil(garantirAgro(env).then(() => cargaEstoqueSantaPaula(env)).catch((e) => console.log('carga do estoque:', e.message))); }
 
     try {
       /* ================= público ================= */
@@ -235,7 +240,8 @@ export default {
 
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
-        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0 });
+        const cg = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:estoque_sp2627'").first().catch(function () { return null; });
+        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0 });
       }
 
       if (rota.startsWith('/img/')) {
