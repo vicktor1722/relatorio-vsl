@@ -127,3 +127,41 @@ export async function cargaEstoqueSantaPaula(env) {
   console.log('carga do estoque Santa Paula:', JSON.stringify(res));
   return res;
 }
+
+/* Troca única (07/11): nas recomendações da Santa Paula, "Glifosato 720" vira "ROUNDUP WG" (720 g/kg, mesma dose;
+   L/ha → kg/ha), para casar com o estoque. O lançamento do estoque também fica como ROUNDUP WG em kg. */
+const CHAVE_RU = 'carga:sp_roundup';
+const UN_KG = { 'L/ha': 'kg/ha', 'mL/ha': 'g/ha', 'L/100L': 'kg/100L', 'mL/100L': 'g/100L' };
+
+export async function trocarGlifosatoSantaPaula(env) {
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_RU).first().catch(() => null);
+  if (feito) return JSON.parse(feito.valor);
+  const c = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE).first().catch(() => null);
+  const fid = c && JSON.parse(c.valor).fazenda;
+  if (!fid) return null;   // a carga do estoque ainda não achou a fazenda
+  const f = await env.DB.prepare('SELECT id, usuario_id FROM fazendas WHERE id = ?').bind(fid).first();
+  if (!f) return null;
+  const { results } = await env.DB.prepare('SELECT id, dados FROM recomendacoes WHERE fazenda_id = ?').bind(fid).all();
+  const cmds = [];
+  let recs = 0, linhas = 0;
+  (results || []).forEach((r) => {
+    let d; try { d = JSON.parse(r.dados || '{}'); } catch (e) { return; }
+    let mudou = false;
+    (d.prods || []).forEach((p) => {
+      if (p && p[0] && solto(p[0]).startsWith('glifosato720')) { p[0] = 'ROUNDUP WG'; p[2] = UN_KG[p[2]] || p[2]; mudou = true; linhas++; }
+    });
+    if (mudou) { recs++; cmds.push(env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id)); }
+  });
+  // estoque: o Roundup WG fica com o nome e a unidade dele
+  cmds.push(env.DB.prepare(`UPDATE estoque_agro SET produto = 'ROUNDUP WG', unidade = 'kg',
+      obs = 'Compra safra 26/27 · BAYER · US$ 5,00/kg a prazo × dólar 5,50 · venc. 30/09/2027' WHERE id = 'es-sp2627-roundupwg' AND fazenda_id = ?`).bind(fid));
+  // catálogo da conta: cadastra o Roundup WG se ainda não existe (o Glifosato 720 continua lá para as outras fazendas)
+  const tem = await env.DB.prepare("SELECT 1 FROM produtos_agro WHERE usuario_id = ? AND REPLACE(LOWER(nome), ' ', '') = 'roundupwg'").bind(f.usuario_id).first();
+  if (!tem) cmds.push(env.DB.prepare(`INSERT OR IGNORE INTO produtos_agro (id, usuario_id, nome, tipo, ingrediente, dose, unidade, intervalo_dias)
+      VALUES (?, ?, 'ROUNDUP WG', 'Herbicida', 'Glifosato 720 g/kg (equivalente ácido)', 0, 'kg/ha', 0)`).bind('pd-roundupwg-' + f.usuario_id.slice(-8), f.usuario_id));
+  await env.DB.batch(cmds);
+  const res = { ok: true, fazenda: fid, recomendacoes: recs, linhas, em: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_RU, JSON.stringify(res)).run();
+  console.log('troca Glifosato 720 → ROUNDUP WG:', JSON.stringify(res));
+  return res;
+}
