@@ -329,6 +329,53 @@
   }
   let chatDe = null;   // conversa que está desenhada agora
 
+  // formato (largura/altura) de cada foto/vídeo, guardado no aparelho: o balão já nasce do tamanho certo
+  // e a conversa não "mexe" quando as fotos terminam de carregar
+  const PROP = (function () { try { return JSON.parse(localStorage.getItem('vsl-prop') || '{}') || {}; } catch (e) { return {}; } })();
+  let propTimer = null;
+  function guardarProp(id, w, h) {
+    if (!id || !w || !h) return null;
+    const r = Math.round(w / h * 100) / 100;
+    if (PROP[id] !== r) {
+      PROP[id] = r;
+      clearTimeout(propTimer);
+      propTimer = setTimeout(function () {
+        try {
+          const k = Object.keys(PROP);
+          if (k.length > 4000) k.slice(0, k.length - 4000).forEach(function (x) { delete PROP[x]; });
+          localStorage.setItem('vsl-prop', JSON.stringify(PROP));
+        } catch (e) { /* sem espaço: só não lembra */ }
+      }, 600);
+    }
+    return r;
+  }
+  // enquanto as fotos carregam, a conversa fica presa no fim (ou na mensagem que a pessoa olhava);
+  // tocar ou rolar solta na hora
+  let fixo = null;
+  function aplicarFixo() {
+    const chat = $('#chat');
+    if (!fixo || Date.now() > fixo.ate) { fixo = null; return; }
+    if (fixo.fim) chat.scrollTop = chat.scrollHeight;
+    else voltarAncora(chat, fixo.anc);
+  }
+  function ligarFixo() {
+    const chat = $('#chat');
+    if (chat.dataset.fixo) return;
+    chat.dataset.fixo = '1';
+    const soltar = function () { fixo = null; };
+    ['touchstart', 'wheel', 'mousedown', 'keydown'].forEach(function (ev) { chat.addEventListener(ev, soltar, { passive: true }); });
+    const medida = function (e) {
+      const m = e.target, box = m && m.closest && m.closest('.midia');
+      if (!box) return;
+      const r = m.tagName === 'IMG' ? guardarProp(box.dataset.midia, m.naturalWidth, m.naturalHeight)
+        : m.tagName === 'VIDEO' ? guardarProp(box.dataset.midia, m.videoWidth, m.videoHeight) : null;
+      if (r && !box.dataset.semProp) box.style.aspectRatio = String(r);
+      aplicarFixo();
+    };
+    chat.addEventListener('load', medida, true);             // load/loadedmetadata não sobem: pega na descida
+    chat.addEventListener('loadedmetadata', medida, true);
+  }
+
   async function renderChat() {
     const chat = $('#chat');
     const anc = ancoraChat(chat);
@@ -384,8 +431,9 @@
     const fim = outra || anc.perto || st.rolarFim;
     st.rolarFim = false;
     chat.innerHTML = html;
-    if (fim || !voltarAncora(chat, anc)) chat.scrollTop = chat.scrollHeight;
-    const posMeio = chat.scrollTop;
+    ligarFixo();
+    fixo = { fim: fim || !anc.id, anc: anc, ate: Date.now() + 5000 };
+    aplicarFixo();
 
     const bl = chat.querySelector('[data-lote]');
     if (bl) bl.onclick = function (ev) { ev.stopPropagation(); concluirLote(); };
@@ -419,16 +467,16 @@
             (it.tipo === 'video' ? '<div class="play">▶</div>' : '') +
             '<div class="dur" style="right:auto;left:6px">☁️ na nuvem</div>';
         } else {
+          el.style.aspectRatio = ''; el.dataset.semProp = '1';
           el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">' +
             (it.tipo === 'video' ? '▶ vídeo ' : '') + 'enviado · mídia na nuvem</div>';
         }
       } else {
+        el.style.aspectRatio = ''; el.dataset.semProp = '1';
         el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">⚠️ arquivo não ficou guardado neste aparelho</div>';
       }
     }
-    // as fotos entraram e mudaram a altura: acerta de novo (se a pessoa não rolou nesse meio tempo)
-    if (fim) chat.scrollTop = chat.scrollHeight;
-    else if (chat.scrollTop === posMeio) voltarAncora(chat, anc);
+    aplicarFixo();   // (se a pessoa não tocou na tela nesse meio tempo)
     recuperarMinis();
   }
 
@@ -463,7 +511,7 @@
     }
 
     return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
-      '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '"></div>' +
+      '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '" style="aspect-ratio:' + (PROP[it.id] || 0.75) + '"></div>' +
       chip +
       (it.legenda ? '<div class="legenda">' + ZAP.html(esc(it.legenda)) + '</div>' : '') +
       '<div class="rodape">' + lapis + (it.bytes ? '<span>' + bytesFmt(it.bytes) + '</span>' : '') +
