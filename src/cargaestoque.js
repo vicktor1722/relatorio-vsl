@@ -215,3 +215,48 @@ export async function voltarLastingSantaPaula(env) {
   console.log('volta para Lasting:', JSON.stringify(res));
   return res;
 }
+
+/* 07/11: tipo certo no catálogo (é ele que separa o estoque por categoria). Corrige os que já existem
+   na conta da Santa Paula e cadastra os que só estão no estoque. */
+const CHAVE_TP = 'carga:sp_tipos';
+const TIPOS_CERTOS = [
+  [['abamectina'], 'Inseticida'],
+  [['clorim'], 'Herbicida'],
+  [['ctgreen', 'ctgren'], 'Adjuvante'],
+  [['etiprole', 'etiplore', 'ethiprole'], 'Inseticida']
+];
+
+export async function tiposSantaPaula(env) {
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_TP).first().catch(() => null);
+  if (feito) return JSON.parse(feito.valor);
+  const c = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE).first().catch(() => null);
+  const fid = c && JSON.parse(c.valor).fazenda;
+  if (!fid) return null;
+  const f = await env.DB.prepare('SELECT id, usuario_id FROM fazendas WHERE id = ?').bind(fid).first();
+  if (!f) return null;
+  const tipoDe = (nome) => { const s = solto(nome); const r = TIPOS_CERTOS.find(([l]) => l.some((k) => s.startsWith(k))); return r ? r[1] : null; };
+  const [cat, est] = await Promise.all([
+    env.DB.prepare('SELECT id, nome, tipo FROM produtos_agro WHERE usuario_id = ?').bind(f.usuario_id).all(),
+    env.DB.prepare('SELECT DISTINCT produto FROM estoque_agro WHERE fazenda_id = ?').bind(fid).all()
+  ]);
+  const cmds = [], noCat = {};
+  let corrigidos = 0, novos = 0;
+  (cat.results || []).forEach((p) => {
+    const t = tipoDe(p.nome);
+    if (!t) return;
+    noCat[solto(p.nome)] = 1;
+    if (p.tipo !== t) { corrigidos++; cmds.push(env.DB.prepare('UPDATE produtos_agro SET tipo = ? WHERE id = ?').bind(t, p.id)); }
+  });
+  (est.results || []).forEach((e) => {
+    const t = tipoDe(e.produto);
+    if (!t || noCat[solto(e.produto)]) return;
+    novos++; noCat[solto(e.produto)] = 1;
+    cmds.push(env.DB.prepare(`INSERT OR IGNORE INTO produtos_agro (id, usuario_id, nome, tipo, ingrediente, dose, unidade, intervalo_dias)
+        VALUES (?, ?, ?, ?, '', 0, 'L/ha', 0)`).bind('pd-' + solto(e.produto).slice(0, 20) + '-' + f.usuario_id.slice(-8), f.usuario_id, e.produto, t));
+  });
+  if (cmds.length) await env.DB.batch(cmds);
+  const res = { ok: true, corrigidos, novos, em: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_TP, JSON.stringify(res)).run();
+  console.log('tipos no catálogo:', JSON.stringify(res));
+  return res;
+}
