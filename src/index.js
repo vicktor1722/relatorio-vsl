@@ -244,7 +244,7 @@ export default {
         const tg = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_roundup'").first().catch(function () { return null; });
         const tz = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_zapp'").first().catch(function () { return null; });
         const tt = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_tipos'").first().catch(function () { return null; });
-        const cc = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('carga:compra_catarinense', 'carga:compra_pindaituba')").all().catch(function () { return { results: [] }; });
+        const cc = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('carga:compra_catarinense', 'carga:compra_pindaituba', 'carga:compra_pantaneira')").all().catch(function () { return { results: [] }; });
         const compras = {}; (cc.results || []).forEach(function (r) { const v = JSON.parse(r.valor); compras[r.chave.slice(13)] = { itens: v.itens, fazendas: v.fazendas_grupo, sem_preco: v.sem_preco, total: v.total }; });
         const tk = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_lasting'").first().catch(function () { return null; });
         return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0, troca_glifosato: tg ? JSON.parse(tg.valor).linhas : null, volta_lasting: tk ? { linhas: JSON.parse(tk.valor).linhas, karate: JSON.parse(tk.valor).karate_restante } : null, troca_zapp: tz ? JSON.parse(tz.valor).linhas : null, tipos: tt ? JSON.parse(tt.valor) : null, compras });
