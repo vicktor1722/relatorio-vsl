@@ -119,7 +119,28 @@ function areasDe(talhoes) {
 }
 
 // estoque da fazenda: entradas − aplicado; "a aplicar" = recomendado e ainda não aplicado (mesma conta do app)
-export function estoqueDe(entradas, recs, areas) {
+// categoria do produto no estoque: a do catálogo da conta; sem ela, pelo nome (produtos mais comuns)
+const GRUPO_TIPO = { herbicida: 'Herbicidas', fungicida: 'Fungicidas', inseticida: 'Inseticidas', adjuvante: 'Adjuvantes', 'óleo / adjuvante': 'Adjuvantes',
+  fertilizante: 'Fertilizantes e nutrição', 'nutrição': 'Fertilizantes e nutrição', micronutriente: 'Fertilizantes e nutrição', corretivo: 'Corretivos',
+  'biológico': 'Biológicos', biologico: 'Biológicos', semente: 'Sementes' };
+const GRUPO_NOME = [
+  ['Herbicidas', ['24d', 'roundup', 'zapp', 'glifosato', 'climur', 'clorim', 'glufosinato', 'kennox', 'zethamaxx', 'atrivo', 'reglone', 'diquat', 'cletodim', 'atrazina', 'haloxifope', 'flumyzin', 'flumioxazina', 'imazetapir', 'metsulfurom', 'paraquat', 'saflufenacil', 'diclosulam', 'smetolacloro']],
+  ['Fungicidas', ['clorotalonil', 'bravonil', 'mancozeb', 'unizeb', 'vessarya', 'evolution', 'teburaz', 'azimut', 'elatus', 'mitrion', 'score', 'armero', 'foxsupra', 'fox', 'difeno', 'tebuconazol', 'azoxistrobina', 'protioconazol', 'priori', 'sphere', 'cypress', 'orkestra', 'ativum', 'blavity']],
+  ['Inseticidas', ['perito', 'acefato', 'clofenapir', 'clorfenapir', 'belt', 'expedition', 'metomy', 'metomil', 'epingle', 'piriproxi', 'elestal', 'instivo', 'karate', 'lasting', 'verdavis', 'vertimec', 'abamectina', 'etiprole', 'ethiprole', 'engeo', 'connect', 'premio', 'imidacloprido', 'tiametoxam', 'bifentrina', 'lambda']],
+  ['Adjuvantes', ['iharol', 'oleo', 'sintronela', 'citronela', 'ctgreen', 'kant', 'antiespuma', 'aurora', 'assist', 'nimbus', 'adjuvante', 'espalhante']],
+  ['Fertilizantes e nutrição', ['boro', 'brave', 'sallvare', 'polyamine', 'magmill', 'maxraiz', 'map', 'kcl', 'cloretodepotassio', 'supertriplo', 'supersimples', 'ureia', 'manganes', 'cobalto', 'molibdenio', 'zinco']],
+  ['Biológicos', ['azotrop', 'rhizotrop', 'bradyrhizobium', 'azospirillum', 'inoculante']]
+];
+const ORDEM_GRUPO = ['Herbicidas', 'Fungicidas', 'Inseticidas', 'Adjuvantes', 'Fertilizantes e nutrição', 'Biológicos', 'Corretivos', 'Sementes', 'Outros'];
+function grupoDe(nome, tipoCat) {
+  const t = GRUPO_TIPO[String(tipoCat || '').trim().toLowerCase()];
+  if (t) return t;
+  const s = String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const [g, l] of GRUPO_NOME) if (l.some((k) => s.startsWith(k) || (k.length > 4 && s.includes(k)))) return g;
+  return 'Outros';
+}
+
+export function estoqueDe(entradas, recs, areas, catalogo) {
   const chave = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const m = {};
   const item = (nome, un) => { const k = chave(nome) + '|' + un; return m[k] || (m[k] = { nome, un, ent: 0, val: 0, qv: 0, apl: 0, prev: 0 }); };
@@ -139,9 +160,10 @@ export function estoqueDe(entradas, recs, areas) {
     });
   });
   const r2 = (v) => Math.round(v * 100) / 100;
+  const tipoCat = {}; (catalogo || []).forEach((p) => { if (p.nome && p.tipo) tipoCat[chave(p.nome)] = p.tipo; });
   return Object.values(m).map((x) => {
-    const custo = x.qv ? x.val / x.qv : 0, saldo = x.ent - x.apl;
-    return { produto: x.nome, unidade: x.un, entradas: r2(x.ent), aplicado: r2(x.apl), a_aplicar: r2(x.prev), saldo: r2(saldo),
+    const custo = x.qv ? x.val / x.qv : 0, saldo = x.ent - x.apl, g = grupoDe(x.nome, tipoCat[chave(x.nome)]);
+    return { produto: x.nome, unidade: x.un, grupo: g, ordem: ORDEM_GRUPO.indexOf(g), entradas: r2(x.ent), aplicado: r2(x.apl), a_aplicar: r2(x.prev), saldo: r2(saldo),
       sobra: r2(saldo - x.prev), custo_unit: r2(custo), valor_saldo: r2(Math.max(0, saldo) * custo), gasto: r2(x.apl * custo) };
   }).sort((a, b) => a.produto.localeCompare(b.produto, 'pt-BR'));
 }
@@ -292,12 +314,13 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
     .bind(fid, acesso.dono_id).first();
   if (!f) return null;
   const dono = acesso.dono_id;
-  const [pl, rc, es, co, ci] = await Promise.all([
+  const [pl, rc, es, co, ci, cat] = await Promise.all([
     env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? ORDER BY data_prevista, criado_em').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
     env.DB.prepare('SELECT * FROM colheita WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
-    env.DB.prepare('SELECT * FROM ciclos WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] }))
+    env.DB.prepare('SELECT * FROM ciclos WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] })),
+    env.DB.prepare('SELECT nome, tipo FROM produtos_agro WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] }))
   ]);
   const recs = (rc.results || []).map((r) => ({ id: r.id, safra: r.safra || '', operacao: r.operacao || '', data_prevista: r.data_prevista || '',
     mostrar: Number(r.mostrar) !== 0, dados: lerJson(r.dados, {}) }));
@@ -349,7 +372,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
   return Object.assign(base, {
     aplicacoes,
     blocos: { evolucao: bl.evolucao || '', mapaVar: bl.mapaVar || '', proximas: bl.topo || '', aplicacoes: bl.fim || '' },
-    estoque: estoqueDe(es.results || [], recs, areas),
+    estoque: estoqueDe(es.results || [], recs, areas, cat.results || []),
     custo: custo ? { talhoes: custo.talhoes, sem_preco: custo.sem_preco } : null,
     colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
     mapaPartes: op.leve ? [] : partesDoMapa(mapa, plantio, areas),
