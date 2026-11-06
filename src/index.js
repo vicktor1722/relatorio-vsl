@@ -23,7 +23,7 @@ import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
 import { climaDe } from './mercado.js';
 import { UFS_LINHAS } from './ufs.js';
-import { atualizarChuva } from './chuva.js';
+import { atualizarChuva, mapaRapido } from './chuva.js';
 import { rotasPainelFaz } from './painelfaz.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
 import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
@@ -245,6 +245,13 @@ export default {
         const js = '(function(){var s=document.createElement("style");s.textContent=' + JSON.stringify(MAPA_CHUVA_CSS) + ';document.head.appendChild(s);})();\n' +
           MAPA_CHUVA_JS + '\nwindow.MapaChuva = MapaChuva;';
         return new Response(js, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' } });
+      }
+
+      // grade do mapa da chuva (previsão pública do modelo europeu) para o app de campo: sem login, resposta rápida
+      if (rota === '/api/mapachuva.json') {
+        const r = await mapaRapido(env, ctx);
+        return new Response(JSON.stringify(Object.assign({ ok: !!(r.mapa && r.mapa.v) }, r)), {
+          headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=600', 'Access-Control-Allow-Origin': '*' } });
       }
 
       // raio-X do armazenamento: só totais (quantidade e tamanho por tipo), sem nomes nem arquivos
