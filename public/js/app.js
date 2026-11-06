@@ -312,8 +312,26 @@
   }
 
   /* ---------------- chat ---------------- */
+  // posição da rolagem: o redesenho que vem sozinho (sincronização, miniatura que chegou, vídeo reduzido)
+  // não pode levar ao final quem está lá em cima procurando uma foto. Vai para o final só se já estava
+  // perto do fim, se abriu outra conversa ou se acabou de registrar algo (st.rolarFim).
+  function ancoraChat(chat) {
+    const perto = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 80;
+    const topo = chat.getBoundingClientRect().top;
+    const el = Array.prototype.find.call(chat.querySelectorAll('[data-id]'), function (x) { return x.getBoundingClientRect().bottom > topo; });
+    return { perto: perto, id: el ? el.dataset.id : null, dy: el ? el.getBoundingClientRect().top - topo : 0 };
+  }
+  function voltarAncora(chat, a) {
+    const el = a.id ? chat.querySelector('[data-id="' + a.id + '"]') : null;
+    if (!el) return false;
+    chat.scrollTop += (el.getBoundingClientRect().top - chat.getBoundingClientRect().top) - a.dy;
+    return true;
+  }
+  let chatDe = null;   // conversa que está desenhada agora
+
   async function renderChat() {
     const chat = $('#chat');
+    const anc = ancoraChat(chat);
     st.urls.forEach(URL.revokeObjectURL); st.urls = [];
     if (!st.rel) {
       chat.innerHTML = '<div class="aviso">Nenhuma conversa aberta. Toque em <b>☰</b> e crie um relatório.</div>';
@@ -361,7 +379,13 @@
       html += '<button type="button" class="lote-pend" data-lote>📷 ' + lote.fotos.length +
         (lote.fotos.length > 1 ? ' fotos esperando' : ' foto esperando') + ' a legenda — toque para concluir</button>';
     }
+    const chave = (st.visitas[0] && st.visitas[0].id) || st.rel.id, outra = chatDe !== chave;
+    chatDe = chave;
+    const fim = outra || anc.perto || st.rolarFim;
+    st.rolarFim = false;
     chat.innerHTML = html;
+    if (fim || !voltarAncora(chat, anc)) chat.scrollTop = chat.scrollHeight;
+    const posMeio = chat.scrollTop;
 
     const bl = chat.querySelector('[data-lote]');
     if (bl) bl.onclick = function (ev) { ev.stopPropagation(); concluirLote(); };
@@ -402,7 +426,9 @@
         el.innerHTML = '<div style="padding:26px;color:#fff;font-size:12px;text-align:center">⚠️ arquivo não ficou guardado neste aparelho</div>';
       }
     }
-    chat.scrollTop = chat.scrollHeight;
+    // as fotos entraram e mudaram a altura: acerta de novo (se a pessoa não rolou nesse meio tempo)
+    if (fim) chat.scrollTop = chat.scrollHeight;
+    else if (chat.scrollTop === posMeio) voltarAncora(chat, anc);
     recuperarMinis();
   }
 
@@ -488,6 +514,7 @@
 
   async function novoItem(tipo, blob, extras) {
     if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return null; }
+    st.rolarFim = true;   // registro novo: a conversa desce até ele
     // visita fechada? abre uma nova na mesma conversa, com a data de hoje
     const alvo = await visitaAberta();
     if (!alvo) return null;
@@ -1532,6 +1559,7 @@
     if (!st.rel) return;
     await DB.cfg('ultimo', id);
     fechar('telaLista');
+    st.rolarFim = true;                       // abriu a conversa: começa no fim, como no WhatsApp
     await renderChat();                       // ajusta st.rel para a visita aberta
     if (await atualizarTalhoes(st.rel)) await renderChat();
     $('#tituloRel').textContent = st.rel.fazenda || 'Relatório';
