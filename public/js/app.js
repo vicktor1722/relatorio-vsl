@@ -1602,11 +1602,11 @@
     return mudou;
   }
 
-  async function abrirRelatorio(id) {
+  async function abrirRelatorio(id, porBaixo) {
     st.rel = await DB.get('relatorios', id);
     if (!st.rel) return;
     await DB.cfg('ultimo', id);
-    fechar('telaLista');
+    if (!porBaixo) fechar('telaLista');
     st.rolarFim = true;                       // abriu a conversa: começa no fim, como no WhatsApp
     await renderChat();                       // ajusta st.rel para a visita aberta
     if (await atualizarTalhoes(st.rel)) await renderChat();
@@ -2308,6 +2308,8 @@
   /* ---------------- init ---------------- */
   async function init() {
     const pelaNotificacao = /[?&]abrir=recs/.test(location.search);   // tocou no aviso de aplicação: abre nas recomendações
+    // a lista de conversas já vem aberta no HTML (abre direto nela); só some quando o app abre em outra tela
+    if (pelaNotificacao || /^#\/r\//.test(location.hash)) fechar('telaLista');
     ligarMedidaDeAltura();
     ligarEventos();
     Conta.ligar();
@@ -2356,9 +2358,10 @@
     });
     window.addEventListener('online', function () { setTimeout(function () { Conta.atualizarSePrecisar().catch(function () {}); }, 1500); });
     const ultimo = await DB.cfg('ultimo');
+    if (!pelaNotificacao && !(location.hash || '').startsWith('#/r/')) await listarRelatorios();   // lista já preenchida
     if (ultimo) {
       const r = await DB.get('relatorios', ultimo);
-      if (r) { await abrirRelatorio(ultimo); }
+      if (r) { await abrirRelatorio(ultimo, true); }   // a última conversa fica pronta por baixo da lista
     }
     if (!(await Sync.logado())) {
       await Conta.mostrarLogin();
