@@ -166,36 +166,48 @@ export async function trocarGlifosatoSantaPaula(env) {
   return res;
 }
 
-/* Troca única (07/11): nas recomendações da Santa Paula, "Lasting" vira o Karate Zeon do estoque
-   (mesmo produto, mesma dose e unidade), para a baixa das aplicações sair dele. */
-const CHAVE_KZ = 'carga:sp_karate';
+/* 07/11: o Karate Zeon foi comprado, mas o que chegou na fazenda foi o Lasting.
+   O lançamento do estoque passa a se chamar Lasting (mesmo volume e valor) e as recomendações ficam com Lasting.
+   Desfaz a troca Lasting → Karate Zeon feita pouco antes (só nas recomendações mexidas por ela). */
+const CHAVE_KZ = 'carga:sp_karate';      // troca anterior (Lasting → Karate Zeon), já feita em produção
+const CHAVE_LA = 'carga:sp_lasting';
+const iso2sql = (iso) => iso.replace('T', ' ').slice(0, 19);
 
-export async function trocarLastingSantaPaula(env) {
-  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_KZ).first().catch(() => null);
+export async function voltarLastingSantaPaula(env) {
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_LA).first().catch(() => null);
   if (feito) return JSON.parse(feito.valor);
   const c = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE).first().catch(() => null);
   const fid = c && JSON.parse(c.valor).fazenda;
   if (!fid) return null;
   const f = await env.DB.prepare('SELECT id, usuario_id FROM fazendas WHERE id = ?').bind(fid).first();
   if (!f) return null;
-  // nome do Karate Zeon como está no estoque da fazenda (a carga pode ter usado o nome das recomendações)
-  const es = await env.DB.prepare("SELECT produto FROM estoque_agro WHERE id = 'es-sp2627-karatezeon' AND fazenda_id = ?").bind(fid).first();
-  const novo = (es && es.produto) || 'KARATE ZEON';
-  const { results } = await env.DB.prepare('SELECT id, dados FROM recomendacoes WHERE fazenda_id = ?').bind(fid).all();
   const cmds = [];
   let recs = 0, linhas = 0;
-  (results || []).forEach((r) => {
-    let d; try { d = JSON.parse(r.dados || '{}'); } catch (e) { return; }
-    let mudou = false;
-    (d.prods || []).forEach((p) => { if (p && p[0] && solto(p[0]).startsWith('lasting')) { p[0] = novo; mudou = true; linhas++; } });
-    if (mudou) { recs++; cmds.push(env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id)); }
-  });
-  const tem = await env.DB.prepare("SELECT 1 FROM produtos_agro WHERE usuario_id = ? AND REPLACE(LOWER(nome), ' ', '') = ?").bind(f.usuario_id, solto(novo)).first();
-  if (!tem) cmds.push(env.DB.prepare(`INSERT OR IGNORE INTO produtos_agro (id, usuario_id, nome, tipo, ingrediente, dose, unidade, intervalo_dias)
-      VALUES (?, ?, ?, 'Inseticida', 'Lambda-cialotrina 250 g/L', 0, 'L/ha', 0)`).bind('pd-karatezeon-' + f.usuario_id.slice(-8), f.usuario_id, novo));
-  if (cmds.length) await env.DB.batch(cmds);
-  const res = { ok: true, fazenda: fid, nome: novo, recomendacoes: recs, linhas, em: new Date().toISOString() };
-  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_KZ, JSON.stringify(res)).run();
-  console.log('troca Lasting → Karate Zeon:', JSON.stringify(res));
+  const kz = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_KZ).first().catch(() => null);
+  const ant = kz ? JSON.parse(kz.valor) : null;
+  if (ant && ant.em && ant.nome) {
+    // recomendações gravadas pela troca anterior (mesmo instante, ±10 min)
+    const t = new Date(ant.em).getTime(), de = iso2sql(new Date(t - 6e5).toISOString()), ate = iso2sql(new Date(t + 6e5).toISOString());
+    const { results } = await env.DB.prepare('SELECT id, dados FROM recomendacoes WHERE fazenda_id = ? AND atualizado_em BETWEEN ? AND ?').bind(fid, de, ate).all();
+    (results || []).forEach((r) => {
+      let d; try { d = JSON.parse(r.dados || '{}'); } catch (e) { return; }
+      let mudou = false;
+      (d.prods || []).forEach((p) => { if (p && p[0] === ant.nome) { p[0] = 'Lasting'; mudou = true; linhas++; } });
+      if (mudou) { recs++; cmds.push(env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id)); }
+    });
+    // o Karate Zeon que a troca anterior cadastrou no catálogo sai
+    cmds.push(env.DB.prepare('DELETE FROM produtos_agro WHERE id = ? AND usuario_id = ?').bind('pd-karatezeon-' + f.usuario_id.slice(-8), f.usuario_id));
+  }
+  // estoque: o volume comprado como Karate Zeon fica como Lasting
+  cmds.push(env.DB.prepare(`UPDATE estoque_agro SET produto = 'Lasting', unidade = 'L',
+      obs = 'Compra safra 26/27 · SYNGENTA · comprado como KARATE ZEON, entregue Lasting · US$ 11,06/L a prazo × dólar 5,50 · venc. 05/09/2027'
+      WHERE id = 'es-sp2627-karatezeon' AND fazenda_id = ?`).bind(fid));
+  await env.DB.batch(cmds);
+  // recomendações da fazenda que ainda citam Karate Zeon (não mexidas aqui)
+  const { results: todas } = await env.DB.prepare('SELECT dados FROM recomendacoes WHERE fazenda_id = ?').bind(fid).all();
+  const karate = (todas || []).reduce((n, r) => n + ((/"karate\s*zeon"/i.test(r.dados || '')) ? 1 : 0), 0);
+  const res = { ok: true, fazenda: fid, recomendacoes: recs, linhas, karate_restante: karate, em: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_LA, JSON.stringify(res)).run();
+  console.log('volta para Lasting:', JSON.stringify(res));
   return res;
 }
