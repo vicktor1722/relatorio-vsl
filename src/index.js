@@ -5,6 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
+import { raioX } from './armazenamento.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
@@ -237,6 +238,9 @@ export default {
       if (rota === '/portal-sw.js') return new Response(PORTAL_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
       if (rota === '/portal.webmanifest') return new Response(PORTAL_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
       if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url, ctx);
+
+      // raio-X do armazenamento: só totais (quantidade e tamanho por tipo), sem nomes nem arquivos
+      if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
 
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
