@@ -1284,18 +1284,22 @@
     try { g = JSON.parse(localStorage.getItem('vsl-chuva-mapa') || 'null'); } catch (e) { g = null; }
     // o mapa é atualizado todo dia de madrugada: o guardado vale até 6 h
     if (g && g.mapa && Date.now() - g.t < 6 * 3600e3) return g.mapa;
+    let erro = '';
     try {
       const r = await Sync.chuvaMapa();
       if (r && r.mapa && r.mapa.v) { try { localStorage.setItem('vsl-chuva-mapa', JSON.stringify({ mapa: r.mapa, t: Date.now() })); } catch (e) {} return r.mapa; }
-    } catch (e) { /* sem internet: usa o guardado */ }
-    return g && g.mapa;
+      erro = 'o servidor ainda não tem a previsão';
+    } catch (e) { erro = e.message || 'falhou'; }   // sem internet: usa o guardado
+    if (g && g.mapa) return g.mapa;
+    throw new Error(erro);
   }
   async function mapaChuvaNoClima(box) {
     const vazio = function (t) { box.querySelector('.cl-chuva-vz') ? box.querySelector('.cl-chuva-vz').textContent = t : null; return null; };
     let M;
     try { [M] = await Promise.all([dadosMapaChuva(), prepararMapa()]); }
-    catch (e) { return vazio(navigator.onLine ? 'Não foi possível carregar o mapa agora.' : 'O mapa da chuva precisa de internet.'); }
-    if (!M || !M.v || !window.MapaChuva) return vazio('Mapa da chuva indisponível agora.');
+    catch (e) { return vazio(navigator.onLine ? 'Não foi possível carregar o mapa agora (' + (e.message || 'erro') + '). Toque no ícone do tempo de novo daqui a pouco.' : 'O mapa da chuva precisa de internet.'); }
+    if (!M || !M.v) return vazio('Mapa da chuva indisponível agora (sem dados da previsão).');
+    if (!window.MapaChuva || !window.L) return vazio('Mapa da chuva indisponível agora (o mapa não carregou).');
     if (!document.body.contains(box)) return null;
     const br = function (d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) : ''; };
     const em = M.gerado_em ? new Date(M.gerado_em).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '';
@@ -1313,7 +1317,7 @@
         box.querySelector('.cl-mapa .t').textContent = t; box.querySelector('.cl-mapa .d').textContent = d;
         if (mc && mc.tocando()) sl.value = String(dia);
       } });
-    if (!mc) return vazio('Mapa da chuva indisponível agora.');
+    if (!mc) return vazio('Mapa da chuva indisponível agora (o mapa não abriu neste aparelho).');
     box.querySelectorAll('[data-clm]').forEach(function (b) {
       b.onclick = function () {
         box.querySelectorAll('[data-clm]').forEach(function (x) { x.classList.toggle('on', x === b); });

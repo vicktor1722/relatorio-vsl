@@ -138,3 +138,12 @@ export async function mapaGuardado(env) {
   }
   return { mapa, proxima: proximaAtualizacao() };
 }
+
+// para o app de campo: responde na hora com o que está guardado; se estiver velho, refaz por trás
+export async function mapaRapido(env, ctx) {
+  let mapa = await ler(env, 'chuva:mapa');
+  const velho = !mapa || mapa.ver !== GRADE.ver || !mapa.gerado_em || Date.now() - new Date(mapa.gerado_em).getTime() > VALIDADE;
+  if (velho && mapa && mapa.v) { ctx.waitUntil(mapaGuardado(env).catch(() => null)); return { mapa, proxima: proximaAtualizacao(), atualizando: true }; }
+  if (velho) return mapaGuardado(env);   // nada guardado: precisa fazer agora
+  return { mapa, proxima: proximaAtualizacao() };
+}
