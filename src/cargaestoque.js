@@ -133,8 +133,9 @@ export async function cargaEstoqueSantaPaula(env) {
 const CHAVE_RU = 'carga:sp_roundup';
 const UN_KG = { 'L/ha': 'kg/ha', 'mL/ha': 'g/ha', 'L/100L': 'kg/100L', 'mL/100L': 'g/100L' };
 
-export async function trocarGlifosatoSantaPaula(env) {
-  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_RU).first().catch(() => null);
+export async function trocarGlifosatoSantaPaula(env, chaveTroca, prefixos) {
+  chaveTroca = chaveTroca || CHAVE_RU; prefixos = prefixos || ['glifosato720'];
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(chaveTroca).first().catch(() => null);
   if (feito) return JSON.parse(feito.valor);
   const c = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE).first().catch(() => null);
   const fid = c && JSON.parse(c.valor).fazenda;
@@ -148,7 +149,7 @@ export async function trocarGlifosatoSantaPaula(env) {
     let d; try { d = JSON.parse(r.dados || '{}'); } catch (e) { return; }
     let mudou = false;
     (d.prods || []).forEach((p) => {
-      if (p && p[0] && solto(p[0]).startsWith('glifosato720')) { p[0] = 'ROUNDUP WG'; p[2] = UN_KG[p[2]] || p[2]; mudou = true; linhas++; }
+      if (p && p[0] && prefixos.some((k) => solto(p[0]).startsWith(k))) { p[0] = 'ROUNDUP WG'; p[2] = UN_KG[p[2]] || p[2]; mudou = true; linhas++; }
     });
     if (mudou) { recs++; cmds.push(env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(d), r.id)); }
   });
@@ -161,10 +162,13 @@ export async function trocarGlifosatoSantaPaula(env) {
       VALUES (?, ?, 'ROUNDUP WG', 'Herbicida', 'Glifosato 720 g/kg (equivalente ácido)', 0, 'kg/ha', 0)`).bind('pd-roundupwg-' + f.usuario_id.slice(-8), f.usuario_id));
   await env.DB.batch(cmds);
   const res = { ok: true, fazenda: fid, recomendacoes: recs, linhas, em: new Date().toISOString() };
-  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_RU, JSON.stringify(res)).run();
-  console.log('troca Glifosato 720 → ROUNDUP WG:', JSON.stringify(res));
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(chaveTroca, JSON.stringify(res)).run();
+  console.log('troca ' + prefixos.join('/') + ' → ROUNDUP WG:', JSON.stringify(res));
   return res;
 }
+
+// 07/11: o Zapp 720 das recomendações da Santa Paula também passa a ser o glifosato comprado (ROUNDUP WG)
+export function trocarZappSantaPaula(env) { return trocarGlifosatoSantaPaula(env, 'carga:sp_zapp', ['zapp']); }
 
 /* 07/11: o Karate Zeon foi comprado, mas o que chegou na fazenda foi o Lasting.
    O lançamento do estoque passa a se chamar Lasting (mesmo volume e valor) e as recomendações ficam com Lasting.
