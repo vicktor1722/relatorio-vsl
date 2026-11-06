@@ -157,7 +157,9 @@ function aplicacoes(recs, areas, hoje, plantio, out, semAplicadas) {
     });
     Object.keys(dt).forEach((t) => { if (dt[t] && (!g.data || dt[t] < g.data)) g.data = dt[t]; });
   });
-  const todas = ordem.map((k) => grupos[k]).sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+  // mais recentes primeiro: a data mais nova da aplicação (feita ou prevista) vai para o topo
+  const ultima = (g) => [g.data].concat(Object.values(g.feito), Object.values(g.prev)).filter(Boolean).sort().pop() || '';
+  const todas = ordem.map((k) => grupos[k]).sort((a, b) => { const x = ultima(a), y = ultima(b); return x < y ? 1 : x > y ? -1 : 0; });
   const cont = {};
   todas.forEach((g) => { cont[g.op] = Math.max(cont[g.op] || 0, g.num); });   // numeração (1ª, 2ª…) conta todas
   // relatório: as já aplicadas em todos os talhões ficam de fora (o portal da fazenda mostra todas)
