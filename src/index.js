@@ -6,6 +6,7 @@ import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usua
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { raioX } from './armazenamento.js';
+import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
@@ -238,6 +239,13 @@ export default {
       if (rota === '/portal-sw.js') return new Response(PORTAL_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
       if (rota === '/portal.webmanifest') return new Response(PORTAL_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
       if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url, ctx);
+
+      // mapa da chuva para o app de campo (o mesmo do portal e do painel); o app carrega quando abre a previsão
+      if (rota === '/api/mapachuva.js') {
+        const js = '(function(){var s=document.createElement("style");s.textContent=' + JSON.stringify(MAPA_CHUVA_CSS) + ';document.head.appendChild(s);})();\n' +
+          MAPA_CHUVA_JS + '\nwindow.MapaChuva = MapaChuva;';
+        return new Response(js, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' } });
+      }
 
       // raio-X do armazenamento: só totais (quantidade e tamanho por tipo), sem nomes nem arquivos
       if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
@@ -781,7 +789,7 @@ export default {
         const dados = await req.arrayBuffer();
         const ext = mime.startsWith('audio/')
           ? (mime.includes('webm') ? 'webm' : mime.includes('ogg') ? 'ogg' : mime.includes('mpeg') ? 'mp3' : 'm4a')
-          : mime.includes('mp4') ? 'mp4' : mime.includes('webm') ? 'webm' : mime.includes('png') ? 'png' : 'jpg';
+          : mime.includes('mp4') ? 'mp4' : mime.includes('quicktime') ? 'mov' : mime.includes('webm') ? 'webm' : mime.includes('png') ? 'png' : 'jpg';
         const r = await salvarMidia(env, { chave: relId + '/' + itemId + '.' + ext, mime, dados });
         return json({ ok: true, midia: r.chave, bytes: r.bytes });
       }

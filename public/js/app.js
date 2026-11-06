@@ -1251,9 +1251,81 @@
   function abrirClima() {
     if (!climaAtual) return;
     const v = document.createElement('div'); v.className = 'cl-veu';
-    v.innerHTML = '<div class="cl-folha"><div class="cl-cab"><b>Previsão do tempo</b><button aria-label="Fechar">✕</button></div>' + climaHtml(climaAtual.c, climaAtual.quando) + '</div>';
-    v.onclick = function (e) { if (e.target === v || e.target.closest('.cl-cab button')) v.remove(); };
+    v.innerHTML = '<div class="cl-folha"><div class="cl-cab"><b>Previsão do tempo</b><button aria-label="Fechar">✕</button></div>' + climaHtml(climaAtual.c, climaAtual.quando) +
+      '<div class="cl-chuva" id="clChuva"><div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span></div>' +
+      '<div class="cl-chuva-vz">Carregando o mapa…</div></div></div>';
+    let mc = null;
+    const fechar = function () { if (mc) { try { mc.destruir(); } catch (e) {} mc = null; } v.remove(); };
+    v.onclick = function (e) { if (e.target === v || e.target.closest('.cl-cab button')) fechar(); };
     document.body.appendChild(v);
+    mapaChuvaNoClima(v.querySelector('#clChuva')).then(function (m) { mc = m; if (!document.body.contains(v) && m) m.destruir(); });
+  }
+
+  /* ---------- mapa da chuva dentro da previsão do tempo (modelo europeu, próximos 15 dias) ---------- */
+  // Leaflet e o módulo do mapa (o mesmo do portal) só carregam quando a previsão é aberta; precisa de internet
+  let promMapa = null;
+  function carregarScript(src) {
+    return new Promise(function (ok, erro) { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { erro(new Error('não carregou')); }; document.head.appendChild(s); });
+  }
+  function prepararMapa() {
+    if (window.MapaChuva && window.L) return Promise.resolve();
+    if (promMapa) return promMapa;
+    promMapa = (async function () {
+      if (!window.L) {
+        const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
+        await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js');
+      }
+      await carregarScript((await Sync.baseApi()) + '/api/mapachuva.js');
+    })().catch(function (e) { promMapa = null; throw e; });
+    return promMapa;
+  }
+  async function dadosMapaChuva() {
+    let g = null;
+    try { g = JSON.parse(localStorage.getItem('vsl-chuva-mapa') || 'null'); } catch (e) { g = null; }
+    // o mapa é atualizado todo dia de madrugada: o guardado vale até 6 h
+    if (g && g.mapa && Date.now() - g.t < 6 * 3600e3) return g.mapa;
+    try {
+      const r = await Sync.chuvaMapa();
+      if (r && r.mapa && r.mapa.v) { try { localStorage.setItem('vsl-chuva-mapa', JSON.stringify({ mapa: r.mapa, t: Date.now() })); } catch (e) {} return r.mapa; }
+    } catch (e) { /* sem internet: usa o guardado */ }
+    return g && g.mapa;
+  }
+  async function mapaChuvaNoClima(box) {
+    const vazio = function (t) { box.querySelector('.cl-chuva-vz') ? box.querySelector('.cl-chuva-vz').textContent = t : null; return null; };
+    let M;
+    try { [M] = await Promise.all([dadosMapaChuva(), prepararMapa()]); }
+    catch (e) { return vazio(navigator.onLine ? 'Não foi possível carregar o mapa agora.' : 'O mapa da chuva precisa de internet.'); }
+    if (!M || !M.v || !window.MapaChuva) return vazio('Mapa da chuva indisponível agora.');
+    if (!document.body.contains(box)) return null;
+    const br = function (d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) : ''; };
+    const em = M.gerado_em ? new Date(M.gerado_em).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '';
+    box.innerHTML = '<div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span></div>' +
+      '<div class="cl-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) { return '<button data-clm="' + x[0] + '" class="' + (x[0] === 'a7' ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="cl-mapa"><div class="cl-mapa-in"></div><span class="t"></span><span class="d"></span></div>' +
+      '<div class="cl-ctrl oculto"><button class="cl-play" aria-label="Animar">▶</button><input type="range" min="0" max="' + (M.v.length - 1) + '" value="0"></div>' +
+      '<div class="mc-esc"></div><div class="mc-escx"></div>' +
+      '<div class="cl-chuva-pe">🌍 Modelo europeu (ECMWF) · atualizado ' + esc(em) + ' · atualiza todo dia de manhã cedo</div>';
+    const pos = st.pos || (function () { try { return JSON.parse(localStorage.getItem('vsl-ult-pos') || 'null'); } catch (e) { return null; } })();
+    const sl = box.querySelector('input[type=range]'), pl = box.querySelector('.cl-play');
+    let mc = null;   // o mapa já chama o info() enquanto é criado
+    mc = MapaChuva.criar(box.querySelector('.cl-mapa-in'), M, pos ? { lat: pos.lat, lon: pos.lon, nome: 'Você' } : null,
+      { modo: 'a7', zoom: false, nivel: pos ? 5 : 4, escala: box.querySelector('.mc-escx'), info: function (t, d, dia) {   // aproxima com dois dedos
+        box.querySelector('.cl-mapa .t').textContent = t; box.querySelector('.cl-mapa .d').textContent = d;
+        if (mc && mc.tocando()) sl.value = String(dia);
+      } });
+    if (!mc) return vazio('Mapa da chuva indisponível agora.');
+    box.querySelectorAll('[data-clm]').forEach(function (b) {
+      b.onclick = function () {
+        box.querySelectorAll('[data-clm]').forEach(function (x) { x.classList.toggle('on', x === b); });
+        box.querySelector('.cl-ctrl').classList.toggle('oculto', b.dataset.clm !== 'dia'); pl.textContent = '▶';
+        mc.modo(b.dataset.clm);
+        if (b.dataset.clm === 'dia') mc.dia(Number(sl.value));
+      };
+    });
+    sl.oninput = function () { pl.textContent = '▶'; mc.dia(Number(sl.value)); };
+    pl.onclick = function () { pl.textContent = mc.play() ? '⏸' : '▶'; };
+    setTimeout(function () { try { mc.mapa.invalidateSize(); } catch (e) {} }, 150);
+    return mc;
   }
   async function climaApp() {
     let pos = st.pos, guard = null;
