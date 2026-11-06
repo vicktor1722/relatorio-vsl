@@ -5,17 +5,28 @@
 export const MAPA_CHUVA_CSS = `
 .mc-cv{filter:blur(2px) saturate(1.35) contrast(1.08)}
 .mc-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
-.mc-escx{display:flex;justify-content:space-between;font-size:10px;color:#6B7B72;margin-top:2px}
+.mc-escx{position:relative;height:14px;font-size:10px;color:#6B7B72;margin-top:2px}.mc-escx span{position:absolute;top:0;white-space:nowrap}
 `;
 
 export const MAPA_CHUVA_JS = String.raw`
 var MapaChuva = (function () {
   var ESC = [[1, [189, 189, 189]], [5, [155, 226, 155]], [10, [46, 170, 60]], [13, [11, 107, 43]], [17, [30, 63, 216]], [20, [46, 123, 255]], [30, [143, 214, 255]],
     [40, [247, 243, 194]], [50, [255, 176, 0]], [70, [255, 106, 0]], [120, [227, 26, 28]], [180, [255, 179, 217]], [270, [142, 92, 255]]];
-  function cor(v) {
-    if (v < 1) return null;
-    for (var i = 1; i < ESC.length; i++) if (v <= ESC[i][0]) {
-      var t = (v - ESC[i - 1][0]) / (ESC[i][0] - ESC[i - 1][0]);
+  // acumulado de 15 dias: mesmas cores numa escala até 500 mm (senão fica tudo vermelho na época das chuvas)
+  var LIM_15 = [3, 10, 20, 30, 45, 60, 80, 110, 150, 200, 280, 380, 500];
+  function limites(modo) { return modo === 'a15' ? LIM_15 : ESC.map(function (x) { return x[0]; }); }
+  function rotulos(modo) {   // números da régua embaixo do mapa, cada um embaixo da sua cor
+    var l = limites(modo);
+    return [0, 2, 4, 6, 8, 10, 12].map(function (k, i, a) {
+      var pos = k === 12 ? 100 : k * 8, ali = i === 0 ? 'left:0' : i === a.length - 1 ? 'right:0' : 'left:' + pos + '%;transform:translateX(-50%)';
+      return '<span style="' + ali + '">' + (i === 0 ? '&lt;' : '') + l[k] + (i === a.length - 1 ? '+ mm' : '') + '</span>';
+    }).join('');
+  }
+  function cor(v, modo) {
+    var L = limites(modo);
+    if (v < L[0]) return null;
+    for (var i = 1; i < ESC.length; i++) if (v <= L[i]) {
+      var t = (v - L[i - 1]) / (L[i] - L[i - 1]);
       return ESC[i - 1][1].map(function (c, j) { return Math.round(c + (ESC[i][1][j] - c) * t); });
     }
     return ESC[ESC.length - 1][1];
@@ -79,7 +90,7 @@ var MapaChuva = (function () {
           var v = g(a0, b0) * (1 - ta) * (1 - tb) + g(a0 + 1, b0) * ta * (1 - tb) + g(a0, b0 + 1) * (1 - ta) * tb + g(a0 + 1, b0 + 1) * ta * tb;
           if (v < 1) continue;
           var nz = 0.65 * ruido(x / 9 + dx, y / 9 + dy) + 0.35 * ruido(x / 4 - dx * 1.6, y / 4 + dy * 1.4);
-          var vv = v * (st.modo === 'dia' ? 0.7 + 0.6 * nz : 0.94 + 0.12 * nz), c = cor(vv);
+          var vv = v * (st.modo === 'dia' ? 0.7 + 0.6 * nz : 0.94 + 0.12 * nz), c = cor(vv, st.modo);
           if (!c) continue;
           var ex = Math.min(x, cw - 1 - x) / (cw * 0.12), borda = Math.min(1, ex, ey);
           var o = (y * cw + x) * 4; im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2];
@@ -87,6 +98,7 @@ var MapaChuva = (function () {
         }
       }
       cx.putImageData(im, 0, 0);
+      if (op.escala) op.escala.innerHTML = rotulos(st.modo);
       if (op.info) {
         var di = Math.min(M.v.length - 1, Math.round(t)), nd2 = Math.min(M.v.length, st.modo === 'a7' ? 7 : 15), br = function (i) { return i.slice(8, 10) + '/' + i.slice(5, 7); };
         op.info(st.modo === 'dia' ? 'Chuva prevista no dia (mm)' : 'Acumulado ' + br(M.datas[0]) + ' a ' + br(M.datas[nd2 - 1]),
@@ -115,6 +127,6 @@ var MapaChuva = (function () {
       destruir: function () { parar(); try { m.remove(); } catch (e) {} }
     };
   }
-  return { criar: criar, cor: cor };
+  return { criar: criar, cor: cor, rotulos: rotulos };
 }());
 `;

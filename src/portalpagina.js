@@ -195,7 +195,7 @@ ${DPG_CSS}
 .chv-tit,.chv-dia{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none}
 .chv-tit{left:8px;font-size:11px;padding:4px 8px;line-height:1.3}.chv-dia{right:8px;font-weight:800;font-size:19px;padding:4px 10px}
 .chv-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
-.chv-escx{display:flex;justify-content:space-between;font-size:10px;color:var(--fraco);margin-top:2px}
+.chv-escx{position:relative;height:14px;font-size:10px;color:var(--fraco);margin-top:2px}.chv-escx span{position:absolute;top:0;white-space:nowrap}
 .chv-ctrl{display:flex;align-items:center;gap:10px;margin-top:8px}.chv-ctrl button{width:38px;height:38px;border-radius:50%;border:0;background:#134A7C;color:#fff;font-size:14px;flex:none}.chv-ctrl input{flex:1;accent-color:#134A7C}
 .ini-ola{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}.ini-agora-mini{font-size:15px;white-space:nowrap;color:var(--texto)}.ini-agora-mini b{display:inline;font-size:16px}
 .ini-sec{font-size:11.5px;font-weight:800;letter-spacing:.06em;color:var(--fraco);text-transform:uppercase;margin:16px 4px 8px;display:flex;align-items:center;gap:8px}.ini-sec::after{content:"";flex:1;height:1px;background:var(--linha)}
@@ -547,10 +547,21 @@ body.sem-rolar{overflow:hidden}
   }
   var ESC_CHUVA = [[1, [189, 189, 189]], [5, [155, 226, 155]], [10, [46, 170, 60]], [13, [11, 107, 43]], [17, [30, 63, 216]], [20, [46, 123, 255]], [30, [143, 214, 255]],
     [40, [247, 243, 194]], [50, [255, 176, 0]], [70, [255, 106, 0]], [120, [227, 26, 28]], [180, [255, 179, 217]], [270, [142, 92, 255]]];
+  // acumulado de 15 dias: mesmas cores numa escala até 500 mm (senão fica tudo vermelho na época das chuvas)
+  var LIM_15 = [3, 10, 20, 30, 45, 60, 80, 110, 150, 200, 280, 380, 500];
+  function limites() { return CHV.modo === 'a15' ? LIM_15 : ESC_CHUVA.map(function (x) { return x[0]; }); }
+  function rotulosEscala() {   // números da régua embaixo do mapa, cada um embaixo da sua cor (cor k em k×8%, a última em 100%)
+    var l = limites();
+    return [0, 2, 4, 6, 8, 10, 12].map(function (k, i, a) {
+      var pos = k === 12 ? 100 : k * 8, ali = i === 0 ? 'left:0' : i === a.length - 1 ? 'right:0' : 'left:' + pos + '%;transform:translateX(-50%)';
+      return '<span style="' + ali + '">' + (i === 0 ? '&lt;' : '') + l[k] + (i === a.length - 1 ? '+ mm' : '') + '</span>';
+    }).join('');
+  }
   function corChuva(v) {
-    if (v < 1) return null;
-    for (var i = 1; i < ESC_CHUVA.length; i++) if (v <= ESC_CHUVA[i][0]) {
-      var t = (v - ESC_CHUVA[i - 1][0]) / (ESC_CHUVA[i][0] - ESC_CHUVA[i - 1][0]);
+    var L = limites();
+    if (v < L[0]) return null;
+    for (var i = 1; i < ESC_CHUVA.length; i++) if (v <= L[i]) {
+      var t = (v - L[i - 1]) / (L[i] - L[i - 1]);
       return ESC_CHUVA[i - 1][1].map(function (c, j) { return Math.round(c + (ESC_CHUVA[i][1][j] - c) * t); });
     }
     return ESC_CHUVA[ESC_CHUVA.length - 1][1];
@@ -571,7 +582,7 @@ body.sem-rolar{overflow:hidden}
         return '<button data-chvm="' + x[0] + '" class="' + (CHV.modo === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="chv-mapa"><div id="chvMapa"></div><div class="chv-tit" id="chvTit"></div><div class="chv-dia" id="chvDia"></div>' +
         '<button class="chv-fs" id="chvFs" aria-label="Tela cheia" title="Tela cheia">⛶</button></div>' +
-        '<div class="chv-esc"></div><div class="chv-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div>' +
+        '<div class="chv-esc"></div><div class="chv-escx" id="chvEscx">' + rotulosEscala() + '</div>' +
         '<div class="chv-ctrl' + (CHV.modo === 'dia' ? '' : ' oculto') + '" id="chvCtrl"><button id="chvPlay" aria-label="Animar">▶</button><input type="range" id="chvSl" min="0" max="' + (M.v.length - 1) + '" value="' + CHV.dia + '"></div></div>';
     }
     var em = new Date(P.gerado_em);
@@ -628,6 +639,7 @@ body.sem-rolar{overflow:hidden}
     var di = Math.min(M.v.length - 1, Math.round(t)), nd2 = Math.min(M.v.length, CHV.modo === 'a7' ? 7 : 15);
     $('#chvTit').innerHTML = CHV.modo === 'dia' ? 'Chuva prevista<br>no dia (mm)' : 'Acumulado<br>' + dataBR(M.datas[0]) + ' a ' + dataBR(M.datas[nd2 - 1]);
     $('#chvDia').textContent = CHV.modo === 'dia' ? dataBR(M.datas[di]) : (CHV.modo === 'a7' ? '7 dias' : '15 dias');
+    var ex = document.getElementById('chvEscx'); if (ex) ex.innerHTML = rotulosEscala();
   }
   function chvParar() { if (CHV.play) { cancelAnimationFrame(CHV.play); CHV.play = null; } var pl = document.getElementById('chvPlay'); if (pl) pl.textContent = '▶'; }
   function ligarChuva() {

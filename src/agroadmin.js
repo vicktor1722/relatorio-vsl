@@ -366,13 +366,13 @@ ${MAPA_CHUVA_JS}
       '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-cam="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
       '<button id="caPlay" class="oculto">▶</button></div>' +
       '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button></div>' +
-      '<div class="mc-esc"></div><div class="mc-escx"><span>&lt;1</span><span>5</span><span>10</span><span>20</span><span>40</span><span>70</span><span>120</span><span>180</span><span>270+ mm</span></div></div>' +
+      '<div class="mc-esc"></div><div class="mc-escx">' + (typeof MapaChuva !== 'undefined' ? MapaChuva.rotulos('a7') : '') + '</div></div>' +
       '<div class="ca-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
       ' · atualiza todo dia de manhã cedo · escolha uma fazenda na lista ou no gráfico de plantio para ver o ponto dela</div>';
     var locs = ((PF.d && PF.d.fazendas) || []).filter(function (f) { return f.local; });
     var lat = locs.length ? locs.reduce(function (a, f) { return a + f.local.lat; }, 0) / locs.length : -14, lon = locs.length ? locs.reduce(function (a, f) { return a + f.local.lon; }, 0) / locs.length : -54;
     if (typeof MapaChuva === 'undefined') return;
-    CA.mc = MapaChuva.criar(document.getElementById('caMapa'), M, null, { modo: 'a7', zoom: true, rotulos: true, lat: lat, lon: lon, nivel: 4, info: function (t, d) {
+    CA.mc = MapaChuva.criar(document.getElementById('caMapa'), M, null, { modo: 'a7', zoom: true, rotulos: true, lat: lat, lon: lon, nivel: 4, escala: cx.querySelector('.mc-escx'), info: function (t, d) {
       var a = document.getElementById('caT'), b = document.getElementById('caD'); if (a) a.textContent = t; if (b) b.textContent = d; } });
     var pl = document.getElementById('caPlay'), bl = document.getElementById('caBloco');
     cx.querySelectorAll('[data-cam]').forEach(function (b) { b.onclick = function () {
