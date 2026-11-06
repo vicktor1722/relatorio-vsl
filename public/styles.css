@@ -96,8 +96,8 @@ input,textarea,select{font:inherit}
 }
 .msg.eu .bolha{background:var(--verde-claro)}
 .bolha.so-texto{padding:6px 9px 6px}
-.bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block}
-.bolha .midia img,.bolha .midia video{display:block;width:100%;max-height:60vh;object-fit:cover}
+.bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block;max-height:60vh}
+.bolha .midia img,.bolha .midia video{display:block;width:100%;height:100%;object-fit:cover}
 .bolha .play{
   position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:34px;
   text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none
