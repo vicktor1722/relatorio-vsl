@@ -112,7 +112,7 @@
     const src = i.src || (i.asset_id ? '/_blob/' + i.asset_id : '');
     return `<div class="rp-item"><figure>` +
       (i.tipo === 'foto'
-        ? `<img loading="lazy" src="${src}" alt="${esc(i.legenda || '')}">`
+        ? `<img loading="lazy" src="${src}" alt="${esc(ZAP.puro(i.legenda || ''))}">`
         : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
       `</figure><div class="rp-meta">` +
       `<span class="rp-tag cinza">${hora(i.capturado_em)}</span>` +
@@ -147,8 +147,8 @@
 
     // observações gerais (texto solto) sobem para logo depois do mapa
     const gNotas = grupos.filter(g => g.chave === '\u0000notas')[0];
-    const notasTopo = (rel.observacoes ? `<div class="rp-nota">${esc(rel.observacoes)}</div>` : '') +
-      (gNotas ? gNotas.itens.map(i => `<div class="rp-nota">${esc(i.legenda)}</div>`).join('') : '');
+    const notasTopo = (rel.observacoes ? `<div class="rp-nota">${ZAP.html(esc(rel.observacoes))}</div>` : '') +
+      (gNotas ? gNotas.itens.map(i => `<div class="rp-nota">${ZAP.html(esc(i.legenda))}</div>`).join('') : '');
     const obsGerais = notasTopo
       ? `<h3 class="rp-talhao">Observações gerais</h3>${notasTopo}` : '';
 
@@ -168,10 +168,10 @@
       });
       segmentos.forEach(seg => {
         if (g.varioDia) corpo += `<h4 class="rp-dia">${esc(diaLongo(seg.iso))}</h4>`;
-        seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="rp-nota">${esc(i.legenda)}</div>`; });
+        seg.lista.filter(i => i.tipo === 'texto').forEach(i => { corpo += `<div class="rp-nota">${ZAP.html(esc(i.legenda))}</div>`; });
         seg.lista.filter(i => i.tipo === 'audio').forEach(i => {
           const src = i.src || (i.asset_id ? '/_blob/' + i.asset_id : '');
-          corpo += `<div class="rp-grupo"><p class="rp-grupo-leg" style="margin-top:2px">🎤 ${esc(i.legenda || 'Áudio')}</p>` +
+          corpo += `<div class="rp-grupo"><p class="rp-grupo-leg" style="margin-top:2px">🎤 ${ZAP.html(esc(i.legenda || 'Áudio'))}</p>` +
             (src ? `<audio controls preload="metadata" src="${src}" style="width:100%"></audio>` : '') +
             `<div class="rp-meta"><span class="rp-tag cinza">${hora(i.capturado_em)}</span>` +
             (i.duracao_s ? `<span class="rp-tag cinza">${Math.round(i.duracao_s)}s</span>` : '') + `</div></div>`;

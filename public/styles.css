@@ -574,3 +574,11 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .cl-jan{margin-top:9px;background:#fff;color:#1C2B23;border-radius:11px;padding:8px 10px;font-size:12.5px}
 .cl-hrs{display:flex;gap:2px;margin-top:5px}.cl-hrs u{flex:1;height:7px;border-radius:2px;background:#DCE2DE}.cl-hrs u.ok{background:#2F9E5B}.cl-hrs u.md{background:#F2C14E}
 .cl-hx{display:flex;justify-content:space-between;font-size:10px;color:#6B7B72;margin-top:2px}
+
+/* barra de negrito/itálico/riscado nas observações */
+.fmt-barra{display:flex;align-items:center;gap:6px;margin:0 0 6px}
+.fmt-barra button{min-width:44px;height:38px;border:1px solid #D5DED8;background:#F6F8F7;border-radius:10px;font-size:16px;color:#1F2A22;padding:0 10px}
+.fmt-barra button:active{background:#1E7B45;color:#fff}
+.fmt-barra span{font-size:11.5px;color:#7A8A80;margin-left:4px}
+.fmt-prev{margin:-4px 0 10px;background:#F3F8F4;border:1px dashed #BFD8C7;border-radius:12px;padding:8px 12px;font-size:14.5px;line-height:1.45;white-space:pre-wrap}
+.fmt-prev small{display:block;color:#7A8A80;font-size:11px;margin-bottom:2px}
