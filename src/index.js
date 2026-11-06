@@ -14,7 +14,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 // onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, garantir as garantirAgro, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
-import { cargaEstoqueSantaPaula, trocarGlifosatoSantaPaula, voltarLastingSantaPaula, trocarZappSantaPaula } from './cargaestoque.js';
+import { cargaEstoqueSantaPaula, trocarGlifosatoSantaPaula, voltarLastingSantaPaula, trocarZappSantaPaula, tiposSantaPaula } from './cargaestoque.js';
 import { avisarAplicacoes, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
@@ -184,7 +184,7 @@ export default {
 
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     // carga única do estoque da Santa Paula (safra 26/27): tenta uma vez por instância até ficar feita
-    if (!cargaTentada) { cargaTentada = true; ctx.waitUntil(garantirAgro(env).then(() => cargaEstoqueSantaPaula(env)).then(() => trocarGlifosatoSantaPaula(env)).then(() => voltarLastingSantaPaula(env)).then(() => trocarZappSantaPaula(env)).catch((e) => console.log('carga do estoque:', e.message))); }
+    if (!cargaTentada) { cargaTentada = true; ctx.waitUntil(garantirAgro(env).then(() => cargaEstoqueSantaPaula(env)).then(() => trocarGlifosatoSantaPaula(env)).then(() => voltarLastingSantaPaula(env)).then(() => trocarZappSantaPaula(env)).then(() => tiposSantaPaula(env)).catch((e) => console.log('carga do estoque:', e.message))); }
 
     try {
       /* ================= público ================= */
@@ -243,8 +243,9 @@ export default {
         const cg = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:estoque_sp2627'").first().catch(function () { return null; });
         const tg = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_roundup'").first().catch(function () { return null; });
         const tz = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_zapp'").first().catch(function () { return null; });
+        const tt = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_tipos'").first().catch(function () { return null; });
         const tk = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_lasting'").first().catch(function () { return null; });
-        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0, troca_glifosato: tg ? JSON.parse(tg.valor).linhas : null, volta_lasting: tk ? { linhas: JSON.parse(tk.valor).linhas, karate: JSON.parse(tk.valor).karate_restante } : null, troca_zapp: tz ? JSON.parse(tz.valor).linhas : null });
+        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0, troca_glifosato: tg ? JSON.parse(tg.valor).linhas : null, volta_lasting: tk ? { linhas: JSON.parse(tk.valor).linhas, karate: JSON.parse(tk.valor).karate_restante } : null, troca_zapp: tz ? JSON.parse(tz.valor).linhas : null, tipos: tt ? JSON.parse(tt.valor) : null });
       }
 
       if (rota.startsWith('/img/')) {

@@ -126,8 +126,8 @@ const GRUPO_TIPO = { herbicida: 'Herbicidas', fungicida: 'Fungicidas', inseticid
 const GRUPO_NOME = [
   ['Herbicidas', ['24d', 'roundup', 'zapp', 'glifosato', 'climur', 'clorim', 'glufosinato', 'kennox', 'zethamaxx', 'atrivo', 'reglone', 'diquat', 'cletodim', 'atrazina', 'haloxifope', 'flumyzin', 'flumioxazina', 'imazetapir', 'metsulfurom', 'paraquat', 'saflufenacil', 'diclosulam', 'smetolacloro']],
   ['Fungicidas', ['clorotalonil', 'bravonil', 'mancozeb', 'unizeb', 'vessarya', 'evolution', 'teburaz', 'azimut', 'elatus', 'mitrion', 'score', 'armero', 'foxsupra', 'fox', 'difeno', 'tebuconazol', 'azoxistrobina', 'protioconazol', 'priori', 'sphere', 'cypress', 'orkestra', 'ativum', 'blavity']],
-  ['Inseticidas', ['perito', 'acefato', 'clofenapir', 'clorfenapir', 'belt', 'expedition', 'metomy', 'metomil', 'epingle', 'piriproxi', 'elestal', 'instivo', 'karate', 'lasting', 'verdavis', 'vertimec', 'abamectina', 'etiprole', 'ethiprole', 'engeo', 'connect', 'premio', 'imidacloprido', 'tiametoxam', 'bifentrina', 'lambda']],
-  ['Adjuvantes', ['iharol', 'oleo', 'sintronela', 'citronela', 'ctgreen', 'kant', 'antiespuma', 'aurora', 'assist', 'nimbus', 'adjuvante', 'espalhante']],
+  ['Inseticidas', ['perito', 'acefato', 'clofenapir', 'clorfenapir', 'belt', 'expedition', 'metomy', 'metomil', 'epingle', 'piriproxi', 'elestal', 'instivo', 'karate', 'lasting', 'verdavis', 'vertimec', 'abamectina', 'etiprole', 'etiplore', 'ethiprole', 'engeo', 'connect', 'premio', 'imidacloprido', 'tiametoxam', 'bifentrina', 'lambda']],
+  ['Adjuvantes', ['iharol', 'oleo', 'sintronela', 'citronela', 'ctgreen', 'ctgren', 'kant', 'antiespuma', 'aurora', 'assist', 'nimbus', 'adjuvante', 'espalhante']],
   ['Fertilizantes e nutrição', ['boro', 'brave', 'sallvare', 'polyamine', 'magmill', 'maxraiz', 'map', 'kcl', 'cloretodepotassio', 'supertriplo', 'supersimples', 'ureia', 'manganes', 'cobalto', 'molibdenio', 'zinco']],
   ['Biológicos', ['azotrop', 'rhizotrop', 'bradyrhizobium', 'azospirillum', 'inoculante']]
 ];
