@@ -76,11 +76,11 @@
   }
   function nomeArq(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pdf'; }
   var COR_PDF = { vis: [0.482, 0.247, 0.749], lem: [0.851, 0.51, 0.169], prev: [0.231, 0.471, 0.765], apl: [0.184, 0.62, 0.357],
-    perto: [0.878, 0.631, 0], venc: [0.753, 0.224, 0.169], ok: [0.18, 0.545, 0.545] };
-  var NOME_COR = { vis: 'visita', lem: 'lembrete', prev: 'aplicação prevista', apl: 'aplicada', perto: 'próxima (perto)', venc: 'vencida', ok: 'próxima' };
+    perto: [0.878, 0.631, 0], venc: [0.753, 0.224, 0.169], ok: [0.18, 0.545, 0.545], colh: [0.604, 0.357, 0.071] };
+  var NOME_COR = { vis: 'visita', lem: 'lembrete', prev: 'aplicação prevista', apl: 'aplicada', perto: 'próxima (perto)', venc: 'vencida', ok: 'próxima', colh: 'colheita prevista' };
   // ícones do app desenhados no PDF (caminhos simples: M L H V Q Z absolutos, no espaço do viewBox)
   function icone(op, cor, x, y, alt) {
-    var vb = cor === 'vis' ? [40, 26] : cor === 'lem' ? [24, 24] : [40, 24], s = alt / vb[1];
+    var vb = cor === 'vis' ? [40, 26] : cor === 'lem' ? [24, 24] : cor === 'colh' ? [44, 24] : [40, 24], s = alt / vb[1];
     function X(v) { return (x + v * s).toFixed(2); }
     function Y(v) { return (y + (vb[1] - v) * s).toFixed(2); }
     function caminho(d, c) {
@@ -114,6 +114,14 @@
     } else if (cor === 'lem') {
       caminho('M12 3 Q6 3 6 9 V13.2 L4.3 16.4 Q4 18 5.2 18 H18.8 Q20 18 19.7 16.4 L18 13.2 V9 Q18 3 12 3 Z', C);
       roda(12, 19.6, 2.5, C);
+    } else if (cor === 'colh') {
+      // colheitadeira simplificada: plataforma, corpo verde, cabine e rodas
+      caminho('M1 13 H13 V16 H1 Z', [0.85, 0.63, 0.13]);
+      caminho('M13 8 H34 Q36 8 36 10 V17 H13 Z', [0.118, 0.557, 0.243]);
+      caminho('M22 2 H31 V8 H22 Z', [0.09, 0.44, 0.19]);
+      caminho('M23.5 3.5 H29.5 V7 H23.5 Z', [0.85, 0.92, 0.98]);
+      caminho('M34 5 H38 V7 H36 V10 H34 Z', [0.25, 0.25, 0.25]);
+      roda(18, 18.5, 4.6, ESC); roda(18, 18.5, 2, CLA); roda(32, 19.5, 3.4, ESC); roda(32, 19.5, 1.4, CLA);
     } else {
       // pulverizador simplificado: tanque, barra e gotas
       caminho('M14 3 H26 Q28 3 28 5 V11 Q28 13 26 13 H14 Q12 13 12 11 V5 Q12 3 14 3 Z', C);
@@ -210,10 +218,11 @@
     // resumo e legenda
     y -= 16; cabe(30);
     var nV = at.filter(function (e) { return e.cor === 'vis'; }).length, nL = at.filter(function (e) { return e.cor === 'lem'; }).length,
-      nA = at.filter(function (e) { return !e.lemb; }).length, fzs = {};
+      nA = at.filter(function (e) { return !e.lemb && e.cor !== 'colh'; }).length, nC = at.filter(function (e) { return e.cor === 'colh'; }).length, fzs = {};
     at.forEach(function (e) { if (e.faz) fzs[e.faz] = 1; });
     var res = [[nV, nV === 1 ? 'visita' : 'visitas'], [nL, nL === 1 ? 'lembrete' : 'lembretes']];
     if (o.apl) res.push([nA, nA === 1 ? 'aplicação' : 'aplicações']);
+    if (o.colh) res.push([nC, nC === 1 ? 'colheita' : 'colheitas']);
     res.push([Object.keys(fzs).length, Object.keys(fzs).length === 1 ? 'fazenda' : 'fazendas']);
     var rx = M;
     res.forEach(function (r) { txt(rx, y, 12, true, String(r[0])); txt(rx + larg(String(r[0]), 12, true) + 4, y, 9.5, false, r[1], [0.25, 0.25, 0.25]); rx += larg(String(r[0]), 12, true) + larg(r[1], 9.5) + 22; });
