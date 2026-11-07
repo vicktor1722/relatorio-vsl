@@ -2576,7 +2576,8 @@
       await renderChat();
       atualizarSync();
       Sync.sincronizar();
-    }
+    },
+    abrirRelatorio: function (id) { return abrirRelatorio(id); }   // o calendário abre a visita feita
   };
 
   document.addEventListener('DOMContentLoaded', init);

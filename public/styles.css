@@ -635,3 +635,7 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-chk{display:flex;align-items:center;gap:8px;font-size:14.5px;margin:6px 0 10px}
 .ag-chk input{width:20px;height:20px;accent-color:#1E7B45}
 .ag-lab{display:block;font-size:13px;color:#5F6F66;margin:2px 0 4px}
+
+/* visita feita (relatório) no calendário */
+.ag-dia span.c-visf,.ag-leg span.c-visf,.ag-ai.c-visf{color:#2F9E5B}
+.ag-alerta.c-visf{border-left-color:#2F9E5B}.ag-ai.c-visf .ag-ico{width:28px;height:24px}
