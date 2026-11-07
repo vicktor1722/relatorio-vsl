@@ -1003,6 +1003,11 @@
       });
     });
     Object.keys(gc).forEach(function (k) { gc[k].txt = 'Colheita prevista · ' + gc[k].mat; ev.push(gc[k]); });
+    // visitas feitas = relatórios de visita guardados no aparelho, no dia da visita
+    (VISITAS || []).forEach(function (v) {
+      if (fid !== '*' && v.fazenda_id !== fid) return;
+      ev.push({ d: v.d, k: 'rel', v: v, txt: 'Visita feita' + (v.fazenda ? ' · ' + v.fazenda : '') });
+    });
     // visitas e lembretes programados (os sem fazenda aparecem em qualquer fazenda)
     (ST.lembretes || []).forEach(function (l) {
       if (fid !== '*' && l.fazenda_id && l.fazenda_id !== fid) return;
@@ -1011,18 +1016,30 @@
     return ev;
   }
   function horaMenos2(h) { var p = String(h).split(':'), m = ((Number(p[0]) || 0) * 60 + (Number(p[1]) || 0) - 120 + 1440) % 1440; return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
+  // relatórios de visita do aparelho (o calendário mostra as visitas já feitas)
+  var VISITAS = null;
+  function carregarVisitas() {
+    if (!global.DB) return;
+    DB.all('relatorios').then(function (l) {
+      var novo = (l || []).filter(function (r) { return r && (r.data_inicio || r.criado_em); }).map(function (r) {
+        return { id: r.id, d: r.data_inicio || String(r.criado_em).slice(0, 10), fazenda_id: r.fazenda_id || '', fazenda: r.fazenda || '', servico: r.servico || '', responsavel: r.responsavel || '', status: r.status || '' };
+      }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+      var mudou = JSON.stringify(novo) !== JSON.stringify(VISITAS); VISITAS = novo;
+      if (mudou && tR && !tR.classList.contains('oculto') && R.view === 'cal') pintarCalendario();
+    }).catch(function () { /* sem banco: segue sem as visitas feitas */ });
+  }
   function txtLemb(l) {
     var f = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
     return l.tipo === 'visita' ? 'Visita' + (f ? ' à ' + f.nome : ' na fazenda') : (l.titulo || 'Lembrete');
   }
   function cadFazDe(id) { return (cad().fazendas || []).filter(function (f) { return f.id === id; })[0] || null; }
   // prevista com a data já passada e ainda não aplicada = atrasada (vermelho), igual ao portal
-  function corEv(e) { return e.k === 'lemb' ? (e.l.tipo === 'visita' ? 'vis' : 'lem') : e.k === 'colh' ? 'colh' : e.k === 'prev' ? (e.d < hoje() ? 'venc' : 'prev') : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
+  function corEv(e) { return e.k === 'rel' ? 'visf' : e.k === 'lemb' ? (e.l.tipo === 'visita' ? 'vis' : 'lem') : e.k === 'colh' ? 'colh' : e.k === 'prev' ? (e.d < hoje() ? 'venc' : 'prev') : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
   /* Aplicações perto (mesma regra do aviso no celular): previstas e próximas das sequências que vencem
      dentro do aviso da recomendação (padrão 3 dias) ou que atrasaram até 7 dias. */
   function pertoDe(fid) {
     return eventosDe(fid).filter(function (e) {
-      if (e.k === 'apl' || e.k === 'colh' || e.k === 'lemb') return false;
+      if (e.k === 'apl' || e.k === 'colh' || e.k === 'lemb' || e.k === 'rel') return false;
       var a = dd(e.r).aviso == null ? 3 : Number(dd(e.r).aviso) || 0, n = difDias(e.d, hoje());
       return n <= a && n >= -7;
     }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
@@ -1035,15 +1052,23 @@
   var ICO_COLH = '<svg class="ag-ico colh" viewBox="0 0 72 40" aria-hidden="true"><g stroke="#B8962E" stroke-width="1.2" stroke-linecap="round"><path d="M60.5 38.5 v-1.8 M63.5 38.5 v-1.5 M66.5 38.5 v-1.9 M69.5 38.5 v-1.4"/></g><path d="M44 11.2 L66 9.6 L66 12.2 L44 13.6 Z" fill="#1E8E3E"/><path d="M65.3 9.2 h3.2 l1.6 5.4 h-2.4 Z" fill="#222"/><path d="M33 15 L30.5 8.5 H50 L47.5 15 Z" fill="#167030"/><path d="M30 14.5 H57 Q60.5 14.5 61 18 L61.5 28.5 H30 Z" fill="#1E8E3E"/><path d="M33 23.5 Q45 20.6 61 20 L61.1 21.6 Q45 22.2 33 24.9 Z" fill="#F2C400"/><rect x="42" y="27.5" width="12" height="4.5" rx="1" fill="#167030"/><path d="M19.5 9 H31 V10.8 H19.5 Z" fill="#1E8E3E"/><rect x="24.3" y="6.6" width="1.8" height="2.4" rx=".6" fill="#F5A623"/><path d="M21 10.8 H30 V21 H22.6 Z" fill="#A9D3DC" stroke="#1F2A22" stroke-width=".9" stroke-linejoin="round"/><path d="M26.3 10.8 V21" stroke="#1F2A22" stroke-width=".8"/><rect x="20.5" y="21" width="10" height="3" fill="#1E8E3E"/><path d="M30 21 L30 28.5 L18 33.5 L16 29 Z" fill="#17803A"/><g stroke="#4F7F22" stroke-width="1.3" stroke-linecap="round" fill="none"><path d="M3 38.5 V24 M3 33 L0.8 30.5 M3 29 L5.4 26.6 M3 26 L1.2 23.8"/><path d="M8.2 38.5 V22.5 M8.2 31.5 L10.6 29.2 M8.2 27.5 L6 25.2 M8.2 25 L10.2 22.8"/></g><g fill="#7DAF3A"><ellipse cx="0.9" cy="30" rx="1.6" ry="1"/><ellipse cx="5.7" cy="26.2" rx="1.6" ry="1"/><ellipse cx="1.1" cy="23.3" rx="1.5" ry="1"/><ellipse cx="10.8" cy="28.8" rx="1.6" ry="1"/><ellipse cx="5.8" cy="24.8" rx="1.5" ry="1"/><ellipse cx="10.4" cy="22.3" rx="1.5" ry="1"/></g><g fill="#C9A227"><ellipse cx="3" cy="23.3" rx="1" ry="1.5"/><ellipse cx="4.1" cy="30.6" rx=".7" ry="1.2"/><ellipse cx="1.9" cy="27.4" rx=".7" ry="1.2"/><ellipse cx="8.2" cy="21.7" rx="1" ry="1.5"/><ellipse cx="9.3" cy="26.6" rx=".7" ry="1.2"/><ellipse cx="7.1" cy="29.8" rx=".7" ry="1.2"/></g><path d="M6.5 35 L9.5 30.5 H22 L24 33.5 L22 37 H8.5 Z" fill="#1E8E3E"/><path d="M8 35.5 L10.6 32.3 H19 L18.2 33.3 H11.4 L9.4 35.5 Z" fill="#F2C400"/><g stroke="#222" stroke-linecap="round"><circle cx="14.5" cy="26" r="5.8" fill="none" stroke-width="1.5"/><path d="M14.5 20.2 V31.8 M9.5 23.1 L19.5 28.9 M9.5 28.9 L19.5 23.1" stroke-width="1"/><path d="M14.5 20.2 l-1.6 -0.6 M19.5 23.1 l0.2 -1.7 M19.5 28.9 l1.4 1 M14.5 31.8 l1.6 .6 M9.5 28.9 l-.2 1.7 M9.5 23.1 l-1.4 -1" stroke-width=".9"/></g><circle cx="14.5" cy="26" r="1.4" fill="#1E8E3E"/><path d="M28.6 24 V35 M30.4 24 V35 M28.6 27 H30.4 M28.6 30 H30.4 M28.6 33 H30.4" stroke="#2DB24F" stroke-width=".6"/><circle cx="37" cy="30.5" r="8.3" fill="#222"/><circle cx="37" cy="30.5" r="4.3" fill="#F2C400"/><circle cx="37" cy="30.5" r="1.2" fill="#B89200"/><circle cx="56" cy="32.6" r="6.2" fill="#222"/><circle cx="56" cy="32.6" r="3.2" fill="#F2C400"/><circle cx="56" cy="32.6" r="0.9" fill="#B89200"/></svg>';
   var PESO = { venc: 5, hoje: 5, perto: 4, prev: 3, ok: 2, apl: 1 };
   function icoDia(es) {
-    var ap = es.filter(function (e) { return e.k !== 'colh' && e.k !== 'lemb'; }), co = es.filter(function (e) { return e.k === 'colh'; }), h = '';
-    var lv = es.filter(function (e) { return e.k === 'lemb' && e.l.tipo === 'visita'; }), ll = es.filter(function (e) { return e.k === 'lemb' && e.l.tipo !== 'visita'; });
+    var ap = es.filter(function (e) { return e.k !== 'colh' && e.k !== 'lemb' && e.k !== 'rel'; }), co = es.filter(function (e) { return e.k === 'colh'; }), h = '';
+    var lv = es.filter(function (e) { return e.k === 'lemb' && e.l.tipo === 'visita'; }), ll = es.filter(function (e) { return e.k === 'lemb' && e.l.tipo !== 'visita'; }), vf = es.filter(function (e) { return e.k === 'rel'; });
     if (ap.length) { var c = ap.map(corEv).sort(function (a, b) { return (PESO[b] || 0) - (PESO[a] || 0); })[0]; h += '<span class="c-' + c + '">' + ICO_PULV + '</span>'; }
     if (co.length) h += '<span class="c-colh">' + ICO_COLH + '</span>';
     if (lv.length) h += '<span class="c-vis' + (lv.every(function (e) { return e.l.feito; }) ? ' feito' : '') + '">' + ICO_VIS + '</span>';
     if (ll.length) h += '<span class="c-lem' + (ll.every(function (e) { return e.l.feito; }) ? ' feito' : '') + '">' + ICO_LEM + '</span>';
+    if (vf.length) h += '<span class="c-visf">' + ICO_VIS + '</span>';
     return h;
   }
   function linhaEvento(e, todas) {
+    if (e.k === 'rel') {
+      var vv = e.v, st = vv.status === 'publicado' ? 'enviado' : vv.status === 'rascunho' ? 'em aberto' : vv.status === 'fila' ? 'aguardando envio' : '';
+      return '<div class="ag-alerta c-visf" data-a="abrirvis" data-v="' + esc(vv.id) + '"><div class="ag-ai c-visf">' + ICO_VIS + '</div>' +
+        '<div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (st ? ' <span class="badge">' + st + '</span>' : '') +
+        '<span>' + [vv.servico ? esc(vv.servico) : 'relatório de visita', vv.responsavel ? '👤 ' + esc(vv.responsavel) : ''].filter(Boolean).join(' · ') + '</span></div>' +
+        '<button class="ag-peq" data-a="abrirvis" data-v="' + esc(vv.id) + '">Abrir</button></div>';
+    }
     if (e.k === 'lemb') {
       var l = e.l, vis = l.tipo === 'visita', fl = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
       return '<div class="ag-alerta c-' + (vis ? 'vis' : 'lem') + (l.feito ? ' feito' : '') + '" data-a="editlemb" data-v="' + esc(l.id) + '"><div class="ag-ai c-' + (vis ? 'vis' : 'lem') + '">' + (vis ? ICO_VIS : ICO_LEM) + '</div>' +
@@ -1063,6 +1088,7 @@
       (e.k.indexOf('prox-') === 0 ? '<button class="ag-peq" data-a="prog" data-v="' + esc(e.r.id) + '|' + e.d + '">Programar</button>' : '') + '</div>';
   }
   function pintarCalendario() {
+    carregarVisitas();
     var todas = R.faz === '*', f = todas ? null : fazDe(R.faz), ev = eventosDe(R.faz), h = R.inicio ? '' : abasRec('cal');
     if (!R.cy) { var t0 = new Date(); R.cy = t0.getFullYear(); R.cm = t0.getMonth(); R.sel = hoje(); }
     var ini = new Date(Date.UTC(R.cy, R.cm, 1)).getUTCDay(), nd = new Date(Date.UTC(R.cy, R.cm + 1, 0)).getUTCDate(), g = '';
@@ -1078,7 +1104,7 @@
       '<div class="ag-grade">' + g + '</div>' +
       '<div class="ag-leg"><span class="c-prev">' + ICO_PULV + 'prevista</span><span class="c-apl">' + ICO_PULV + 'aplicada</span><span class="c-perto">' + ICO_PULV + 'próxima (perto)</span>' +
       '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span><span class="c-colh">' + ICO_COLH + 'colheita prevista</span>' +
-      '<span class="c-vis">' + ICO_VIS + 'visita</span><span class="c-lem">' + ICO_LEM + 'lembrete</span></div>';
+      '<span class="c-vis">' + ICO_VIS + 'visita programada</span><span class="c-visf">' + ICO_VIS + 'visita feita</span><span class="c-lem">' + ICO_LEM + 'lembrete</span></div>';
     var ds = ev.filter(function (e) { return e.d === R.sel; });
     h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
     var pl = (ST.lembretes || []).filter(function (l) { return !l.feito && l.data >= hoje() && (todas || !l.fazenda_id || l.fazenda_id === R.faz); })
@@ -1344,7 +1370,7 @@
       out.push({ d: l.data, k: 'lemb', l: l, hora: l.hora || '' });
     });
     if (o.apl) eventosDe(o.faz).forEach(function (e) {
-      if (e.k === 'lemb' || e.k === 'colh' || e.d < o.de || e.d > o.ate) return;
+      if (e.k === 'lemb' || e.k === 'colh' || e.k === 'rel' || e.d < o.de || e.d > o.ate) return;
       out.push(Object.assign({ hora: '' }, e));
     });
     return out.sort(function (a, b) { var x = a.d + (a.hora || '99'), y = b.d + (b.hora || '99'); return x < y ? -1 : x > y ? 1 : 0; });
@@ -1931,6 +1957,10 @@
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
     if (a === 'novolemb') { menuMais(); return; }
     if (a === 'pdfplan') { modalPlano(); return; }
+    if (a === 'abrirvis') {
+      if (global.App && App.abrirRelatorio) { R.inicio = false; tR.classList.add('oculto'); atualizarSino(); App.abrirRelatorio(v); }
+      return;
+    }
     if (a === 'editlemb') { var le = (ST.lembretes || []).filter(function (x) { return x.id === v; })[0]; if (le) modalLembrete(le); return; }
     if (a === 'feitolemb') { var lf = (ST.lembretes || []).filter(function (x) { return x.id === v; })[0]; if (lf) { salvarLemb(Object.assign({}, lf, { feito: 1 })); pintarRecs(); toast('Marcado como feito'); } return; }
     if (a === 'calmes') { R.cm += Number(v); if (R.cm < 0) { R.cm = 11; R.cy--; } if (R.cm > 11) { R.cm = 0; R.cy++; } pintarCalendario(); return; }
