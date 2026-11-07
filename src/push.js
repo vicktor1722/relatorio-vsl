@@ -241,6 +241,9 @@ export async function avisarAplicacoes(env, quem) {
         if (msg && (await enviarParaConta(env, uid, msg))) contas++;
         continue;
       }
+      // visitas e lembretes programados para hoje (calendário do app)
+      const ml = await mensagemLembretes(env, uid);
+      if (ml && (await enviarParaConta(env, uid, ml))) contas++;
       const mod = await modulosDe(env, uid);
       if (!mod.recomendacoes) continue;
       const msg = mensagem(await proximas(env, uid));
@@ -248,6 +251,25 @@ export async function avisarAplicacoes(env, quem) {
     } catch (e) { /* uma conta com problema não segura as outras */ }
   }
   return contas;
+}
+
+// visitas e lembretes do dia (horário de MT) de uma conta, numa notificação só
+export async function mensagemLembretes(env, uid) {
+  const hoje = new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
+  let l = [];
+  try {
+    l = (await env.DB.prepare(`SELECT l.tipo, l.titulo, l.hora, l.obs, f.nome AS fazenda FROM lembretes_agro l LEFT JOIN fazendas f ON f.id = l.fazenda_id
+        WHERE l.usuario_id = ? AND l.data = ? AND l.feito = 0 ORDER BY l.hora`).bind(uid, hoje).all()).results || [];
+  } catch (e) { return null; }   // tabela ainda não existe
+  if (!l.length) return null;
+  const linha = (x) => (x.hora ? x.hora + ' · ' : '') + (x.tipo === 'visita' ? 'Visita' + (x.fazenda ? ' à ' + x.fazenda : '') : (x.titulo || 'Lembrete') + (x.fazenda ? ' · ' + x.fazenda : '')) +
+    (x.tipo === 'visita' && x.titulo ? ' — ' + x.titulo : '');
+  const visitas = l.filter((x) => x.tipo === 'visita').length;
+  return {
+    title: l.length === 1 ? (visitas ? '🚙 Hoje: visita' + (l[0].fazenda ? ' à ' + l[0].fazenda : '') : '🔔 Lembrete de hoje') : '📅 Hoje: ' + l.length + (visitas === l.length ? ' visitas' : ' compromissos'),
+    body: l.slice(0, 5).map(linha).join('\n') + (l.length > 5 ? '\n+ ' + (l.length - 5) + ' outro(s)' : ''),
+    url: '/?abrir=cal', tag: 'lembretes'
+  };
 }
 
 /* ---------------- rotas /api/push/* ---------------- */

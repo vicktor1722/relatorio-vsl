@@ -609,3 +609,18 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .campo .rico:focus{border-color:var(--verde)}
 
 .lista-item .txt em.pend{font-style:normal;color:#9A6A00;font-weight:600}
+
+/* visitas e lembretes no calendário */
+.ag-mais{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;font-size:24px;line-height:1;display:grid;place-items:center}
+.ag-dia span.c-vis,.ag-leg span.c-vis,.ag-ai.c-vis,.ag-tipolemb .ag-ico.vis{color:#7B3FBF}
+.ag-dia span.c-lem,.ag-leg span.c-lem,.ag-ai.c-lem,.ag-tipolemb .ag-ico.lem{color:#D9822B}
+.ag-dia span.feito{opacity:.4}
+.ag-ico.vis{width:22px}.ag-ico.lem{width:15px}
+.ag-dia i{gap:0;flex-wrap:nowrap;overflow:hidden;justify-content:center}
+.ag-alerta.c-vis{border-left-color:#7B3FBF}.ag-alerta.c-lem{border-left-color:#D9822B}.ag-alerta.feito{opacity:.6}
+.ag-ai.c-vis .ag-ico,.ag-ai.c-lem .ag-ico{width:28px;height:24px}
+.ag-addlemb{margin-top:10px}
+.ag-tipolemb{display:flex;gap:8px;margin:4px 0 12px}
+.ag-tipolemb button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 6px;border:1.5px solid #D5DED8;border-radius:12px;background:#fff;font-size:14px;color:#1F2A22}
+.ag-tipolemb button.on{border-color:#1E7B45;background:#EEF6F0;font-weight:600}
+.ag-tipolemb .ag-ico{width:24px;height:20px}

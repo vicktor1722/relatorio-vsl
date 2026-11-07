@@ -106,6 +106,20 @@ export function garantir(env) {
         ponto       REAL DEFAULT 14,
         atualizado_em TEXT DEFAULT (datetime('now'))
       )`),
+      // lembretes e visitas programadas (calendário do app): aviso no celular de manhã no dia
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS lembretes_agro (
+        id          TEXT PRIMARY KEY,
+        usuario_id  TEXT NOT NULL,
+        fazenda_id  TEXT DEFAULT '',
+        tipo        TEXT DEFAULT 'visita',
+        titulo      TEXT DEFAULT '',
+        data        TEXT NOT NULL,
+        hora        TEXT DEFAULT '',
+        obs         TEXT DEFAULT '',
+        feito       INTEGER DEFAULT 0,
+        criado_em   TEXT DEFAULT (datetime('now'))
+      )`),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS lembretes_dia ON lembretes_agro (usuario_id, data)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS estoque_faz ON estoque_agro (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS recs_faz ON recomendacoes (usuario_id, fazenda_id)'),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS plantio_usr ON plantio (usuario_id, fazenda_id)')
@@ -683,6 +697,31 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (rota === '/api/agro/comparativo' && req.method === 'GET') {
     if (!mod.plantio && !mod.recomendacoes) return json({ erro: 'módulos não liberados para esta conta' }, 403);
     return json(await comparativo(env, me, mod.admin, url.searchParams.get('safra')));
+  }
+
+  /* ----- lembretes e visitas programadas (calendário) ----- */
+  if (rota === '/api/agro/lembretes' && req.method === 'GET') {
+    const { results } = await env.DB.prepare('SELECT * FROM lembretes_agro WHERE usuario_id = ? ORDER BY data, hora').bind(me.id).all();
+    return json({ ok: true, lembretes: results || [] });
+  }
+  if (rota === '/api/agro/lembrete' && req.method === 'POST') {
+    const b = await req.json();
+    const data = dia(b.data);
+    if (!data) return json({ erro: 'informe a data' }, 400);
+    const fid = txt(b.fazenda_id, 80);
+    if (fid && !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    const id = b.id ? txt(b.id, 60) : novoId('lb');
+    const hora = /^\d{2}:\d{2}$/.test(String(b.hora || '')) ? b.hora : '';
+    await env.DB.prepare(`INSERT INTO lembretes_agro (id, usuario_id, fazenda_id, tipo, titulo, data, hora, obs, feito) VALUES (?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET fazenda_id = excluded.fazenda_id, tipo = excluded.tipo, titulo = excluded.titulo, data = excluded.data,
+          hora = excluded.hora, obs = excluded.obs, feito = excluded.feito WHERE lembretes_agro.usuario_id = excluded.usuario_id`)
+      .bind(id, me.id, fid, b.tipo === 'lembrete' ? 'lembrete' : 'visita', txt(b.titulo, 120), data, hora, txt(b.obs, 500), b.feito ? 1 : 0).run();
+    return json({ ok: true, id });
+  }
+  if (rota === '/api/agro/lembrete/apagar' && req.method === 'POST') {
+    const b = await req.json();
+    await env.DB.prepare('DELETE FROM lembretes_agro WHERE id = ? AND usuario_id = ?').bind(txt(b.id, 60), me.id).run();
+    return json({ ok: true });
   }
 
   /* ----- estoque de produtos por fazenda ----- */
