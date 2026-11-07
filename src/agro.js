@@ -700,6 +700,39 @@ export async function rotasAgro(env, req, me, rota, url) {
     return json(await comparativo(env, me, mod.admin, url.searchParams.get('safra')));
   }
 
+  /* ----- colheita prevista por dia (aba Calendário do painel): mesmo cálculo do quadro de evolução e do portal ----- */
+  if (rota === '/api/agro/colheita-prevista' && req.method === 'GET') {
+    if (!mod.plantio) return json({ ok: true, colheita: [] });
+    const [pl, fz, cic, reg, colh] = await Promise.all([
+      env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? LIMIT 20000').bind(me.id).all(),
+      env.DB.prepare("SELECT id, talhoes FROM fazendas WHERE usuario_id = ? AND talhoes IS NOT NULL AND talhoes != ''").bind(me.id).all(),
+      env.DB.prepare('SELECT variedade, dias, gmr FROM ciclos WHERE usuario_id = ?').bind(me.id).all().catch(() => ({ results: [] })),
+      env.DB.prepare('SELECT gmr, dias, ponto FROM ciclo_regra WHERE usuario_id = ?').bind(me.id).first().catch(() => null),
+      env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0 AND usuario_id = ?').bind(me.id).all().catch(() => ({ results: [] }))
+    ]);
+    const areas = {}, colhidos = {};
+    ((fz && fz.results) || []).forEach((f) => {
+      let gj = null; try { gj = JSON.parse(f.talhoes); } catch (e) { return; }
+      const a = areas[f.id] = {};
+      ((gj && gj.features) || []).forEach((ft) => { const pr = (ft && ft.properties) || {}; if (pr.nome) a[String(pr.nome)] = Number(pr.area_ha) || 0; });
+    });
+    ((colh && colh.results) || []).forEach((c) => { colhidos[c.fazenda_id + '|' + safraPadrao(c.safra || '') + '|' + c.talhao] = 1; });
+    const cicloDe = cicloDaConta((cic && cic.results) || [], regraValida(reg || REGRA_PADRAO));
+    const g = {};
+    ((pl && pl.results) || []).forEach((r) => {
+      const a = areas[r.fazenda_id]; if (!a || SEM_PLANTIO[r.cultura]) return;
+      if (colhidos[r.fazenda_id + '|' + safraPadrao(r.safra || '') + '|' + r.talhao]) return;   // já colhido: sai do calendário
+      previsaoTalhao(r, a[r.talhao] || 0, cicloDe, false).forEach((x) => {
+        const k = x.d + '|' + r.fazenda_id + '|' + (x.mat || x.cultura);
+        const o = g[k] || (g[k] = { d: x.d, fazenda_id: r.fazenda_id, mat: x.mat || '', cultura: x.cultura, tal: [], ha: 0, est: false });
+        if (o.tal.indexOf(r.talhao) < 0) o.tal.push(r.talhao);
+        o.ha += x.ha; if (x.est) o.est = true;
+      });
+    });
+    const colheita = Object.values(g).map((o) => Object.assign(o, { ha: Math.round(o.ha * 10) / 10 })).sort((x, y) => (x.d < y.d ? -1 : x.d > y.d ? 1 : 0));
+    return json({ ok: true, colheita });
+  }
+
   /* ----- lembretes e visitas programadas (calendário) ----- */
   if (rota === '/api/agro/lembretes' && req.method === 'GET') {
     const { results } = await env.DB.prepare('SELECT * FROM lembretes_agro WHERE usuario_id = ? ORDER BY data, hora').bind(me.id).all();
