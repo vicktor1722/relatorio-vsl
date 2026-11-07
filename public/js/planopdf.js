@@ -76,11 +76,11 @@
   }
   function nomeArq(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pdf'; }
   var COR_PDF = { vis: [0.482, 0.247, 0.749], lem: [0.851, 0.51, 0.169], prev: [0.231, 0.471, 0.765], apl: [0.184, 0.62, 0.357],
-    perto: [0.878, 0.631, 0], venc: [0.753, 0.224, 0.169], ok: [0.18, 0.545, 0.545], colh: [0.604, 0.357, 0.071] };
-  var NOME_COR = { vis: 'visita', lem: 'lembrete', prev: 'aplicação prevista', apl: 'aplicada', perto: 'próxima (perto)', venc: 'vencida', ok: 'próxima', colh: 'colheita prevista' };
+    perto: [0.878, 0.631, 0], venc: [0.753, 0.224, 0.169], ok: [0.18, 0.545, 0.545], colh: [0.604, 0.357, 0.071], visf: [0.184, 0.62, 0.357] };
+  var NOME_COR = { vis: 'visita programada', visf: 'visita realizada', lem: 'lembrete', prev: 'aplicação prevista', apl: 'aplicada', perto: 'próxima (perto)', venc: 'vencida', ok: 'próxima', colh: 'colheita prevista' };
   // ícones do app desenhados no PDF (caminhos simples: M L H V Q Z absolutos, no espaço do viewBox)
   function icone(op, cor, x, y, alt) {
-    var vb = cor === 'vis' ? [40, 26] : cor === 'lem' ? [24, 24] : cor === 'colh' ? [44, 24] : [40, 24], s = alt / vb[1];
+    var vb = (cor === 'vis' || cor === 'visf') ? [40, 26] : cor === 'lem' ? [24, 24] : cor === 'colh' ? [44, 24] : [40, 24], s = alt / vb[1];
     function X(v) { return (x + v * s).toFixed(2); }
     function Y(v) { return (y + (vb[1] - v) * s).toFixed(2); }
     function caminho(d, c) {
@@ -107,7 +107,7 @@
         X(ccx + k) + ' ' + Y(ccy - r) + ' ' + X(ccx + r) + ' ' + Y(ccy - k) + ' ' + X(ccx + r) + ' ' + Y(ccy) + ' c f');
     }
     var C = COR_PDF[cor] || COR_PDF.prev, ESC = [0.13, 0.13, 0.13], CLA = [0.81, 0.81, 0.81];
-    if (cor === 'vis') {
+    if (cor === 'vis' || cor === 'visf') {
       caminho('M3 15 V11.5 Q3 10 4.5 10 H17 L21 4.5 Q21.8 3.5 23 3.5 H30 Q31.5 3.5 32.2 4.8 L35.5 10 Q37.5 10.4 37.5 12.5 V17.5 Q37.5 19 36 19 H4.5 Q3 19 3 17.5 Z', C);
       caminho('M22.4 5.6 H29.6 L32.4 10 H19.6 Z', [0.91, 0.945, 0.984]);
       roda(10.5, 19.5, 4.6, ESC); roda(10.5, 19.5, 2, CLA); roda(29.5, 19.5, 4.6, ESC); roda(29.5, 19.5, 2, CLA);
@@ -208,7 +208,7 @@
         var yy = y - 22;
         c.es.slice(0, MAXC).forEach(function (e, k) {
           icone(op, e.cor, x0 + 3.5, yy - 6.2, 7);
-          c.li[k].forEach(function (l, j) { txt(x0 + 16, yy - 5 - j * LT, FC, false, l, e.feito ? [0.5, 0.5, 0.5] : [0.15, 0.15, 0.15]); });
+          c.li[k].forEach(function (l, j) { txt(x0 + 16, yy - 5 - j * LT, FC, false, l, e.feito && e.cor !== 'visf' ? [0.5, 0.5, 0.5] : [0.15, 0.15, 0.15]); });
           yy -= c.li[k].length * LT + 3;
         });
         if (c.es.length > MAXC) txt(x0 + 16, yy - 5, FC, true, '+' + (c.es.length - MAXC) + ' mais', CINZA);
@@ -217,10 +217,11 @@
     }
     // resumo e legenda
     y -= 16; cabe(30);
-    var nV = at.filter(function (e) { return e.cor === 'vis'; }).length, nL = at.filter(function (e) { return e.cor === 'lem'; }).length,
+    var nVF = at.filter(function (e) { return e.cor === 'visf'; }).length, nV = at.filter(function (e) { return e.cor === 'vis'; }).length, nL = at.filter(function (e) { return e.cor === 'lem'; }).length,
       nA = at.filter(function (e) { return !e.lemb && e.cor !== 'colh'; }).length, nC = at.filter(function (e) { return e.cor === 'colh'; }).length, fzs = {};
     at.forEach(function (e) { if (e.faz) fzs[e.faz] = 1; });
-    var res = [[nV, nV === 1 ? 'visita' : 'visitas'], [nL, nL === 1 ? 'lembrete' : 'lembretes']];
+    var res = o.feitas ? [[nV, nV === 1 ? 'visita programada' : 'visitas programadas'], [nVF, nVF === 1 ? 'visita realizada' : 'visitas realizadas'], [nL, nL === 1 ? 'lembrete' : 'lembretes']]
+      : [[nV, nV === 1 ? 'visita' : 'visitas'], [nL, nL === 1 ? 'lembrete' : 'lembretes']];
     if (o.apl) res.push([nA, nA === 1 ? 'aplicação' : 'aplicações']);
     if (o.colh) res.push([nC, nC === 1 ? 'colheita' : 'colheitas']);
     res.push([Object.keys(fzs).length, Object.keys(fzs).length === 1 ? 'fazenda' : 'fazendas']);
@@ -240,18 +241,31 @@
     dias.forEach(function (dia) {
       var es = porDia[dia];
       var primeiro = es[0], q0 = quebra(primeiro.sub, LS, 8.5, false);
-      cabe(34 + 14 + q0.length * 11);
+      cabe(34 + 14 + q0.length * 11 + (primeiro.extra ? primeiro.extra.length * 14 + 24 : 0));
       y -= 16;
       var dn = diaSem(dia); txt(M, y, 10.5, true, dn.charAt(0).toUpperCase() + dn.slice(1) + ', ' + curta(dia) + (dia === hoje() ? '  (hoje)' : ''), ESCURO);
       y -= 5; linha(M, y, W - M, TRACO, 0.8); y -= 4;
       es.forEach(function (e) {
         var sub = quebra(e.sub, LS, 8.5, false), tl = quebra(e.tit, LS, 10, true, 2), h = 8 + tl.length * 12 + sub.length * 10.5 + 4;
+        var LB = 70, cx = (e.extra || []).map(function (x) { return { r: x[0], l: quebra(x[1], W - M - TX - 16 - LB, 8.5, false, 8) }; }), hb = 0;
+        cx.forEach(function (x) { hb += x.l.length * 10.5 + 2; });
+        if (cx.length) { hb += 10; h += hb + 8; }
         if (!cabe(h)) { txt(M, y - 10, 8.5, true, curta(dia) + ' (continuação)', CINZA); y -= 16; }
         var y0 = y - 13;
         icone(op, e.cor, M, y0 - 1.5, 9);
         txt(CX, y0, 9.5, true, e.hora || '-', [0.2, 0.2, 0.2]);
-        tl.forEach(function (l, j) { txt(TX, y0 - j * 12, 10, true, l, e.feito ? [0.45, 0.45, 0.45] : [0.1, 0.1, 0.1]); });
+        tl.forEach(function (l, j) { txt(TX, y0 - j * 12, 10, true, l, e.feito && e.cor !== 'visf' ? [0.45, 0.45, 0.45] : [0.1, 0.1, 0.1]); });
         sub.forEach(function (l, j) { txt(TX, y0 - tl.length * 12 - j * 10.5 + 1.5, 8.5, false, l, CINZA); });
+        if (cx.length) {
+          var yb = y0 - tl.length * 12 - sub.length * 10.5 - 3;
+          rect(TX, yb - hb, W - M - TX, hb, [0.953, 0.98, 0.965]); borda(TX, yb - hb, W - M - TX, hb, [0.83, 0.92, 0.87], 0.6);
+          var yy2 = yb - 11;
+          cx.forEach(function (x) {
+            txt(TX + 8, yy2, 7.5, true, x.r, CINZA);
+            x.l.forEach(function (l, j) { txt(TX + 8 + LB, yy2 - j * 10.5, 8.5, false, l, x.r === 'Relatório' ? VERDE : [0.15, 0.15, 0.15]); });
+            yy2 -= x.l.length * 10.5 + 2;
+          });
+        }
         var bx = W - M - 11, by = y0 - 1.5;
         if (e.feito) {
           rect(bx, by, 10, 10, VERDE);

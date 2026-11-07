@@ -1022,12 +1022,29 @@
     if (!global.DB) return;
     DB.all('relatorios').then(function (l) {
       var novo = (l || []).filter(function (r) { return r && (r.data_inicio || r.criado_em); }).map(function (r) {
-        return { id: r.id, d: r.data_inicio || String(r.criado_em).slice(0, 10), fazenda_id: r.fazenda_id || '', fazenda: r.fazenda || '', servico: r.servico || '', responsavel: r.responsavel || '', status: r.status || '' };
+        return { id: r.id, d: r.data_inicio || String(r.criado_em).slice(0, 10), fazenda_id: r.fazenda_id || '', fazenda: r.fazenda || '', servico: r.servico || '', responsavel: r.responsavel || '', status: r.status || '',
+          obs: r.observacoes || '', criado: r.criado_em || '' };
       }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
       var mudou = JSON.stringify(novo) !== JSON.stringify(VISITAS); VISITAS = novo;
       if (mudou && tR && !tR.classList.contains('oculto') && R.view === 'cal') pintarCalendario();
     }).catch(function () { /* sem banco: segue sem as visitas feitas */ });
   }
+  // registros de cada visita (para o resumo no PDF): quantidade por tipo, talhões e hora do 1º registro
+  var VIS_RES = {};
+  function resumirVisitas() {
+    if (!global.DB) return Promise.resolve();
+    return DB.all('itens').then(function (l) {
+      var r = {};
+      (l || []).forEach(function (it) {
+        var x = r[it.relatorio_id] || (r[it.relatorio_id] = { foto: 0, video: 0, audio: 0, texto: 0, tal: [], ini: '' });
+        if (x[it.tipo] != null) x[it.tipo]++;
+        if (it.talhao && x.tal.indexOf(it.talhao) < 0) x.tal.push(it.talhao);
+        if (it.capturado_em && (!x.ini || it.capturado_em < x.ini)) x.ini = it.capturado_em;
+      });
+      VIS_RES = r;
+    }).catch(function () { /* segue sem o resumo */ });
+  }
+  function horaLocal(iso) { if (!iso) return ''; var d = new Date(iso); return isNaN(d) ? '' : p2(d.getHours()) + ':' + p2(d.getMinutes()); }
   function txtLemb(l) {
     var f = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
     return l.tipo === 'visita' ? 'Visita' + (f ? ' à ' + f.nome : ' na fazenda') : (l.titulo || 'Lembrete');
@@ -1369,6 +1386,13 @@
       if (o.faz !== '*' && l.fazenda_id && l.fazenda_id !== o.faz) return;
       out.push({ d: l.data, k: 'lemb', l: l, hora: l.hora || '' });
     });
+    if (o.feitas) (VISITAS || []).forEach(function (v) {
+      if (v.d < o.de || v.d > o.ate) return;
+      if (o.faz !== '*' && v.fazenda_id !== o.faz) return;
+      if (o.resp !== '*' && (v.responsavel || '') !== o.resp && !(o.soUm && !v.responsavel)) return;
+      var rs = VIS_RES[v.id] || {};
+      out.push({ d: v.d, k: 'rel', v: v, hora: horaLocal(rs.ini || v.criado) });
+    });
     if (o.apl) eventosDe(o.faz).forEach(function (e) {
       if (e.k === 'lemb' || e.k === 'colh' || e.k === 'rel' || e.d < o.de || e.d > o.ate) return;
       out.push(Object.assign({ hora: '' }, e));
@@ -1376,6 +1400,19 @@
     return out.sort(function (a, b) { var x = a.d + (a.hora || '99'), y = b.d + (b.hora || '99'); return x < y ? -1 : x > y ? 1 : 0; });
   }
   function descAtiv(e, todosResp) {
+    if (e.k === 'rel') {
+      var v = e.v, rs = VIS_RES[v.id] || { foto: 0, video: 0, audio: 0, texto: 0, tal: [] }, reg = [];
+      [['foto', 'foto', 'fotos'], ['video', 'vídeo', 'vídeos'], ['audio', 'áudio', 'áudios'], ['texto', 'nota', 'notas']].forEach(function (t) {
+        if (rs[t[0]]) reg.push(rs[t[0]] + ' ' + (rs[t[0]] === 1 ? t[1] : t[2])); });
+      var ex = [];
+      if (rs.tal && rs.tal.length) ex.push(['Talhões', rs.tal.slice().sort(function (x, y) { return String(x).localeCompare(String(y), 'pt-BR', { numeric: true }); }).join(', ')]);
+      ex.push(['Registros', reg.length ? reg.join('  -  ') : 'nenhum registro']);
+      if (v.obs) ex.push(['Observação', v.obs.replace(/[*_~]/g, '')]);
+      if (v.status === 'publicado') ex.push(['Relatório', 'amvs.ia.br/r/' + v.id]);
+      return { cor: 'visf', faz: v.fazenda_id || '', tit: 'Visita realizada' + (v.fazenda ? ' - ' + v.fazenda : ''), feito: true,
+        sub: [v.servico, todosResp || v.responsavel ? (v.responsavel ? 'Responsável: ' + v.responsavel : '') : ''].filter(Boolean).join('  -  '),
+        curto: v.fazenda || 'Visita', extra: ex };
+    }
     if (e.k === 'lemb') {
       var l = e.l, vis = l.tipo === 'visita', fl = l.fazenda_id ? cadFazDe(l.fazenda_id) : null, sub = [];
       if (vis && l.titulo) sub.push(l.titulo);
@@ -1394,8 +1431,8 @@
   }
   function pdfPlano(o) {
     var todos = o.resp === '*', fz = o.faz !== '*' ? (fazDe(o.faz) || cadFazDe(o.faz)) : null;
-    var at = atividadesPeriodo(o).map(function (e) { var x = descAtiv(e, todos); x.d = e.d; x.hora = e.hora; x.lemb = e.k === 'lemb'; return x; });
-    return global.PlanoPDF.plano({ de: o.de, ate: o.ate, resp: o.resp, fazNome: fz ? fz.nome : '', apl: o.apl, ativ: at, logo: LOGO_PDF, empresa: EMP_PDF.empresa, cidade: EMP_PDF.cidade });
+    var at = atividadesPeriodo(o).map(function (e) { var x = descAtiv(e, todos); x.d = e.d; x.hora = e.hora; x.lemb = e.k === 'lemb' || e.k === 'rel'; return x; });
+    return global.PlanoPDF.plano({ de: o.de, ate: o.ate, resp: o.resp, fazNome: fz ? fz.nome : '', apl: o.apl, feitas: o.feitas, ativ: at, logo: LOGO_PDF, empresa: EMP_PDF.empresa, cidade: EMP_PDF.cidade });
   }
   // botão ＋ do calendário: programar ou exportar o planejamento
   function menuMais() {
@@ -1428,6 +1465,7 @@
       '<div class="ag-semnav" id="ppSem"><button data-w="-1" aria-label="Semana anterior">‹</button><b id="ppSemTxt"></b><button data-w="1" aria-label="Próxima semana">›</button></div>' +
       '<div class="linha2" id="ppPer"><div class="campo"><label>De</label><input type="date" id="ppDe" value="' + seg + '"></div>' +
         '<div class="campo"><label>Até</label><input type="date" id="ppAte" value="' + addDias(seg, 6) + '"></div></div>' +
+      '<label class="ag-chk"><input type="checkbox" id="ppFeitas"' + (pref.feitas !== false ? ' checked' : '') + '> Incluir as visitas realizadas (resumo)</label>' +
       '<label class="ag-chk"><input type="checkbox" id="ppApl"' + (pref.apl ? ' checked' : '') + '> Incluir as aplicações das fazendas</label>' +
       '<div class="ag-dica" id="ppConta"></div>' +
       '<div class="ag-dica" id="ppEmp" style="' + (EMP_PDF.empresa ? 'display:none' : '') + '">🏢 Para sair o nome da sua empresa no cabeçalho, preencha <b>Empresa</b> em Ajustes.</div>' +
@@ -1436,7 +1474,7 @@
     if (rIni === '*') $('#ppResp', ov).value = '*';
     function escolha() {
       var de = modo === 'sem' ? seg : $('#ppDe', ov).value, ate = modo === 'sem' ? addDias(seg, 6) : $('#ppAte', ov).value;
-      return { de: de, ate: ate, resp: $('#ppResp', ov).value, faz: $('#ppFaz', ov).value, apl: $('#ppApl', ov).checked, soUm: soUm };
+      return { de: de, ate: ate, resp: $('#ppResp', ov).value, faz: $('#ppFaz', ov).value, apl: $('#ppApl', ov).checked, feitas: $('#ppFeitas', ov).checked, soUm: soUm };
     }
     function atualizar() {
       ov.querySelectorAll('[data-p]').forEach(function (b) { b.classList.toggle('on', b.dataset.p === modo); });
@@ -1446,16 +1484,17 @@
       var o = escolha(), c = $('#ppConta', ov);
       if (!o.de || !o.ate || o.ate < o.de) { c.textContent = 'Escolha o período (a data final depois da inicial).'; return; }
       if (difDias(o.ate, o.de) > 92) { c.textContent = 'Período muito longo: escolha até 3 meses.'; return; }
-      var at = atividadesPeriodo(o), v = 0, l = 0, a = 0;
-      at.forEach(function (e) { if (e.k !== 'lemb') a++; else if (e.l.tipo === 'visita') v++; else l++; });
+      var at = atividadesPeriodo(o), v = 0, l = 0, a = 0, f = 0;
+      at.forEach(function (e) { if (e.k === 'rel') f++; else if (e.k !== 'lemb') a++; else if (e.l.tipo === 'visita') v++; else l++; });
       c.textContent = at.length ? '📋 ' + at.length + (at.length === 1 ? ' atividade' : ' atividades') + ' no período: ' +
-        [v ? v + (v === 1 ? ' visita' : ' visitas') : '', l ? l + (l === 1 ? ' lembrete' : ' lembretes') : '', a ? a + (a === 1 ? ' aplicação' : ' aplicações') : ''].filter(Boolean).join(', ') + '.'
+        [v ? v + (v === 1 ? ' visita programada' : ' visitas programadas') : '', f ? f + (f === 1 ? ' visita realizada' : ' visitas realizadas') : '', l ? l + (l === 1 ? ' lembrete' : ' lembretes') : '', a ? a + (a === 1 ? ' aplicação' : ' aplicações') : ''].filter(Boolean).join(', ') + '.'
         : 'Nada programado neste período. O PDF sai com o calendário vazio.';
     }
     ov.querySelectorAll('[data-p]').forEach(function (b) { b.onclick = function () { modo = b.dataset.p; if (modo === 'per') { $('#ppDe', ov).value = seg; $('#ppAte', ov).value = addDias(seg, 6); } atualizar(); }; });
     ov.querySelectorAll('[data-w]').forEach(function (b) { b.onclick = function () { seg = addDias(seg, 7 * Number(b.dataset.w)); atualizar(); }; });
-    ['#ppResp', '#ppFaz', '#ppApl', '#ppDe', '#ppAte'].forEach(function (s) { $(s, ov).addEventListener('change', atualizar); });
+    ['#ppResp', '#ppFaz', '#ppApl', '#ppFeitas', '#ppDe', '#ppAte'].forEach(function (s) { $(s, ov).addEventListener('change', atualizar); });
     atualizar();
+    carregarVisitas(); resumirVisitas().then(function () { setTimeout(atualizar, 150); });   // visitas do aparelho e o resumo delas, antes do toque em Gerar
     ov.onclick = function (ev) {
       var m = ev.target.dataset && ev.target.dataset.m;
       if (m === 'no' || ev.target === ov) { ov.remove(); return; }
@@ -1463,7 +1502,7 @@
       var o = escolha();
       if (!o.de || !o.ate || o.ate < o.de) { toast('Escolha o período'); return; }
       if (difDias(o.ate, o.de) > 92) { toast('Escolha um período de até 3 meses'); return; }
-      ST.planPdf = { resp: o.resp, apl: o.apl, modo: modo }; gravar();
+      ST.planPdf = { resp: o.resp, apl: o.apl, feitas: o.feitas, modo: modo }; gravar();
       var bytes = pdfPlano(o);
       ov.remove();
       entregarPdf(bytes, nomeArq('planejamento-' + (o.resp === '*' ? 'todos' : o.resp) + '-' + o.de), 'Planejamento das Atividades');
