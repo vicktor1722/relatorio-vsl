@@ -131,7 +131,8 @@ export function garantir(env) {
 // colunas novas da tabela ciclos: GMR informado e empresa (materiais cadastrados pelo consultor)
 // + plantio lançado por dia pelo gerente da fazenda (plantio.lanc)
 async function colunasCiclos(env) {
-  for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''", "plantio ADD COLUMN partes TEXT DEFAULT ''"]) {
+  for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''", "plantio ADD COLUMN partes TEXT DEFAULT ''",
+                   "lembretes_agro ADD COLUMN responsavel TEXT DEFAULT ''"]) {
     try { await env.DB.prepare('ALTER TABLE ' + c).run(); } catch (e) { /* já existe */ }
   }
 }
@@ -712,10 +713,10 @@ export async function rotasAgro(env, req, me, rota, url) {
     if (fid && !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
     const id = b.id ? txt(b.id, 60) : novoId('lb');
     const hora = /^\d{2}:\d{2}$/.test(String(b.hora || '')) ? b.hora : '';
-    await env.DB.prepare(`INSERT INTO lembretes_agro (id, usuario_id, fazenda_id, tipo, titulo, data, hora, obs, feito) VALUES (?,?,?,?,?,?,?,?,?)
+    await env.DB.prepare(`INSERT INTO lembretes_agro (id, usuario_id, fazenda_id, tipo, titulo, data, hora, obs, feito, responsavel) VALUES (?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET fazenda_id = excluded.fazenda_id, tipo = excluded.tipo, titulo = excluded.titulo, data = excluded.data,
-          hora = excluded.hora, obs = excluded.obs, feito = excluded.feito WHERE lembretes_agro.usuario_id = excluded.usuario_id`)
-      .bind(id, me.id, fid, b.tipo === 'lembrete' ? 'lembrete' : 'visita', txt(b.titulo, 120), data, hora, txt(b.obs, 500), b.feito ? 1 : 0).run();
+          hora = excluded.hora, obs = excluded.obs, feito = excluded.feito, responsavel = excluded.responsavel WHERE lembretes_agro.usuario_id = excluded.usuario_id`)
+      .bind(id, me.id, fid, b.tipo === 'lembrete' ? 'lembrete' : 'visita', txt(b.titulo, 120), data, hora, txt(b.obs, 500), b.feito ? 1 : 0, txt(b.responsavel, 80)).run();
     return json({ ok: true, id });
   }
   if (rota === '/api/agro/lembrete/apagar' && req.method === 'POST') {
