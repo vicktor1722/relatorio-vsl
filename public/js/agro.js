@@ -829,7 +829,6 @@
 
   // ícone 📅 da tela inicial: calendário de todas as fazendas
   function abrirCalendarioGeral() {
-    if (!ST.mod.recomendacoes) return;
     ESC = ''; R.faz = '*'; R.view = 'cal'; R.inicio = true; R.W = null; R.cy = 0;
     tR.classList.remove('oculto'); pintarRecs(); topoRolagem(tR);
     baixar().then(function (ok) { atualizarSino(); if (ok && !tR.classList.contains('oculto') && R.view === 'cal') pintarRecs(); });
@@ -839,16 +838,16 @@
     var acoes = document.querySelector('#telaLista .acoes'); if (!acoes) return;
     var b = document.getElementById('btnCalAg');
     if (!b) {
-      b = document.createElement('button'); b.id = 'btnCalAg'; b.className = 'ag-calbtn'; b.title = 'Calendário de aplicações';
+      b = document.createElement('button'); b.id = 'btnCalAg'; b.className = 'ag-calbtn'; b.title = 'Calendário';
       b.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><i></i>';
       b.onclick = abrirCalendarioGeral;
       acoes.insertBefore(b, acoes.firstChild);
     }
-    b.style.display = ST.mod.recomendacoes ? '' : 'none';
+    b.style.display = '';   // calendário para todas as contas (visitas e lembretes); aplicações só com o módulo
     var lh = (ST.lembretes || []).filter(function (x) { return x.data === hoje() && !x.feito; }).length;
-    var n = ST.mod.recomendacoes ? pertoDe('*').length + lh : 0, i = b.querySelector('i');
+    var n = (ST.mod.recomendacoes ? pertoDe('*').length : 0) + lh, i = b.querySelector('i');
     i.textContent = n > 9 ? '9+' : String(n); i.style.display = n ? '' : 'none';
-    b.title = n ? n + ' aplicação(ões) perto — calendário' : 'Calendário de aplicações';
+    b.title = n ? n + ' compromisso(s) perto — calendário' : 'Calendário';
   }
 
   function abrirRecs() {
@@ -1116,11 +1115,12 @@
       g += '<button class="ag-dia' + (iso === hoje() ? ' hoje' : '') + (iso === R.sel ? ' sel' : '') + '" data-a="calsel" data-v="' + iso + '"><span>' + d + '</span><i>' +
         icoDia(es) + '</i></button>';
     }
-    h += '<div class="campo"><label>Fazenda</label><select data-c="faz"><option value="*"' + (todas ? ' selected' : '') + '>Todas as fazendas</option>' + opcoesFaz(R.faz) + '</select></div>' +
+    h += '<div class="campo"><label>Fazenda</label><select data-c="faz"><option value="*"' + (todas ? ' selected' : '') + '>Todas as fazendas</option>' +
+      (cad().fazendas || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === R.faz ? ' selected' : '') + '>' + esc(x.nome) + '</option>'; }).join('') + '</select></div>' +
       '<div class="ag-calhead"><button data-a="calmes" data-v="-1">‹</button><b>' + MESES[R.cm].charAt(0).toUpperCase() + MESES[R.cm].slice(1) + ' de ' + R.cy + '</b><button data-a="calmes" data-v="1">›</button></div>' +
       '<div class="ag-grade">' + g + '</div>' +
-      '<div class="ag-leg"><span class="c-prev">' + ICO_PULV + 'prevista</span><span class="c-apl">' + ICO_PULV + 'aplicada</span><span class="c-perto">' + ICO_PULV + 'próxima (perto)</span>' +
-      '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span><span class="c-colh">' + ICO_COLH + 'colheita prevista</span>' +
+      '<div class="ag-leg">' + (ST.mod.recomendacoes ? '<span class="c-prev">' + ICO_PULV + 'prevista</span><span class="c-apl">' + ICO_PULV + 'aplicada</span><span class="c-perto">' + ICO_PULV + 'próxima (perto)</span>' +
+      '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span>' : '') + (ST.mod.plantio ? '<span class="c-colh">' + ICO_COLH + 'colheita prevista</span>' : '') +
       '<span class="c-vis">' + ICO_VIS + 'visita programada</span><span class="c-visf">' + ICO_VIS + 'visita feita</span><span class="c-lem">' + ICO_LEM + 'lembrete</span></div>';
     var ds = ev.filter(function (e) { return e.d === R.sel; });
     h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
@@ -1466,7 +1466,7 @@
       '<div class="linha2" id="ppPer"><div class="campo"><label>De</label><input type="date" id="ppDe" value="' + seg + '"></div>' +
         '<div class="campo"><label>Até</label><input type="date" id="ppAte" value="' + addDias(seg, 6) + '"></div></div>' +
       '<label class="ag-chk"><input type="checkbox" id="ppFeitas"' + (pref.feitas !== false ? ' checked' : '') + '> Incluir as visitas realizadas (resumo)</label>' +
-      '<label class="ag-chk"><input type="checkbox" id="ppApl"' + (pref.apl ? ' checked' : '') + '> Incluir as aplicações das fazendas</label>' +
+      (ST.mod.recomendacoes ? '<label class="ag-chk"><input type="checkbox" id="ppApl"' + (pref.apl ? ' checked' : '') + '> Incluir as aplicações das fazendas</label>' : '<input type="checkbox" id="ppApl" hidden>') +
       '<div class="ag-dica" id="ppConta"></div>' +
       '<div class="ag-dica" id="ppEmp" style="' + (EMP_PDF.empresa ? 'display:none' : '') + '">🏢 Para sair o nome da sua empresa no cabeçalho, preencha <b>Empresa</b> em Ajustes.</div>' +
       '<button class="btn" data-m="ok">📄 Gerar PDF</button><button class="btn secundario" data-m="no">Cancelar</button></div>';
@@ -2082,7 +2082,7 @@
   }
   // aparelho já autorizado: confirma a assinatura no servidor uma vez por abertura (troca de conta, assinatura renovada)
   function conferirPush() {
-    if (!pushPossivel() || Notification.permission !== 'granted' || !ST.mod.recomendacoes || !navigator.onLine) return;
+    if (!pushPossivel() || Notification.permission !== 'granted' || !navigator.onLine) return;
     assinarPush().catch(function () { /* tenta na próxima abertura */ });
   }
   function cartaoPush() {
@@ -2217,7 +2217,7 @@
     var bm = $('#btnMapa'); if (bm) bm.addEventListener('click', function () { marcaVisto('mapa'); atualizarModulos(); });
     window.addEventListener('online', function () { atualizarModulos().then(descarregar); verificarVersao(); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { atualizarModulos().then(descarregar); verificarVersao(); } });
-    atualizarModulos().then(function () { conferirPush(); return ST.mod.recomendacoes ? baixar() : descarregar(); });
+    atualizarModulos().then(function () { conferirPush(); return baixar(); });   // lembretes e visitas: todas as contas
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') atualizarSino(); });
     // tocou na notificação: abre direto nas recomendações
     var abrirPeloAviso = function () { if (ST.mod.recomendacoes) { var tl = document.getElementById('telaLista'); if (tl) tl.classList.add('oculto'); abrirRecs(); } };
@@ -2227,7 +2227,7 @@
     }
     if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'recs') abrirPeloAviso(); if (ev.data && ev.data.abrir === 'cal') abrirCalPeloAviso(); });
     // tocou no aviso das visitas/lembretes do dia: abre o calendário em hoje
-    var abrirCalPeloAviso = function () { if (ST.mod.recomendacoes) abrirCalendarioGeral(); };
+    var abrirCalPeloAviso = function () { abrirCalendarioGeral(); };
     if (/[?&]abrir=cal/.test(location.search)) {
       try { history.replaceState(null, '', location.pathname); } catch (e) {}
       setTimeout(abrirCalPeloAviso, 1800);

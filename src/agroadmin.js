@@ -43,6 +43,12 @@ export const AGRO_CSS = `
 .agd .c-vis{color:#7B3FBF}.agd .c-lem{color:#D9822B}.agd .c-prev{color:#3B78C3}.agd .c-apl{color:#2F9E5B}.agd .c-perto{color:#E0A100}.agd .c-venc{color:#C0392B}.agd .c-ok{color:#2E8B8B}
 @media (max-width:620px){.agd-dia em{display:none}.agd-sem{gap:3px}.agd-dia{min-height:66px;padding:5px 1px 6px}.agd-dia i .ai{width:15px;height:11px}.agd-res{gap:10px}}
 /* ---------- Calendário (agenda) ---------- */
+.agc-ev.c-visf.feito,.agc-it.c-visf.feito{opacity:1}
+#agAgenda .agc-it.c-vis b .ai{color:#7B3FBF}#agAgenda .agc-it.c-lem b .ai{color:#D9822B}#agAgenda .agc-it.c-visf b .ai{color:#2F9E5B}#agAgenda .agc-it.c-prev b .ai{color:#3B78C3}#agAgenda .agc-it.c-apl b .ai{color:#2F9E5B}#agAgenda .agc-it.c-perto b .ai{color:#E0A100}#agAgenda .agc-it.c-venc b .ai{color:#C0392B}#agAgenda .agc-it.c-ok b .ai{color:#2E8B8B}#agAgenda .agc-it.c-colh b .ai{color:#9A5B12}
+#agAgenda .c-visf,.agd .c-visf,.agc-ver .c-visf{color:#2F9E5B}.agc-ev.c-visf{background:#E8F5EE}.agc-ver button.on.c-visf{background:#EEF8F2}
+.agc-vr{background:#F3FAF6;border:1px solid #D3EBDD;border-radius:8px;padding:6px 8px;margin-top:6px;font-size:12.5px;color:var(--texto)}
+.agc-vr div{display:flex;gap:6px;margin:1px 0}.agc-vr i{font-style:normal;color:var(--fraco);min-width:74px}
+.agc-acoes a{font-size:12.5px;font-weight:700;color:var(--verde);text-decoration:none}
 .agc-ver{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}.agc-ver>span{font-size:12.5px;color:var(--fraco)}
 .agc-ver button{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--linha);background:#fff;border-radius:18px;padding:5px 11px;font-size:13px;color:var(--fraco);cursor:pointer;opacity:.75}
 .agc-ver button .ai{filter:grayscale(1);opacity:.6}
@@ -923,7 +929,7 @@ ${MAPA_CHUVA_JS}
     if (a) a.style.display = ST.mod.plantio ? '' : 'none';
     if (b) b.style.display = ST.mod.recomendacoes ? '' : 'none';
     var c = document.getElementById('abaCusto'); if (c) c.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
-    var ag = document.getElementById('abaAgenda'); if (ag) ag.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
+    var ag = document.getElementById('abaAgenda'); if (ag) ag.style.display = '';   // calendário para todas as contas
     var ab = document.getElementById('abaAcessos'); if (ab) ab.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
   }
 
@@ -1985,8 +1991,8 @@ ${MAPA_CHUVA_JS}
 
   /* =================== CALENDÁRIO (aba própria): visitas, lembretes e aplicações da conta =================== */
   // mesma agenda do app (tabela lembretes_agro): o que muda aqui aparece no celular e vice-versa
-  var tA = null, AG = { lemb: [], colh: [], ev: [], cy: 0, cm: 0, sel: '', modo: 'mes', faz: '*', resp: '*', ver: { lemb: true, apl: true, colh: true }, logo: null, emp: {}, ultResp: '' };
-  try { var vv = JSON.parse(localStorage.getItem('agc-ver') || 'null'); if (vv) AG.ver = { lemb: vv.lemb !== false, apl: vv.apl !== false, colh: vv.colh !== false }; } catch (e) { /* padrão: tudo */ }
+  var tA = null, AG = { lemb: [], colh: [], feitas: [], ev: [], cy: 0, cm: 0, sel: '', modo: 'mes', faz: '*', resp: '*', ver: { lemb: true, feitas: true, apl: true, colh: true }, logo: null, emp: {}, ultResp: '' };
+  try { var vv = JSON.parse(localStorage.getItem('agc-ver') || 'null'); if (vv) AG.ver = { lemb: vv.lemb !== false, feitas: vv.feitas !== false, apl: vv.apl !== false, colh: vv.colh !== false }; } catch (e) { /* padrão: tudo */ }
   var AI_VIS = '<svg class="ai vis" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 15 V11.5 Q3 10 4.5 10 H17 L21 4.5 Q21.8 3.5 23 3.5 H30 Q31.5 3.5 32.2 4.8 L35.5 10 Q37.5 10.4 37.5 12.5 V17.5 Q37.5 19 36 19 H4.5 Q3 19 3 17.5 Z" fill="currentColor"/><path d="M22.4 5.6 H29.6 L32.4 10 H19.6 Z" fill="#E8F1FB"/><rect x="5" y="11.6" width="12" height="1.6" rx=".8" fill="#fff" opacity=".55"/><circle cx="10.5" cy="19.5" r="4.6" fill="#222"/><circle cx="10.5" cy="19.5" r="2" fill="#CFCFCF"/><circle cx="29.5" cy="19.5" r="4.6" fill="#222"/><circle cx="29.5" cy="19.5" r="2" fill="#CFCFCF"/><rect x="34.6" y="12.2" width="2.6" height="2" rx=".6" fill="#FFD54A"/></svg>';
   var AI_LEM = '<svg class="ai lem" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4.2L4.3 16.4A1 1 0 0 0 5.2 18h13.6a1 1 0 0 0 .9-1.6L18 13.2V9a6 6 0 0 0-6-6z" fill="currentColor"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0z" fill="currentColor"/></svg>';
   var AI_PULV = '<svg class="ai pulv" viewBox="0 0 64 30" aria-hidden="true"><g fill="#38B6E8"><path d="M3.5 16 l-1.6 4.2 h3.2z M9.5 16 l-1.6 4.2 h3.2z M15.5 16 l-1.6 4.2 h3.2z M21 16 l-1.6 4.2 h3.2z M43 16 l-1.6 4.2 h3.2z M48.5 16 l-1.6 4.2 h3.2z M54.5 16 l-1.6 4.2 h3.2z M60.5 16 l-1.6 4.2 h3.2z"/></g><g stroke="currentColor" stroke-linecap="round" fill="none"><path d="M1.5 11.2 H24 M40 11.2 H62.5" stroke-width="1.6"/><path d="M2 15 H24 M40 15 H62" stroke-width="1.8"/><path d="M2 15 L5 11.2 L8 15 L11 11.2 L14 15 L17 11.2 L20 15 L23 11.2 M41 11.2 L44 15 L47 11.2 L50 15 L53 11.2 L56 15 L59 11.2 L62 15" stroke-width="1"/></g><g fill="#1F2A22"><rect x="2.8" y="15" width="1.4" height="1.4"/><rect x="8.8" y="15" width="1.4" height="1.4"/><rect x="14.8" y="15" width="1.4" height="1.4"/><rect x="20.3" y="15" width="1.4" height="1.4"/><rect x="42.3" y="15" width="1.4" height="1.4"/><rect x="47.8" y="15" width="1.4" height="1.4"/><rect x="53.8" y="15" width="1.4" height="1.4"/><rect x="59.8" y="15" width="1.4" height="1.4"/></g><rect x="23.2" y="15.5" width="4.4" height="13" rx="1.6" fill="#222"/><rect x="36.4" y="15.5" width="4.4" height="13" rx="1.6" fill="#222"/><rect x="25" y="14" width="14" height="4.2" rx="1" fill="currentColor"/><path d="M24.5 6.2 Q24.5 3.4 27.3 3.4 H36.7 Q39.5 3.4 39.5 6.2 V15 H24.5 Z" fill="currentColor"/><rect x="26.6" y="6" width="10.8" height="5.6" rx="1" fill="#24312A"/><path d="M27.6 7 h3 l-1.8 3.6 h-1.2z" fill="#fff" opacity=".35"/><rect x="30.8" y="1.6" width="2.4" height="1.8" rx=".6" fill="#F5B400"/><rect x="22.4" y="7.2" width="1.6" height="2.6" rx=".5" fill="#1F2A22"/><rect x="40" y="7.2" width="1.6" height="2.6" rx=".5" fill="#1F2A22"/></svg>';
@@ -1994,7 +2000,7 @@ ${MAPA_CHUVA_JS}
   var AG_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   var AG_DSEM = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
   function agSeg(iso) { return addDias(iso, -((new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7)); }
-  function agIco(cor) { return cor === 'vis' ? AI_VIS : cor === 'lem' ? AI_LEM : cor === 'colh' ? AI_COLH : AI_PULV; }
+  function agIco(cor) { return (cor === 'vis' || cor === 'visf') ? AI_VIS : cor === 'lem' ? AI_LEM : cor === 'colh' ? AI_COLH : AI_PULV; }
   function agFazNome(id) { var f = id ? fazDe(id) : null; return f ? f.nome : ''; }
   function agResps() {
     var l = (cad().responsaveis || []).map(function (x) { return x.nome; });
@@ -2035,6 +2041,24 @@ ${MAPA_CHUVA_JS}
         Object.keys(gg).forEach(function (dia) { add(dia, 'prox', gg[dia], ordTxt(r.operacao, (Number(d.num) || 1) + 1), situ(dia, Number(d.aviso) || 0)); });
       }
     });
+    if (f.feitas) AG.feitas.forEach(function (v) {
+      var d = v.data_inicio || String(v.criado_em || '').slice(0, 10); if (!d) return;
+      if (f.de && (d < f.de || d > f.ate)) return;
+      if (f.faz !== '*' && v.fazenda_id !== f.faz) return;
+      if (!todos && (v.responsavel || '') !== f.resp && !(soUm && !v.responsavel)) return;
+      var reg = [];
+      [['fotos', 'foto', 'fotos'], ['videos', 'vídeo', 'vídeos'], ['audios', 'áudio', 'áudios'], ['notas', 'nota', 'notas']].forEach(function (t) {
+        var n = Number(v[t[0]]) || 0; if (n) reg.push(n + ' ' + (n === 1 ? t[1] : t[2])); });
+      var tal = String(v.talhoes || '').split(',').filter(Boolean).sort(function (x, y) { return x.localeCompare(y, 'pt-BR', { numeric: true }); });
+      var ex = []; if (tal.length) ex.push(['Talhões', tal.join(', ')]);
+      ex.push(['Registros', reg.length ? reg.join('  -  ') : 'nenhum registro']);
+      if (v.observacoes) ex.push(['Observação', String(v.observacoes).replace(/[*_~]/g, '')]);
+      if (v.status === 'publicado') ex.push(['Relatório', 'amvs.ia.br/r/' + v.id]);
+      var hi = v.ini ? new Date(v.ini) : null;
+      ev.push({ d: d, hora: hi && !isNaN(hi) ? p2(hi.getHours()) + ':' + p2(hi.getMinutes()) : '', k: 'rel', v: v, lemb: true, cor: 'visf', feito: true, faz: v.fazenda_id || '',
+        tit: 'Visita realizada' + (v.fazenda ? ' - ' + v.fazenda : ''), sub: [v.servico, v.responsavel ? 'Responsável: ' + v.responsavel : ''].filter(Boolean).join('  -  '),
+        curto: v.fazenda || 'Visita', extra: ex });
+    });
     if (f.colh && ST.mod.plantio) AG.colh.forEach(function (c) {
       if (f.de && (c.d < f.de || c.d > f.ate)) return;
       if (f.faz !== '*' && c.fazenda_id !== f.faz) return;
@@ -2046,7 +2070,7 @@ ${MAPA_CHUVA_JS}
     });
     return ev.sort(function (a, b) { var x = a.d + (a.hora || '99'), y = b.d + (b.hora || '99'); return x < y ? -1 : x > y ? 1 : 0; });
   }
-  function agFiltro(extra) { return Object.assign({ faz: AG.faz, resp: AG.resp, lemb: AG.ver.lemb, apl: AG.ver.apl, colh: AG.ver.colh }, extra || {}); }
+  function agFiltro(extra) { return Object.assign({ faz: AG.faz, resp: AG.resp, lemb: AG.ver.lemb, feitas: AG.ver.feitas, apl: AG.ver.apl, colh: AG.ver.colh }, extra || {}); }
   function agPintar() {
     if (!tA) return;
     if (!AG.cy) { var t0 = new Date(); AG.cy = t0.getFullYear(); AG.cm = t0.getMonth(); AG.sel = hoje(); }
@@ -2073,6 +2097,11 @@ ${MAPA_CHUVA_JS}
     }
     var ds = porDia[AG.sel] || [];
     function card(e) {
+      if (e.k === 'rel') {
+        return '<div class="agc-it c-visf"><b>' + AI_VIS + esc(e.tit) + '</b><span>' + [e.hora ? '🕘 ' + esc(e.hora) : '', e.sub ? esc(e.sub) : ''].filter(Boolean).join(' · ') + '</span>' +
+          '<div class="agc-vr">' + e.extra.filter(function (x) { return x[0] !== 'Relatório'; }).map(function (x) { return '<div><i>' + esc(x[0]) + '</i>' + esc(x[1]) + '</div>'; }).join('') + '</div>' +
+          (e.v.status === 'publicado' ? '<div class="agc-acoes"><a href="/r/' + encodeURIComponent(e.v.id) + '" target="_blank" rel="noopener">Abrir relatório ›</a></div>' : '<div class="agc-acoes"><span class="badge">em aberto</span></div>') + '</div>';
+      }
       var acoes = e.lemb
         ? (e.feito ? '<button data-a="agdesfeito" data-v="' + e.i + '">Desfazer feito</button>' : '<button data-a="agfeito" data-v="' + e.i + '">✓ Feito</button>') +
           '<button data-a="agedit" data-v="' + e.i + '">Editar</button><button data-a="agdel" data-v="' + e.i + '">Excluir</button>'
@@ -2082,7 +2111,7 @@ ${MAPA_CHUVA_JS}
         '<span>' + [e.hora ? '🕘 ' + esc(e.hora) : '', e.sub ? esc(e.sub) : ''].filter(Boolean).join(' · ') +
         (e.lemb && l.responsavel && AG.resp !== '*' ? '<br>👤 ' + esc(l.responsavel) : '') + '</span>' + (acoes ? '<div class="agc-acoes">' + acoes + '</div>' : '') + '</div>';
     }
-    var prox = agEventos(agFiltro({ apl: false, colh: false, lemb: true })).filter(function (e) { return !e.feito && e.d >= hoje(); }).slice(0, 8);
+    var prox = agEventos(agFiltro({ apl: false, colh: false, feitas: false, lemb: true })).filter(function (e) { return !e.feito && e.d >= hoje(); }).slice(0, 8);
     var dn = AG_DSEM[new Date(AG.sel + 'T12:00:00Z').getUTCDay()];
     tA.innerHTML = '<div class="agc-barra">' +
       '<label class="agc-f">Fazenda<select data-c="agfaz"><option value="*">Todas</option>' +
@@ -2091,14 +2120,16 @@ ${MAPA_CHUVA_JS}
         resps.map(function (n) { return '<option' + (n === AG.resp ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>' +
       '<div class="agc-seg"><button class="' + (AG.modo === 'mes' ? 'on' : '') + '" data-a="agmodo" data-v="mes">Mês</button><button class="' + (AG.modo === 'sem' ? 'on' : '') + '" data-a="agmodo" data-v="sem">Semana</button></div>' +
       '<div class="agc-ver" role="group" aria-label="O que ver no calendário"><span>Ver:</span>' +
-        '<button class="c-vis' + (AG.ver.lemb ? ' on' : '') + '" data-a="agver" data-v="lemb" aria-pressed="' + AG.ver.lemb + '">' + AI_VIS + 'Visitas e lembretes</button>' +
+        '<button class="c-vis' + (AG.ver.lemb ? ' on' : '') + '" data-a="agver" data-v="lemb" aria-pressed="' + AG.ver.lemb + '">' + AI_VIS + 'Programadas e lembretes</button>' +
+        '<button class="c-visf' + (AG.ver.feitas ? ' on' : '') + '" data-a="agver" data-v="feitas" aria-pressed="' + AG.ver.feitas + '">' + AI_VIS + 'Visitas realizadas</button>' +
         (ST.mod.recomendacoes ? '<button class="c-prev' + (AG.ver.apl ? ' on' : '') + '" data-a="agver" data-v="apl" aria-pressed="' + AG.ver.apl + '">' + AI_PULV + 'Aplicações</button>' : '') +
         (ST.mod.plantio ? '<button class="c-colh' + (AG.ver.colh ? ' on' : '') + '" data-a="agver" data-v="colh" aria-pressed="' + AG.ver.colh + '">' + AI_COLH + 'Colheita</button>' : '') + '</div>' +
       '<span class="agc-esp"></span><button class="agc-bt" data-a="agpdf">📄 Exportar PDF</button><button class="agc-bt v" data-a="agnovo" data-v="">＋ Programar</button></div>' +
       '<div class="agc"><div>' +
         '<div class="agc-mes"><button data-a="agnav" data-v="-1" aria-label="Anterior">‹</button><b>' + titulo + '</b><button data-a="agnav" data-v="1" aria-label="Próximo">›</button><button class="agc-hoje" data-a="aghoje">Hoje</button></div>' +
         '<div class="agc-grade">' + g + '</div>' +
-        '<div class="agc-leg">' + (AG.ver.lemb ? '<span class="c-vis">' + AI_VIS + 'visita</span><span class="c-lem">' + AI_LEM + 'lembrete</span>' : '') +
+        '<div class="agc-leg">' + (AG.ver.lemb ? '<span class="c-vis">' + AI_VIS + 'visita programada</span><span class="c-lem">' + AI_LEM + 'lembrete</span>' : '') +
+          (AG.ver.feitas ? '<span class="c-visf">' + AI_VIS + 'visita realizada</span>' : '') +
           (ST.mod.recomendacoes && AG.ver.apl ? '<span class="c-prev">' + AI_PULV + 'prevista</span><span class="c-apl">' + AI_PULV + 'aplicada</span><span class="c-perto">' + AI_PULV + 'próxima (perto)</span><span class="c-venc">' + AI_PULV + 'vencida</span><span class="c-ok">' + AI_PULV + 'próxima</span>' : '') +
           (ST.mod.plantio && AG.ver.colh ? '<span class="c-colh">' + AI_COLH + 'colheita prevista</span>' : '') +
           '<span>passe o mouse num dia e clique em ＋ para programar ali</span></div>' +
@@ -2195,7 +2226,8 @@ ${MAPA_CHUVA_JS}
       '<div class="agc-tipo"><button data-p="sem" class="on">Semana</button><button data-p="per">Escolher datas</button></div>' +
       '<div class="agc-semnav" id="pjSem"><button data-w="-1">‹</button><b id="pjSemTxt"></b><button data-w="1">›</button></div>' +
       '<div class="linha2" id="pjPer" style="display:none"><div class="campo"><label>De</label><input type="date" id="pjDe"></div><div class="campo"><label>Até</label><input type="date" id="pjAte"></div></div>' +
-      '<label class="agc-ck" style="margin:6px 0 6px"><input type="checkbox" id="pjLemb"' + (AG.ver.lemb ? ' checked' : '') + '> Visitas e lembretes</label>' +
+      '<label class="agc-ck" style="margin:6px 0 6px"><input type="checkbox" id="pjLemb"' + (AG.ver.lemb ? ' checked' : '') + '> Visitas programadas e lembretes</label>' +
+      '<label class="agc-ck" style="margin:0 0 6px"><input type="checkbox" id="pjFeitas"' + (AG.ver.feitas ? ' checked' : '') + '> Visitas realizadas (resumo)</label>' +
       (ST.mod.recomendacoes ? '<label class="agc-ck" style="margin:0 0 6px"><input type="checkbox" id="pjApl"' + (AG.ver.apl ? ' checked' : '') + '> Aplicações das fazendas</label>' : '') +
       (ST.mod.plantio ? '<label class="agc-ck" style="margin:0 0 10px"><input type="checkbox" id="pjColh"' + (AG.ver.colh ? ' checked' : '') + '> Colheita prevista</label>' : '') +
       '<div class="ag-dica" id="pjConta"></div>' +
@@ -2205,7 +2237,7 @@ ${MAPA_CHUVA_JS}
     if (AG.resp === '*') $('#pjResp', ov).value = '*';
     function escolha() {
       var de = modo === 'sem' ? seg : $('#pjDe', ov).value, ate = modo === 'sem' ? addDias(seg, 6) : $('#pjAte', ov).value, ap = $('#pjApl', ov), co = $('#pjColh', ov);
-      return { de: de, ate: ate, resp: $('#pjResp', ov).value, faz: $('#pjFaz', ov).value, lemb: $('#pjLemb', ov).checked, apl: !!(ap && ap.checked), colh: !!(co && co.checked) };
+      return { de: de, ate: ate, resp: $('#pjResp', ov).value, faz: $('#pjFaz', ov).value, lemb: $('#pjLemb', ov).checked, feitas: $('#pjFeitas', ov).checked, apl: !!(ap && ap.checked), colh: !!(co && co.checked) };
     }
     function atualizar() {
       ov.querySelectorAll('[data-p]').forEach(function (b) { b.classList.toggle('on', b.dataset.p === modo); });
@@ -2214,15 +2246,15 @@ ${MAPA_CHUVA_JS}
       var o = escolha(), c = $('#pjConta', ov);
       if (!o.de || !o.ate || o.ate < o.de) { c.textContent = 'Escolha o período (a data final depois da inicial).'; return; }
       if (difDias(o.ate, o.de) > 92) { c.textContent = 'Período muito longo: escolha até 3 meses.'; return; }
-      var at = agEventos(o), v = 0, l = 0, a = 0, h = 0;
-      at.forEach(function (e) { if (e.k === 'colh') h++; else if (!e.lemb) a++; else if (e.cor === 'vis') v++; else l++; });
+      var at = agEventos(o), v = 0, l = 0, a = 0, h = 0, fe = 0;
+      at.forEach(function (e) { if (e.k === 'colh') h++; else if (e.k === 'rel') fe++; else if (!e.lemb) a++; else if (e.cor === 'vis') v++; else l++; });
       c.textContent = at.length ? '📋 ' + at.length + (at.length === 1 ? ' atividade' : ' atividades') + ' no período: ' +
-        [v ? v + (v === 1 ? ' visita' : ' visitas') : '', l ? l + (l === 1 ? ' lembrete' : ' lembretes') : '', a ? a + (a === 1 ? ' aplicação' : ' aplicações') : '', h ? h + (h === 1 ? ' colheita' : ' colheitas') : ''].filter(Boolean).join(', ') + '.'
+        [v ? v + (v === 1 ? ' visita programada' : ' visitas programadas') : '', fe ? fe + (fe === 1 ? ' visita realizada' : ' visitas realizadas') : '', l ? l + (l === 1 ? ' lembrete' : ' lembretes') : '', a ? a + (a === 1 ? ' aplicação' : ' aplicações') : '', h ? h + (h === 1 ? ' colheita' : ' colheitas') : ''].filter(Boolean).join(', ') + '.'
         : 'Nada programado neste período. O PDF sai com o calendário vazio.';
     }
     ov.querySelectorAll('[data-p]').forEach(function (b) { b.onclick = function () { modo = b.dataset.p; if (modo === 'per') { $('#pjDe', ov).value = seg; $('#pjAte', ov).value = addDias(seg, 6); } atualizar(); }; });
     ov.querySelectorAll('[data-w]').forEach(function (b) { b.onclick = function () { seg = addDias(seg, 7 * Number(b.dataset.w)); atualizar(); }; });
-    ['#pjResp', '#pjFaz', '#pjLemb', '#pjApl', '#pjColh', '#pjDe', '#pjAte'].forEach(function (s) { var n = $(s, ov); if (n) n.addEventListener('change', atualizar); });
+    ['#pjResp', '#pjFaz', '#pjLemb', '#pjFeitas', '#pjApl', '#pjColh', '#pjDe', '#pjAte'].forEach(function (s) { var n = $(s, ov); if (n) n.addEventListener('change', atualizar); });
     atualizar();
     ov.onclick = function (ev) {
       var m = ev.target.dataset && ev.target.dataset.m;
@@ -2232,7 +2264,7 @@ ${MAPA_CHUVA_JS}
       if (!o.de || !o.ate || o.ate < o.de) { toast('Escolha o período'); return; }
       if (difDias(o.ate, o.de) > 92) { toast('Escolha um período de até 3 meses'); return; }
       var fz = o.faz !== '*' ? fazDe(o.faz) : null;
-      var bytes = PlanoPDF.plano({ de: o.de, ate: o.ate, resp: o.resp, fazNome: fz ? fz.nome : '', apl: o.apl, colh: o.colh, ativ: agEventos(o), logo: AG.logo, empresa: AG.emp.empresa, cidade: AG.emp.cidade });
+      var bytes = PlanoPDF.plano({ de: o.de, ate: o.ate, resp: o.resp, fazNome: fz ? fz.nome : '', apl: o.apl, colh: o.colh, feitas: o.feitas, ativ: agEventos(o), logo: AG.logo, empresa: AG.emp.empresa, cidade: AG.emp.cidade });
       ov.remove();
       PlanoPDF.entregar(bytes, PlanoPDF.nomeArq('planejamento-' + (o.resp === '*' ? 'todos' : o.resp) + '-' + o.de), 'Planejamento das Atividades', toast);
     };
@@ -2241,7 +2273,7 @@ ${MAPA_CHUVA_JS}
     var e = AG.ev[Number(v)];
     if (a === 'agsel' || a === 'agir') { AG.sel = v; if (a === 'agir') { var d0 = new Date(v + 'T12:00:00'); AG.cy = d0.getFullYear(); AG.cm = d0.getMonth(); } agPintar(); return; }
     if (a === 'agnovo') { agModal(null, v || AG.sel); return; }
-    if (a === 'agev') { if (!e) return; AG.sel = e.d; agPintar(); if (e.lemb) agModal(e.l); else agAbrirRec(e.r); return; }
+    if (a === 'agev') { if (!e) return; AG.sel = e.d; agPintar(); if (e.k === 'lemb') agModal(e.l); else if (e.r) agAbrirRec(e.r); return; }
     if (a === 'agedit' && e) { agModal(e.l); return; }
     if (a === 'agdel' && e) { agApagar(e.l); return; }
     if ((a === 'agfeito' || a === 'agdesfeito') && e) { agSalvar(Object.assign(cp(e.l), { feito: a === 'agfeito' ? 1 : 0 })); return; }
@@ -2269,7 +2301,7 @@ ${MAPA_CHUVA_JS}
   // cartão "Agenda da semana" na Visão geral: resumo da semana; clicar leva à aba Calendário
   async function agDash() {
     var cx = document.getElementById('caixaAgenda'), aba = document.getElementById('abaAgenda');
-    if (!(ST.mod.plantio || ST.mod.recomendacoes) || !aba) { if (cx) cx.remove(); return; }
+    if (!aba) { if (cx) cx.remove(); return; }
     if (!cx) { cx = document.createElement('div'); cx.className = 'caixa agd'; cx.id = 'caixaAgenda'; $('#kpis').insertAdjacentElement('afterend', cx); }
     try { var r = await api('/api/agro/lembretes'); AG.lemb = (r && r.lembretes) || []; } catch (e) { /* mostra o que tiver */ }
     await agColheita();
@@ -2278,7 +2310,7 @@ ${MAPA_CHUVA_JS}
   function agDashPintar() {
     var cx = document.getElementById('caixaAgenda'); if (!cx) return;
     var ini = agSeg(hoje()), fim = addDias(ini, 6);
-    var ev = agEventos({ faz: '*', resp: '*', lemb: AG.ver.lemb, apl: AG.ver.apl, colh: AG.ver.colh, de: ini, ate: fim }), por = {};
+    var ev = agEventos({ faz: '*', resp: '*', lemb: AG.ver.lemb, feitas: AG.ver.feitas, apl: AG.ver.apl, colh: AG.ver.colh, de: ini, ate: fim }), por = {};
     ev.forEach(function (e) { (por[e.d] = por[e.d] || []).push(e); });
     var dias = '';
     for (var i = 0; i < 7; i++) {
@@ -2290,11 +2322,11 @@ ${MAPA_CHUVA_JS}
         (es.length ? '<em>' + es.length + '</em>' : '') + '</button>';
     }
     var nV = ev.filter(function (e) { return e.cor === 'vis'; }).length, nL = ev.filter(function (e) { return e.cor === 'lem'; }).length,
-      nA = ev.filter(function (e) { return !e.lemb && e.k !== 'colh'; }).length, nC = ev.filter(function (e) { return e.k === 'colh'; }).length;
-    var prox = agEventos({ faz: '*', resp: '*', lemb: true, apl: false, colh: false }).filter(function (e) { return !e.feito && e.d >= hoje(); }).slice(0, 4);
+      nA = ev.filter(function (e) { return !e.lemb && e.k !== 'colh'; }).length, nC = ev.filter(function (e) { return e.k === 'colh'; }).length, nF = ev.filter(function (e) { return e.k === 'rel'; }).length;
+    var prox = agEventos({ faz: '*', resp: '*', lemb: true, feitas: false, apl: false, colh: false }).filter(function (e) { return !e.feito && e.d >= hoje(); }).slice(0, 4);
     cx.innerHTML = '<div class="cab-caixa"><h2>📅 Agenda da semana <small>' + curta(ini) + ' a ' + curta(fim) + '</small></h2><button class="btn-mini" data-ag="abrir">Abrir calendário ›</button></div>' +
       '<div class="agd-sem">' + dias + '</div>' +
-      '<div class="agd-res"><span><b>' + nV + '</b> ' + (nV === 1 ? 'visita' : 'visitas') + '</span><span><b>' + nL + '</b> ' + (nL === 1 ? 'lembrete' : 'lembretes') + '</span>' +
+      '<div class="agd-res"><span><b>' + nV + '</b> ' + (nV === 1 ? 'visita programada' : 'visitas programadas') + '</span>' + (AG.ver.feitas ? '<span><b>' + nF + '</b> ' + (nF === 1 ? 'realizada' : 'realizadas') + '</span>' : '') + '<span><b>' + nL + '</b> ' + (nL === 1 ? 'lembrete' : 'lembretes') + '</span>' +
         (ST.mod.recomendacoes && AG.ver.apl ? '<span><b>' + nA + '</b> ' + (nA === 1 ? 'aplicação' : 'aplicações') + '</span>' : '') +
         (ST.mod.plantio && AG.ver.colh ? '<span><b>' + nC + '</b> ' + (nC === 1 ? 'colheita prevista' : 'colheitas previstas') + '</span>' : '') + '</div>' +
       (prox.length ? '<div class="agd-prox">' + prox.map(function (e) {
@@ -2310,9 +2342,14 @@ ${MAPA_CHUVA_JS}
     };
   }
 
+  async function agFeitas() {
+    try { var r = await api('/api/agro/visitas-feitas'); AG.feitas = (r && r.visitas) || []; } catch (e) { /* segue sem as visitas feitas */ }
+  }
   async function agColheita() {
-    if (!ST.mod.plantio) { AG.colh = []; return; }
-    try { var r = await api('/api/agro/colheita-prevista'); AG.colh = (r && r.colheita) || []; } catch (e) { /* segue sem colheita */ }
+    var pf = agFeitas();   // visitas realizadas: todas as contas
+    if (ST.mod.plantio) { try { var r = await api('/api/agro/colheita-prevista'); AG.colh = (r && r.colheita) || []; } catch (e) { /* segue sem colheita */ } }
+    else AG.colh = [];
+    await pf;
   }
   async function abrirAgenda() {
     if (!tA) return;
@@ -2344,7 +2381,8 @@ ${MAPA_CHUVA_JS}
     }
     zoomIniciar();
     await atualizarModulos();
-    if (ST.mod.plantio || ST.mod.recomendacoes) { avisoNovoAdm(); await baixar(); }
+    if (ST.mod.plantio || ST.mod.recomendacoes) avisoNovoAdm();
+    await baixar();   // cadastro (fazendas e responsáveis) vale para todas as contas
     agDash();
   };
 

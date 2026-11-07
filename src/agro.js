@@ -733,6 +733,17 @@ export async function rotasAgro(env, req, me, rota, url) {
     return json({ ok: true, colheita });
   }
 
+  /* ----- visitas feitas (relatórios da conta) para o calendário do painel ----- */
+  if (rota === '/api/agro/visitas-feitas' && req.method === 'GET') {
+    const { results } = await env.DB.prepare(`SELECT r.id, r.fazenda_id, r.fazenda, r.servico, r.responsavel, r.data_inicio, r.status, r.criado_em, r.observacoes,
+        SUM(CASE WHEN i.tipo = 'foto' THEN 1 ELSE 0 END) AS fotos, SUM(CASE WHEN i.tipo = 'video' THEN 1 ELSE 0 END) AS videos,
+        SUM(CASE WHEN i.tipo = 'audio' THEN 1 ELSE 0 END) AS audios, SUM(CASE WHEN i.tipo = 'texto' THEN 1 ELSE 0 END) AS notas,
+        GROUP_CONCAT(DISTINCT i.talhao) AS talhoes, MIN(i.capturado_em) AS ini
+      FROM relatorios r LEFT JOIN itens i ON i.relatorio_id = r.id
+      WHERE r.usuario_id = ? GROUP BY r.id ORDER BY r.data_inicio DESC LIMIT 1500`).bind(me.id).all();
+    return json({ ok: true, visitas: results || [] });
+  }
+
   /* ----- lembretes e visitas programadas (calendário) ----- */
   if (rota === '/api/agro/lembretes' && req.method === 'GET') {
     const { results } = await env.DB.prepare('SELECT * FROM lembretes_agro WHERE usuario_id = ? ORDER BY data, hora').bind(me.id).all();
