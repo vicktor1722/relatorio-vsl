@@ -206,6 +206,86 @@
     return c;
   }
 
+  /* ---------- cadastro sem internet: fica no aparelho (fila) e sobe sozinho quando a conexão voltar ---------- */
+  const semRede = (e) => /sem conex|não respondeu|failed to fetch|networkerror|load failed/i.test(String((e && e.message) || e));
+  const idLocal = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const LISTA = { produtor: 'produtores', fazenda: 'fazendas', safra: 'safras', responsavel: 'responsaveis' };
+  // a fila é de cada conta (outra conta entrando no aparelho não leva nem apaga o que é da primeira)
+  async function filaCad() { const f = (await DB.cfg('cadastro_fila')) || {}; return ((f.porDono || {})[(await meuId()) || '?'] || []).slice(); }
+  async function gravarFilaCad(itens) {
+    const f = (await DB.cfg('cadastro_fila')) || {}, k = (await meuId()) || '?';
+    f.porDono = f.porDono || {};
+    if (itens.length) f.porDono[k] = itens; else delete f.porDono[k];
+    await DB.cfg('cadastro_fila', f);
+  }
+  // o que ainda não subiu aparece por cima do cadastro guardado (com o selo "aguardando internet")
+  function aplicarFila(cad, fila) {
+    fila.forEach(function (x) {
+      const lista = cad[LISTA[x.tipo]]; if (!lista) return;
+      const id = x.op === 'apagar' ? x.id : x.dados.id, i = lista.findIndex(function (e) { return e.id === id; });
+      if (x.op === 'apagar') { if (i >= 0) lista.splice(i, 1); return; }
+      const reg = Object.assign({}, i >= 0 ? lista[i] : {}, x.dados, { pendente: true });
+      if (x.tipo === 'fazenda') {
+        const fs = (reg.talhoes && reg.talhoes.features) || [];
+        reg.n_talhoes = fs.length; reg.area_ha = fs.reduce(function (s, t) { return s + ((t.properties && t.properties.area_ha) || 0); }, 0);
+      }
+      if (i >= 0) lista[i] = reg; else lista.push(reg);
+    });
+    return cad;
+  }
+  let salvoSemRede = false;   // o último cadastro ficou no aparelho (sem internet)
+  async function guardarSemRede(tipo, dados) {
+    const fila = await filaCad();
+    dados = Object.assign({}, dados);
+    const novo = !dados.id;
+    if (novo) dados.id = idLocal(tipo === 'produtor' ? 'p' : 'f');
+    const j = fila.findIndex(function (x) { return x.op === 'salvar' && x.tipo === tipo && x.dados.id === dados.id; });
+    if (j >= 0) fila[j].dados = Object.assign({}, fila[j].dados, dados);   // feito sem internet e mudado de novo: junta
+    else fila.push({ op: 'salvar', tipo: tipo, dados: dados, novo: novo });
+    await gravarFilaCad(fila);
+    await DB.cfg('cadastro', aplicarFila(await cadastroLocal(), fila));
+    salvoSemRede = true; repetidoNoServidor = false;
+    emitir({ tipo: 'cadastro' });
+    return dados.id;
+  }
+  // troca o id do aparelho pelo do servidor (outro celular já tinha cadastrado o mesmo): fila e relatórios
+  async function trocarIdCadastro(tipo, de, para, fila) {
+    fila.forEach(function (x) {
+      if (x.op === 'salvar' && x.tipo === tipo && x.dados.id === de) x.dados.id = para;
+      if (x.op === 'apagar' && x.tipo === tipo && x.id === de) x.id = para;
+      if (tipo === 'produtor' && x.op === 'salvar' && x.tipo === 'fazenda' && x.dados.produtor_id === de) x.dados.produtor_id = para;
+    });
+    const campo = tipo === 'produtor' ? 'produtor_id' : 'fazenda_id';
+    for (const r of await DB.all('relatorios')) if (r[campo] === de) { r[campo] = para; await DB.put('relatorios', r); }
+  }
+  let emCad = false;
+  async function sincronizarCadastro() {
+    if (emCad || !navigator.onLine) return 0;
+    const fila = await filaCad();
+    if (!fila.length) return 0;
+    emCad = true;
+    let feitos = 0;
+    try {
+      while (fila.length) {
+        const x = fila[0];
+        try {
+          if (x.op === 'apagar') await comJson('/api/apagar', { tipo: x.tipo, id: x.id });
+          else {
+            const r = await comJson(x.tipo === 'produtor' ? '/api/produtor' : '/api/fazenda', Object.assign({}, x.dados, { novo: !!x.novo }));
+            if (r && r.id && r.id !== x.dados.id) await trocarIdCadastro(x.tipo, x.dados.id, r.id, fila);
+          }
+        } catch (e) {
+          if (semRede(e) || /sess|401/i.test(String(e.message))) break;   // sem internet ou sem login: tenta na próxima
+          console.log('cadastro recusado pelo servidor:', e.message);       // erro do próprio cadastro: não trava a fila
+        }
+        fila.shift(); feitos++;
+        await gravarFilaCad(fila);
+      }
+    } finally { emCad = false; }
+    if (feitos) { try { await baixarCadastro(); } catch (e) { /* fica o local */ } }
+    return feitos;
+  }
+
   async function baixarCadastro() {
     const r = await chamar('/api/cadastro');
     const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], safra_atual: r.safra_atual || '', responsaveis: r.responsaveis || [], max_responsaveis: r.max_responsaveis || 4, em: new Date().toISOString() };
@@ -214,6 +294,7 @@
         try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; }
       }
     });
+    aplicarFila(dados, await filaCad());   // o que foi feito sem internet e ainda não subiu continua aparecendo
     await DB.cfg('cadastro', dados);
     emitir({ tipo: 'cadastro' });
     return dados;
@@ -233,23 +314,40 @@
 
   let repetidoNoServidor = false;   // o último cadastro já existia na conta (outro aparelho tinha criado)
 
-  async function salvarProdutor(p) {
-    const r = await comJson('/api/produtor', p);
-    repetidoNoServidor = !!r.repetido;
-    await baixarCadastro();
-    return r.id;
+  // com internet vai direto para a nuvem; sem internet (ou se a conexão cair) fica no aparelho e sobe depois
+  async function salvarCadastro(tipo, dados) {
+    salvoSemRede = false;
+    const pend = dados.id && (await filaCad()).some(function (x) { return x.op === 'salvar' && x.tipo === tipo && x.dados.id === dados.id; });
+    if (navigator.onLine && !pend) {
+      try {
+        const r = await comJson(tipo === 'produtor' ? '/api/produtor' : '/api/fazenda', dados);
+        repetidoNoServidor = !!r.repetido;
+        await baixarCadastro();
+        return r.id;
+      } catch (e) { if (!semRede(e)) throw e; }
+    }
+    const id = await guardarSemRede(tipo, dados);
+    if (navigator.onLine) sincronizarCadastro().catch(function () {});   // ainda na fila: tenta subir já
+    return id;
   }
-
-  async function salvarFazenda(f) {
-    const r = await comJson('/api/fazenda', f);
-    repetidoNoServidor = !!r.repetido;
-    await baixarCadastro();
-    return r.id;
-  }
+  async function salvarProdutor(p) { return salvarCadastro('produtor', p); }
+  async function salvarFazenda(f) { return salvarCadastro('fazenda', f); }
 
   async function apagarCadastro(tipo, id) {
-    await comJson('/api/apagar', { tipo, id });
-    await baixarCadastro();
+    let fila = await filaCad();
+    // feito sem internet e ainda não subiu: só tira da fila
+    const local = fila.some(function (x) { return x.op === 'salvar' && x.tipo === tipo && x.dados.id === id && x.novo; });
+    if (!local && navigator.onLine) {
+      try { await comJson('/api/apagar', { tipo, id }); await baixarCadastro(); return; }
+      catch (e) { if (!semRede(e)) throw e; }
+    }
+    fila = fila.filter(function (x) { return !(x.op === 'salvar' && x.tipo === tipo && x.dados.id === id); });
+    if (!local) fila.push({ op: 'apagar', tipo: tipo, id: id });
+    await gravarFilaCad(fila);
+    const cad = await cadastroLocal(), l = cad[LISTA[tipo]];
+    if (l) { const i = l.findIndex(function (e) { return e.id === id; }); if (i >= 0) l.splice(i, 1); }
+    await DB.cfg('cadastro', cad);
+    emitir({ tipo: 'cadastro' });
   }
 
   /* ---------------- relatórios ---------------- */
@@ -466,6 +564,7 @@
   async function sincronizar(relIdOpcional) {
     if (!(await logado())) { emitir({ tipo: 'sem-sessao' }); return { erro: 'sem-sessao' }; }
     if (!navigator.onLine) { emitir({ tipo: 'offline' }); return { erro: 'offline' }; }
+    await sincronizarCadastro().catch(function () {});   // produtor/fazenda feitos sem internet antes dos relatórios
     // pedido de um relatório específico (ex.: acabou de salvar uma foto) espera a rodada em andamento
     // terminar, em vez de ser descartado e só subir no próximo minuto
     while (rodando) {
@@ -606,6 +705,7 @@
     if (emRodada || !navigator.onLine) return;
     emRodada = true;
     try {
+      await sincronizarCadastro();    // produtor/fazenda feitos sem internet sobem antes dos relatórios que usam eles
       await publicarPendentes();      // o que está na fila de publicação vai primeiro
       await sincronizar();
       await liberarSincronizados();
@@ -626,6 +726,7 @@
   global.Sync = {
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
     cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
+    sincronizarCadastro, foiSemRede: function () { return salvoSemRede; }, cadastroPendente: async function () { return (await filaCad()).length; },
     salvarPerfil, baixarPerfil,
     meuId, fixarDono, limparIdentidadeLocal, limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
     status, autoSync, aoMudar: f => ouvintes.push(f),

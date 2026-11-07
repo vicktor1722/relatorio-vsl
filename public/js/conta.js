@@ -179,6 +179,7 @@
         '<div class="ic">🌾</div><div class="txt"><b>' + esc(x.nome) + '</b><span>' +
         (prod ? esc(prod.nome) + ' · ' : '') +
         (x.n_talhoes ? x.n_talhoes + ' talhões · ' + Math.round(x.area_ha || 0) + ' ha' : 'sem KML') +
+        (x.pendente ? ' · <em class="pend">⏳ aguardando internet</em>' : '') +
         '</span></div><span class="badge">editar</span></div>';
     }).join('') : '<div class="aviso">Nenhuma fazenda cadastrada.</div>';
 
@@ -186,7 +187,7 @@
       const n = f.filter(y => y.produtor_id === x.id).length;
       return '<div class="lista-item" data-produtor="' + esc(x.id) + '">' +
         '<div class="ic">👤</div><div class="txt"><b>' + esc(x.nome) + '</b><span>' +
-        (x.telefone ? esc(x.telefone) + ' · ' : '') + n + ' fazenda(s)</span></div>' +
+        (x.telefone ? esc(x.telefone) + ' · ' : '') + n + ' fazenda(s)' + (x.pendente ? ' · <em class="pend">⏳ aguardando internet</em>' : '') + '</span></div>' +
         '<span class="badge">editar</span></div>';
     }).join('') : '<div class="aviso">Nenhum produtor cadastrado.</div>';
 
@@ -303,6 +304,14 @@
     abrir('telaProdutor');
   }
 
+  // salvo sem internet: avisa uma vez por abertura do app (o selo ⏳ fica na lista até subir)
+  let avisouSemRede = false;
+  function avisoSemRede() {
+    if (!Sync.foiSemRede() || avisouSemRede) return;
+    avisouSemRede = true;
+    alert('Sem internet: ficou salvo neste celular e já pode ser usado nos relatórios. Vai para a nuvem sozinho quando a internet voltar.');
+  }
+
   async function salvarProdutor() {
     const nome = $('#pNome').value.trim();
     if (!nome) { alert('Informe o nome do produtor.'); return; }
@@ -321,6 +330,7 @@
         observacoes: $('#pObs').value.trim()
       });
       if (Sync.foiRepetido()) alert('Esse produtor já estava cadastrado em outro aparelho. Mantive o cadastro que já existe.');
+      avisoSemRede();
       await atualizarCadastro(false);
       fechar('telaProdutor');
     } catch (e) { alert('Não salvou: ' + e.message); }
@@ -417,6 +427,7 @@
       else if (fazendaEdicao && fazendaEdicao.talhoes) corpo.talhoes = fazendaEdicao.talhoes;
       await Sync.salvarFazenda(corpo);
       if (Sync.foiRepetido()) alert('Essa fazenda já estava cadastrada em outro aparelho. Mantive o cadastro que já existe.');
+      avisoSemRede();
       await atualizarCadastro(false);
       fechar('telaFazenda');
     } catch (e) { alert('Não salvou: ' + e.message); }
@@ -495,7 +506,11 @@
       location.reload();
     };
 
-    Sync.aoMudar(function (evt) { if (evt.tipo === 'sem-sessao') mostrarLogin(); });
+    Sync.aoMudar(function (evt) {
+      if (evt.tipo === 'sem-sessao') mostrarLogin();
+      // cadastro mudou (ex.: o que foi feito sem internet subiu): redesenha a lista e as escolhas
+      if (evt.tipo === 'cadastro') { Sync.cadastroLocal().then(function (c) { cadastro = c; renderCadastro(); preencherSelecoes(); }).catch(function () {}); }
+    });
   }
 
   global.Conta = {
