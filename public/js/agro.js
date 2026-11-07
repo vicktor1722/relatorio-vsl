@@ -1010,6 +1010,7 @@
     });
     return ev;
   }
+  function horaMenos2(h) { var p = String(h).split(':'), m = ((Number(p[0]) || 0) * 60 + (Number(p[1]) || 0) - 120 + 1440) % 1440; return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
   function txtLemb(l) {
     var f = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
     return l.tipo === 'visita' ? 'Visita' + (f ? ' à ' + f.nome : ' na fazenda') : (l.titulo || 'Lembrete');
@@ -1048,7 +1049,7 @@
       return '<div class="ag-alerta c-' + (vis ? 'vis' : 'lem') + (l.feito ? ' feito' : '') + '" data-a="editlemb" data-v="' + esc(l.id) + '"><div class="ag-ai c-' + (vis ? 'vis' : 'lem') + '">' + (vis ? ICO_VIS : ICO_LEM) + '</div>' +
         '<div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (l.feito ? ' <span class="badge">feito</span>' : '') +
         '<span>' + (l.hora ? '🕘 ' + esc(l.hora) + ' · ' : '') + (vis && l.titulo ? esc(l.titulo) : (!vis && fl ? esc(fl.nome) : (vis ? 'visita programada' : 'lembrete'))) + (l.obs ? ' · ' + esc(l.obs) : '') +
-          (l.responsavel ? '<br>👤 ' + esc(l.responsavel) : '') + '</span></div>' +
+          (l.responsavel ? '<br>👤 ' + esc(l.responsavel) : '') + (l.hora && !l.feito ? '<br>🔔 avisa de manhã e às ' + esc(horaMenos2(l.hora)) : '') + '</span></div>' +
         (!l.feito ? '<button class="ag-peq" data-a="feitolemb" data-v="' + esc(l.id) + '">✓ Feito</button>' : '') + '</div>';
     }
     if (e.k === 'colh') {
@@ -1119,7 +1120,7 @@
       '<div class="linha2"><div class="campo"><label>Dia</label><input type="date" id="lbData" value="' + esc(l.data) + '"></div>' +
       '<div class="campo"><label>Hora (opcional)</label><input type="time" id="lbHora" value="' + esc(l.hora || '') + '"></div></div>' +
       '<div class="campo"><label>Observação (opcional)</label><input id="lbObs" maxlength="500" value="' + esc(l.obs || '') + '"></div>' +
-      '<div class="ag-dica">🔔 No dia, o aviso chega no celular de manhã cedo (junto com o das aplicações) e aparece aqui no calendário.</div>' +
+      '<div class="ag-dica">🔔 O aviso chega no celular de manhã cedo, no dia (junto com o das aplicações). Com hora marcada, chega outro <b>2 horas antes</b>.</div>' +
       '<button class="btn" data-m="ok">Salvar</button>' +
       (novo ? '' : (l.feito ? '<button class="btn secundario" data-m="desfeito">Marcar como não feito</button>' : '') + '<button class="btn perigo" data-m="del">Excluir</button>') +
       '<button class="btn secundario" data-m="no">Cancelar</button></div>';
