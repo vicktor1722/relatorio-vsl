@@ -146,7 +146,8 @@
         ST.mod.recomendacoes ? chamar('/api/agro/produtos') : null,
         ST.mod.recomendacoes ? chamar('/api/agro/estoque').catch(function () { return null; }) : null,
         ST.mod.plantio ? chamar('/api/agro/colheita').catch(function () { return null; }) : null,
-        ST.mod.plantio ? chamar('/api/agro/ciclos').catch(function () { return null; }) : null
+        ST.mod.plantio ? chamar('/api/agro/ciclos').catch(function () { return null; }) : null,
+        chamar('/api/agro/lembretes').catch(function () { return null; })
       ]);
       if (ST.fila.length) return false;
       if (tudo[0]) ST.plantio = tudo[0].plantio || [];
@@ -155,7 +156,8 @@
       if (tudo[3]) { ST.estoque = tudo[3].estoque || []; ST.grupos = tudo[3].grupos || {}; }
       if (tudo[4]) ST.colheita = tudo[4].colheita || [];
       if (tudo[5]) { ST.ciclos = tudo[5].ciclos || []; if (tudo[5].regra) ST.regra = tudo[5].regra; IDX = null; }
-      gravar(); atualizarSino();
+      if (tudo[6]) ST.lembretes = tudo[6].lembretes || [];
+      gravar(); atualizarSino(); avisarLembretesHoje();
       if (tudo[5]) await baixarCat(tudo[5].versao_cat);
       return true;
     } catch (e) { return false; }
@@ -843,7 +845,8 @@
       acoes.insertBefore(b, acoes.firstChild);
     }
     b.style.display = ST.mod.recomendacoes ? '' : 'none';
-    var n = ST.mod.recomendacoes ? pertoDe('*').length : 0, i = b.querySelector('i');
+    var lh = (ST.lembretes || []).filter(function (x) { return x.data === hoje() && !x.feito; }).length;
+    var n = ST.mod.recomendacoes ? pertoDe('*').length + lh : 0, i = b.querySelector('i');
     i.textContent = n > 9 ? '9+' : String(n); i.style.display = n ? '' : 'none';
     b.title = n ? n + ' aplicação(ões) perto — calendário' : 'Calendário de aplicações';
   }
@@ -1000,15 +1003,25 @@
       });
     });
     Object.keys(gc).forEach(function (k) { gc[k].txt = 'Colheita prevista · ' + gc[k].mat; ev.push(gc[k]); });
+    // visitas e lembretes programados (os sem fazenda aparecem em qualquer fazenda)
+    (ST.lembretes || []).forEach(function (l) {
+      if (fid !== '*' && l.fazenda_id && l.fazenda_id !== fid) return;
+      ev.push({ d: l.data, k: 'lemb', l: l, txt: txtLemb(l) });
+    });
     return ev;
   }
+  function txtLemb(l) {
+    var f = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
+    return l.tipo === 'visita' ? 'Visita' + (f ? ' à ' + f.nome : ' na fazenda') : (l.titulo || 'Lembrete');
+  }
+  function cadFazDe(id) { return (cad().fazendas || []).filter(function (f) { return f.id === id; })[0] || null; }
   // prevista com a data já passada e ainda não aplicada = atrasada (vermelho), igual ao portal
-  function corEv(e) { return e.k === 'colh' ? 'colh' : e.k === 'prev' ? (e.d < hoje() ? 'venc' : 'prev') : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
+  function corEv(e) { return e.k === 'lemb' ? (e.l.tipo === 'visita' ? 'vis' : 'lem') : e.k === 'colh' ? 'colh' : e.k === 'prev' ? (e.d < hoje() ? 'venc' : 'prev') : e.k === 'apl' ? 'apl' : (e.sit.k === 'venc' || e.sit.k === 'hoje') ? 'venc' : e.sit.k === 'perto' ? 'perto' : 'ok'; }
   /* Aplicações perto (mesma regra do aviso no celular): previstas e próximas das sequências que vencem
      dentro do aviso da recomendação (padrão 3 dias) ou que atrasaram até 7 dias. */
   function pertoDe(fid) {
     return eventosDe(fid).filter(function (e) {
-      if (e.k === 'apl' || e.k === 'colh') return false;
+      if (e.k === 'apl' || e.k === 'colh' || e.k === 'lemb') return false;
       var a = dd(e.r).aviso == null ? 3 : Number(dd(e.r).aviso) || 0, n = difDias(e.d, hoje());
       return n <= a && n >= -7;
     }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
@@ -1016,15 +1029,27 @@
   function quandoTxt(iso) { var n = difDias(iso, hoje()); return n < 0 ? 'atrasada ' + (-n) + (n === -1 ? ' dia' : ' dias') : n === 0 ? 'hoje' : n === 1 ? 'amanhã' : 'em ' + n + ' dias'; }
   // ícones do calendário: pulverizador = aplicação, colheitadeira = colheita
   var ICO_PULV = '<svg class="ag-ico pulv" viewBox="0 0 64 30" aria-hidden="true"><g fill="#38B6E8"><path d="M3.5 16 l-1.6 4.2 h3.2z M9.5 16 l-1.6 4.2 h3.2z M15.5 16 l-1.6 4.2 h3.2z M21 16 l-1.6 4.2 h3.2z M43 16 l-1.6 4.2 h3.2z M48.5 16 l-1.6 4.2 h3.2z M54.5 16 l-1.6 4.2 h3.2z M60.5 16 l-1.6 4.2 h3.2z"/></g><g stroke="currentColor" stroke-linecap="round" fill="none"><path d="M1.5 11.2 H24 M40 11.2 H62.5" stroke-width="1.6"/><path d="M2 15 H24 M40 15 H62" stroke-width="1.8"/><path d="M2 15 L5 11.2 L8 15 L11 11.2 L14 15 L17 11.2 L20 15 L23 11.2 M41 11.2 L44 15 L47 11.2 L50 15 L53 11.2 L56 15 L59 11.2 L62 15" stroke-width="1"/></g><g fill="#1F2A22"><rect x="2.8" y="15" width="1.4" height="1.4"/><rect x="8.8" y="15" width="1.4" height="1.4"/><rect x="14.8" y="15" width="1.4" height="1.4"/><rect x="20.3" y="15" width="1.4" height="1.4"/><rect x="42.3" y="15" width="1.4" height="1.4"/><rect x="47.8" y="15" width="1.4" height="1.4"/><rect x="53.8" y="15" width="1.4" height="1.4"/><rect x="59.8" y="15" width="1.4" height="1.4"/></g><rect x="23.2" y="15.5" width="4.4" height="13" rx="1.6" fill="#222"/><rect x="36.4" y="15.5" width="4.4" height="13" rx="1.6" fill="#222"/><rect x="25" y="14" width="14" height="4.2" rx="1" fill="currentColor"/><path d="M24.5 6.2 Q24.5 3.4 27.3 3.4 H36.7 Q39.5 3.4 39.5 6.2 V15 H24.5 Z" fill="currentColor"/><rect x="26.6" y="6" width="10.8" height="5.6" rx="1" fill="#24312A"/><path d="M27.6 7 h3 l-1.8 3.6 h-1.2z" fill="#fff" opacity=".35"/><rect x="30.8" y="1.6" width="2.4" height="1.8" rx=".6" fill="#F5B400"/><rect x="22.4" y="7.2" width="1.6" height="2.6" rx=".5" fill="#1F2A22"/><rect x="40" y="7.2" width="1.6" height="2.6" rx=".5" fill="#1F2A22"/></svg>';
+  var ICO_VIS = '<svg class="ag-ico vis" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 15 V11.5 Q3 10 4.5 10 H17 L21 4.5 Q21.8 3.5 23 3.5 H30 Q31.5 3.5 32.2 4.8 L35.5 10 Q37.5 10.4 37.5 12.5 V17.5 Q37.5 19 36 19 H4.5 Q3 19 3 17.5 Z" fill="currentColor"/><path d="M22.4 5.6 H29.6 L32.4 10 H19.6 Z" fill="#E8F1FB"/><rect x="5" y="11.6" width="12" height="1.6" rx=".8" fill="#fff" opacity=".55"/><circle cx="10.5" cy="19.5" r="4.6" fill="#222"/><circle cx="10.5" cy="19.5" r="2" fill="#CFCFCF"/><circle cx="29.5" cy="19.5" r="4.6" fill="#222"/><circle cx="29.5" cy="19.5" r="2" fill="#CFCFCF"/><rect x="34.6" y="12.2" width="2.6" height="2" rx=".6" fill="#FFD54A"/></svg>';   // visita na fazenda (caminhonete)
+  var ICO_LEM = '<svg class="ag-ico lem" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4.2L4.3 16.4A1 1 0 0 0 5.2 18h13.6a1 1 0 0 0 .9-1.6L18 13.2V9a6 6 0 0 0-6-6z" fill="currentColor"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0z" fill="currentColor"/></svg>';   // lembrete (sino)
   var ICO_COLH = '<svg class="ag-ico colh" viewBox="0 0 72 40" aria-hidden="true"><g stroke="#B8962E" stroke-width="1.2" stroke-linecap="round"><path d="M60.5 38.5 v-1.8 M63.5 38.5 v-1.5 M66.5 38.5 v-1.9 M69.5 38.5 v-1.4"/></g><path d="M44 11.2 L66 9.6 L66 12.2 L44 13.6 Z" fill="#1E8E3E"/><path d="M65.3 9.2 h3.2 l1.6 5.4 h-2.4 Z" fill="#222"/><path d="M33 15 L30.5 8.5 H50 L47.5 15 Z" fill="#167030"/><path d="M30 14.5 H57 Q60.5 14.5 61 18 L61.5 28.5 H30 Z" fill="#1E8E3E"/><path d="M33 23.5 Q45 20.6 61 20 L61.1 21.6 Q45 22.2 33 24.9 Z" fill="#F2C400"/><rect x="42" y="27.5" width="12" height="4.5" rx="1" fill="#167030"/><path d="M19.5 9 H31 V10.8 H19.5 Z" fill="#1E8E3E"/><rect x="24.3" y="6.6" width="1.8" height="2.4" rx=".6" fill="#F5A623"/><path d="M21 10.8 H30 V21 H22.6 Z" fill="#A9D3DC" stroke="#1F2A22" stroke-width=".9" stroke-linejoin="round"/><path d="M26.3 10.8 V21" stroke="#1F2A22" stroke-width=".8"/><rect x="20.5" y="21" width="10" height="3" fill="#1E8E3E"/><path d="M30 21 L30 28.5 L18 33.5 L16 29 Z" fill="#17803A"/><g stroke="#4F7F22" stroke-width="1.3" stroke-linecap="round" fill="none"><path d="M3 38.5 V24 M3 33 L0.8 30.5 M3 29 L5.4 26.6 M3 26 L1.2 23.8"/><path d="M8.2 38.5 V22.5 M8.2 31.5 L10.6 29.2 M8.2 27.5 L6 25.2 M8.2 25 L10.2 22.8"/></g><g fill="#7DAF3A"><ellipse cx="0.9" cy="30" rx="1.6" ry="1"/><ellipse cx="5.7" cy="26.2" rx="1.6" ry="1"/><ellipse cx="1.1" cy="23.3" rx="1.5" ry="1"/><ellipse cx="10.8" cy="28.8" rx="1.6" ry="1"/><ellipse cx="5.8" cy="24.8" rx="1.5" ry="1"/><ellipse cx="10.4" cy="22.3" rx="1.5" ry="1"/></g><g fill="#C9A227"><ellipse cx="3" cy="23.3" rx="1" ry="1.5"/><ellipse cx="4.1" cy="30.6" rx=".7" ry="1.2"/><ellipse cx="1.9" cy="27.4" rx=".7" ry="1.2"/><ellipse cx="8.2" cy="21.7" rx="1" ry="1.5"/><ellipse cx="9.3" cy="26.6" rx=".7" ry="1.2"/><ellipse cx="7.1" cy="29.8" rx=".7" ry="1.2"/></g><path d="M6.5 35 L9.5 30.5 H22 L24 33.5 L22 37 H8.5 Z" fill="#1E8E3E"/><path d="M8 35.5 L10.6 32.3 H19 L18.2 33.3 H11.4 L9.4 35.5 Z" fill="#F2C400"/><g stroke="#222" stroke-linecap="round"><circle cx="14.5" cy="26" r="5.8" fill="none" stroke-width="1.5"/><path d="M14.5 20.2 V31.8 M9.5 23.1 L19.5 28.9 M9.5 28.9 L19.5 23.1" stroke-width="1"/><path d="M14.5 20.2 l-1.6 -0.6 M19.5 23.1 l0.2 -1.7 M19.5 28.9 l1.4 1 M14.5 31.8 l1.6 .6 M9.5 28.9 l-.2 1.7 M9.5 23.1 l-1.4 -1" stroke-width=".9"/></g><circle cx="14.5" cy="26" r="1.4" fill="#1E8E3E"/><path d="M28.6 24 V35 M30.4 24 V35 M28.6 27 H30.4 M28.6 30 H30.4 M28.6 33 H30.4" stroke="#2DB24F" stroke-width=".6"/><circle cx="37" cy="30.5" r="8.3" fill="#222"/><circle cx="37" cy="30.5" r="4.3" fill="#F2C400"/><circle cx="37" cy="30.5" r="1.2" fill="#B89200"/><circle cx="56" cy="32.6" r="6.2" fill="#222"/><circle cx="56" cy="32.6" r="3.2" fill="#F2C400"/><circle cx="56" cy="32.6" r="0.9" fill="#B89200"/></svg>';
   var PESO = { venc: 5, hoje: 5, perto: 4, prev: 3, ok: 2, apl: 1 };
   function icoDia(es) {
-    var ap = es.filter(function (e) { return e.k !== 'colh'; }), co = es.filter(function (e) { return e.k === 'colh'; }), h = '';
+    var ap = es.filter(function (e) { return e.k !== 'colh' && e.k !== 'lemb'; }), co = es.filter(function (e) { return e.k === 'colh'; }), h = '';
+    var lv = es.filter(function (e) { return e.k === 'lemb' && e.l.tipo === 'visita'; }), ll = es.filter(function (e) { return e.k === 'lemb' && e.l.tipo !== 'visita'; });
     if (ap.length) { var c = ap.map(corEv).sort(function (a, b) { return (PESO[b] || 0) - (PESO[a] || 0); })[0]; h += '<span class="c-' + c + '">' + ICO_PULV + '</span>'; }
     if (co.length) h += '<span class="c-colh">' + ICO_COLH + '</span>';
+    if (lv.length) h += '<span class="c-vis' + (lv.every(function (e) { return e.l.feito; }) ? ' feito' : '') + '">' + ICO_VIS + '</span>';
+    if (ll.length) h += '<span class="c-lem' + (ll.every(function (e) { return e.l.feito; }) ? ' feito' : '') + '">' + ICO_LEM + '</span>';
     return h;
   }
   function linhaEvento(e, todas) {
+    if (e.k === 'lemb') {
+      var l = e.l, vis = l.tipo === 'visita', fl = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
+      return '<div class="ag-alerta c-' + (vis ? 'vis' : 'lem') + (l.feito ? ' feito' : '') + '" data-a="editlemb" data-v="' + esc(l.id) + '"><div class="ag-ai c-' + (vis ? 'vis' : 'lem') + '">' + (vis ? ICO_VIS : ICO_LEM) + '</div>' +
+        '<div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (l.feito ? ' <span class="badge">feito</span>' : '') +
+        '<span>' + (l.hora ? '🕘 ' + esc(l.hora) + ' · ' : '') + (vis && l.titulo ? esc(l.titulo) : (!vis && fl ? esc(fl.nome) : (vis ? 'visita programada' : 'lembrete'))) + (l.obs ? ' · ' + esc(l.obs) : '') + '</span></div>' +
+        (!l.feito ? '<button class="ag-peq" data-a="feitolemb" data-v="' + esc(l.id) + '">✓ Feito</button>' : '') + '</div>';
+    }
     if (e.k === 'colh') {
       var fc = fazDe(e.faz), hac = haDe(fc, e.tal);
       return '<div class="ag-alerta c-colh"><div class="ag-ai c-colh">' + ICO_COLH + '</div><div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (e.est ? ' <span class="badge">estimado</span>' : '') +
@@ -1050,14 +1075,92 @@
       '<div class="ag-calhead"><button data-a="calmes" data-v="-1">‹</button><b>' + MESES[R.cm].charAt(0).toUpperCase() + MESES[R.cm].slice(1) + ' de ' + R.cy + '</b><button data-a="calmes" data-v="1">›</button></div>' +
       '<div class="ag-grade">' + g + '</div>' +
       '<div class="ag-leg"><span class="c-prev">' + ICO_PULV + 'prevista</span><span class="c-apl">' + ICO_PULV + 'aplicada</span><span class="c-perto">' + ICO_PULV + 'próxima (perto)</span>' +
-      '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span><span class="c-colh">' + ICO_COLH + 'colheita prevista</span></div>';
+      '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span><span class="c-colh">' + ICO_COLH + 'colheita prevista</span>' +
+      '<span class="c-vis">' + ICO_VIS + 'visita</span><span class="c-lem">' + ICO_LEM + 'lembrete</span></div>';
     var ds = ev.filter(function (e) { return e.d === R.sel; });
-    h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
+    h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>') +
+      '<button class="btn secundario ag-addlemb" data-a="novolemb">＋ Programar visita ou lembrete em ' + dataBR(R.sel).slice(0, 5) + '</button>';
+    var pl = (ST.lembretes || []).filter(function (l) { return !l.feito && l.data >= hoje() && (todas || !l.fazenda_id || l.fazenda_id === R.faz); })
+      .sort(function (a, b) { return (a.data + (a.hora || '')) < (b.data + (b.hora || '')) ? -1 : 1; }).slice(0, 6);
+    if (pl.length) h += '<h2>Próximas visitas e lembretes</h2>' + pl.map(function (l) {
+      return '<div class="ag-quando">' + dataBR(l.data).slice(0, 5) + ' · ' + quandoTxt(l.data).replace('atrasada', 'há') + '</div>' + linhaEvento({ d: l.data, k: 'lemb', l: l, txt: txtLemb(l) }, todas);
+    }).join('');
     var pt = pertoDe(R.faz);
     if (pt.length) h += '<h2>Próximas aplicações</h2>' + pt.map(function (e) {
       return '<div class="ag-quando">' + dataBR(e.d).slice(0, 5) + ' · ' + quandoTxt(e.d) + '</div>' + linhaEvento(e, todas);
     }).join('');
-    pintar(tR, todas ? 'Calendário de aplicações' : 'Calendário', todas ? 'Todas as fazendas' : (f ? f.nome : '—'), '', h);
+    pintar(tR, todas ? 'Calendário de aplicações' : 'Calendário', todas ? 'Todas as fazendas' : (f ? f.nome : '—'),
+      '<button class="ag-mais" data-a="novolemb" aria-label="Programar visita ou lembrete" title="Programar visita ou lembrete">＋</button>', h);
+  }
+
+  /* ----- visitas e lembretes programados ----- */
+  function salvarLemb(l) {
+    ST.lembretes = ST.lembretes || [];
+    var i = ST.lembretes.findIndex(function (x) { return x.id === l.id; });
+    if (i >= 0) ST.lembretes[i] = l; else ST.lembretes.push(l);
+    gravar(); enfileirar('/api/agro/lembrete', l); atualizarSino();
+  }
+  function modalLembrete(l) {
+    var novo = !l;
+    l = l || { id: novoId('lb'), tipo: 'visita', fazenda_id: R.faz !== '*' ? R.faz : '', titulo: '', data: R.sel || hoje(), hora: '', obs: '', feito: 0 };
+    var fzs = (cad().fazendas || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+    var ov = document.createElement('div'); ov.className = 'ag-ov';
+    ov.innerHTML = '<div class="ag-mod"><h3>' + (novo ? 'Programar' : 'Editar') + '</h3>' +
+      '<div class="ag-tipolemb"><button data-t="visita" class="' + (l.tipo === 'visita' ? 'on' : '') + '">' + ICO_VIS + 'Visita na fazenda</button>' +
+      '<button data-t="lembrete" class="' + (l.tipo !== 'visita' ? 'on' : '') + '">' + ICO_LEM + 'Lembrete</button></div>' +
+      '<div class="campo"><label id="lbFazLab">Fazenda</label><select id="lbFaz"><option value="">' + (l.tipo === 'visita' ? '— escolha a fazenda —' : '— nenhuma —') + '</option>' +
+        fzs.map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === l.fazenda_id ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label id="lbTitLab">' + (l.tipo === 'visita' ? 'Assunto da visita (opcional)' : 'O que lembrar') + '</label><input id="lbTit" maxlength="120" value="' + esc(l.titulo || '') + '" placeholder="' + (l.tipo === 'visita' ? 'Ex.: avaliar emergência do TH-05' : 'Ex.: ligar para o gerente') + '"></div>' +
+      '<div class="linha2"><div class="campo"><label>Dia</label><input type="date" id="lbData" value="' + esc(l.data) + '"></div>' +
+      '<div class="campo"><label>Hora (opcional)</label><input type="time" id="lbHora" value="' + esc(l.hora || '') + '"></div></div>' +
+      '<div class="campo"><label>Observação (opcional)</label><input id="lbObs" maxlength="500" value="' + esc(l.obs || '') + '"></div>' +
+      '<div class="ag-dica">🔔 No dia, o aviso chega no celular de manhã cedo (junto com o das aplicações) e aparece aqui no calendário.</div>' +
+      '<button class="btn" data-m="ok">Salvar</button>' +
+      (novo ? '' : (l.feito ? '<button class="btn secundario" data-m="desfeito">Marcar como não feito</button>' : '') + '<button class="btn perigo" data-m="del">Excluir</button>') +
+      '<button class="btn secundario" data-m="no">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    var tipo = l.tipo;
+    ov.querySelectorAll('[data-t]').forEach(function (b) {
+      b.onclick = function () {
+        tipo = b.dataset.t;
+        ov.querySelectorAll('[data-t]').forEach(function (x) { x.classList.toggle('on', x === b); });
+        $('#lbFaz', ov).options[0].textContent = tipo === 'visita' ? '— escolha a fazenda —' : '— nenhuma —';
+        $('#lbTitLab', ov).textContent = tipo === 'visita' ? 'Assunto da visita (opcional)' : 'O que lembrar';
+        $('#lbTit', ov).placeholder = tipo === 'visita' ? 'Ex.: avaliar emergência do TH-05' : 'Ex.: ligar para o gerente';
+      };
+    });
+    ov.onclick = function (ev) {
+      var m = ev.target.dataset && ev.target.dataset.m;
+      if (m === 'no' || ev.target === ov) { ov.remove(); return; }
+      if (m === 'del') {
+        if (!confirm('Excluir esta ' + (l.tipo === 'visita' ? 'visita' : 'lembrete') + '?')) return;
+        ST.lembretes = (ST.lembretes || []).filter(function (x) { return x.id !== l.id; }); gravar(); enfileirar('/api/agro/lembrete/apagar', { id: l.id });
+        ov.remove(); atualizarSino(); pintarRecs(); return;
+      }
+      if (m === 'desfeito') { salvarLemb(Object.assign({}, l, { feito: 0 })); ov.remove(); pintarRecs(); return; }
+      if (m !== 'ok') return;
+      var fz = $('#lbFaz', ov).value, tit = $('#lbTit', ov).value.trim(), dt = $('#lbData', ov).value;
+      if (tipo === 'visita' && !fz) { toast('Escolha a fazenda da visita'); return; }
+      if (tipo !== 'visita' && !tit) { toast('Escreva o que lembrar'); return; }
+      if (!dt) { toast('Escolha o dia'); return; }
+      var nl = Object.assign({}, l, { tipo: tipo, fazenda_id: fz, titulo: tit, data: dt, hora: $('#lbHora', ov).value || '', obs: $('#lbObs', ov).value.trim() });
+      salvarLemb(nl); ov.remove();
+      R.sel = dt; var dd0 = new Date(dt + 'T12:00:00'); R.cy = dd0.getFullYear(); R.cm = dd0.getMonth();
+      pintarRecs();
+      toast(novo ? (tipo === 'visita' ? 'Visita programada' : 'Lembrete salvo') + ' para ' + dataBR(dt).slice(0, 5) : 'Atualizado');
+    };
+  }
+  // no dia: mostra uma vez (ao abrir o app) as visitas e lembretes de hoje
+  function avisarLembretesHoje() {
+    var hj = hoje(), vistos = {};
+    try { vistos = JSON.parse(localStorage.getItem('vsl-lemb-avisado') || '{}'); } catch (e) { vistos = {}; }
+    var l = (ST.lembretes || []).filter(function (x) { return x.data === hj && !x.feito && !vistos[x.id + '|' + hj]; });
+    if (!l.length) return;
+    l.forEach(function (x) { vistos[x.id + '|' + hj] = 1; });
+    Object.keys(vistos).forEach(function (k) { if (k.split('|')[1] < hj) delete vistos[k]; });
+    try { localStorage.setItem('vsl-lemb-avisado', JSON.stringify(vistos)); } catch (e) {}
+    var m = '📅 Hoje: ' + l.map(function (x) { return (x.hora ? x.hora + ' ' : '') + txtLemb(x); }).join(' · ') + ' — toque para ver';
+    if (global.App && App.toast) App.toast(m, 7000, abrirCalendarioGeral); else toast(m);
   }
 
   /* ----- compartilhar a ordem de campo (WhatsApp / PDF) ----- */
@@ -1728,6 +1831,9 @@
     if (a === 'push') { ativarAvisos(); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
+    if (a === 'novolemb') { modalLembrete(null); return; }
+    if (a === 'editlemb') { var le = (ST.lembretes || []).filter(function (x) { return x.id === v; })[0]; if (le) modalLembrete(le); return; }
+    if (a === 'feitolemb') { var lf = (ST.lembretes || []).filter(function (x) { return x.id === v; })[0]; if (lf) { salvarLemb(Object.assign({}, lf, { feito: 1 })); pintarRecs(); toast('Marcado como feito'); } return; }
     if (a === 'calmes') { R.cm += Number(v); if (R.cm < 0) { R.cm = 11; R.cy--; } if (R.cm > 11) { R.cm = 0; R.cy++; } pintarCalendario(); return; }
     if (a === 'filtro') { R.filtro = v; pintarRecs(); return; }
     if (a === 'nova') { R.W = novoW(R.faz); R.view = 'wiz'; pintarRecs(); topoRolagem(tR); return; }
@@ -1951,7 +2057,13 @@
       try { history.replaceState(null, '', location.pathname); } catch (e) {}
       setTimeout(abrirPeloAviso, 1800);
     }
-    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'recs') abrirPeloAviso(); });
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'recs') abrirPeloAviso(); if (ev.data && ev.data.abrir === 'cal') abrirCalPeloAviso(); });
+    // tocou no aviso das visitas/lembretes do dia: abre o calendário em hoje
+    var abrirCalPeloAviso = function () { if (ST.mod.recomendacoes) abrirCalendarioGeral(); };
+    if (/[?&]abrir=cal/.test(location.search)) {
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      setTimeout(abrirCalPeloAviso, 1800);
+    }
     prepararLogoPdf();
     setTimeout(verificarVersao, 4000);
   }
