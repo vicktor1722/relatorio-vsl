@@ -624,3 +624,12 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-tipolemb button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 6px;border:1.5px solid #D5DED8;border-radius:12px;background:#fff;font-size:14px;color:#1F2A22}
 .ag-tipolemb button.on{border-color:#1E7B45;background:#EEF6F0;font-weight:600}
 .ag-tipolemb .ag-ico{width:24px;height:20px}
+
+/* exportar planejamento em PDF */
+.topo .acoes button.ag-pdfbt{height:36px;padding:0 12px;border-radius:18px;background:rgba(255,255,255,.18);color:#fff;font-size:14px;font-weight:600;align-self:center;margin-right:4px}
+.ag-semnav{display:flex;align-items:center;justify-content:space-between;border:1px solid #D5DED8;border-radius:12px;padding:4px;margin:0 0 10px;background:#fff}
+.ag-semnav b{font-size:15px}
+.ag-semnav button{width:38px;height:38px;border-radius:10px;font-size:22px;background:#F3F7F4}
+.ag-chk{display:flex;align-items:center;gap:8px;font-size:14.5px;margin:6px 0 10px}
+.ag-chk input{width:20px;height:20px;accent-color:#1E7B45}
+.ag-lab{display:block;font-size:13px;color:#5F6F66;margin:2px 0 4px}
