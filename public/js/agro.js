@@ -1216,9 +1216,18 @@
     Sync.conf().then(async function (c) {
       var src = (c && c.logo) || '';
       EMP_PDF = { empresa: (c && c.empresa) || '', cidade: (c && c.cidade) || '' };
-      if (!src && navigator.onLine) {
-        try { var pf = await Sync.baixarPerfil(); src = (pf && pf.logo) || ''; } catch (e) { /* sem rede: fica sem logo */ }
+      // falta logo ou nome da empresa neste aparelho: busca no perfil da conta (o mesmo do relatório) e guarda aqui
+      if ((!src || !EMP_PDF.empresa) && navigator.onLine) {
+        try {
+          var pf = await Sync.baixarPerfil();
+          if (pf) {
+            src = src || pf.logo || '';
+            EMP_PDF = { empresa: EMP_PDF.empresa || pf.empresa || '', cidade: EMP_PDF.cidade || pf.cidade || '' };
+            if ((pf.empresa && !c.empresa) || (pf.cidade && !c.cidade)) Sync.salvarConf({ empresa: EMP_PDF.empresa, cidade: EMP_PDF.cidade }).catch(function () {});
+          }
+        } catch (e) { /* sem rede: fica com o que tem */ }
       }
+      var av = document.getElementById('ppEmp'); if (av) av.style.display = EMP_PDF.empresa ? 'none' : '';
       if (!src) return;
       if (LOGO_PDF && LOGO_PDF.src === src) return;
       var im = new Image();
@@ -1486,7 +1495,7 @@
       op('q ' + lw.toFixed(2) + ' 0 0 ' + lh.toFixed(2) + ' ' + M + ' ' + (topo - 27 - lh / 2).toFixed(2) + ' cm /Im1 Do Q');
       tx = M + lw + 12;
     }
-    var emp = EMP_PDF.empresa || 'AMVS Relatório de Campo';
+    var emp = EMP_PDF.empresa || (logo ? '' : 'AMVS Relatório de Campo');
     var el = quebra(emp, W - M - tx - 80, 11.5, true, 2), ey = topo - (el.length > 1 ? 16 : 22);
     el.forEach(function (l) { txt(tx, ey, 11.5, true, l, [0.12, 0.16, 0.13]); ey -= 14; });
     if (EMP_PDF.cidade) txt(tx, ey - 1, 8.5, false, EMP_PDF.cidade, CINZA);
@@ -1621,6 +1630,7 @@
         '<div class="campo"><label>Até</label><input type="date" id="ppAte" value="' + addDias(seg, 6) + '"></div></div>' +
       '<label class="ag-chk"><input type="checkbox" id="ppApl"' + (pref.apl ? ' checked' : '') + '> Incluir as aplicações das fazendas</label>' +
       '<div class="ag-dica" id="ppConta"></div>' +
+      '<div class="ag-dica" id="ppEmp" style="' + (EMP_PDF.empresa ? 'display:none' : '') + '">🏢 Para sair o nome da sua empresa no cabeçalho, preencha <b>Empresa</b> em Ajustes.</div>' +
       '<button class="btn" data-m="ok">📄 Gerar PDF</button><button class="btn secundario" data-m="no">Cancelar</button></div>';
     document.body.appendChild(ov);
     if (rIni === '*') $('#ppResp', ov).value = '*';
