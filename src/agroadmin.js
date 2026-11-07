@@ -10,6 +10,7 @@ import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
 export const AGRO_ABAS =
   '<button data-aba="plantio" id="abaPlantio" style="display:none">Plantio</button>' +
   '<button data-aba="recs" id="abaRecs" style="display:none">Recomendações</button>' +
+  '<button data-aba="agenda" id="abaAgenda" style="display:none">📅 Calendário</button>' +
   '<button data-aba="custo" id="abaCusto" style="display:none">Custo × produção</button>' +
   '<button data-aba="acessos" id="abaAcessos" style="display:none">Acessos fazenda</button>' +
   '<button data-aba="modulos" id="abaModulos" style="display:none">Módulos</button>';
@@ -17,6 +18,7 @@ export const AGRO_ABAS =
 export const AGRO_PAINEIS = `
     <section class="painel" id="pPlantio"><div id="agPlantio" class="ag-tela"></div></section>
     <section class="painel" id="pRecs"><div id="agRecs" class="ag-tela"></div></section>
+    <section class="painel" id="pAgenda"><div id="agAgenda"><div class="aviso">Carregando…</div></div><script src="/planopdf.js" defer></script></section>
     <section class="painel" id="pCusto"><div id="agCusto"><div class="aviso">Carregando…</div></div></section>
     <section class="painel" id="pAcessos"><div id="agAcessos"><div class="aviso">Carregando…</div></div></section>
     <section class="painel" id="pModulos">
@@ -25,6 +27,51 @@ export const AGRO_PAINEIS = `
 `;
 
 export const AGRO_CSS = `
+
+/* ---------- Calendário (agenda) ---------- */
+.agc-barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.agc-f{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:2px 4px 2px 10px;font-size:12.5px;color:var(--fraco)}
+.agc-f select{border:0;background:transparent;font-size:14px;padding:7px 4px;max-width:200px;color:var(--texto)}
+.agc-seg{display:inline-flex;border:1px solid var(--linha);border-radius:10px;overflow:hidden;background:#fff}
+.agc-seg button{border:0;background:#fff;padding:8px 13px;font-size:13.5px;cursor:pointer}.agc-seg button.on{background:var(--verde-claro);font-weight:700;color:var(--verde-escuro)}
+.agc-ck{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}.agc-ck input{width:18px;height:18px;accent-color:var(--verde)}
+.agc-esp{flex:1}
+.agc-bt{border:1px solid var(--linha);background:#fff;border-radius:10px;padding:8px 14px;font-size:13.5px;font-weight:700;cursor:pointer}
+.agc-bt.v{background:var(--verde);border-color:var(--verde);color:#fff}
+.agc{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.agc-mes{display:flex;align-items:center;gap:10px;margin:2px 0 8px}.agc-mes b{font-size:18px}
+.agc-mes button{width:32px;height:32px;border-radius:50%;border:1px solid var(--linha);background:#fff;font-size:18px;cursor:pointer}
+.agc-mes .agc-hoje{width:auto;border-radius:16px;padding:0 12px;font-size:13px}
+.agc-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#fff;border:1px solid var(--linha);border-radius:12px;overflow:hidden}
+.agc-dow{font-size:11.5px;font-weight:700;color:var(--fraco);text-transform:uppercase;padding:6px 8px;background:#F7FAF8;border-bottom:1px solid var(--linha)}
+.agc-dia{min-height:96px;border-right:1px solid #EDF1EE;border-bottom:1px solid #EDF1EE;padding:4px 5px 6px;cursor:pointer;min-width:0}
+.agc-dia:nth-child(7n){border-right:0}.agc-dia.alto{min-height:320px}
+.agc-dia.fora{background:#FAFBFA;color:#B5BEB8}.agc-dia.sel{box-shadow:inset 0 0 0 2px var(--verde);background:#F4FAF6}
+.agc-n{display:flex;align-items:center;justify-content:space-between;gap:4px;height:22px}.agc-n b{font-size:13px;padding:1px 6px;white-space:nowrap;overflow:hidden}.agc-n small{font-weight:400;color:var(--fraco)}
+.agc-dia.hoje .agc-n b{background:var(--verde);color:#fff;border-radius:11px}
+.agc-add{border:0;background:transparent;color:#8A9A90;font-size:15px;cursor:pointer;opacity:0;padding:0 4px}.agc-dia:hover .agc-add,.agc-dia.sel .agc-add{opacity:1}
+.agc-ev{display:flex;gap:4px;align-items:center;width:100%;border:0;border-radius:6px;padding:2px 4px;margin-top:3px;font-size:11.5px;text-align:left;cursor:pointer;min-width:0}
+.agc-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--texto)}.agc-dia.alto .agc-ev span{white-space:normal}
+.agc-ev .ai,.agc-it .ai,.agc-leg .ai,.agc-tipo .ai{width:17px;height:12px;flex:none}
+.agc-ev.feito{opacity:.5}
+.agc-mais{border:0;background:transparent;color:var(--fraco);font-size:11.5px;font-weight:700;padding:2px 4px;cursor:pointer}
+#agAgenda .c-vis{color:#7B3FBF}#agAgenda .c-lem{color:#D9822B}#agAgenda .c-prev{color:#3B78C3}#agAgenda .c-apl{color:#2F9E5B}#agAgenda .c-perto{color:#E0A100}#agAgenda .c-venc{color:#C0392B}#agAgenda .c-ok{color:#2E8B8B}
+.agc-ev.c-vis{background:#F3ECFB}.agc-ev.c-lem{background:#FDF2E6}.agc-ev.c-prev{background:#EAF1FA}.agc-ev.c-apl{background:#E8F5EE}.agc-ev.c-perto{background:#FFF6DA}.agc-ev.c-venc{background:#FBEAE8}.agc-ev.c-ok{background:#E6F4F4}
+.agc-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--fraco);margin-top:8px}.agc-leg span{display:inline-flex;gap:4px;align-items:center}
+.agc-lado{display:flex;flex-direction:column;gap:12px}
+.agc-cx{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:12px}.agc-cx h3{margin:0 0 8px;font-size:15px}
+.agc-it{border-left:4px solid currentColor;border-radius:8px;background:#FAFBFA;padding:8px 10px;margin-top:8px;font-size:13px}
+.agc-it b{display:flex;gap:6px;align-items:center;color:var(--texto)}.agc-it span{display:block;color:var(--fraco);margin-top:2px}
+.agc-it.feito{opacity:.6}.agc-it.mini{cursor:pointer}
+.agc-acoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.agc-acoes button{font-size:12px;border:1px solid var(--linha);border-radius:8px;padding:4px 9px;background:#fff;cursor:pointer}
+.agc-tipo{display:flex;gap:8px;margin:4px 0 12px}
+.agc-tipo button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border:1.5px solid var(--linha);border-radius:10px;background:#fff;font-size:14px;cursor:pointer}
+.agc-tipo button.on{border-color:var(--verde);background:var(--verde-claro);font-weight:700}
+.agc-tipo button[data-t=visita] .ai{color:#7B3FBF}.agc-tipo button[data-t=lembrete] .ai{color:#D9822B}
+.agc-semnav{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--linha);border-radius:10px;padding:4px;margin:0 0 10px}
+.agc-semnav button{width:36px;height:36px;border-radius:8px;border:0;background:#F3F7F4;font-size:20px;cursor:pointer}
+@media (min-width:700px){.agc-ov{align-items:center}.agc-ov .ag-mod{border-radius:18px}}
+@media (max-width:979px){.agc{grid-template-columns:1fr}.agc-dia{min-height:70px;padding:3px 2px 5px}.agc-add{display:none}.agc-n b{padding:1px 3px;overflow:visible}.agc-n small{display:none}.agc-ev{justify-content:center;padding:2px 1px}.agc-ev span{display:none}.agc-dia.alto{min-height:120px}.agc-mais{padding:2px 0;font-size:10.5px}}
 .sw{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.35;cursor:pointer}
 .sw input{width:22px;height:22px;flex:none;accent-color:var(--verde);margin-top:1px}
 .ck{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
@@ -850,6 +897,7 @@ ${MAPA_CHUVA_JS}
     if (a) a.style.display = ST.mod.plantio ? '' : 'none';
     if (b) b.style.display = ST.mod.recomendacoes ? '' : 'none';
     var c = document.getElementById('abaCusto'); if (c) c.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
+    var ag = document.getElementById('abaAgenda'); if (ag) ag.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
     var ab = document.getElementById('abaAcessos'); if (ab) ab.style.display = (ST.mod.plantio || ST.mod.recomendacoes) ? '' : 'none';
   }
 
@@ -1909,6 +1957,279 @@ ${MAPA_CHUVA_JS}
     };
   }
 
+  /* =================== CALENDÁRIO (aba própria): visitas, lembretes e aplicações da conta =================== */
+  // mesma agenda do app (tabela lembretes_agro): o que muda aqui aparece no celular e vice-versa
+  var tA = null, AG = { lemb: [], ev: [], cy: 0, cm: 0, sel: '', modo: 'mes', faz: '*', resp: '*', apl: true, logo: null, emp: {}, ultResp: '' };
+  var AI_VIS = '<svg class="ai" viewBox="0 0 40 26" aria-hidden="true"><path d="M3 15 V11.5 Q3 10 4.5 10 H17 L21 4.5 Q21.8 3.5 23 3.5 H30 Q31.5 3.5 32.2 4.8 L35.5 10 Q37.5 10.4 37.5 12.5 V17.5 Q37.5 19 36 19 H4.5 Q3 19 3 17.5 Z" fill="currentColor"/><path d="M22.4 5.6 H29.6 L32.4 10 H19.6 Z" fill="#E8F1FB"/><circle cx="10.5" cy="19.5" r="4.6" fill="#222"/><circle cx="10.5" cy="19.5" r="2" fill="#CFCFCF"/><circle cx="29.5" cy="19.5" r="4.6" fill="#222"/><circle cx="29.5" cy="19.5" r="2" fill="#CFCFCF"/></svg>';
+  var AI_LEM = '<svg class="ai" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4.2L4.3 16.4A1 1 0 0 0 5.2 18h13.6a1 1 0 0 0 .9-1.6L18 13.2V9a6 6 0 0 0-6-6z" fill="currentColor"/><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0z" fill="currentColor"/></svg>';
+  var AI_PULV = '<svg class="ai" viewBox="0 0 40 24" aria-hidden="true"><path d="M14 3h12q2 0 2 2v6q0 2-2 2H14q-2 0-2-2V5q0-2 2-2z M1 12h38v2.2H1z" fill="currentColor"/><path d="M4 15.5l-1.6 4.5h3.2z M10 15.5l-1.6 4.5h3.2z M30 15.5l-1.6 4.5h3.2z M36 15.5l-1.6 4.5h3.2z" fill="#38B6E8"/><circle cx="16" cy="17" r="3.6" fill="#222"/><circle cx="24" cy="17" r="3.6" fill="#222"/></svg>';
+  var AG_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  var AG_DSEM = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  function agSeg(iso) { return addDias(iso, -((new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7)); }
+  function agIco(cor) { return cor === 'vis' ? AI_VIS : cor === 'lem' ? AI_LEM : AI_PULV; }
+  function agFazNome(id) { var f = id ? fazDe(id) : null; return f ? f.nome : ''; }
+  function agResps() {
+    var l = (cad().responsaveis || []).map(function (x) { return x.nome; });
+    AG.lemb.forEach(function (x) { if (x.responsavel && l.indexOf(x.responsavel) < 0) l.push(x.responsavel); });
+    return l;
+  }
+  function agHoraCurta(h) { return h ? h.replace(':00', 'h').replace(':', 'h') : ''; }
+  // f = { faz, resp, apl, de, ate }: atividades já descritas (o mesmo formato que o PDF usa)
+  function agEventos(f) {
+    var ev = [], soUm = agResps().length <= 1, todos = f.resp === '*';
+    AG.lemb.forEach(function (l) {
+      if (f.de && (l.data < f.de || l.data > f.ate)) return;
+      if (f.faz !== '*' && l.fazenda_id && l.fazenda_id !== f.faz) return;
+      if (!todos && (l.responsavel || '') !== f.resp && !(soUm && !l.responsavel)) return;
+      var vis = l.tipo === 'visita', fn = agFazNome(l.fazenda_id);
+      ev.push({ d: l.data, hora: l.hora || '', k: 'lemb', l: l, lemb: true, cor: vis ? 'vis' : 'lem', feito: !!l.feito, faz: l.fazenda_id || '',
+        tit: vis ? 'Visita' + (fn ? ' à ' + fn : ' na fazenda') : (l.titulo || 'Lembrete'),
+        sub: [vis ? l.titulo : fn, l.obs, todos && l.responsavel ? 'Responsável: ' + l.responsavel : ''].filter(Boolean).join('  -  '),
+        curto: (vis ? (fn || 'Visita') : (l.titulo || 'Lembrete')) + (l.hora ? ' ' + agHoraCurta(l.hora) : '') });
+    });
+    if (f.apl && ST.mod.recomendacoes) ST.recs.forEach(function (r) {
+      if (f.faz !== '*' && r.fazenda_id !== f.faz) return;
+      var fz = fazDe(r.fazenda_id); if (!fz) return;
+      var d = dd(r);
+      function add(dia, k, tal, txt, sit) {
+        if (f.de && (dia < f.de || dia > f.ate)) return;
+        var cor = k === 'prev' ? (dia < hoje() ? 'venc' : 'prev') : k === 'apl' ? 'apl' : (sit.k === 'venc' || sit.k === 'hoje') ? 'venc' : sit.k === 'perto' ? 'perto' : 'ok';
+        var s2 = [fz.nome, tal.join(', ') + ' (' + fmt(haDe(fz, tal, d.parte)) + ' ha)']; if (d.resp) s2.push('Quem aplica: ' + d.resp);
+        ev.push({ d: dia, hora: '', k: k, r: r, lemb: false, cor: cor, feito: k === 'apl', faz: r.fazenda_id, tit: txt + (sit ? ' (' + sit.t + ')' : ''), sub: s2.join('  -  '), curto: r.operacao + ' - ' + fz.nome });
+      }
+      var pend = talDe(r).filter(function (t) { return !feitoDe(r)[t]; }), dt = datasTal(r), gp = {};
+      pend.forEach(function (t) { if (dt[t]) (gp[dt[t]] = gp[dt[t]] || []).push(t); });
+      Object.keys(gp).forEach(function (dia) { add(dia, 'prev', gp[dia], r.operacao + ' prevista'); });
+      var g = {}; talDe(r).forEach(function (t) { if (feitoDe(r)[t]) (g[feitoDe(r)[t]] = g[feitoDe(r)[t]] || []).push(t); });
+      Object.keys(g).forEach(function (dia) { add(dia, 'apl', g[dia], r.operacao + ' aplicada'); });
+      if (Number(d.rep) > 0 && (Number(d.num) || 1) < (Number(d.total) || 1)) {
+        var gg = {}; talDe(r).forEach(function (t) { if (feitoDe(r)[t] && !proxDe(r)[t]) { var v = venc(r, t); (gg[v] = gg[v] || []).push(t); } });
+        Object.keys(gg).forEach(function (dia) { add(dia, 'prox', gg[dia], ordTxt(r.operacao, (Number(d.num) || 1) + 1), situ(dia, Number(d.aviso) || 0)); });
+      }
+    });
+    return ev.sort(function (a, b) { var x = a.d + (a.hora || '99'), y = b.d + (b.hora || '99'); return x < y ? -1 : x > y ? 1 : 0; });
+  }
+  function agPintar() {
+    if (!tA) return;
+    if (!AG.cy) { var t0 = new Date(); AG.cy = t0.getFullYear(); AG.cm = t0.getMonth(); AG.sel = hoje(); }
+    var resps = agResps(), ini, fim, titulo;
+    if (AG.modo === 'sem') { ini = agSeg(AG.sel); fim = addDias(ini, 6); titulo = curta(ini) + ' a ' + dataBR(fim); }
+    else {
+      var p1 = AG.cy + '-' + p2(AG.cm + 1) + '-01', ult = AG.cy + '-' + p2(AG.cm + 1) + '-' + p2(new Date(Date.UTC(AG.cy, AG.cm + 1, 0)).getUTCDate());
+      ini = agSeg(p1); fim = addDias(agSeg(ult), 6); titulo = AG_MESES[AG.cm].charAt(0).toUpperCase() + AG_MESES[AG.cm].slice(1) + ' de ' + AG.cy;
+    }
+    AG.ev = agEventos({ faz: AG.faz, resp: AG.resp, apl: AG.apl });
+    var porDia = {}; AG.ev.forEach(function (e, i) { e.i = i; (porDia[e.d] = porDia[e.d] || []).push(e); });
+    function chip(e) {
+      return '<button class="agc-ev c-' + e.cor + (e.feito ? ' feito' : '') + '" data-a="agev" data-v="' + e.i + '" title="' + esc(e.tit + (e.sub ? ' - ' + e.sub : '')) + '">' + agIco(e.cor) + '<span>' +
+        esc(e.curto) + '</span></button>';
+    }
+    var g = '';
+    ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].forEach(function (x) { g += '<div class="agc-dow">' + x + '</div>'; });
+    for (var dia = ini; dia <= fim; dia = addDias(dia, 1)) {
+      var es = porDia[dia] || [], fora = AG.modo === 'mes' && Number(dia.slice(5, 7)) !== AG.cm + 1, max = AG.modo === 'sem' ? 99 : 3;
+      g += '<div class="agc-dia' + (fora ? ' fora' : '') + (dia === hoje() ? ' hoje' : '') + (dia === AG.sel ? ' sel' : '') + (AG.modo === 'sem' ? ' alto' : '') + '" data-a="agsel" data-v="' + dia + '">' +
+        '<div class="agc-n"><b>' + Number(dia.slice(8, 10)) + (AG.modo === 'sem' ? ' <small>' + AG_DSEM[new Date(dia + 'T12:00:00Z').getUTCDay()] + '</small>' : '') + '</b>' +
+        '<button class="agc-add" data-a="agnovo" data-v="' + dia + '" title="Programar neste dia" aria-label="Programar neste dia">＋</button></div>' +
+        es.slice(0, max).map(chip).join('') + (es.length > max ? '<button class="agc-mais" data-a="agsel" data-v="' + dia + '">+' + (es.length - max) + ' mais</button>' : '') + '</div>';
+    }
+    var ds = porDia[AG.sel] || [];
+    function card(e) {
+      var acoes = e.lemb
+        ? (e.feito ? '<button data-a="agdesfeito" data-v="' + e.i + '">Desfazer feito</button>' : '<button data-a="agfeito" data-v="' + e.i + '">✓ Feito</button>') +
+          '<button data-a="agedit" data-v="' + e.i + '">Editar</button><button data-a="agdel" data-v="' + e.i + '">Excluir</button>'
+        : '<button data-a="agrec" data-v="' + e.i + '">Abrir recomendação</button>';
+      var l = e.l || {};
+      return '<div class="agc-it c-' + e.cor + (e.feito ? ' feito' : '') + '"><b>' + agIco(e.cor) + esc(e.tit) + (e.feito ? ' <span class="badge">feito</span>' : '') + '</b>' +
+        '<span>' + [e.hora ? '🕘 ' + esc(e.hora) : '', e.sub ? esc(e.sub) : ''].filter(Boolean).join(' · ') +
+        (e.lemb && l.responsavel && AG.resp !== '*' ? '<br>👤 ' + esc(l.responsavel) : '') + '</span><div class="agc-acoes">' + acoes + '</div></div>';
+    }
+    var prox = agEventos({ faz: AG.faz, resp: AG.resp, apl: false }).filter(function (e) { return !e.feito && e.d >= hoje(); }).slice(0, 8);
+    var dn = AG_DSEM[new Date(AG.sel + 'T12:00:00Z').getUTCDay()];
+    tA.innerHTML = '<div class="agc-barra">' +
+      '<label class="agc-f">Fazenda<select data-c="agfaz"><option value="*">Todas</option>' +
+        (cad().fazendas || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === AG.faz ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="agc-f">Responsável<select data-c="agresp"><option value="*">Todos</option>' +
+        resps.map(function (n) { return '<option' + (n === AG.resp ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>' +
+      '<div class="agc-seg"><button class="' + (AG.modo === 'mes' ? 'on' : '') + '" data-a="agmodo" data-v="mes">Mês</button><button class="' + (AG.modo === 'sem' ? 'on' : '') + '" data-a="agmodo" data-v="sem">Semana</button></div>' +
+      (ST.mod.recomendacoes ? '<label class="agc-ck"><input type="checkbox" data-c="agapl"' + (AG.apl ? ' checked' : '') + '> Aplicações</label>' : '') +
+      '<span class="agc-esp"></span><button class="agc-bt" data-a="agpdf">📄 Exportar PDF</button><button class="agc-bt v" data-a="agnovo" data-v="">＋ Programar</button></div>' +
+      '<div class="agc"><div>' +
+        '<div class="agc-mes"><button data-a="agnav" data-v="-1" aria-label="Anterior">‹</button><b>' + titulo + '</b><button data-a="agnav" data-v="1" aria-label="Próximo">›</button><button class="agc-hoje" data-a="aghoje">Hoje</button></div>' +
+        '<div class="agc-grade">' + g + '</div>' +
+        '<div class="agc-leg"><span class="c-vis">' + AI_VIS + 'visita</span><span class="c-lem">' + AI_LEM + 'lembrete</span>' +
+          (ST.mod.recomendacoes && AG.apl ? '<span class="c-prev">' + AI_PULV + 'prevista</span><span class="c-apl">' + AI_PULV + 'aplicada</span><span class="c-perto">' + AI_PULV + 'próxima (perto)</span><span class="c-venc">' + AI_PULV + 'vencida</span>' : '') +
+          '<span>passe o mouse num dia e clique em ＋ para programar ali</span></div>' +
+      '</div><aside class="agc-lado">' +
+        '<div class="agc-cx"><h3>' + dn.charAt(0).toUpperCase() + dn.slice(1) + ', ' + curta(AG.sel) + (AG.sel === hoje() ? ' (hoje)' : '') + '</h3>' +
+          (ds.length ? ds.map(card).join('') : '<div class="ag-dica">Nada neste dia.</div>') +
+          '<button class="agc-bt" data-a="agnovo" data-v="' + AG.sel + '" style="width:100%;margin-top:8px">＋ Programar neste dia</button></div>' +
+        '<div class="agc-cx"><h3>Próximas visitas e lembretes</h3>' +
+          (prox.length ? prox.map(function (e) {
+            return '<div class="agc-it c-' + e.cor + ' mini" data-a="agir" data-v="' + e.d + '"><b>' + curta(e.d) + ' · ' + esc(e.tit) + '</b><span>' + [e.hora, e.l && e.l.responsavel ? '👤 ' + esc(e.l.responsavel) : ''].filter(Boolean).join(' · ') + '</span></div>';
+          }).join('') : '<div class="ag-dica">Nada programado daqui para frente.</div>') + '</div>' +
+      '</aside></div>';
+  }
+  async function agSalvar(l) {
+    var i = AG.lemb.findIndex(function (x) { return x.id === l.id; });
+    if (i >= 0) AG.lemb[i] = l; else AG.lemb.push(l);
+    agPintar();
+    try { await api('/api/agro/lembrete', l); } catch (e) { toast('Não salvou na nuvem: ' + e.message); }
+  }
+  function agModal(l, dia) {
+    var novo = !l, resps = (cad().responsaveis || []).map(function (x) { return x.nome; });
+    l = l ? cp(l) : { id: novoId('lb'), tipo: 'visita', fazenda_id: AG.faz !== '*' ? AG.faz : '', titulo: '', data: dia || AG.sel || hoje(), hora: '', obs: '', feito: 0,
+      responsavel: resps.length === 1 ? resps[0] : (AG.resp !== '*' ? AG.resp : AG.ultResp) };
+    if (l.responsavel && resps.indexOf(l.responsavel) < 0) resps.push(l.responsavel);
+    var fzs = (cad().fazendas || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+    var ov = document.createElement('div'); ov.className = 'ag-ov agc-ov';
+    ov.innerHTML = '<div class="ag-mod"><h3>' + (novo ? 'Programar' : 'Editar') + '</h3>' +
+      '<div class="agc-tipo"><button data-t="visita" class="' + (l.tipo === 'visita' ? 'on' : '') + '">' + AI_VIS + 'Visita na fazenda</button><button data-t="lembrete" class="' + (l.tipo !== 'visita' ? 'on' : '') + '">' + AI_LEM + 'Lembrete</button></div>' +
+      '<div class="campo"><label>Fazenda</label><select id="agFaz"><option value="">' + (l.tipo === 'visita' ? '— escolha a fazenda —' : '— nenhuma —') + '</option>' +
+        fzs.map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === l.fazenda_id ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label id="agTitLab">' + (l.tipo === 'visita' ? 'Assunto da visita (opcional)' : 'O que lembrar') + '</label><input id="agTit" maxlength="120" value="' + esc(l.titulo || '') + '"></div>' +
+      '<div class="campo"><label>Responsável</label><select id="agResp"><option value="">' + (resps.length ? '— escolha —' : '— cadastre em Produtores e fazendas no app —') + '</option>' +
+        resps.map(function (n) { return '<option' + (n === l.responsavel ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="linha2"><div class="campo"><label>Dia</label><input type="date" id="agData" value="' + esc(l.data) + '"></div><div class="campo"><label>Hora (opcional)</label><input type="time" id="agHora" value="' + esc(l.hora || '') + '"></div></div>' +
+      '<div class="campo"><label>Observação (opcional)</label><input id="agObs" maxlength="500" value="' + esc(l.obs || '') + '"></div>' +
+      '<div class="ag-dica">🔔 O aviso chega no celular de manhã cedo no dia e, com hora marcada, outro 2 horas antes.</div>' +
+      '<button class="btn" data-m="ok">Salvar</button>' + (novo ? '' : '<button class="btn perigo" data-m="del">Excluir</button>') + '<button class="btn secundario" data-m="no">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    var tipo = l.tipo;
+    ov.querySelectorAll('[data-t]').forEach(function (b) {
+      b.onclick = function () {
+        tipo = b.dataset.t; ov.querySelectorAll('[data-t]').forEach(function (x) { x.classList.toggle('on', x === b); });
+        $('#agFaz', ov).options[0].textContent = tipo === 'visita' ? '— escolha a fazenda —' : '— nenhuma —';
+        $('#agTitLab', ov).textContent = tipo === 'visita' ? 'Assunto da visita (opcional)' : 'O que lembrar';
+      };
+    });
+    ov.onclick = function (ev) {
+      var m = ev.target.dataset && ev.target.dataset.m;
+      if (m === 'no' || ev.target === ov) { ov.remove(); return; }
+      if (m === 'del') { ov.remove(); agApagar(l); return; }
+      if (m !== 'ok') return;
+      var fz = $('#agFaz', ov).value, tit = $('#agTit', ov).value.trim(), dt = $('#agData', ov).value;
+      if (tipo === 'visita' && !fz) { toast('Escolha a fazenda da visita'); return; }
+      if (tipo !== 'visita' && !tit) { toast('Escreva o que lembrar'); return; }
+      if (!dt) { toast('Escolha o dia'); return; }
+      var rp = $('#agResp', ov).value; if (rp) AG.ultResp = rp;
+      ov.remove();
+      AG.sel = dt; var d0 = new Date(dt + 'T12:00:00'); AG.cy = d0.getFullYear(); AG.cm = d0.getMonth();
+      agSalvar(Object.assign(l, { tipo: tipo, fazenda_id: fz, titulo: tit, data: dt, hora: $('#agHora', ov).value || '', obs: $('#agObs', ov).value.trim(), responsavel: rp }));
+      toast(novo ? (tipo === 'visita' ? 'Visita programada' : 'Lembrete salvo') + ' para ' + curta(dt) : 'Atualizado');
+    };
+  }
+  async function agApagar(l) {
+    if (!confirm('Excluir ' + (l.tipo === 'visita' ? 'esta visita' : 'este lembrete') + '?')) return;
+    AG.lemb = AG.lemb.filter(function (x) { return x.id !== l.id; }); agPintar();
+    try { await api('/api/agro/lembrete/apagar', { id: l.id }); } catch (e) { toast('Não apagou na nuvem: ' + e.message); }
+  }
+  // logo e nome da empresa do perfil da conta (o mesmo do relatório), já em JPEG para o PDF
+  async function agPerfil() {
+    try {
+      var r = await api('/api/perfil'), pf = (r && r.perfil) || {};
+      AG.emp = { empresa: pf.empresa || '', cidade: pf.cidade || '' };
+      if (pf.logo && (!AG.logo || AG.logo.src !== pf.logo)) {
+        var im = new Image();
+        im.onload = function () {
+          try {
+            var cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+            var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+            AG.logo = { src: pf.logo, w: cv.width, h: cv.height, bin: atob(cv.toDataURL('image/jpeg', 0.92).split(',')[1]) };
+          } catch (e) { /* sem logo */ }
+        };
+        im.src = pf.logo;
+      }
+    } catch (e) { /* segue sem */ }
+  }
+  function agModalPdf() {
+    if (!window.PlanoPDF) { toast('Gerador de PDF ainda carregando, tente de novo'); return; }
+    var resps = agResps(), seg = agSeg(AG.sel || hoje()), modo = 'sem';
+    var ov = document.createElement('div'); ov.className = 'ag-ov agc-ov';
+    ov.innerHTML = '<div class="ag-mod"><h3>Exportar planejamento</h3>' +
+      '<div class="campo"><label>Responsável</label><select id="pjResp"><option value="*">Todos</option>' + resps.map(function (n) { return '<option' + (n === AG.resp ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label>Fazenda</label><select id="pjFaz"><option value="*">Todas as fazendas</option>' +
+        (cad().fazendas || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === AG.faz ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="agc-tipo"><button data-p="sem" class="on">Semana</button><button data-p="per">Escolher datas</button></div>' +
+      '<div class="agc-semnav" id="pjSem"><button data-w="-1">‹</button><b id="pjSemTxt"></b><button data-w="1">›</button></div>' +
+      '<div class="linha2" id="pjPer" style="display:none"><div class="campo"><label>De</label><input type="date" id="pjDe"></div><div class="campo"><label>Até</label><input type="date" id="pjAte"></div></div>' +
+      (ST.mod.recomendacoes ? '<label class="agc-ck" style="margin:6px 0 10px"><input type="checkbox" id="pjApl"' + (AG.apl ? ' checked' : '') + '> Incluir as aplicações das fazendas</label>' : '') +
+      '<div class="ag-dica" id="pjConta"></div>' +
+      (AG.emp.empresa ? '' : '<div class="ag-dica">🏢 Para sair o nome da sua empresa no cabeçalho, preencha <b>Empresa</b> nos Ajustes do app.</div>') +
+      '<button class="btn" data-m="ok">📄 Gerar PDF</button><button class="btn secundario" data-m="no">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    if (AG.resp === '*') $('#pjResp', ov).value = '*';
+    function escolha() {
+      var de = modo === 'sem' ? seg : $('#pjDe', ov).value, ate = modo === 'sem' ? addDias(seg, 6) : $('#pjAte', ov).value, ap = $('#pjApl', ov);
+      return { de: de, ate: ate, resp: $('#pjResp', ov).value, faz: $('#pjFaz', ov).value, apl: !!(ap && ap.checked) };
+    }
+    function atualizar() {
+      ov.querySelectorAll('[data-p]').forEach(function (b) { b.classList.toggle('on', b.dataset.p === modo); });
+      $('#pjSem', ov).style.display = modo === 'sem' ? '' : 'none'; $('#pjPer', ov).style.display = modo === 'per' ? '' : 'none';
+      $('#pjSemTxt', ov).textContent = PlanoPDF.periodoTxt(seg, addDias(seg, 6));
+      var o = escolha(), c = $('#pjConta', ov);
+      if (!o.de || !o.ate || o.ate < o.de) { c.textContent = 'Escolha o período (a data final depois da inicial).'; return; }
+      if (difDias(o.ate, o.de) > 92) { c.textContent = 'Período muito longo: escolha até 3 meses.'; return; }
+      var at = agEventos(o), v = 0, l = 0, a = 0;
+      at.forEach(function (e) { if (!e.lemb) a++; else if (e.cor === 'vis') v++; else l++; });
+      c.textContent = at.length ? '📋 ' + at.length + (at.length === 1 ? ' atividade' : ' atividades') + ' no período: ' +
+        [v ? v + (v === 1 ? ' visita' : ' visitas') : '', l ? l + (l === 1 ? ' lembrete' : ' lembretes') : '', a ? a + (a === 1 ? ' aplicação' : ' aplicações') : ''].filter(Boolean).join(', ') + '.'
+        : 'Nada programado neste período. O PDF sai com o calendário vazio.';
+    }
+    ov.querySelectorAll('[data-p]').forEach(function (b) { b.onclick = function () { modo = b.dataset.p; if (modo === 'per') { $('#pjDe', ov).value = seg; $('#pjAte', ov).value = addDias(seg, 6); } atualizar(); }; });
+    ov.querySelectorAll('[data-w]').forEach(function (b) { b.onclick = function () { seg = addDias(seg, 7 * Number(b.dataset.w)); atualizar(); }; });
+    ['#pjResp', '#pjFaz', '#pjApl', '#pjDe', '#pjAte'].forEach(function (s) { var n = $(s, ov); if (n) n.addEventListener('change', atualizar); });
+    atualizar();
+    ov.onclick = function (ev) {
+      var m = ev.target.dataset && ev.target.dataset.m;
+      if (m === 'no' || ev.target === ov) { ov.remove(); return; }
+      if (m !== 'ok') return;
+      var o = escolha();
+      if (!o.de || !o.ate || o.ate < o.de) { toast('Escolha o período'); return; }
+      if (difDias(o.ate, o.de) > 92) { toast('Escolha um período de até 3 meses'); return; }
+      var fz = o.faz !== '*' ? fazDe(o.faz) : null;
+      var bytes = PlanoPDF.plano({ de: o.de, ate: o.ate, resp: o.resp, fazNome: fz ? fz.nome : '', apl: o.apl, ativ: agEventos(o), logo: AG.logo, empresa: AG.emp.empresa, cidade: AG.emp.cidade });
+      ov.remove();
+      PlanoPDF.entregar(bytes, PlanoPDF.nomeArq('planejamento-' + (o.resp === '*' ? 'todos' : o.resp) + '-' + o.de), 'Planejamento das Atividades', toast);
+    };
+  }
+  function agClique(a, v) {
+    var e = AG.ev[Number(v)];
+    if (a === 'agsel' || a === 'agir') { AG.sel = v; if (a === 'agir') { var d0 = new Date(v + 'T12:00:00'); AG.cy = d0.getFullYear(); AG.cm = d0.getMonth(); } agPintar(); return; }
+    if (a === 'agnovo') { agModal(null, v || AG.sel); return; }
+    if (a === 'agev') { if (!e) return; AG.sel = e.d; agPintar(); if (e.lemb) agModal(e.l); else agAbrirRec(e.r); return; }
+    if (a === 'agedit' && e) { agModal(e.l); return; }
+    if (a === 'agdel' && e) { agApagar(e.l); return; }
+    if ((a === 'agfeito' || a === 'agdesfeito') && e) { agSalvar(Object.assign(cp(e.l), { feito: a === 'agfeito' ? 1 : 0 })); return; }
+    if (a === 'agrec' && e) { agAbrirRec(e.r); return; }
+    if (a === 'agmodo') { AG.modo = v; agPintar(); return; }
+    if (a === 'aghoje') { var t = new Date(); AG.cy = t.getFullYear(); AG.cm = t.getMonth(); AG.sel = hoje(); agPintar(); return; }
+    if (a === 'agnav') {
+      if (AG.modo === 'sem') { AG.sel = addDias(AG.sel, 7 * Number(v)); var d1 = new Date(AG.sel + 'T12:00:00'); AG.cy = d1.getFullYear(); AG.cm = d1.getMonth(); }
+      else { AG.cm += Number(v); if (AG.cm < 0) { AG.cm = 11; AG.cy--; } if (AG.cm > 11) { AG.cm = 0; AG.cy++; } AG.sel = AG.cy + '-' + p2(AG.cm + 1) + '-01'; }
+      agPintar(); return;
+    }
+    if (a === 'agpdf') { agModalPdf(); return; }
+  }
+  function agMuda(n) {
+    var c = n.dataset.c;
+    if (c === 'agfaz') AG.faz = n.value; else if (c === 'agresp') AG.resp = n.value; else if (c === 'agapl') AG.apl = n.checked; else return;
+    agPintar();
+  }
+  function agAbrirRec(r) {
+    var b = document.getElementById('abaRecs'); if (!b || !r) return;
+    b.click();
+    R.faz = r.fazenda_id; R.prod = produtorDe(fazDe(R.faz)); R.view = 'det'; R.id = r.id; pintarRecs();
+  }
+  async function abrirAgenda() {
+    if (!tA) return;
+    if (!AG.lemb.length) tA.innerHTML = '<div class="aviso">Carregando…</div>';
+    agPerfil();
+    try { var r = await api('/api/agro/lembretes'); AG.lemb = (r && r.lembretes) || []; } catch (e) { toast('Não consegui buscar a agenda: ' + e.message); }
+    if (!(cad().fazendas || []).length) await baixar();
+    agPintar();
+  }
+
   var iniciado = false;
   window.agroIniciar = async function () {
     if (!iniciado) {
@@ -1922,6 +2243,9 @@ ${MAPA_CHUVA_JS}
       var am = document.getElementById('abaModulos'); if (am) am.addEventListener('click', function () { marcaNvA('modulos'); });
       if (ar) ar.addEventListener('click', function () { marcaNvA('recs'); abrirRecs(); });
       var ac = document.getElementById('abaCusto'); if (ac) ac.addEventListener('click', function () { agroCusto(); });
+      tA = document.getElementById('agAgenda');
+      if (tA) ligarTela(tA, agClique, agMuda);
+      var ag = document.getElementById('abaAgenda'); if (ag) ag.addEventListener('click', function () { abrirAgenda(); });
       var aa = document.getElementById('abaAcessos'); if (aa) aa.addEventListener('click', function () { agroAcessos(); });
     }
     zoomIniciar();
