@@ -1250,6 +1250,8 @@
   }
   function abrirClima() {
     if (!climaAtual) return;
+    try { localStorage.setItem(LS_NOVO_CLIMA, '9'); } catch (e) {}   // já conhece a novidade
+    const nv = document.getElementById('clNovo'); if (nv) nv.remove();
     const v = document.createElement('div'); v.className = 'cl-veu';
     v.innerHTML = '<div class="cl-folha"><div class="cl-cab"><b>Previsão do tempo</b><button aria-label="Fechar">✕</button></div>' + climaHtml(climaAtual.c, climaAtual.quando) +
       '<div class="cl-chuva" id="clChuva"><div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span></div>' +
@@ -1259,6 +1261,39 @@
     v.onclick = function (e) { if (e.target === v || e.target.closest('.cl-cab button')) fechar(); };
     document.body.appendChild(v);
     mapaChuvaNoClima(v.querySelector('#clChuva')).then(function (m) { mc = m; if (!document.body.contains(v) && m) m.destruir(); });
+  }
+
+  /* ---------- novidade: mapa da chuva na previsão (cartão na lista, no máximo 3 vezes) ---------- */
+  const LS_NOVO_CLIMA = 'vsl-novo-clima';
+  function novidadeClima() {
+    let n = 9; try { n = Number(localStorage.getItem(LS_NOVO_CLIMA)) || 0; } catch (e) { return; }
+    if (n >= 3) return;
+    const t = setInterval(function () {
+      const telas = document.querySelectorAll('.tela:not(.oculto)');
+      if (!window.__appPronto || !climaAtual || telas.length !== 1 || telas[0].id !== 'telaLista' || document.querySelector('.cl-veu, .veu, .ag-novo, #telaLogin:not(.oculto)')) return;
+      clearInterval(t);
+      try { localStorage.setItem(LS_NOVO_CLIMA, String(n + 1)); } catch (e) {}
+      const d = document.createElement('div'); d.id = 'clNovo'; d.className = 'ag-novo';
+      d.innerHTML = '<div class="ag-novo-card"><div class="ag-novo-ic">🌧️</div><h3>Novidade: mapa da chuva!</h3>' +
+        '<p>Toque no <b>ícone da temperatura</b>, no topo desta tela, e veja a chuva prevista para os próximos 15 dias: dia a dia, 7 e 15 dias.</p>' +
+        '<p class="ag-novo-como">Dá para abrir em <b>tela cheia</b> no botão ⛶ do mapa.</p>' +
+        '<button class="btn" id="clNovoVer">Ver o mapa da chuva</button><button class="btn secundario" id="clNovoOk">Entendi</button></div>';
+      document.body.appendChild(d);
+      document.getElementById('clNovoOk').onclick = function () { d.remove(); };
+      document.getElementById('clNovoVer').onclick = function () { d.remove(); abrirClima(); };
+    }, 1500);
+    setTimeout(function () { clearInterval(t); }, 90000);
+  }
+  // tocou na notificação da novidade: abre a previsão assim que ela estiver pronta
+  function abrirClimaQuandoPronto() {
+    let tentativas = 0;
+    const t = setInterval(function () {
+      if (++tentativas > 40) { clearInterval(t); return; }
+      if (!window.__appPronto || !climaAtual || document.querySelector('.cl-veu')) return;
+      clearInterval(t);
+      const nv = document.getElementById('clNovo'); if (nv) nv.remove();
+      abrirClima();
+    }, 500);
   }
 
   /* ---------- mapa da chuva dentro da previsão do tempo (modelo europeu, próximos 15 dias) ---------- */
@@ -2503,6 +2538,12 @@
     document.addEventListener('click', tocouApp, true);
     document.addEventListener('visibilitychange', function () { if (!document.hidden && st.videoEsperando) setTimeout(processarFilaVideo, 800); });
     window.__appPronto = true;   // avisos (ex.: novidade do mapa) só depois daqui
+    if (/[?&]abrir=clima/.test(location.search)) {
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      try { localStorage.setItem(LS_NOVO_CLIMA, '9'); } catch (e) {}
+      abrirClimaQuandoPronto();
+    } else novidadeClima();
+    if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'clima') abrirClimaQuandoPronto(); });
     atualizarSync();
     atualizarBotaoEnvio();
     if ('serviceWorker' in navigator) {
