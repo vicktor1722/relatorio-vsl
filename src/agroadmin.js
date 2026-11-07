@@ -28,6 +28,20 @@ export const AGRO_PAINEIS = `
 
 export const AGRO_CSS = `
 
+/* ---------- cartão Agenda da semana (Visão geral) ---------- */
+.agd{cursor:pointer}.agd h2 small{font-weight:400;color:var(--fraco);font-size:13px;margin-left:6px}
+.agd-sem{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.agd-dia{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid var(--linha);border-radius:10px;background:#FAFBFA;padding:6px 2px 8px;cursor:pointer;min-width:0;min-height:78px}
+.agd-dia small{font-size:11px;color:var(--fraco);text-transform:uppercase}.agd-dia b{font-size:16px}
+.agd-dia.hoje{border-color:var(--verde);background:var(--verde-claro)}.agd-dia.hoje b{color:var(--verde-escuro)}.agd-dia.passou{opacity:.6}
+.agd-dia i{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;font-style:normal}.agd-dia i .ai{width:18px;height:13px}
+.agd-dia em{position:absolute;top:4px;right:5px;font-style:normal;font-size:10.5px;font-weight:700;background:var(--verde);color:#fff;border-radius:9px;padding:0 5px;line-height:16px}
+.agd-res{display:flex;gap:16px;font-size:13px;color:var(--fraco);margin:10px 2px 4px}.agd-res b{color:var(--texto);font-size:15px}
+.agd-prox{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;margin-top:6px}
+.agd-it{display:flex;align-items:center;gap:7px;border:0;border-left:4px solid currentColor;border-radius:8px;background:#FAFBFA;padding:7px 9px;font-size:13px;text-align:left;cursor:pointer;min-width:0}
+.agd-it b{color:var(--texto);white-space:nowrap}.agd-it span{color:var(--fraco);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agd-it .ai{width:18px;height:13px;flex:none}
+.agd .c-vis{color:#7B3FBF}.agd .c-lem{color:#D9822B}.agd .c-prev{color:#3B78C3}.agd .c-apl{color:#2F9E5B}.agd .c-perto{color:#E0A100}.agd .c-venc{color:#C0392B}.agd .c-ok{color:#2E8B8B}
+@media (max-width:620px){.agd-dia em{display:none}.agd-sem{gap:3px}.agd-dia{min-height:66px;padding:5px 1px 6px}.agd-dia i .ai{width:15px;height:11px}.agd-res{gap:10px}}
 /* ---------- Calendário (agenda) ---------- */
 .agc-barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .agc-f{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:2px 4px 2px 10px;font-size:12.5px;color:var(--fraco)}
@@ -372,7 +386,7 @@ ${MAPA_CHUVA_JS}
     var box = document.getElementById('agFazendas');
     if (!box) {
       box = document.createElement('div'); box.id = 'agFazendas'; box.className = 'pf-bloco';
-      $('#kpis').insertAdjacentElement('afterend', box);
+      (document.getElementById('caixaAgenda') || $('#kpis')).insertAdjacentElement('afterend', box);
     }
     if (!PF.d) box.innerHTML = '<h2>🌾 Fazendas hoje</h2><div class="aviso">Carregando as fazendas, o tempo e o mercado…</div>';
     try { PF.d = await api('/api/painel/fazendas'); }
@@ -635,12 +649,12 @@ ${MAPA_CHUVA_JS}
     try { d = await api('/api/agro/admin/plantio'); }
     catch (e) {
       if (!adm) { if (box) box.remove(); return; }   // conta sem o módulo de plantio: não mostra a caixa
-      if (!box) { box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio'; (document.getElementById('agFazendas') || $('#kpis')).insertAdjacentElement('afterend', box); }
+      if (!box) { box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio'; (document.getElementById('agFazendas') || document.getElementById('caixaAgenda') || $('#kpis')).insertAdjacentElement('afterend', box); }
       box.innerHTML = '<h2>Plantio das áreas</h2><div class="aviso ruim">' + esc(e.message) + '</div>'; return;
     }
     if (!box) {
       box = document.createElement('div'); box.className = 'caixa'; box.id = 'caixaPlantio';
-      (document.getElementById('agFazendas') || $('#kpis')).insertAdjacentElement('afterend', box);
+      (document.getElementById('agFazendas') || document.getElementById('caixaAgenda') || $('#kpis')).insertAdjacentElement('afterend', box);
     }
     DP.dados = d;
     var ss = DP.dados.safras || [];
@@ -2073,7 +2087,7 @@ ${MAPA_CHUVA_JS}
   async function agSalvar(l) {
     var i = AG.lemb.findIndex(function (x) { return x.id === l.id; });
     if (i >= 0) AG.lemb[i] = l; else AG.lemb.push(l);
-    agPintar();
+    agPintar(); agDashPintar();
     try { await api('/api/agro/lembrete', l); } catch (e) { toast('Não salvou na nuvem: ' + e.message); }
   }
   function agModal(l, dia) {
@@ -2121,7 +2135,7 @@ ${MAPA_CHUVA_JS}
   }
   async function agApagar(l) {
     if (!confirm('Excluir ' + (l.tipo === 'visita' ? 'esta visita' : 'este lembrete') + '?')) return;
-    AG.lemb = AG.lemb.filter(function (x) { return x.id !== l.id; }); agPintar();
+    AG.lemb = AG.lemb.filter(function (x) { return x.id !== l.id; }); agPintar(); agDashPintar();
     try { await api('/api/agro/lembrete/apagar', { id: l.id }); } catch (e) { toast('Não apagou na nuvem: ' + e.message); }
   }
   // logo e nome da empresa do perfil da conta (o mesmo do relatório), já em JPEG para o PDF
@@ -2221,6 +2235,47 @@ ${MAPA_CHUVA_JS}
     b.click();
     R.faz = r.fazenda_id; R.prod = produtorDe(fazDe(R.faz)); R.view = 'det'; R.id = r.id; pintarRecs();
   }
+  // cartão "Agenda da semana" na Visão geral: resumo da semana; clicar leva à aba Calendário
+  async function agDash() {
+    var cx = document.getElementById('caixaAgenda'), aba = document.getElementById('abaAgenda');
+    if (!(ST.mod.plantio || ST.mod.recomendacoes) || !aba) { if (cx) cx.remove(); return; }
+    if (!cx) { cx = document.createElement('div'); cx.className = 'caixa agd'; cx.id = 'caixaAgenda'; $('#kpis').insertAdjacentElement('afterend', cx); }
+    try { var r = await api('/api/agro/lembretes'); AG.lemb = (r && r.lembretes) || []; } catch (e) { /* mostra o que tiver */ }
+    agDashPintar();
+  }
+  function agDashPintar() {
+    var cx = document.getElementById('caixaAgenda'); if (!cx) return;
+    var ini = agSeg(hoje()), fim = addDias(ini, 6);
+    var ev = agEventos({ faz: '*', resp: '*', apl: true, de: ini, ate: fim }), por = {};
+    ev.forEach(function (e) { (por[e.d] = por[e.d] || []).push(e); });
+    var dias = '';
+    for (var i = 0; i < 7; i++) {
+      var d = addDias(ini, i), es = por[d] || [], cores = [];
+      es.forEach(function (e) { if (cores.indexOf(e.cor) < 0) cores.push(e.cor); });
+      dias += '<button class="agd-dia' + (d === hoje() ? ' hoje' : '') + (d < hoje() ? ' passou' : '') + '" data-ag="dia" data-v="' + d + '" title="' + esc(es.map(function (e) { return (e.hora ? e.hora + ' ' : '') + e.tit; }).join('\n')) + '">' +
+        '<small>' + ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'][i] + '</small><b>' + Number(d.slice(8, 10)) + '</b>' +
+        '<i>' + cores.slice(0, 3).map(function (c) { return '<span class="c-' + c + '">' + agIco(c) + '</span>'; }).join('') + '</i>' +
+        (es.length ? '<em>' + es.length + '</em>' : '') + '</button>';
+    }
+    var nV = ev.filter(function (e) { return e.cor === 'vis'; }).length, nL = ev.filter(function (e) { return e.cor === 'lem'; }).length, nA = ev.filter(function (e) { return !e.lemb; }).length;
+    var prox = agEventos({ faz: '*', resp: '*', apl: false }).filter(function (e) { return !e.feito && e.d >= hoje(); }).slice(0, 4);
+    cx.innerHTML = '<div class="cab-caixa"><h2>📅 Agenda da semana <small>' + curta(ini) + ' a ' + curta(fim) + '</small></h2><button class="btn-mini" data-ag="abrir">Abrir calendário ›</button></div>' +
+      '<div class="agd-sem">' + dias + '</div>' +
+      '<div class="agd-res"><span><b>' + nV + '</b> ' + (nV === 1 ? 'visita' : 'visitas') + '</span><span><b>' + nL + '</b> ' + (nL === 1 ? 'lembrete' : 'lembretes') + '</span>' +
+        (ST.mod.recomendacoes ? '<span><b>' + nA + '</b> ' + (nA === 1 ? 'aplicação' : 'aplicações') + '</span>' : '') + '</div>' +
+      (prox.length ? '<div class="agd-prox">' + prox.map(function (e) {
+        return '<button class="agd-it c-' + e.cor + '" data-ag="dia" data-v="' + e.d + '">' + agIco(e.cor) + '<b>' + (e.d === hoje() ? 'Hoje' : curta(e.d)) + (e.hora ? ' ' + esc(e.hora) : '') + '</b><span>' + esc(e.tit) +
+          (e.l && e.l.responsavel ? ' · 👤 ' + esc(e.l.responsavel) : '') + '</span></button>';
+      }).join('') + '</div>' : '<div class="nota">Nenhuma visita ou lembrete programado. Clique para programar no calendário.</div>');
+    cx.onclick = function (ev2) {
+      var n = ev2.target.closest('[data-ag]');
+      var dia = n && n.dataset.ag === 'dia' ? n.dataset.v : '';
+      if (dia) { AG.sel = dia; var d0 = new Date(dia + 'T12:00:00'); AG.cy = d0.getFullYear(); AG.cm = d0.getMonth(); }
+      else if (!AG.cy) { AG.sel = hoje(); }
+      var b = document.getElementById('abaAgenda'); if (b) { b.click(); window.scrollTo(0, 0); }
+    };
+  }
+
   async function abrirAgenda() {
     if (!tA) return;
     if (!AG.lemb.length) tA.innerHTML = '<div class="aviso">Carregando…</div>';
@@ -2251,6 +2306,7 @@ ${MAPA_CHUVA_JS}
     zoomIniciar();
     await atualizarModulos();
     if (ST.mod.plantio || ST.mod.recomendacoes) { avisoNovoAdm(); await baixar(); }
+    agDash();
   };
 
   function ligarTela(el, clique, muda) {
