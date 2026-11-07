@@ -1091,8 +1091,7 @@
       return '<div class="ag-quando">' + dataBR(e.d).slice(0, 5) + ' · ' + quandoTxt(e.d) + '</div>' + linhaEvento(e, todas);
     }).join('');
     pintar(tR, 'Calendário', '',
-      '<button class="ag-pdfbt" data-a="pdfplan" aria-label="Exportar planejamento em PDF">📄 PDF</button>' +
-      '<button class="ag-mais" data-a="novolemb" aria-label="Programar visita ou lembrete" title="Programar visita ou lembrete">＋</button>', h);
+      '<button class="ag-mais" data-a="novolemb" aria-label="Programar ou exportar" title="Programar ou exportar">＋</button>', h);
   }
 
   /* ----- visitas e lembretes programados ----- */
@@ -1588,6 +1587,21 @@
     });
     pdfRodape(pgs, W, M);
     return pdfBytes(pgs, logo, W, H);
+  }
+  // botão ＋ do calendário: programar ou exportar o planejamento
+  function menuMais() {
+    var ov = document.createElement('div'); ov.className = 'ag-ov';
+    ov.innerHTML = '<div class="ag-mod ag-menu">' +
+      '<button data-m="vis"><span class="ag-ai c-vis">' + ICO_VIS + '</span><b>Programar visita ou lembrete</b></button>' +
+      '<button data-m="pdf"><span class="ag-ai">📄</span><b>Exportar planejamento em PDF</b></button>' +
+      '<button class="btn secundario" data-m="no">Cancelar</button></div>';
+    document.body.appendChild(ov);
+    ov.onclick = function (ev) {
+      var b = ev.target.closest('[data-m]'), m = b ? b.dataset.m : (ev.target === ov ? 'no' : '');
+      if (!m) return;
+      ov.remove();
+      if (m === 'vis') modalLembrete(null); else if (m === 'pdf') modalPlano();
+    };
   }
   function modalPlano() {
     prepararLogoPdf();
@@ -2131,7 +2145,7 @@
     if (a === 'push') { ativarAvisos(); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
-    if (a === 'novolemb') { modalLembrete(null); return; }
+    if (a === 'novolemb') { menuMais(); return; }
     if (a === 'pdfplan') { modalPlano(); return; }
     if (a === 'editlemb') { var le = (ST.lembretes || []).filter(function (x) { return x.id === v; })[0]; if (le) modalLembrete(le); return; }
     if (a === 'feitolemb') { var lf = (ST.lembretes || []).filter(function (x) { return x.id === v; })[0]; if (lf) { salvarLemb(Object.assign({}, lf, { feito: 1 })); pintarRecs(); toast('Marcado como feito'); } return; }

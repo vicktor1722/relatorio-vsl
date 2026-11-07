@@ -626,7 +626,8 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .ag-tipolemb .ag-ico{width:24px;height:20px}
 
 /* exportar planejamento em PDF */
-.topo .acoes button.ag-pdfbt{height:36px;padding:0 12px;border-radius:18px;background:rgba(255,255,255,.18);color:#fff;font-size:14px;font-weight:600;align-self:center;margin-right:4px}
+.ag-menu>button[data-m=vis],.ag-menu>button[data-m=pdf]{display:flex;align-items:center;gap:12px;width:100%;padding:14px 12px;margin-bottom:8px;border:1.5px solid #D5DED8;border-radius:14px;background:#fff;font-size:15.5px;color:#1F2A22;text-align:left}
+.ag-menu .ag-ai{width:34px;display:grid;place-items:center;font-size:22px}.ag-menu .ag-ai .ag-ico{width:30px;height:22px}
 .ag-semnav{display:flex;align-items:center;justify-content:space-between;border:1px solid #D5DED8;border-radius:12px;padding:4px;margin:0 0 10px;background:#fff}
 .ag-semnav b{font-size:15px}
 .ag-semnav button{width:38px;height:38px;border-radius:10px;font-size:22px;background:#F3F7F4}
