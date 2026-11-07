@@ -272,6 +272,38 @@ export async function mensagemLembretes(env, uid) {
   };
 }
 
+// a cada 15 min: visitas e lembretes com hora marcada recebem um aviso 2 horas antes (horário de MT).
+// Marcado ou criado em cima da hora (menos de 2 h antes), avisa na próxima volta com o tempo que falta.
+// aviso2h guarda "data hora" já avisada: se a hora for trocada, o aviso volta a valer.
+export async function avisarPertoDaHora(env) {
+  const agora = Date.now() - 4 * 3600e3, hoje = new Date(agora).toISOString().slice(0, 10), amanha = new Date(agora + 864e5).toISOString().slice(0, 10);
+  try { await env.DB.prepare('SELECT aviso2h FROM lembretes_agro LIMIT 0').all(); }
+  catch (e) {
+    try { await env.DB.prepare("ALTER TABLE lembretes_agro ADD COLUMN aviso2h TEXT DEFAULT ''").run(); } catch (e2) { return 0; }   // tabela ainda não existe
+  }
+  const { results } = await env.DB.prepare(`SELECT l.id, l.usuario_id, l.tipo, l.titulo, l.data, l.hora, l.obs, l.responsavel, l.aviso2h, f.nome AS fazenda
+      FROM lembretes_agro l LEFT JOIN fazendas f ON f.id = l.fazenda_id
+      WHERE l.feito = 0 AND l.hora != '' AND l.data IN (?, ?)`).bind(hoje, amanha).all();
+  let n = 0;
+  for (const x of results || []) {
+    const quando = Date.parse(x.data + 'T' + x.hora + ':00Z'), falta = Math.round((quando - agora) / 60000), chave = x.data + ' ' + x.hora;
+    if (!(falta > 0 && falta <= 120) || x.aviso2h === chave) continue;
+    // reserva antes de mandar: duas voltas do cron ao mesmo tempo não mandam duas vezes
+    const r = await env.DB.prepare('UPDATE lembretes_agro SET aviso2h = ? WHERE id = ? AND aviso2h IS NOT ?').bind(chave, x.id, chave).run();
+    if (!r.meta || r.meta.changes !== 1) continue;
+    const em = falta >= 105 ? '2 horas' : falta >= 55 && falta <= 65 ? '1 hora' : falta + ' min';
+    const vis = x.tipo === 'visita';
+    try {
+      if (await enviarParaConta(env, x.usuario_id, {
+        title: (vis ? '🚙 Daqui a ' + em + ': visita' + (x.fazenda ? ' à ' + x.fazenda : '') : '🔔 Daqui a ' + em + ': ' + (x.titulo || 'lembrete')),
+        body: [x.hora + (x.data !== hoje ? ' (amanhã)' : ''), vis ? x.titulo : x.fazenda, x.obs, x.responsavel ? 'Responsável: ' + x.responsavel : ''].filter(Boolean).join(' · '),
+        url: '/?abrir=cal', tag: 'lemb-' + x.id
+      })) n++;
+    } catch (e) { /* segue com os outros */ }
+  }
+  return n;
+}
+
 /* ---------------- rotas /api/push/* ---------------- */
 export async function rotasPush(env, req, me, rota) {
   await garantir(env);

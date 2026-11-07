@@ -17,7 +17,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, garantir as garantirAgro, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
 import { cargaEstoqueSantaPaula, trocarGlifosatoSantaPaula, voltarLastingSantaPaula, trocarZappSantaPaula, tiposSantaPaula, cargaComprasGerais } from './cargaestoque.js';
-import { NOVIDADE_CLIMA, avisarAplicacoes, avisarNovidade, rotasPush } from './push.js';
+import { NOVIDADE_CLIMA, avisarAplicacoes, avisarNovidade, avisarPertoDaHora, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
@@ -856,9 +856,10 @@ export default {
     }
   },
 
-  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; 4h30 a chuva dos próximos 15 dias
+  // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; 4h30 a chuva dos próximos 15 dias; a cada 15 min o aviso 2 h antes das visitas
   async scheduled(evento, env, ctx) {
-    if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env)); return; }   // todo dia 4h30 de MT: chuva dos próximos 15 dias
+    if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env)); return; }
+    if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env)); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };

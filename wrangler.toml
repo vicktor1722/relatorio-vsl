@@ -35,4 +35,4 @@ run_worker_first = ["/", "/r/*", "/img/*", "/api/*", "/oauth/*", "/admin", "/adm
 
 # todo dia às 5h00 de Mato Grosso (9h00 UTC) o aviso do operador e às 5h40 (9h40 UTC) o do consultor
 [triggers]
-crons = ["0 9 * * *", "40 9 * * *", "30 8 * * *"]   # 5h00 e 5h40 de MT = avisos; 4h30 de MT = chuva dos próximos 15 dias (todo dia)
+crons = ["0 9 * * *", "40 9 * * *", "30 8 * * *", "*/15 * * * *"]   # 5h00 e 5h40 de MT = avisos; 4h30 de MT = chuva dos próximos 15 dias (todo dia); a cada 15 min = aviso 2 h antes das visitas/lembretes
