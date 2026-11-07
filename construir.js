@@ -53,6 +53,8 @@ fs.writeFileSync(path.join(saida, 'index.html'), html);
 ['manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png'].forEach(function (f) {
   fs.copyFileSync(path.join(pub, f), path.join(saida, f));
 });
+// gerador de PDF também solto, para o painel /admin usar o mesmo
+fs.copyFileSync(path.join(pub, 'js', 'planopdf.js'), path.join(saida, 'planopdf.js'));
 
 /* 5. site institucional (www.amvs.ia.br): copia public/amvs -> site/amvs */
 const web = path.join(pub, 'amvs');
