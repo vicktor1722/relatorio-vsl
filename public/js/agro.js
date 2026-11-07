@@ -1078,8 +1078,7 @@
       '<span class="c-venc">' + ICO_PULV + 'vencida</span><span class="c-ok">' + ICO_PULV + 'próxima</span><span class="c-colh">' + ICO_COLH + 'colheita prevista</span>' +
       '<span class="c-vis">' + ICO_VIS + 'visita</span><span class="c-lem">' + ICO_LEM + 'lembrete</span></div>';
     var ds = ev.filter(function (e) { return e.d === R.sel; });
-    h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>') +
-      '<button class="btn secundario ag-addlemb" data-a="novolemb">＋ Programar visita ou lembrete em ' + dataBR(R.sel).slice(0, 5) + '</button>';
+    h += '<h2>' + dataBR(R.sel) + (R.sel === hoje() ? ' (hoje)' : '') + '</h2>' + (ds.length ? ds.map(function (e) { return linhaEvento(e, todas); }).join('') : '<div class="ag-dica">Nada neste dia.</div>');
     var pl = (ST.lembretes || []).filter(function (l) { return !l.feito && l.data >= hoje() && (todas || !l.fazenda_id || l.fazenda_id === R.faz); })
       .sort(function (a, b) { return (a.data + (a.hora || '')) < (b.data + (b.hora || '')) ? -1 : 1; }).slice(0, 6);
     if (pl.length) h += '<h2>Próximas visitas e lembretes</h2>' + pl.map(function (l) {
