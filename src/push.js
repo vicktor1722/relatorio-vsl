@@ -282,3 +282,26 @@ export async function rotasPush(env, req, me, rota) {
 
   return json({ erro: 'rota não encontrada' }, 404);
 }
+
+/* ---------------- aviso de novidade (uma vez) para as contas do app ---------------- */
+// Pega a "vez" no banco antes de enviar (INSERT que só passa uma vez): mesmo com várias instâncias, sai um aviso só.
+export async function avisarNovidade(env, chave, msg) {
+  await garantir(env);
+  const pegou = await env.DB.prepare("INSERT INTO config (chave, valor) VALUES (?, '{\"enviando\":true}') ON CONFLICT(chave) DO NOTHING").bind(chave).run();
+  if (!pegou.meta || !pegou.meta.changes) return null;   // já foi (ou está indo) por outra instância
+  const { results } = await env.DB.prepare("SELECT DISTINCT usuario_id FROM push_assinaturas WHERE usuario_id NOT LIKE 'portal:%'").all();
+  let contas = 0, aparelhos = 0;
+  for (const { usuario_id: uid } of results || []) {
+    try { const n = await enviarParaConta(env, uid, msg); if (n) { contas++; aparelhos += n; } } catch (e) { /* segue para as outras */ }
+  }
+  const res = { contas, aparelhos, de: (results || []).length, em: new Date().toISOString() };
+  await env.DB.prepare('UPDATE config SET valor = ? WHERE chave = ?').bind(JSON.stringify(res), chave).run();
+  return res;
+}
+
+export const NOVIDADE_CLIMA = {
+  title: '🌧️ Novidade: mapa da chuva no app',
+  body: 'Toque no ícone da temperatura, no topo da lista de conversas, e veja a chuva dos próximos 15 dias (dia a dia, 7 e 15 dias), em tela cheia se quiser.',
+  url: '/?abrir=clima',
+  tag: 'novidade-clima'
+};

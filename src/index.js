@@ -17,7 +17,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, garantir as garantirAgro, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
 import { cargaEstoqueSantaPaula, trocarGlifosatoSantaPaula, voltarLastingSantaPaula, trocarZappSantaPaula, tiposSantaPaula, cargaComprasGerais } from './cargaestoque.js';
-import { avisarAplicacoes, rotasPush } from './push.js';
+import { NOVIDADE_CLIMA, avisarAplicacoes, avisarNovidade, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
@@ -176,7 +176,7 @@ async function pngIcone(tipo) {
   return new Response(out, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' } });
 }
 
-let cargaTentada = false;
+let cargaTentada = false, avisoTentado = false;
 
 export default {
   async fetch(req, env, ctx) {
@@ -186,6 +186,8 @@ export default {
 
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     // carga única do estoque da Santa Paula (safra 26/27): tenta uma vez por instância até ficar feita
+    // aviso único às contas do app: mapa da chuva na previsão do tempo (sai uma vez só, ver avisarNovidade)
+    if (!avisoTentado) { avisoTentado = true; ctx.waitUntil(avisarNovidade(env, 'aviso:novidade_clima', NOVIDADE_CLIMA).catch((e) => console.log('aviso novidade:', e.message))); }
     if (!cargaTentada) { cargaTentada = true; ctx.waitUntil(garantirAgro(env).then(() => cargaEstoqueSantaPaula(env)).then(() => trocarGlifosatoSantaPaula(env)).then(() => voltarLastingSantaPaula(env)).then(() => trocarZappSantaPaula(env)).then(() => tiposSantaPaula(env)).then(() => cargaComprasGerais(env)).catch((e) => console.log('carga do estoque:', e.message))); }
 
     try {
@@ -262,11 +264,12 @@ export default {
         const cg = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:estoque_sp2627'").first().catch(function () { return null; });
         const tg = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_roundup'").first().catch(function () { return null; });
         const tz = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_zapp'").first().catch(function () { return null; });
+        const av = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'aviso:novidade_clima'").first().catch(function () { return null; });
         const tt = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_tipos'").first().catch(function () { return null; });
         const cc = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('carga:compra_catarinense', 'carga:compra_pindaituba', 'carga:compra_pantaneira')").all().catch(function () { return { results: [] }; });
         const compras = {}; (cc.results || []).forEach(function (r) { const v = JSON.parse(r.valor); compras[r.chave.slice(13)] = { itens: v.itens, fazendas: v.fazendas_grupo, sem_preco: v.sem_preco, total: v.total }; });
         const tk = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_lasting'").first().catch(function () { return null; });
-        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0, troca_glifosato: tg ? JSON.parse(tg.valor).linhas : null, volta_lasting: tk ? { linhas: JSON.parse(tk.valor).linhas, karate: JSON.parse(tk.valor).karate_restante } : null, troca_zapp: tz ? JSON.parse(tz.valor).linhas : null, tipos: tt ? JSON.parse(tt.valor) : null, compras });
+        return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0, troca_glifosato: tg ? JSON.parse(tg.valor).linhas : null, volta_lasting: tk ? { linhas: JSON.parse(tk.valor).linhas, karate: JSON.parse(tk.valor).karate_restante } : null, troca_zapp: tz ? JSON.parse(tz.valor).linhas : null, tipos: tt ? JSON.parse(tt.valor) : null, compras, aviso_clima: av ? JSON.parse(av.valor) : null });
       }
 
       if (rota.startsWith('/img/')) {
