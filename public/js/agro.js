@@ -1047,7 +1047,8 @@
       var l = e.l, vis = l.tipo === 'visita', fl = l.fazenda_id ? cadFazDe(l.fazenda_id) : null;
       return '<div class="ag-alerta c-' + (vis ? 'vis' : 'lem') + (l.feito ? ' feito' : '') + '" data-a="editlemb" data-v="' + esc(l.id) + '"><div class="ag-ai c-' + (vis ? 'vis' : 'lem') + '">' + (vis ? ICO_VIS : ICO_LEM) + '</div>' +
         '<div class="ag-ac"><b>' + esc(e.txt) + '</b>' + (l.feito ? ' <span class="badge">feito</span>' : '') +
-        '<span>' + (l.hora ? '🕘 ' + esc(l.hora) + ' · ' : '') + (vis && l.titulo ? esc(l.titulo) : (!vis && fl ? esc(fl.nome) : (vis ? 'visita programada' : 'lembrete'))) + (l.obs ? ' · ' + esc(l.obs) : '') + '</span></div>' +
+        '<span>' + (l.hora ? '🕘 ' + esc(l.hora) + ' · ' : '') + (vis && l.titulo ? esc(l.titulo) : (!vis && fl ? esc(fl.nome) : (vis ? 'visita programada' : 'lembrete'))) + (l.obs ? ' · ' + esc(l.obs) : '') +
+          (l.responsavel ? '<br>👤 ' + esc(l.responsavel) : '') + '</span></div>' +
         (!l.feito ? '<button class="ag-peq" data-a="feitolemb" data-v="' + esc(l.id) + '">✓ Feito</button>' : '') + '</div>';
     }
     if (e.k === 'colh') {
@@ -1088,7 +1089,7 @@
     if (pt.length) h += '<h2>Próximas aplicações</h2>' + pt.map(function (e) {
       return '<div class="ag-quando">' + dataBR(e.d).slice(0, 5) + ' · ' + quandoTxt(e.d) + '</div>' + linhaEvento(e, todas);
     }).join('');
-    pintar(tR, todas ? 'Calendário de aplicações' : 'Calendário', todas ? 'Todas as fazendas' : (f ? f.nome : '—'),
+    pintar(tR, 'Calendário', '',
       '<button class="ag-mais" data-a="novolemb" aria-label="Programar visita ou lembrete" title="Programar visita ou lembrete">＋</button>', h);
   }
 
@@ -1101,7 +1102,9 @@
   }
   function modalLembrete(l) {
     var novo = !l;
-    l = l || { id: novoId('lb'), tipo: 'visita', fazenda_id: R.faz !== '*' ? R.faz : '', titulo: '', data: R.sel || hoje(), hora: '', obs: '', feito: 0 };
+    var resps = (cad().responsaveis || []).map(function (x) { return x.nome; });
+    l = l || { id: novoId('lb'), tipo: 'visita', fazenda_id: R.faz !== '*' ? R.faz : '', titulo: '', data: R.sel || hoje(), hora: '', obs: '', feito: 0, responsavel: resps.length === 1 ? resps[0] : (ST.ultResp || '') };
+    if (l.responsavel && resps.indexOf(l.responsavel) < 0) resps.push(l.responsavel);
     var fzs = (cad().fazendas || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
     var ov = document.createElement('div'); ov.className = 'ag-ov';
     ov.innerHTML = '<div class="ag-mod"><h3>' + (novo ? 'Programar' : 'Editar') + '</h3>' +
@@ -1110,6 +1113,8 @@
       '<div class="campo"><label id="lbFazLab">Fazenda</label><select id="lbFaz"><option value="">' + (l.tipo === 'visita' ? '— escolha a fazenda —' : '— nenhuma —') + '</option>' +
         fzs.map(function (f) { return '<option value="' + esc(f.id) + '"' + (f.id === l.fazenda_id ? ' selected' : '') + '>' + esc(f.nome) + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo"><label id="lbTitLab">' + (l.tipo === 'visita' ? 'Assunto da visita (opcional)' : 'O que lembrar') + '</label><input id="lbTit" maxlength="120" value="' + esc(l.titulo || '') + '" placeholder="' + (l.tipo === 'visita' ? 'Ex.: avaliar emergência do TH-05' : 'Ex.: ligar para o gerente') + '"></div>' +
+      '<div class="campo"><label>Responsável</label><select id="lbResp"><option value="">' + (resps.length ? '— escolha —' : '— cadastre em Produtores e fazendas —') + '</option>' +
+        resps.map(function (n) { return '<option' + (n === l.responsavel ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' +
       '<div class="linha2"><div class="campo"><label>Dia</label><input type="date" id="lbData" value="' + esc(l.data) + '"></div>' +
       '<div class="campo"><label>Hora (opcional)</label><input type="time" id="lbHora" value="' + esc(l.hora || '') + '"></div></div>' +
       '<div class="campo"><label>Observação (opcional)</label><input id="lbObs" maxlength="500" value="' + esc(l.obs || '') + '"></div>' +
@@ -1142,7 +1147,9 @@
       if (tipo === 'visita' && !fz) { toast('Escolha a fazenda da visita'); return; }
       if (tipo !== 'visita' && !tit) { toast('Escreva o que lembrar'); return; }
       if (!dt) { toast('Escolha o dia'); return; }
-      var nl = Object.assign({}, l, { tipo: tipo, fazenda_id: fz, titulo: tit, data: dt, hora: $('#lbHora', ov).value || '', obs: $('#lbObs', ov).value.trim() });
+      var rp = $('#lbResp', ov).value;
+      if (rp) ST.ultResp = rp;
+      var nl = Object.assign({}, l, { tipo: tipo, fazenda_id: fz, titulo: tit, data: dt, hora: $('#lbHora', ov).value || '', obs: $('#lbObs', ov).value.trim(), responsavel: rp });
       salvarLemb(nl); ov.remove();
       R.sel = dt; var dd0 = new Date(dt + 'T12:00:00'); R.cy = dd0.getFullYear(); R.cm = dd0.getMonth();
       pintarRecs();

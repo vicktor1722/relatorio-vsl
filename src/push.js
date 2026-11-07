@@ -258,12 +258,12 @@ export async function mensagemLembretes(env, uid) {
   const hoje = new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
   let l = [];
   try {
-    l = (await env.DB.prepare(`SELECT l.tipo, l.titulo, l.hora, l.obs, f.nome AS fazenda FROM lembretes_agro l LEFT JOIN fazendas f ON f.id = l.fazenda_id
+    l = (await env.DB.prepare(`SELECT l.tipo, l.titulo, l.hora, l.obs, l.responsavel, f.nome AS fazenda FROM lembretes_agro l LEFT JOIN fazendas f ON f.id = l.fazenda_id
         WHERE l.usuario_id = ? AND l.data = ? AND l.feito = 0 ORDER BY l.hora`).bind(uid, hoje).all()).results || [];
   } catch (e) { return null; }   // tabela ainda não existe
   if (!l.length) return null;
   const linha = (x) => (x.hora ? x.hora + ' · ' : '') + (x.tipo === 'visita' ? 'Visita' + (x.fazenda ? ' à ' + x.fazenda : '') : (x.titulo || 'Lembrete') + (x.fazenda ? ' · ' + x.fazenda : '')) +
-    (x.tipo === 'visita' && x.titulo ? ' — ' + x.titulo : '');
+    (x.tipo === 'visita' && x.titulo ? ' — ' + x.titulo : '') + (x.responsavel ? ' (' + x.responsavel + ')' : '');
   const visitas = l.filter((x) => x.tipo === 'visita').length;
   return {
     title: l.length === 1 ? (visitas ? '🚙 Hoje: visita' + (l[0].fazenda ? ' à ' + l[0].fazenda : '') : '🔔 Lembrete de hoje') : '📅 Hoje: ' + l.length + (visitas === l.length ? ' visitas' : ' compromissos'),
