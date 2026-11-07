@@ -647,8 +647,8 @@ export default {
 
       if (rota === '/api/produtor' && req.method === 'POST') {
         const p = await req.json();
-        // sem id = cadastro novo: se a conta já tem um produtor com esse nome, devolve o existente
-        if (!p.id) {
+        // sem id (ou novo: feito sem internet, com id do aparelho) = cadastro novo: se a conta já tem um produtor com esse nome, devolve o existente
+        if (!p.id || p.novo) {
           // (comparação em JS: o lower() do SQLite não entende acentos, ex.: JOÃO x João)
           const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
           const { results: todos } = await env.DB.prepare('SELECT id, nome FROM produtores WHERE usuario_id = ?').bind(me.id).all();
@@ -669,8 +669,8 @@ export default {
 
       if (rota === '/api/fazenda' && req.method === 'POST') {
         const f = await req.json();
-        // sem id = cadastro novo: mesma fazenda (nome + produtor) já cadastrada? devolve a existente
-        if (!f.id) {
+        // sem id (ou novo: feito sem internet) = cadastro novo: mesma fazenda (nome + produtor) já cadastrada? devolve a existente
+        if (!f.id || f.novo) {
           const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
           const { results: todas } = await env.DB.prepare('SELECT id, nome, produtor_id, talhoes FROM fazendas WHERE usuario_id = ?').bind(me.id).all();
           const ja = (todas || []).find((x) => norm(x.nome) === norm(f.nome) && (x.produtor_id || '') === (f.produtor_id || ''));
