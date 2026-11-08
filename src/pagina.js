@@ -84,7 +84,7 @@ footer .bandeira{display:block;margin:12px auto 0;width:30px;height:21px;border-
 .barra-idioma .aviso-trad{margin-left:auto}
 .barra-idioma .aviso-trad button{border:0;background:none;color:var(--verde);text-decoration:underline;padding:0 0 0 4px;font-weight:500}
 @media print{.barra-idioma{display:none}}
-.visor{position:fixed;left:0;right:0;top:0;height:100vh;height:100dvh;z-index:90;background:rgba(0,0,0,.96);
+.visor{position:fixed;left:0;right:0;top:0;height:100vh;height:100dvh;z-index:5000;background:rgba(0,0,0,.96);
  display:flex;align-items:center;justify-content:center}
 .visor img{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom}
 .visor .x{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;z-index:2;width:44px;height:44px;border-radius:50%;
