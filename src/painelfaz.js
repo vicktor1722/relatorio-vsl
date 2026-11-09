@@ -2,7 +2,7 @@
    janela de pulverização, soja na fazenda) e o resumo de uma fazenda ao clicar.
    Usa os mesmos cálculos da tela Início do dono (portal). */
 import { modulosDe } from './agro.js';
-import { dadosParaPainel } from './portal.js';
+import { dadosPainelLote, dadosParaPainel } from './portal.js';
 import { calibracao, climaVarios, climaDe, localDaFazenda, mercadoDaFazenda, mercadoGeral, salvarCalibracao } from './mercado.js';
 import { chuvaDaFazenda, mapaGuardado } from './chuva.js';
 import { comCentro, comResumo, resumosDe } from './resumokml.js';
@@ -75,15 +75,11 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
     const rsm = await resumosDe(env, faz);   // centro e áreas sem abrir os KMLs
     faz.forEach((f) => { f.centro = rsm[f.id] ? rsm[f.id].centro : null; });
     const [fr, mg] = await Promise.all([fretes(env), mercadoGeral(env).catch(() => null)]);
-    // dados de cada fazenda (de 6 em 6) e o local
-    const dados = [], locais = [];
-    for (let i = 0; i < faz.length; i += 6) {
-      const parte = await Promise.all(faz.slice(i, i + 6).map(async (f) => {
-        const [d, l] = await Promise.all([dadosParaPainel(env, f.usuario_id, f.id, { leve: true }).catch(() => null), localDaFazenda(f).catch(() => null)]);
-        return [d, l];
-      }));
-      parte.forEach((x) => { dados.push(x[0]); locais.push(x[1]); });
-    }
+    // dados de todas as fazendas carregados juntos (poucas consultas) e o local de cada uma (centro do resumo do mapa)
+    const [dados, locais] = await Promise.all([
+      dadosPainelLote(env, faz, { leve: true }).catch(() => faz.map(() => null)),
+      Promise.all(faz.map((f) => localDaFazenda(f).catch(() => null)))
+    ]);
     const climas = await climaVarios(locais).catch(() => locais.map(() => null));
     const linhas = [], regDisp = {};
     let regFut = null;

@@ -3,6 +3,7 @@
    API (login, cadastro, relatórios) + página pública do relatório
    ============================================================ */
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
+import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
@@ -179,8 +180,21 @@ async function pngIcone(tipo) {
 
 let cargaTentada = false, avisoTentado = false;
 
+// quadros pesados guardados prontos (segundos até vencer); ver quadros.js
+const QUADROS = { '/api/painel/fazendas': 1800, '/api/painel/fazenda': 1800, '/api/agro/admin/plantio': 3600, '/api/agro/comparativo': 3600, '/api/agro/colheita-prevista': 3600 };
+
 export default {
   async fetch(req, env, ctx) {
+    const res = await this.responder(req, env, ctx);
+    // lançamento que muda os quadros: sobe a versão (os quadros prontos antigos deixam de valer)
+    try {
+      const rota = new URL(req.url).pathname;
+      if (res && res.status < 400 && mudaQuadros(rota, req.method)) await mudouDados(env).catch(() => {});   // antes de responder: a próxima tela já vem atualizada
+    } catch (e) { /* não atrapalha a resposta */ }
+    return res;
+  },
+
+  async responder(req, env, ctx) {
     const url = new URL(req.url);
     const rota = url.pathname;
     const origem = url.origin;
@@ -465,6 +479,13 @@ export default {
       if (rota.startsWith('/api/push/')) return await rotasPush(env, req, me, rota);
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
+      if (req.method === 'GET' && QUADROS[rota]) {
+        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|' + url.search;
+        return await quadroPronto(env, ctx, req, chave, QUADROS[rota], async () => {
+          const r = rota.startsWith('/api/painel/') ? await rotasPainelFaz(env, req, me, rota, url) : await rotasAgro(env, req, me, rota, url);
+          return r.status === 200 ? await r.json() : r;
+        });
+      }
       if (rota.startsWith('/api/painel/')) return await rotasPainelFaz(env, req, me, rota, url);   // aba Fazendas do painel
       if (rota === '/api/modulos' || rota.startsWith('/api/agro/')) return await rotasAgro(env, req, me, rota, url);
 
@@ -475,7 +496,8 @@ export default {
         if (!adm && await ehAdminSemCodigo(env, me.id)) return json({ erro: 'Conta administradora: entre com o código de confirmação', precisaCodigo: true }, 401);
         // qualquer conta vê o próprio painel; admin vê o de todos
         if (rota === '/api/admin/resumo') return json(await resumoAdmin(env, me, adm));
-        if (rota === '/api/admin/areas') return json(await areasAdmin(env, me, adm));
+        // mapa das fazendas da Visão geral (desenho de todos os KMLs): quadro pronto; muda quando um KML muda (versão dos dados)
+        if (rota === '/api/admin/areas') return await quadroPronto(env, ctx, req, 'areas|' + me.id + '|' + (adm ? 1 : 0), 21600, () => areasAdmin(env, me, adm));
         if (!adm) return json({ erro: 'esta conta não tem acesso de administrador' }, 403);
         if (rota === '/api/admin/usuario' && req.method === 'POST') {
           try { return json(await criarConta(env, await req.json())); }
