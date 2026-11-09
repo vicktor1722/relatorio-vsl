@@ -1897,14 +1897,16 @@
   }
 
   /* ---------------- mudar a ordem das fotos na conversa ----------------
-     Só as fotos ainda não sincronizadas mudam de lugar (setinhas discretas ao lado da bolha). A ordem da
-     conversa é a do relatório: cada registro tem uma chave de ordem (pos, em ms); sem pos, vale a hora.
+     As fotos mudam de lugar enquanto a visita não foi finalizada (link gerado); depois disso a ordem fica.
+     Setinhas discretas ao lado da bolha. A ordem da conversa é a do relatório: cada registro tem uma chave
+     de ordem (pos, em ms); sem pos, vale a hora. Foto já na nuvem que mudou de lugar sobe de novo só a posição.
      Enquanto organiza, a sincronização fica pausada para nada subir no meio da troca. */
-  function podeMover(it) { return it && (it.tipo === 'foto' || it.tipo === 'video') && it.sync_state !== 'ok'; }
+  function visitaFinalizada(relId) { const v = (st.visitas || []).filter(function (x) { return x.id === relId; })[0]; return !!(v && (v.status === 'publicado' || v.na_fila)); }
+  function podeMover(it) { return !!it && (it.tipo === 'foto' || it.tipo === 'video') && !visitaFinalizada(it.relatorio_id); }
   async function modoOrdem(ligar) {
     if (ligar) {
       const n = st.itens.filter(podeMover).length;
-      if (!n) { toast('Só dá para mudar a ordem das fotos que ainda não foram sincronizadas — as desta conversa já estão na nuvem', 5000); return; }
+      if (!n) { toast('As visitas desta conversa já foram finalizadas (link gerado) — a ordem das fotos não muda mais', 5000); return; }
       st.ordem = true; Sync.pausar(true);
       clearTimeout(st.ordemTimer); st.ordemTimer = setTimeout(function () { if (st.ordem) modoOrdem(false); }, 15 * 60 * 1000);   // não deixa a sincronização parada por esquecimento
     } else {
@@ -1926,10 +1928,11 @@
     const l = st.itens, k = l.findIndex(function (x) { return x.id === id; }), m = k + (dir === 'sobe' ? -1 : 1);
     if (k < 0 || m < 0 || m >= l.length) return;
     const a = l[k], b = l[m];
-    if (a.relatorio_id !== b.relatorio_id || b.sync_state === 'ok' || !podeMover(a)) { toast('Só troca de lugar com registros que ainda não foram sincronizados'); return; }
+    if (a.relatorio_id !== b.relatorio_id || !podeMover(a)) { toast('A foto só troca de lugar dentro da mesma visita, antes de finalizar'); return; }
     const ka = chaveOrdem(a), kb = chaveOrdem(b);
     a.pos = kb === ka ? kb + (dir === 'sobe' ? -1 : 1) : kb; b.pos = ka;
-    for (const x of [a, b]) { const it = await DB.get('itens', x.id); if (it) { it.pos = x.pos; await DB.put('itens', it); } }
+    // já na nuvem: volta para a fila só para subir a posição nova (a foto não é enviada de novo)
+    for (const x of [a, b]) { const it = await DB.get('itens', x.id); if (it) { it.pos = x.pos; if (it.sync_state === 'ok') it.sync_state = 'pendente'; x.sync_state = it.sync_state; await DB.put('itens', it); } }
     l[k] = b; l[m] = a;
     // troca as duas bolhas na tela sem redesenhar a conversa (não pisca); com divisor de dia no meio, redesenha
     const chat = $('#chat'), ea = chat.querySelector('.msg[data-id="' + a.id + '"]'), eb = chat.querySelector('.msg[data-id="' + b.id + '"]');
@@ -1949,7 +1952,7 @@
     const l = st.itens, chat = document.getElementById('chat');
     l.forEach(function (it, k) {
       if (!podeMover(it)) return;
-      const ok = function (j) { const v = l[j]; return !!(v && v.relatorio_id === it.relatorio_id && v.sync_state !== 'ok'); };
+      const ok = function (j) { const v = l[j]; return !!(v && v.relatorio_id === it.relatorio_id); };
       const s = chat.querySelector('[data-ord="sobe"][data-id="' + it.id + '"]'), d = chat.querySelector('[data-ord="desce"][data-id="' + it.id + '"]');
       if (s) s.disabled = !ok(k - 1);
       if (d) d.disabled = !ok(k + 1);
