@@ -400,7 +400,7 @@
     let numVisita = 0;
     for (let vi = 0; vi < st.visitas.length; vi++) {
       const v = st.visitas[vi];
-      const itens = await DB.itensDoRelatorio(v.id);
+      const itens = ordenarConversa(await DB.itensDoRelatorio(v.id));
       // visita antiga, vazia e nunca enviada: não aparece
       if (!itens.length && v.status !== 'publicado' && !v.na_fila && v.id !== st.rel.id && vi !== st.visitas.length - 1) continue;
       html += divisorVisita(v, ++numVisita);
@@ -437,6 +437,7 @@
 
     const bl = chat.querySelector('[data-lote]');
     if (bl) bl.onclick = function (ev) { ev.stopPropagation(); concluirLote(); };
+    atualizarSetas();
 
     $$('#chat [data-env]').forEach(function (b) {
       b.onclick = function (ev) { ev.stopPropagation(); enviarDaLista(b); };
@@ -480,6 +481,10 @@
     recuperarMinis();
   }
 
+  // ordem da conversa e do relatório: pos (ms) quando o consultor trocou de lugar; senão a hora do registro
+  function chaveOrdem(i) { const p = Number(i.pos); return p > 1e11 ? p : (Date.parse(i.capturado_em) || 0); }
+  function ordenarConversa(l) { return l.slice().sort(function (a, b) { return chaveOrdem(a) - chaveOrdem(b) || String(a.capturado_em).localeCompare(String(b.capturado_em)); }); }
+
   function bolhaHTML(it, editavel) {
     // lápis para editar a legenda (só nas visitas ainda em aberto)
     const lapis = editavel ? '<button type="button" class="lapis" data-editar="' + it.id + '" title="Editar legenda" aria-label="Editar legenda">' +
@@ -510,12 +515,14 @@
         '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
     }
 
-    return '<div class="msg eu" data-id="' + it.id + '"><div class="bolha">' +
+    const setas = st.ordem && podeMover(it) ? '<div class="ord-setas"><button type="button" data-ord="sobe" data-id="' + it.id + '" aria-label="Subir">▲</button>' +
+      '<button type="button" data-ord="desce" data-id="' + it.id + '" aria-label="Descer">▼</button></div>' : '';
+    return '<div class="msg eu' + (setas ? ' ord' : '') + '" data-id="' + it.id + '"><div class="bolha">' +
       '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '" style="aspect-ratio:' + (PROP[it.id] || 0.75) + '"></div>' +
       chip +
       (it.legenda ? '<div class="legenda">' + ZAP.html(esc(it.legenda)) + '</div>' : '') +
       '<div class="rodape">' + lapis + (it.bytes ? '<span>' + bytesFmt(it.bytes) + '</span>' : '') +
-      '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div></div>';
+      '<span>' + hora(it.capturado_em) + '</span>' + ticks + '</div></div>' + setas + '</div>';
   }
 
   /* ---------------- captura ---------------- */
@@ -1720,6 +1727,7 @@
   }
 
   async function abrirRelatorio(id, porBaixo) {
+    if (st.ordem) { st.ordem = false; Sync.pausar(false); const ob = document.getElementById('ordBarra'); if (ob) ob.remove(); }   // trocou de conversa: sai do modo de ordem
     st.rel = await DB.get('relatorios', id);
     if (!st.rel) return;
     await DB.cfg('ultimo', id);
@@ -1866,7 +1874,7 @@
       '<div class="opcao" data-a="editar"><span>✏️</span><span>Editar dados da visita</span></div>' +
       '<div class="opcao" data-a="sync"><span>🔄</span><span>Sincronizar agora</span></div>' +
       '<div class="opcao" data-a="previa"><span>👁️</span><span>Ver como o cliente vê</span></div>' +
-      '<div class="opcao" data-a="organizar"><span>↕️</span><span>Organizar fotos do relatório</span></div>' +
+      '<div class="opcao" data-a="organizar"><span>↕️</span><span>' + (st.ordem ? 'Concluir a ordem das fotos' : 'Mudar ordem das fotos') + '</span></div>' +
       '<div class="opcao" data-a="publicar"><span>🔗</span><span><b>Finalizar e gerar link</b></span></div>' +
       '<div class="opcao" data-a="lista"><span>📁</span><span>Todos os relatórios</span></div>';
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
@@ -1881,94 +1889,74 @@
         }
         if (a === 'sync') { toast('Sincronizando…'); const r = await Sync.sincronizar(); if (!r.erro) toast(r.enviados + ' enviados, ' + r.falhas + ' falhas'); await renderChat(); atualizarSync(); }
         if (a === 'previa') abrirRelatorioPronto(st.rel.id, true);
-        if (a === 'organizar') organizarFotos();
+        if (a === 'organizar') modoOrdem(!st.ordem);
         if (a === 'publicar') publicarRelatorio();
         if (a === 'lista') { await listarRelatorios(); abrir('telaLista'); }
       };
     });
   }
 
-  /* ---------------- organizar fotos: ordem em que saem no relatório ----------------
-     O relatório agrupa por talhão (ordem do KML); aqui o consultor muda a ordem dentro de cada talhão.
-     A conversa continua na ordem em que foi feita. A posição (pos) sobe para a nuvem com o registro. */
-  async function organizarFotos() {
-    const rel = st.rel; if (!rel) return;
-    const todos = (await DB.itensDoRelatorio(rel.id)).filter(function (i) { return i.tipo === 'foto' || i.tipo === 'video'; });
-    if (todos.length < 2) { toast('Esta visita tem menos de 2 fotos para organizar'); return; }
-    const ordemKml = {};
-    ((rel.talhoes && rel.talhoes.features) || []).forEach(function (f, i) { const n = (f.properties || {}).nome; if (n) ordemKml[n] = i; });
-    const temP = function (x) { return x.pos != null && x.pos !== ''; };
-    const porPos = function (a, b) { return (temP(a) && temP(b) ? Number(a.pos) - Number(b.pos) : temP(a) ? -1 : temP(b) ? 1 : 0) || String(a.capturado_em).localeCompare(String(b.capturado_em)); };
-    const grupos = {};
-    todos.forEach(function (i) { const k = i.talhao || ''; (grupos[k] = grupos[k] || []).push(i); });
-    const chaves = Object.keys(grupos).sort(function (a, b) {
-      const pa = a === '' ? 1e6 : (ordemKml[a] != null ? ordemKml[a] : 1e5), pb = b === '' ? 1e6 : (ordemKml[b] != null ? ordemKml[b] : 1e5);
-      return pa - pb || a.localeCompare(b);
+  /* ---------------- mudar a ordem das fotos na conversa ----------------
+     As fotos mudam de lugar enquanto a visita não foi finalizada (link gerado); depois disso a ordem fica.
+     Setinhas discretas ao lado da bolha. A ordem da conversa é a do relatório: cada registro tem uma chave
+     de ordem (pos, em ms); sem pos, vale a hora. Foto já na nuvem que mudou de lugar sobe de novo só a posição.
+     Enquanto organiza, a sincronização fica pausada para nada subir no meio da troca. */
+  function visitaFinalizada(relId) { const v = (st.visitas || []).filter(function (x) { return x.id === relId; })[0]; return !!(v && (v.status === 'publicado' || v.na_fila)); }
+  function podeMover(it) { return !!it && (it.tipo === 'foto' || it.tipo === 'video') && !visitaFinalizada(it.relatorio_id); }
+  async function modoOrdem(ligar) {
+    if (ligar) {
+      const n = st.itens.filter(podeMover).length;
+      if (!n) { toast('As visitas desta conversa já foram finalizadas (link gerado) — a ordem das fotos não muda mais', 5000); return; }
+      st.ordem = true; Sync.pausar(true);
+      clearTimeout(st.ordemTimer); st.ordemTimer = setTimeout(function () { if (st.ordem) modoOrdem(false); }, 15 * 60 * 1000);   // não deixa a sincronização parada por esquecimento
+    } else {
+      st.ordem = false; Sync.pausar(false); clearTimeout(st.ordemTimer);
+    }
+    await renderChat();
+    let barra = document.getElementById('ordBarra');
+    if (st.ordem && !barra) {
+      barra = document.createElement('div'); barra.id = 'ordBarra'; barra.className = 'ord-barra';
+      barra.innerHTML = '<span>↕️ Mudando a ordem das fotos</span><button type="button" id="ordOk">Concluir</button>';
+      document.body.appendChild(barra);
+      barra.querySelector('#ordOk').onclick = function () { modoOrdem(false); };
+    }
+    if (!st.ordem && barra) barra.remove();
+    if (!st.ordem && navigator.onLine && st.rel) Sync.sincronizar(st.rel.id);
+  }
+  // troca o registro com o vizinho (só entre registros que ainda não subiram)
+  async function moverItem(id, dir) {
+    const l = st.itens, k = l.findIndex(function (x) { return x.id === id; }), m = k + (dir === 'sobe' ? -1 : 1);
+    if (k < 0 || m < 0 || m >= l.length) return;
+    const a = l[k], b = l[m];
+    if (a.relatorio_id !== b.relatorio_id || !podeMover(a)) { toast('A foto só troca de lugar dentro da mesma visita, antes de finalizar'); return; }
+    const ka = chaveOrdem(a), kb = chaveOrdem(b);
+    a.pos = kb === ka ? kb + (dir === 'sobe' ? -1 : 1) : kb; b.pos = ka;
+    // já na nuvem: volta para a fila só para subir a posição nova (a foto não é enviada de novo)
+    for (const x of [a, b]) { const it = await DB.get('itens', x.id); if (it) { it.pos = x.pos; if (it.sync_state === 'ok') it.sync_state = 'pendente'; x.sync_state = it.sync_state; await DB.put('itens', it); } }
+    l[k] = b; l[m] = a;
+    // troca as duas bolhas na tela sem redesenhar a conversa (não pisca); com divisor de dia no meio, redesenha
+    const chat = $('#chat'), ea = chat.querySelector('.msg[data-id="' + a.id + '"]'), eb = chat.querySelector('.msg[data-id="' + b.id + '"]');
+    if (ea && eb && dir === 'desce' && ea.nextElementSibling === eb) ea.parentNode.insertBefore(eb, ea);
+    else if (ea && eb && dir === 'sobe' && eb.nextElementSibling === ea) eb.parentNode.insertBefore(ea, eb);
+    else {
+      const y0 = ea ? ea.getBoundingClientRect().top : 0;
+      await renderChat();
+      const e2 = chat.querySelector('.msg[data-id="' + a.id + '"]');
+      if (e2 && ea) chat.scrollTop += e2.getBoundingClientRect().top - y0;
+    }
+    atualizarSetas();
+  }
+  // apaga a setinha que não pode ser usada (vizinho já sincronizado ou de outra visita)
+  function atualizarSetas() {
+    if (!st.ordem) return;
+    const l = st.itens, chat = document.getElementById('chat');
+    l.forEach(function (it, k) {
+      if (!podeMover(it)) return;
+      const ok = function (j) { const v = l[j]; return !!(v && v.relatorio_id === it.relatorio_id); };
+      const s = chat.querySelector('[data-ord="sobe"][data-id="' + it.id + '"]'), d = chat.querySelector('[data-ord="desce"][data-id="' + it.id + '"]');
+      if (s) s.disabled = !ok(k - 1);
+      if (d) d.disabled = !ok(k + 1);
     });
-    chaves.forEach(function (k) { grupos[k].sort(porPos); });
-    const antes = {}; chaves.forEach(function (k) { antes[k] = grupos[k].map(function (i) { return i.id; }).join(','); });
-    const urls = {};
-    const tela = document.createElement('div'); tela.className = 'org-tela';
-    tela.innerHTML = '<header><button class="org-x" data-o="sair" aria-label="Fechar">✕</button><div><b>Organizar fotos</b><span>Ordem em que saem no relatório</span></div>' +
-      '<button class="org-ok" data-o="salvar">Salvar</button></header><div class="org-corpo"></div>';
-    document.body.appendChild(tela);
-    const corpo = tela.querySelector('.org-corpo');
-    function pintar() {
-      corpo.innerHTML = '<p class="org-dica">Use ▲ ▼ para mudar a posição. A conversa continua na ordem em que as fotos foram tiradas.</p>' +
-        chaves.map(function (k) {
-          const l = grupos[k];
-          return '<section><h3>' + esc(k || 'Fora dos talhões') + ' <small>' + l.length + (l.length === 1 ? ' registro' : ' registros') + '</small></h3>' +
-            l.map(function (i, n) {
-              return '<div class="org-it" data-id="' + i.id + '"><b class="org-n">' + (n + 1) + '</b><div class="org-mini" data-mini="' + i.id + '">' + (i.tipo === 'video' ? '🎬' : '🖼️') + '</div>' +
-                '<div class="org-txt">' + (i.legenda ? esc(ZAP.puro(i.legenda)).slice(0, 90) : '<i>sem legenda</i>') + '<small>' + (i.tipo === 'video' ? 'vídeo · ' : '') + horaDe(i.capturado_em) + '</small></div>' +
-                '<div class="org-bt"><button data-o="sobe" data-k="' + esc(k) + '" data-n="' + n + '"' + (n === 0 ? ' disabled' : '') + ' aria-label="Subir">▲</button>' +
-                '<button data-o="desce" data-k="' + esc(k) + '" data-n="' + n + '"' + (n === l.length - 1 ? ' disabled' : '') + ' aria-label="Descer">▼</button></div></div>';
-            }).join('') + '</section>';
-        }).join('');
-      corpo.querySelectorAll('[data-mini]').forEach(function (el) { if (urls[el.dataset.mini]) el.innerHTML = urls[el.dataset.mini]; });
-    }
-    function horaDe(iso) { try { const d = new Date(iso); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); } catch (e) { return ''; } }
-    pintar();
-    // miniaturas: a foto guardada no aparelho, a miniatura, ou a da nuvem
-    for (const i of todos) {
-      try {
-        let u = '';
-        const mini = await DB.lerMini(i.id);
-        if (mini) u = objURL(mini);
-        else if (i.tipo === 'foto') { const b = await DB.lerMidia(i.id); if (b) u = objURL(b); }
-        if (!u && i.midia && navigator.onLine && i.tipo === 'foto') u = await Sync.urlMidia(i);
-        if (u) { urls[i.id] = '<img src="' + u + '" alt="">' + (i.tipo === 'video' ? '<span class="org-play">▶</span>' : ''); const el = corpo.querySelector('[data-mini="' + i.id + '"]'); if (el) el.innerHTML = urls[i.id]; }
-      } catch (e) { /* fica o ícone */ }
-    }
-    tela.onclick = async function (ev) {
-      const b = ev.target.closest('[data-o]'); if (!b) return;
-      const o = b.dataset.o;
-      if (o === 'sair') { tela.remove(); return; }
-      if (o === 'sobe' || o === 'desce') {
-        const l = grupos[b.dataset.k], n = Number(b.dataset.n), m = o === 'sobe' ? n - 1 : n + 1;
-        if (!l || m < 0 || m >= l.length) return;
-        const x = l[n]; l[n] = l[m]; l[m] = x;
-        const y = corpo.scrollTop; pintar(); corpo.scrollTop = y;
-        return;
-      }
-      if (o === 'salvar') {
-        let mudou = 0;
-        for (const k of chaves) {
-          if (grupos[k].map(function (i) { return i.id; }).join(',') === antes[k]) continue;
-          for (let n = 0; n < grupos[k].length; n++) {
-            const it = await DB.get('itens', grupos[k][n].id); if (!it) continue;
-            it.pos = n + 1;
-            if (it.sync_state === 'ok') it.sync_state = 'pendente';
-            await DB.put('itens', it); mudou++;
-          }
-        }
-        tela.remove();
-        if (!mudou) { toast('Nenhuma mudança na ordem'); return; }
-        toast('Ordem das fotos salva' + (navigator.onLine ? '' : ' — sobe quando a internet voltar'));
-        await renderChat(); atualizarSync();
-        if (navigator.onLine) Sync.sincronizar(rel.id);
-      }
-    };
   }
 
   // o item "Finalizar e gerar link" do menu ⋮ usa o mesmo caminho do botão da lista,
@@ -2295,6 +2283,8 @@
     chat.addEventListener('contextmenu', function (e) { if (e.target.closest && e.target.closest('.visita')) e.preventDefault(); });
     chat.addEventListener('click', function (e) {
       if (segurouVisita) { segurouVisita = false; e.stopPropagation(); e.preventDefault(); }
+      const ord = e.target.closest && e.target.closest('[data-ord]');
+      if (ord) { e.stopPropagation(); e.preventDefault(); moverItem(ord.dataset.id, ord.dataset.ord); }
     }, true);
 
     // toque simples numa observação de texto (ou no lápis) abre a edição direto

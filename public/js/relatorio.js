@@ -79,11 +79,10 @@
     });
 
     return chaves.map(function (k) {
-      // ordem escolhida no "Organizar fotos" (pos); sem ela, a hora do registro. Registro novo sem posição vai para o fim.
-      const temP = function (x) { return x.pos != null && x.pos !== ''; };
+      // mesma ordem da conversa: pos (ms) quando o consultor trocou de lugar; senão a hora do registro
+      const ch = function (x) { const p = Number(x.pos); return p > 1e11 ? p : (Date.parse(x.capturado_em) || 0); };
       const lista = mapa[k].slice().sort(function (a, b) {
-        return (temP(a) && temP(b) ? Number(a.pos) - Number(b.pos) : temP(a) ? -1 : temP(b) ? 1 : 0) ||
-          String(a.capturado_em).localeCompare(String(b.capturado_em));
+        return ch(a) - ch(b) || String(a.capturado_em).localeCompare(String(b.capturado_em));
       });
       const diasDistintos = {};
       lista.forEach(function (i) { diasDistintos[String(i.capturado_em).slice(0, 10)] = 1; });
