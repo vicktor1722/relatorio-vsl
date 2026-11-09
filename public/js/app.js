@@ -1866,6 +1866,7 @@
       '<div class="opcao" data-a="editar"><span>✏️</span><span>Editar dados da visita</span></div>' +
       '<div class="opcao" data-a="sync"><span>🔄</span><span>Sincronizar agora</span></div>' +
       '<div class="opcao" data-a="previa"><span>👁️</span><span>Ver como o cliente vê</span></div>' +
+      '<div class="opcao" data-a="organizar"><span>↕️</span><span>Organizar fotos do relatório</span></div>' +
       '<div class="opcao" data-a="publicar"><span>🔗</span><span><b>Finalizar e gerar link</b></span></div>' +
       '<div class="opcao" data-a="lista"><span>📁</span><span>Todos os relatórios</span></div>';
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
@@ -1880,10 +1881,94 @@
         }
         if (a === 'sync') { toast('Sincronizando…'); const r = await Sync.sincronizar(); if (!r.erro) toast(r.enviados + ' enviados, ' + r.falhas + ' falhas'); await renderChat(); atualizarSync(); }
         if (a === 'previa') abrirRelatorioPronto(st.rel.id, true);
+        if (a === 'organizar') organizarFotos();
         if (a === 'publicar') publicarRelatorio();
         if (a === 'lista') { await listarRelatorios(); abrir('telaLista'); }
       };
     });
+  }
+
+  /* ---------------- organizar fotos: ordem em que saem no relatório ----------------
+     O relatório agrupa por talhão (ordem do KML); aqui o consultor muda a ordem dentro de cada talhão.
+     A conversa continua na ordem em que foi feita. A posição (pos) sobe para a nuvem com o registro. */
+  async function organizarFotos() {
+    const rel = st.rel; if (!rel) return;
+    const todos = (await DB.itensDoRelatorio(rel.id)).filter(function (i) { return i.tipo === 'foto' || i.tipo === 'video'; });
+    if (todos.length < 2) { toast('Esta visita tem menos de 2 fotos para organizar'); return; }
+    const ordemKml = {};
+    ((rel.talhoes && rel.talhoes.features) || []).forEach(function (f, i) { const n = (f.properties || {}).nome; if (n) ordemKml[n] = i; });
+    const temP = function (x) { return x.pos != null && x.pos !== ''; };
+    const porPos = function (a, b) { return (temP(a) && temP(b) ? Number(a.pos) - Number(b.pos) : temP(a) ? -1 : temP(b) ? 1 : 0) || String(a.capturado_em).localeCompare(String(b.capturado_em)); };
+    const grupos = {};
+    todos.forEach(function (i) { const k = i.talhao || ''; (grupos[k] = grupos[k] || []).push(i); });
+    const chaves = Object.keys(grupos).sort(function (a, b) {
+      const pa = a === '' ? 1e6 : (ordemKml[a] != null ? ordemKml[a] : 1e5), pb = b === '' ? 1e6 : (ordemKml[b] != null ? ordemKml[b] : 1e5);
+      return pa - pb || a.localeCompare(b);
+    });
+    chaves.forEach(function (k) { grupos[k].sort(porPos); });
+    const antes = {}; chaves.forEach(function (k) { antes[k] = grupos[k].map(function (i) { return i.id; }).join(','); });
+    const urls = {};
+    const tela = document.createElement('div'); tela.className = 'org-tela';
+    tela.innerHTML = '<header><button class="org-x" data-o="sair" aria-label="Fechar">✕</button><div><b>Organizar fotos</b><span>Ordem em que saem no relatório</span></div>' +
+      '<button class="org-ok" data-o="salvar">Salvar</button></header><div class="org-corpo"></div>';
+    document.body.appendChild(tela);
+    const corpo = tela.querySelector('.org-corpo');
+    function pintar() {
+      corpo.innerHTML = '<p class="org-dica">Use ▲ ▼ para mudar a posição. A conversa continua na ordem em que as fotos foram tiradas.</p>' +
+        chaves.map(function (k) {
+          const l = grupos[k];
+          return '<section><h3>' + esc(k || 'Fora dos talhões') + ' <small>' + l.length + (l.length === 1 ? ' registro' : ' registros') + '</small></h3>' +
+            l.map(function (i, n) {
+              return '<div class="org-it" data-id="' + i.id + '"><b class="org-n">' + (n + 1) + '</b><div class="org-mini" data-mini="' + i.id + '">' + (i.tipo === 'video' ? '🎬' : '🖼️') + '</div>' +
+                '<div class="org-txt">' + (i.legenda ? esc(ZAP.puro(i.legenda)).slice(0, 90) : '<i>sem legenda</i>') + '<small>' + (i.tipo === 'video' ? 'vídeo · ' : '') + horaDe(i.capturado_em) + '</small></div>' +
+                '<div class="org-bt"><button data-o="sobe" data-k="' + esc(k) + '" data-n="' + n + '"' + (n === 0 ? ' disabled' : '') + ' aria-label="Subir">▲</button>' +
+                '<button data-o="desce" data-k="' + esc(k) + '" data-n="' + n + '"' + (n === l.length - 1 ? ' disabled' : '') + ' aria-label="Descer">▼</button></div></div>';
+            }).join('') + '</section>';
+        }).join('');
+      corpo.querySelectorAll('[data-mini]').forEach(function (el) { if (urls[el.dataset.mini]) el.innerHTML = urls[el.dataset.mini]; });
+    }
+    function horaDe(iso) { try { const d = new Date(iso); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); } catch (e) { return ''; } }
+    pintar();
+    // miniaturas: a foto guardada no aparelho, a miniatura, ou a da nuvem
+    for (const i of todos) {
+      try {
+        let u = '';
+        const mini = await DB.lerMini(i.id);
+        if (mini) u = objURL(mini);
+        else if (i.tipo === 'foto') { const b = await DB.lerMidia(i.id); if (b) u = objURL(b); }
+        if (!u && i.midia && navigator.onLine && i.tipo === 'foto') u = await Sync.urlMidia(i);
+        if (u) { urls[i.id] = '<img src="' + u + '" alt="">' + (i.tipo === 'video' ? '<span class="org-play">▶</span>' : ''); const el = corpo.querySelector('[data-mini="' + i.id + '"]'); if (el) el.innerHTML = urls[i.id]; }
+      } catch (e) { /* fica o ícone */ }
+    }
+    tela.onclick = async function (ev) {
+      const b = ev.target.closest('[data-o]'); if (!b) return;
+      const o = b.dataset.o;
+      if (o === 'sair') { tela.remove(); return; }
+      if (o === 'sobe' || o === 'desce') {
+        const l = grupos[b.dataset.k], n = Number(b.dataset.n), m = o === 'sobe' ? n - 1 : n + 1;
+        if (!l || m < 0 || m >= l.length) return;
+        const x = l[n]; l[n] = l[m]; l[m] = x;
+        const y = corpo.scrollTop; pintar(); corpo.scrollTop = y;
+        return;
+      }
+      if (o === 'salvar') {
+        let mudou = 0;
+        for (const k of chaves) {
+          if (grupos[k].map(function (i) { return i.id; }).join(',') === antes[k]) continue;
+          for (let n = 0; n < grupos[k].length; n++) {
+            const it = await DB.get('itens', grupos[k][n].id); if (!it) continue;
+            it.pos = n + 1;
+            if (it.sync_state === 'ok') it.sync_state = 'pendente';
+            await DB.put('itens', it); mudou++;
+          }
+        }
+        tela.remove();
+        if (!mudou) { toast('Nenhuma mudança na ordem'); return; }
+        toast('Ordem das fotos salva' + (navigator.onLine ? '' : ' — sobe quando a internet voltar'));
+        await renderChat(); atualizarSync();
+        if (navigator.onLine) Sync.sincronizar(rel.id);
+      }
+    };
   }
 
   // o item "Finalizar e gerar link" do menu ⋮ usa o mesmo caminho do botão da lista,

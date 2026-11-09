@@ -10,16 +10,17 @@
    ============================================================ */
 
 import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } from './auth.js';
+import { quadroPronto } from './quadros.js';
 import { areasDaFazenda, comResumo, fazendaLocal, resumoDaLinha, resumosDe } from './resumokml.js';
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo, variedadePadrao } from './agro.js';
-import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
+import { CATALOGO, REGRA_PADRAO, chaveCult, cicloMaterial, regraValida } from './cultivares.js';
 import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { climaDe, localDaFazenda, mercadoDaFazenda } from './mercado.js';
 import { chuvaDaFazenda } from './chuva.js';
 import { safraPadrao } from './safras.js';
-import { grupoDaFazenda } from './estoquegrupo.js';
+import { grupoDaFazenda, mapaGrupos } from './estoquegrupo.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
 
@@ -311,15 +312,17 @@ function partesDoMapa(mapa, plantio, areas) {
 async function dadosFazenda(env, acesso, fid, safraPedida, op) {
   op = op || {};
   // painel (leve) não precisa do desenho: lê só o resumo do mapa; o portal completo lê o KML para o mapa
-  const f = await comResumo(env, () => env.DB.prepare('SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len' + (op.leve ? '' : ', f.talhoes') +
+  // op.pre: dados já carregados em lote pelo painel (Fazendas hoje) — sem consultas por fazenda
+  const P = op.pre || null;
+  const f = P ? P.f : await comResumo(env, () => env.DB.prepare('SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len' + (op.leve ? '' : ', f.talhoes') +
       ', p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
     .bind(fid, acesso.dono_id).first());
   if (!f) return null;
   const dono = acesso.dono_id;
   // estoque compartilhado: entradas e recomendações de todas as fazendas do grupo
-  const grp = await grupoDaFazenda(env, fid).catch(() => ({ id: fid, ids: [fid] }));
+  const grp = P ? P.grp : await grupoDaFazenda(env, fid).catch(() => ({ id: fid, ids: [fid] }));
   const outras = grp.ids.filter((x) => x !== fid), qm = (l) => l.map(() => '?').join(',');
-  const [pl, rc, es, co, ci, cat, rcG] = await Promise.all([
+  const [pl, rc, es, co, ci, cat, rcG] = P ? [P.pl, P.rc, P.es, P.co, P.ci, P.cat, P.rcG] : await Promise.all([
     env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? ORDER BY data_prevista, criado_em').bind(dono, fid).all(),
     env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? AND fazenda_id IN (' + qm(grp.ids) + ')').bind(dono, ...grp.ids).all().catch(() => ({ results: [] })),
@@ -340,7 +343,7 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
   const areas = (op.leve ? ((await resumosDe(env, [f]))[f.id] || {}).areas : resumoDaLinha(f).areas) || {};
   const nomesG = {}, rsG = await resumosDe(env, (rcG.results || []).map((r) => ({ id: r.fid, resumo: r.resumo, kml_len: r.kml_len })));
   const recsGrupo = (rcG.results || []).map((r) => { nomesG[r.fid] = r.fnome; return { dados: lerJson(r.dados, {}), areas: (rsG[r.fid] && rsG[r.fid].areas) || {} }; });
-  const nomesGrupo = grp.ids.length > 1 ? (await env.DB.prepare('SELECT nome FROM fazendas WHERE id IN (' + qm(grp.ids) + ')').bind(...grp.ids).all().catch(() => ({ results: [] }))).results.map((x) => x.nome) : [];
+  const nomesGrupo = P ? P.nomesGrupo : grp.ids.length > 1 ? (await env.DB.prepare('SELECT nome FROM fazendas WHERE id IN (' + qm(grp.ids) + ')').bind(...grp.ids).all().catch(() => ({ results: [] }))).results.map((x) => x.nome) : [];
   const porTal = {}; plantio.forEach((p) => { porTal[safraPadrao(p.safra) + '|' + p.talhao] = p; });
   const base = { fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '' }, safra, safras, mapa,
     plantio: plantio.map((p) => ({ talhao: p.talhao, cultura: p.cultura, variedade: p.variedade, data_plantio: p.data_plantio, data_emerg: p.data_emerg,
@@ -388,17 +391,17 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
     colheita: (co.results || []).filter(daSafra).map((c) => ({ talhao: c.talhao, sc_ha: c.sc_ha, data: c.data || '' })),
     mapaPartes: op.leve ? [] : partesDoMapa(mapa, plantio, areas),
     ciclos: op.leve ? [] : await ciclosDoPlantio(env, dono, plantio, ci.results || []),
-    graf: await grafPlantio(env, dono, plantio, areas, (co.results || []).filter(daSafra), ci.results || [])
+    graf: await grafPlantio(env, dono, plantio, areas, (co.results || []).filter(daSafra), ci.results || [], P ? P.regra : null)
   });
 }
 
 // dados dos gráficos (evolução do plantio ⇄ previsão de colheita), iguais aos do painel
-async function grafPlantio(env, dono, plantio, areas, colheita, linhasCiclo) {
+async function grafPlantio(env, dono, plantio, areas, colheita, linhasCiclo, regraPre) {
   const fora = { pastagem: 1, pousio: 1 }, naoPl = {}, lin = {}, colhido = {};
   plantio.forEach((p) => { if (fora[p.cultura]) naoPl[p.talhao] = 1; });
   colheita.forEach((c) => { if (Number(c.sc_ha) > 0) colhido[c.talhao] = 1; });
   const total = Object.keys(areas).filter((t) => !naoPl[t]).reduce((s, t) => s + areas[t], 0);
-  const cicloDe = cicloDaConta(linhasCiclo, await regraCiclo(env, dono));
+  const cicloDe = cicloDaConta(linhasCiclo, regraPre || await regraCiclo(env, dono));
   const prev = [];
   plantio.forEach((p) => {
     if (!p.cultura || fora[p.cultura]) return;
@@ -423,6 +426,53 @@ async function acessoDaRequisicao(req, env) {
 }
 
 // painel do consultor (aba Fazendas): os mesmos números que o dono vê no Início
+/* dados de várias fazendas para o painel (Fazendas hoje) com poucas consultas: carrega tudo junto
+   (IN em lotes) e entrega a cada fazenda o mesmo que dadosFazenda leria sozinha. faz: [{id, usuario_id, nome, produtor, resumo, kml_len}] */
+export async function dadosPainelLote(env, faz, op) {
+  const G = await mapaGrupos(env).catch(() => ({}));
+  const ids = faz.map((f) => f.id), donos = [...new Set(faz.map((f) => f.usuario_id))];
+  const todos = new Set(ids); ids.forEach((id) => (G[id] || []).forEach((x) => todos.add(x)));
+  const emLotes = async (sql, lista, extra) => {
+    const out = [];
+    for (let i = 0; i < lista.length; i += 90) {
+      const parte = lista.slice(i, i + 90);
+      const r = await env.DB.prepare(sql.replace('(?)', '(' + parte.map(() => '?').join(',') + ')') + (extra || '')).bind(...parte).all().catch(() => ({ results: [] }));
+      out.push(...(r.results || []));
+    }
+    return out;
+  };
+  const listaTodos = [...todos];
+  const [pl, rc, es, co, ci, cat, rg, fzG] = await Promise.all([
+    emLotes('SELECT * FROM plantio WHERE fazenda_id IN (?)', ids),
+    emLotes('SELECT * FROM recomendacoes WHERE fazenda_id IN (?)', listaTodos, ' ORDER BY data_prevista, criado_em'),
+    emLotes('SELECT * FROM estoque_agro WHERE fazenda_id IN (?)', listaTodos),
+    emLotes('SELECT * FROM colheita WHERE fazenda_id IN (?)', ids),
+    emLotes('SELECT * FROM ciclos WHERE usuario_id IN (?)', donos),
+    emLotes('SELECT usuario_id, nome, tipo FROM produtos_agro WHERE usuario_id IN (?)', donos),
+    emLotes('SELECT usuario_id, gmr, dias, ponto FROM ciclo_regra WHERE usuario_id IN (?)', donos),
+    comResumo(env, () => emLotes('SELECT id, nome, resumo, length(talhoes) AS kml_len FROM fazendas WHERE id IN (?)', listaTodos))
+  ]);
+  const por = (l, k) => { const m = {}; l.forEach((x) => { (m[x[k]] = m[x[k]] || []).push(x); }); return m; };
+  const plF = por(pl, 'fazenda_id'), rcF = por(rc, 'fazenda_id'), esF = por(es, 'fazenda_id'), coF = por(co, 'fazenda_id'), ciU = por(ci, 'usuario_id'), catU = por(cat, 'usuario_id');
+  const regraU = {}; rg.forEach((r) => { regraU[r.usuario_id] = regraValida(r); });
+  const fzM = {}; fzG.forEach((x) => { fzM[x.id] = x; });
+  const meu = (l, dono) => (l || []).filter((x) => x.usuario_id === dono);
+  return Promise.all(faz.map((f) => {
+    const dono = f.usuario_id, lst = G[f.id], grp = lst ? { id: lst[0], ids: lst } : { id: f.id, ids: [f.id] };
+    const outras = grp.ids.filter((x) => x !== f.id);
+    const rcG = [];
+    outras.forEach((o) => meu(rcF[o], dono).forEach((r) => { const z = fzM[o] || {}; rcG.push({ dados: r.dados, fid: o, fnome: z.nome || '', resumo: z.resumo, kml_len: z.kml_len }); }));
+    const pre = {
+      f: { id: f.id, nome: f.nome, produtor: f.produtor, resumo: f.resumo, kml_len: f.kml_len }, grp,
+      pl: { results: meu(plF[f.id], dono) }, rc: { results: meu(rcF[f.id], dono) },
+      es: { results: [].concat(...grp.ids.map((g) => meu(esF[g], dono))) }, co: { results: meu(coF[f.id], dono) },
+      ci: { results: ciU[dono] || [] }, cat: { results: (catU[dono] || []).map((x) => ({ nome: x.nome, tipo: x.tipo })) }, rcG: { results: rcG },
+      nomesGrupo: grp.ids.length > 1 ? grp.ids.map((g) => (fzM[g] || {}).nome).filter(Boolean) : [], regra: regraU[dono] || regraValida(REGRA_PADRAO)
+    };
+    return dadosFazenda(env, { id: '__painel', dono_id: dono, papel: 'fazenda', nome: 'Consultor', lista: [f.id] }, f.id, '', Object.assign({ todas: true, pre }, op || {})).catch(() => null);
+  }));
+}
+
 export async function dadosParaPainel(env, dono, fid, op) {
   return dadosFazenda(env, { id: '__painel', dono_id: dono, papel: 'fazenda', nome: 'Consultor', lista: [fid] }, fid, '', Object.assign({ todas: true }, op || {}));
 }
@@ -480,10 +530,14 @@ export async function rotasPortal(env, req, rota, url, ctx) {
   if (rota === '/api/portal/fazenda') {
     const fid = txt(url.searchParams.get('id'), 80);
     // "Todas as fazendas": acesso da fazenda com mais de uma fazenda vê tudo junto
-    if (fid === '*' && a.lista.length > 1) return json(Object.assign({ ok: true }, await dadosTodas(env, a, url.searchParams.get('safra'))));
+    if (fid === '*' && a.lista.length > 1) return quadroPronto(env, ctx, req, 'portal|' + a.id + '|' + a.papel + '|*|' + (url.searchParams.get('safra') || ''), 1800,
+      async () => Object.assign({ ok: true }, await dadosTodas(env, a, url.searchParams.get('safra'))));
     if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
-    const d = await dadosFazenda(env, a, fid, url.searchParams.get('safra'));
-    return d ? json(Object.assign({ ok: true }, d)) : json({ erro: 'fazenda não encontrada' }, 404);
+    // quadro pronto por acesso (o operador vê só as aplicações; a fazenda vê tudo)
+    return quadroPronto(env, ctx, req, 'portal|' + a.id + '|' + a.papel + '|' + fid + '|' + (url.searchParams.get('safra') || ''), 1800, async () => {
+      const d = await dadosFazenda(env, a, fid, url.searchParams.get('safra'));
+      return d ? Object.assign({ ok: true }, d) : json({ erro: 'fazenda não encontrada' }, 404);
+    });
   }
 
   // tela Início: tempo na fazenda e mercado (praça mais próxima); com "Todas", a fazenda escolhida em loc

@@ -35,7 +35,15 @@ const UF_NOME = { AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: '
   RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins' };
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
+const MEM_GEO = new Map();   // município → coordenada (não muda): uma busca por instância
 export async function geocodificar(cidade, uf) {
+  const kg = String(cidade || '') + '|' + String(uf || '');
+  if (MEM_GEO.has(kg)) return MEM_GEO.get(kg);
+  const g = await geocodificar0(cidade, uf);
+  if (g) MEM_GEO.set(kg, g);
+  return g;
+}
+async function geocodificar0(cidade, uf) {
   // "Vila Bela da Santissima Trindade/MT", "Cáceres - MT": separa a UF do nome
   let nome = String(cidade || '').trim(), u = String(uf || '').trim().toUpperCase();
   const m = nome.match(/^(.*?)\s*[\/\-–,]\s*([A-Za-z]{2})$/);

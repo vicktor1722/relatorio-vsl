@@ -287,9 +287,14 @@
   }
 
   async function baixarCadastro() {
-    const r = await chamar('/api/cadastro');
+    // manda a versão dos mapas que o aparelho já tem: o servidor só devolve o KML das fazendas que mudaram
+    const antes = await cadastroLocal(), guardado = {};
+    (antes.fazendas || []).forEach(function (f) { if (f && f.id && f.talhoes && f.atualizado_em) guardado[f.id] = f; });
+    const tenho = Object.keys(guardado).map(function (id) { return id + '~' + guardado[id].atualizado_em; }).join(',');
+    const r = await chamar('/api/cadastro?kml_tenho=' + encodeURIComponent(tenho));
     const dados = { produtores: r.produtores || [], fazendas: r.fazendas || [], safras: r.safras || [], safra_atual: r.safra_atual || '', responsaveis: r.responsaveis || [], max_responsaveis: r.max_responsaveis || 4, em: new Date().toISOString() };
     dados.fazendas.forEach(function (f) {
+      if (f.kml_igual) { f.talhoes = guardado[f.id] ? guardado[f.id].talhoes : null; delete f.kml_igual; return; }
       if (typeof f.talhoes === 'string' && f.talhoes) {
         try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; }
       }
@@ -397,7 +402,7 @@
       duracao_s: item.duracao_s, bytes: item.bytes,
       lat: item.lat, lon: item.lon, precisao_m: item.precisao_m, altitude_m: item.altitude_m,
       talhao: item.talhao, talhao_id: item.talhao_id,
-      capturado_em: item.capturado_em, ordem: item.ordem
+      capturado_em: item.capturado_em, ordem: item.ordem, pos: item.pos != null ? item.pos : null
     });
     item.midia = midia;
     item.sync_state = 'ok';

@@ -3,6 +3,7 @@
    API (login, cadastro, relatórios) + página pública do relatório
    ============================================================ */
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
+import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
@@ -179,8 +180,29 @@ async function pngIcone(tipo) {
 
 let cargaTentada = false, avisoTentado = false;
 
+// coluna "pos" dos registros (ordem escolhida pelo consultor no relatório): criada uma vez por instância
+let posOk = false;
+async function garantirPos(env) {
+  if (posOk) return;
+  try { await env.DB.prepare('ALTER TABLE itens ADD COLUMN pos REAL').run(); } catch (e) { /* já existe */ }
+  posOk = true;
+}
+
+// quadros pesados guardados prontos (segundos até vencer); ver quadros.js
+const QUADROS = { '/api/painel/fazendas': 1800, '/api/painel/fazenda': 1800, '/api/agro/admin/plantio': 3600, '/api/agro/comparativo': 3600, '/api/agro/colheita-prevista': 3600 };
+
 export default {
   async fetch(req, env, ctx) {
+    const res = await this.responder(req, env, ctx);
+    // lançamento que muda os quadros: sobe a versão (os quadros prontos antigos deixam de valer)
+    try {
+      const rota = new URL(req.url).pathname;
+      if (res && res.status < 400 && mudaQuadros(rota, req.method)) await mudouDados(env).catch(() => {});   // antes de responder: a próxima tela já vem atualizada
+    } catch (e) { /* não atrapalha a resposta */ }
+    return res;
+  },
+
+  async responder(req, env, ctx) {
     const url = new URL(req.url);
     const rota = url.pathname;
     const origem = url.origin;
@@ -465,6 +487,13 @@ export default {
       if (rota.startsWith('/api/push/')) return await rotasPush(env, req, me, rota);
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
+      if (req.method === 'GET' && QUADROS[rota]) {
+        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|' + url.search;
+        return await quadroPronto(env, ctx, req, chave, QUADROS[rota], async () => {
+          const r = rota.startsWith('/api/painel/') ? await rotasPainelFaz(env, req, me, rota, url) : await rotasAgro(env, req, me, rota, url);
+          return r.status === 200 ? await r.json() : r;
+        });
+      }
       if (rota.startsWith('/api/painel/')) return await rotasPainelFaz(env, req, me, rota, url);   // aba Fazendas do painel
       if (rota === '/api/modulos' || rota.startsWith('/api/agro/')) return await rotasAgro(env, req, me, rota, url);
 
@@ -475,7 +504,8 @@ export default {
         if (!adm && await ehAdminSemCodigo(env, me.id)) return json({ erro: 'Conta administradora: entre com o código de confirmação', precisaCodigo: true }, 401);
         // qualquer conta vê o próprio painel; admin vê o de todos
         if (rota === '/api/admin/resumo') return json(await resumoAdmin(env, me, adm));
-        if (rota === '/api/admin/areas') return json(await areasAdmin(env, me, adm));
+        // mapa das fazendas da Visão geral (desenho de todos os KMLs): quadro pronto; muda quando um KML muda (versão dos dados)
+        if (rota === '/api/admin/areas') return await quadroPronto(env, ctx, req, 'areas|' + me.id + '|' + (adm ? 1 : 0), 21600, () => areasAdmin(env, me, adm));
         if (!adm) return json({ erro: 'esta conta não tem acesso de administrador' }, 403);
         if (rota === '/api/admin/usuario' && req.method === 'POST') {
           try { return json(await criarConta(env, await req.json())); }
@@ -600,8 +630,29 @@ export default {
       if (rota === '/api/cadastro' && req.method === 'GET') {
         const prod = await env.DB.prepare(
           'SELECT * FROM produtores WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
-        const faz = await env.DB.prepare(
-          'SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
+        // app novo manda kml_tenho=id~atualizado_em dos mapas que já guarda: só vai o KML das fazendas que mudaram.
+        // Sem o parâmetro (app antigo, painel), vai tudo como antes.
+        const tenho = url.searchParams.get('kml_tenho');
+        let faz;
+        if (tenho === null) faz = await env.DB.prepare('SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
+        else {
+          const conhecidos = {};
+          String(tenho).split(',').forEach((x) => { const i = x.lastIndexOf('~'); if (i > 0) conhecidos[x.slice(0, i)] = x.slice(i + 1); });
+          faz = await env.DB.prepare(`SELECT id, usuario_id, produtor_id, nome, municipio, uf, area_ha, n_talhoes, criado_em, atualizado_em,
+              (talhoes IS NOT NULL AND talhoes != '') AS tem_kml FROM fazendas WHERE usuario_id = ? ORDER BY nome`).bind(me.id).all();
+          const lista = faz.results || [], precisa = lista.filter((f) => Number(f.tem_kml) && conhecidos[f.id] !== String(f.atualizado_em || '')).map((f) => f.id);
+          const kml = {};
+          for (let i = 0; i < precisa.length; i += 50) {
+            const parte = precisa.slice(i, i + 50);
+            const r = await env.DB.prepare('SELECT id, talhoes FROM fazendas WHERE id IN (' + parte.map(() => '?').join(',') + ')').bind(...parte).all();
+            (r.results || []).forEach((x) => { kml[x.id] = x.talhoes || ''; });
+          }
+          lista.forEach((f) => {
+            if (Number(f.tem_kml) && !(f.id in kml)) f.kml_igual = 1;   // o aparelho já tem este mapa
+            else f.talhoes = kml[f.id] || '';
+            delete f.tem_kml;
+          });
+        }
         const saf = await env.DB.prepare(
           'SELECT * FROM safras WHERE usuario_id = ? ORDER BY nome DESC').bind(me.id).all();
         let resp = { results: [] };
@@ -819,16 +870,18 @@ export default {
 
       if (rota === '/api/item' && req.method === 'POST') {
         const i = await req.json();
+        await garantirPos(env);   // posição escolhida no "Organizar fotos" (ordem no relatório)
+        const pos = Number.isFinite(Number(i.pos)) && i.pos !== null && i.pos !== '' ? Number(i.pos) : null;
         await env.DB.prepare(`
-          INSERT INTO itens (id,relatorio_id,tipo,legenda,midia,mime,duracao_s,bytes,lat,lon,precisao_m,altitude_m,talhao,talhao_id,capturado_em,ordem)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          INSERT INTO itens (id,relatorio_id,tipo,legenda,midia,mime,duracao_s,bytes,lat,lon,precisao_m,altitude_m,talhao,talhao_id,capturado_em,ordem,pos)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           ON CONFLICT(id) DO UPDATE SET
             legenda=excluded.legenda, midia=COALESCE(excluded.midia, itens.midia),
-            talhao=excluded.talhao, talhao_id=excluded.talhao_id
+            talhao=excluded.talhao, talhao_id=excluded.talhao_id, pos=COALESCE(excluded.pos, itens.pos)
         `).bind(i.id, i.relatorio_id, i.tipo, i.legenda || '', i.midia || null, i.mime || null,
                 i.duracao_s || null, i.bytes || null, i.lat ?? null, i.lon ?? null,
                 i.precisao_m || null, i.altitude_m || null, i.talhao || null, i.talhao_id || null,
-                i.capturado_em, i.ordem || 0).run();
+                i.capturado_em, i.ordem || 0, pos).run();
         return json({ ok: true, id: i.id });
       }
 

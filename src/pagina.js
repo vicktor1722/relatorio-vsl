@@ -248,7 +248,9 @@ function agruparPorTalhao(itens, talhoes) {
   return Object.keys(mapa)
     .sort((a, b) => peso(a) - peso(b) || a.localeCompare(b))
     .map(k => {
-      const lista = mapa[k].slice().sort((a, b) =>
+      // ordem escolhida no "Organizar fotos" (pos); sem ela, a hora do registro. Registro novo sem posição vai para o fim.
+      const temP = (x) => x.pos != null && x.pos !== '';
+      const lista = mapa[k].slice().sort((a, b) => (temP(a) && temP(b) ? Number(a.pos) - Number(b.pos) : temP(a) ? -1 : temP(b) ? 1 : 0) ||
         String(a.capturado_em).localeCompare(String(b.capturado_em)));
       const dias = {};
       lista.forEach(i => { dias[noFuso(i.capturado_em).slice(0, 10)] = 1; });
