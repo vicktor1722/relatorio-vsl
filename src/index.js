@@ -3,6 +3,7 @@
    API (login, cadastro, relatórios) + página pública do relatório
    ============================================================ */
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
+import { preencherResumos } from './resumokml.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { raioX } from './armazenamento.js';
@@ -258,6 +259,8 @@ export default {
 
       // raio-X do armazenamento: só totais (quantidade e tamanho por tipo), sem nomes nem arquivos
       if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
+      // preenche os resumos dos mapas que faltam (lotes pequenos; o cron também faz)
+      if (rota === '/api/status/resumos') return json(await preencherResumos(env, 600000));
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
         const q = async (sql) => { try { return (await env.DB.prepare(sql).all()).results || []; } catch (e) { return [{ erro: String(e.message || e).slice(0, 120) }]; } };
@@ -869,7 +872,7 @@ export default {
   // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; 4h30 a chuva dos próximos 15 dias; a cada 15 min o aviso 2 h antes das visitas
   async scheduled(evento, env, ctx) {
     if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env)); return; }
-    if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env)); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
+    if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env).then(() => preencherResumos(env, 400000)).catch(() => {})); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };

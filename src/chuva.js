@@ -3,6 +3,7 @@
    - "chuva:mapa": grade do Brasil, chuva de cada dia nos próximos 15 dias
    - "chuva:p:<lat>,<lon>": 15 dias no ponto da fazenda (50 cenários do ECMWF) */
 import { localDaFazenda } from './mercado.js';
+import { fazendaLocal } from './resumokml.js';
 
 const UA = 'Mozilla/5.0 (compatible; AMVS-Relatorio/1.0)';
 const GRADE = { la0: -35, la1: 7, lo0: -76, lo1: -32, passo: 2, ver: 2 };   // ver: muda quando a grade muda (refaz o guardado)
@@ -93,7 +94,7 @@ async function atualizarChuva1(env) {
   ids = [...new Set(ids)].slice(0, 200);
   const feitos = {};
   for (const id of ids) {
-    const f = await env.DB.prepare('SELECT talhoes, municipio, uf FROM fazendas WHERE id = ?').bind(id).first();
+    const f = await fazendaLocal(env, id).catch(() => null);
     const l = f && await localDaFazenda(f);
     if (!l) continue;
     const k = chaveP(l);
