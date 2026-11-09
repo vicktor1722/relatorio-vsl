@@ -248,10 +248,9 @@ function agruparPorTalhao(itens, talhoes) {
   return Object.keys(mapa)
     .sort((a, b) => peso(a) - peso(b) || a.localeCompare(b))
     .map(k => {
-      // ordem escolhida no "Organizar fotos" (pos); sem ela, a hora do registro. Registro novo sem posição vai para o fim.
-      const temP = (x) => x.pos != null && x.pos !== '';
-      const lista = mapa[k].slice().sort((a, b) => (temP(a) && temP(b) ? Number(a.pos) - Number(b.pos) : temP(a) ? -1 : temP(b) ? 1 : 0) ||
-        String(a.capturado_em).localeCompare(String(b.capturado_em)));
+      // mesma ordem da conversa no app: pos (ms) quando o consultor trocou de lugar; senão a hora do registro
+      const ch = (x) => { const p = Number(x.pos); return p > 1e11 ? p : (Date.parse(x.capturado_em) || 0); };
+      const lista = mapa[k].slice().sort((a, b) => ch(a) - ch(b) || String(a.capturado_em).localeCompare(String(b.capturado_em)));
       const dias = {};
       lista.forEach(i => { dias[noFuso(i.capturado_em).slice(0, 10)] = 1; });
       return {

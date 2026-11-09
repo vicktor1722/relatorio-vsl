@@ -566,7 +566,11 @@
     return n;
   }
 
+  // pausa enquanto o consultor muda a ordem das fotos (nada sobe no meio da troca)
+  let pausado = false;
+  function pausar(v) { pausado = !!v; }
   async function sincronizar(relIdOpcional) {
+    if (pausado) return { pausado: true, enviados: 0, falhas: 0 };
     if (!(await logado())) { emitir({ tipo: 'sem-sessao' }); return { erro: 'sem-sessao' }; }
     if (!navigator.onLine) { emitir({ tipo: 'offline' }); return { erro: 'offline' }; }
     await sincronizarCadastro().catch(function () {});   // produtor/fazenda feitos sem internet antes dos relatórios
@@ -730,7 +734,7 @@
 
   global.Sync = {
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
-    cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
+    pausar, cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
     sincronizarCadastro, foiSemRede: function () { return salvoSemRede; }, cadastroPendente: async function () { return (await filaCad()).length; },
     salvarPerfil, baixarPerfil,
     meuId, fixarDono, limparIdentidadeLocal, limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
