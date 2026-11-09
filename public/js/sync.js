@@ -402,7 +402,7 @@
       duracao_s: item.duracao_s, bytes: item.bytes,
       lat: item.lat, lon: item.lon, precisao_m: item.precisao_m, altitude_m: item.altitude_m,
       talhao: item.talhao, talhao_id: item.talhao_id,
-      capturado_em: item.capturado_em, ordem: item.ordem
+      capturado_em: item.capturado_em, ordem: item.ordem, pos: item.pos != null ? item.pos : null
     });
     item.midia = midia;
     item.sync_state = 'ok';

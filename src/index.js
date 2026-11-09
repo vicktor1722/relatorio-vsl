@@ -180,6 +180,14 @@ async function pngIcone(tipo) {
 
 let cargaTentada = false, avisoTentado = false;
 
+// coluna "pos" dos registros (ordem escolhida pelo consultor no relatório): criada uma vez por instância
+let posOk = false;
+async function garantirPos(env) {
+  if (posOk) return;
+  try { await env.DB.prepare('ALTER TABLE itens ADD COLUMN pos REAL').run(); } catch (e) { /* já existe */ }
+  posOk = true;
+}
+
 // quadros pesados guardados prontos (segundos até vencer); ver quadros.js
 const QUADROS = { '/api/painel/fazendas': 1800, '/api/painel/fazenda': 1800, '/api/agro/admin/plantio': 3600, '/api/agro/comparativo': 3600, '/api/agro/colheita-prevista': 3600 };
 
@@ -862,16 +870,18 @@ export default {
 
       if (rota === '/api/item' && req.method === 'POST') {
         const i = await req.json();
+        await garantirPos(env);   // posição escolhida no "Organizar fotos" (ordem no relatório)
+        const pos = Number.isFinite(Number(i.pos)) && i.pos !== null && i.pos !== '' ? Number(i.pos) : null;
         await env.DB.prepare(`
-          INSERT INTO itens (id,relatorio_id,tipo,legenda,midia,mime,duracao_s,bytes,lat,lon,precisao_m,altitude_m,talhao,talhao_id,capturado_em,ordem)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          INSERT INTO itens (id,relatorio_id,tipo,legenda,midia,mime,duracao_s,bytes,lat,lon,precisao_m,altitude_m,talhao,talhao_id,capturado_em,ordem,pos)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           ON CONFLICT(id) DO UPDATE SET
             legenda=excluded.legenda, midia=COALESCE(excluded.midia, itens.midia),
-            talhao=excluded.talhao, talhao_id=excluded.talhao_id
+            talhao=excluded.talhao, talhao_id=excluded.talhao_id, pos=COALESCE(excluded.pos, itens.pos)
         `).bind(i.id, i.relatorio_id, i.tipo, i.legenda || '', i.midia || null, i.mime || null,
                 i.duracao_s || null, i.bytes || null, i.lat ?? null, i.lon ?? null,
                 i.precisao_m || null, i.altitude_m || null, i.talhao || null, i.talhao_id || null,
-                i.capturado_em, i.ordem || 0).run();
+                i.capturado_em, i.ordem || 0, pos).run();
         return json({ ok: true, id: i.id });
       }
 
