@@ -14,6 +14,8 @@ const r2 = (v) => Math.round(v * 100) / 100;
 /* ---------------- local da fazenda ---------------- */
 // centro do mapa (KML); sem mapa, o município cadastrado
 export async function localDaFazenda(f) {
+  if (f && f.centro && typeof f.centro.lat === 'number') return { lat: f.centro.lat, lon: f.centro.lon, fonte: 'mapa' };   // centro já calculado (resumo do mapa)
+  if (f && f.talhoes === undefined && !f.municipio) return null;
   try {
     const gj = typeof f.talhoes === 'string' ? JSON.parse(f.talhoes || 'null') : f.talhoes;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;

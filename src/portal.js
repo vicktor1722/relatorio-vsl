@@ -10,6 +10,7 @@
    ============================================================ */
 
 import { conferirSenha, criarTokenPortal, hashSenha, lerTokenPortal, novoId } from './auth.js';
+import { areasDaFazenda, comResumo, fazendaLocal, resumoDaLinha, resumosDe } from './resumokml.js';
 import { blocosAgro } from './agrorel.js';
 import { baseUnidade, comparativo, garantir as garantirAgro, modulosDe, regraCiclo, variedadePadrao } from './agro.js';
 import { CATALOGO, chaveCult, cicloMaterial } from './cultivares.js';
@@ -112,12 +113,6 @@ export async function rotasAcessos(env, req, me, rota) {
 }
 
 /* ---------------- dados de uma fazenda para o portal ---------------- */
-function areasDe(talhoes) {
-  const out = {};
-  const t = lerJson(talhoes, null);
-  ((t && t.features) || []).forEach((x) => { const p = x.properties || {}; if (p.nome) out[String(p.nome)] = Number(p.area_ha) || 0; });
-  return out;
-}
 
 // estoque da fazenda: entradas − aplicado; "a aplicar" = recomendado e ainda não aplicado (mesma conta do app)
 // categoria do produto no estoque: a do catálogo da conta; sem ela, pelo nome (produtos mais comuns)
@@ -201,8 +196,8 @@ async function ciclosDoPlantio(env, dono, plantio, linhas) {
 // notificação para o consultor: "✔ Aplicação lançada · FAZENDA — Herbicida pós · TH-05 (20 de 50 ha) · por …"
 async function avisarConsultor(env, dono, r, d, talhoes, parcial, quem, data, regId) {
   await garantirPush(env);
-  const f = await env.DB.prepare('SELECT nome, talhoes FROM fazendas WHERE id = ?').bind(r.fazenda_id).first();
-  const areas = areasDe(f && f.talhoes), parte = d.parte || {};
+  const f = await areasDaFazenda(env, r.fazenda_id);
+  const areas = (f && f.areas) || {}, parte = d.parte || {};
   const haTal = (t) => { const tot = areas[t] || 0, p = Number(parte[t]); return p > 0 && p < tot ? p : tot; };
   const n1 = (v) => (Math.round(v * 10) / 10).toString().replace('.', ',');
   const tal = parcial
@@ -315,8 +310,10 @@ function partesDoMapa(mapa, plantio, areas) {
 // op.leve: sem custo, blocos do relatório e mapa (resumo do painel do consultor); op.todas: inclui aplicações ocultas da fazenda
 async function dadosFazenda(env, acesso, fid, safraPedida, op) {
   op = op || {};
-  const f = await env.DB.prepare('SELECT f.id, f.nome, f.talhoes, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
-    .bind(fid, acesso.dono_id).first();
+  // painel (leve) não precisa do desenho: lê só o resumo do mapa; o portal completo lê o KML para o mapa
+  const f = await comResumo(env, () => env.DB.prepare('SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len' + (op.leve ? '' : ', f.talhoes') +
+      ', p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ? AND f.usuario_id = ?')
+    .bind(fid, acesso.dono_id).first());
   if (!f) return null;
   const dono = acesso.dono_id;
   // estoque compartilhado: entradas e recomendações de todas as fazendas do grupo
@@ -329,8 +326,8 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
     env.DB.prepare('SELECT * FROM colheita WHERE usuario_id = ? AND fazenda_id = ?').bind(dono, fid).all().catch(() => ({ results: [] })),
     env.DB.prepare('SELECT * FROM ciclos WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] })),
     env.DB.prepare('SELECT nome, tipo FROM produtos_agro WHERE usuario_id = ?').bind(dono).all().catch(() => ({ results: [] })),
-    outras.length ? env.DB.prepare('SELECT r.dados, f.id AS fid, f.nome AS fnome, f.talhoes FROM recomendacoes r JOIN fazendas f ON f.id = r.fazenda_id WHERE r.usuario_id = ? AND r.fazenda_id IN (' + qm(outras) + ')')
-      .bind(dono, ...outras).all().catch(() => ({ results: [] })) : { results: [] }
+    outras.length ? comResumo(env, () => env.DB.prepare('SELECT r.dados, f.id AS fid, f.nome AS fnome, f.resumo, length(f.talhoes) AS kml_len FROM recomendacoes r JOIN fazendas f ON f.id = r.fazenda_id WHERE r.usuario_id = ? AND r.fazenda_id IN (' + qm(outras) + ')')
+      .bind(dono, ...outras).all()).catch(() => ({ results: [] })) : { results: [] }
   ]);
   const recs = (rc.results || []).map((r) => ({ id: r.id, safra: r.safra || '', operacao: r.operacao || '', data_prevista: r.data_prevista || '',
     mostrar: Number(r.mostrar) !== 0, dados: lerJson(r.dados, {}) }));
@@ -339,10 +336,10 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
   const safra = safraPadrao(safraPedida || '') || safras[0] || '';
   const daSafra = (x) => !safra || !x.safra || safraPadrao(x.safra) === safra;
   const plantio = plantioTodas.filter(daSafra);
-  const mapa = lerJson(f.talhoes, null);
-  const areas = areasDe(f.talhoes);
-  const areasF = {}, nomesG = {};
-  const recsGrupo = (rcG.results || []).map((r) => { nomesG[r.fid] = r.fnome; return { dados: lerJson(r.dados, {}), areas: areasF[r.fid] || (areasF[r.fid] = areasDe(r.talhoes)) }; });
+  const mapa = op.leve ? null : lerJson(f.talhoes, null);
+  const areas = (op.leve ? ((await resumosDe(env, [f]))[f.id] || {}).areas : resumoDaLinha(f).areas) || {};
+  const nomesG = {}, rsG = await resumosDe(env, (rcG.results || []).map((r) => ({ id: r.fid, resumo: r.resumo, kml_len: r.kml_len })));
+  const recsGrupo = (rcG.results || []).map((r) => { nomesG[r.fid] = r.fnome; return { dados: lerJson(r.dados, {}), areas: (rsG[r.fid] && rsG[r.fid].areas) || {} }; });
   const nomesGrupo = grp.ids.length > 1 ? (await env.DB.prepare('SELECT nome FROM fazendas WHERE id IN (' + qm(grp.ids) + ')').bind(...grp.ids).all().catch(() => ({ results: [] }))).results.map((x) => x.nome) : [];
   const porTal = {}; plantio.forEach((p) => { porTal[safraPadrao(p.safra) + '|' + p.talhao] = p; });
   const base = { fazenda: { id: f.id, nome: f.nome, produtor: f.produtor || '' }, safra, safras, mapa,
@@ -494,7 +491,7 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     let fid = txt(url.searchParams.get('loc') || url.searchParams.get('id'), 80);
     if (!a.lista.includes(fid)) fid = a.lista[0];
     if (!fid) return json({ erro: 'nenhuma fazenda liberada' }, 404);
-    const f = await env.DB.prepare('SELECT id, nome, talhoes, municipio, uf FROM fazendas WHERE id = ?').bind(fid).first();
+    const f = await fazendaLocal(env, fid);   // centro do mapa pronto (resumo), sem abrir o KML
     if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
     const local = await localDaFazenda(f);
     let frete = null;
@@ -538,9 +535,9 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     const b = await req.json().catch(() => ({}));
     const fid = txt(b.fazenda, 80);
     if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
-    const f = await env.DB.prepare('SELECT talhoes FROM fazendas WHERE id = ? AND usuario_id = ?').bind(fid, a.dono_id).first();
+    const f = await areasDaFazenda(env, fid, a.dono_id);
     if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
-    const areas = areasDe(f.talhoes), talhao = txt(b.talhao, 80), data = dia(b.data);
+    const areas = f.areas, talhao = txt(b.talhao, 80), data = dia(b.data);
     if (!(talhao in areas)) return json({ erro: 'talhão não encontrado no mapa da fazenda' }, 400);
     // o que vier errado é corrigido aqui em vez de recusar (o gerente não vê aviso de erro)
     const dataOk = data && data <= somaDias(hojeMT(), 1) ? data : hojeMT();   // sem data ou no futuro → hoje
@@ -633,8 +630,8 @@ export async function rotasPortal(env, req, rota, url, ctx) {
       if (tal.length !== 1) return json({ erro: 'aplicação parcial é lançada um talhão por vez' }, 400);
       const t = tal[0];
       if (d.feito[t]) return json({ erro: 'este talhão já está marcado como aplicado' }, 400);
-      const f = await env.DB.prepare('SELECT talhoes FROM fazendas WHERE id = ?').bind(r.fazenda_id).first();
-      const tot = areasDe(f && f.talhoes)[t] || 0, p = Number((d.parte || {})[t]), haTal = p > 0 && p < tot ? p : tot;
+      const f = await areasDaFazenda(env, r.fazenda_id);
+      const tot = ((f && f.areas) || {})[t] || 0, p = Number((d.parte || {})[t]), haTal = p > 0 && p < tot ? p : tot;
       const ja = haAplicada(d, t, haTal);
       if (haTal && ja + haParc < haTal - 0.05) {
         const id = regId || novoId('rg');

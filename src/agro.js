@@ -13,6 +13,7 @@ import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
 import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
+import { comResumo, resumosDe } from './resumokml.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
 
 let pronta = null;
@@ -339,11 +340,12 @@ export async function plantioGeral(env, uid) {
   await garantir(env);
   const [pl, fz, mu] = await Promise.all([
     uid ? env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? LIMIT 30000').bind(uid).all() : env.DB.prepare('SELECT * FROM plantio LIMIT 30000').all(),
-    env.DB.prepare(`SELECT f.id, f.nome, f.talhoes, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
+    comResumo(env, () => env.DB.prepare(`SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
         FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id LEFT JOIN produtores p ON p.id = f.produtor_id
-       WHERE f.talhoes IS NOT NULL AND f.talhoes != ''` + (uid ? ' AND f.usuario_id = ?' : '') + ' LIMIT 1000').bind(...(uid ? [uid] : [])).all(),
+       WHERE f.talhoes IS NOT NULL AND f.talhoes != ''` + (uid ? ' AND f.usuario_id = ?' : '') + ' LIMIT 1000').bind(...(uid ? [uid] : [])).all()),
     env.DB.prepare('SELECT usuario_id FROM modulos_usuario WHERE plantio = 1').all()
   ]);
+  const resumos = await resumosDe(env, (fz && fz.results) || []);   // nome e área dos talhões sem abrir o KML
   // para a previsão de colheita: ciclo dos materiais, regra do GMR e talhões já colhidos
   const ondeU = uid ? ' WHERE usuario_id = ?' : '', argU = uid ? [uid] : [];
   const [cic, reg, colh] = await Promise.all([
@@ -362,14 +364,9 @@ export async function plantioGeral(env, uid) {
 
   const faz = {};
   ((fz && fz.results) || []).forEach((f) => {
-    let gj = null;
-    try { gj = JSON.parse(f.talhoes); } catch (e) { return; }
-    const areas = {}; let total = 0;
-    ((gj && gj.features) || []).forEach((ft) => {
-      const pr = (ft && ft.properties) || {};
-      const nome = String(pr.nome || ''); const ha = Number(pr.area_ha) || 0;
-      if (nome) { areas[nome] = ha; total += ha; }
-    });
+    const rs = resumos[f.id]; if (!rs) return;
+    const areas = rs.areas || {}; let total = 0;
+    Object.keys(areas).forEach((k) => { total += Number(areas[k]) || 0; });
     if (!total) return;
     faz[f.id] = { id: f.id, nome: f.nome || '', produtor: f.produtor || '', conta: f.conta_nome || f.conta || '', dono: f.usuario_id,
       areas, total, ativa: !!uid || Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
@@ -479,15 +476,6 @@ export function baseUnidade(u) {
 }
 const chaveProd = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-function areasDe(f) {
-  const out = {};
-  try {
-    const t = typeof f.talhoes === 'string' ? JSON.parse(f.talhoes || '{}') : f.talhoes;
-    ((t && t.features) || []).forEach((x) => { const p = x.properties || {}; if (p.nome) out[String(p.nome)] = Number(p.area_ha) || 0; });
-  } catch (e) { /* sem talhões */ }
-  return out;
-}
-
 // Por fazenda e talhão: quanto se gastou em produtos aplicados (custo médio das entradas do estoque
 // daquela fazenda) e quanto se colheu. Conta comum vê só as suas; administrador vê todas.
 export async function comparativo(env, me, adm, safraPedida) {
@@ -496,7 +484,7 @@ export async function comparativo(env, me, adm, safraPedida) {
   const onde = adm ? '' : ' WHERE usuario_id = ?';
   const arg = adm ? [] : [me.id];
   const [faz, recs, ent, col, pla, contas] = await Promise.all([
-    env.DB.prepare('SELECT f.id, f.nome, f.talhoes, f.usuario_id, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id' + (adm ? '' : ' WHERE f.usuario_id = ?')).bind(...arg).all(),
+    comResumo(env, () => env.DB.prepare('SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.usuario_id, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id' + (adm ? '' : ' WHERE f.usuario_id = ?')).bind(...arg).all()),
     env.DB.prepare('SELECT fazenda_id, safra, operacao, dados FROM recomendacoes' + onde).bind(...arg).all(),
     env.DB.prepare('SELECT fazenda_id, produto, unidade, qtd, valor FROM estoque_agro' + onde).bind(...arg).all(),
     env.DB.prepare('SELECT fazenda_id, safra, talhao, sc_ha FROM colheita' + onde).bind(...arg).all(),
@@ -522,9 +510,9 @@ export async function comparativo(env, me, adm, safraPedida) {
   });
   const preco = (fid, nome, un) => { const c = custo[gid(fid) + '|' + chaveProd(nome) + '|' + un]; return c && c.q ? c.v / c.q : 0; };
 
-  const porFaz = {};
+  const porFaz = {}, rsm = await resumosDe(env, faz.results || []);
   (faz.results || []).forEach((f) => {
-    porFaz[f.id] = { id: f.id, nome: f.nome, produtor: f.produtor || '', conta: nomeConta[f.usuario_id] || '', area: areasDe(f), tal: {}, semPreco: {} };
+    porFaz[f.id] = { id: f.id, nome: f.nome, produtor: f.produtor || '', conta: nomeConta[f.usuario_id] || '', area: (rsm[f.id] && rsm[f.id].areas) || {}, tal: {}, semPreco: {} };
   });
   const tal = (F, n) => F.tal[n] || (F.tal[n] = { nome: n, ha: F.area[n] || 0, cultura: '', custo: 0, sc_ha: 0, aplic: 0 });
 
@@ -705,17 +693,13 @@ export async function rotasAgro(env, req, me, rota, url) {
     if (!mod.plantio) return json({ ok: true, colheita: [] });
     const [pl, fz, cic, reg, colh] = await Promise.all([
       env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? LIMIT 20000').bind(me.id).all(),
-      env.DB.prepare("SELECT id, talhoes FROM fazendas WHERE usuario_id = ? AND talhoes IS NOT NULL AND talhoes != ''").bind(me.id).all(),
+      comResumo(env, () => env.DB.prepare("SELECT id, resumo, length(talhoes) AS kml_len FROM fazendas WHERE usuario_id = ? AND talhoes IS NOT NULL AND talhoes != ''").bind(me.id).all()),
       env.DB.prepare('SELECT variedade, dias, gmr FROM ciclos WHERE usuario_id = ?').bind(me.id).all().catch(() => ({ results: [] })),
       env.DB.prepare('SELECT gmr, dias, ponto FROM ciclo_regra WHERE usuario_id = ?').bind(me.id).first().catch(() => null),
       env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0 AND usuario_id = ?').bind(me.id).all().catch(() => ({ results: [] }))
     ]);
-    const areas = {}, colhidos = {};
-    ((fz && fz.results) || []).forEach((f) => {
-      let gj = null; try { gj = JSON.parse(f.talhoes); } catch (e) { return; }
-      const a = areas[f.id] = {};
-      ((gj && gj.features) || []).forEach((ft) => { const pr = (ft && ft.properties) || {}; if (pr.nome) a[String(pr.nome)] = Number(pr.area_ha) || 0; });
-    });
+    const areas = {}, colhidos = {}, rsm = await resumosDe(env, (fz && fz.results) || []);
+    Object.keys(rsm).forEach((id) => { areas[id] = rsm[id].areas || {}; });
     ((colh && colh.results) || []).forEach((c) => { colhidos[c.fazenda_id + '|' + safraPadrao(c.safra || '') + '|' + c.talhao] = 1; });
     const cicloDe = cicloDaConta((cic && cic.results) || [], regraValida(reg || REGRA_PADRAO));
     const g = {};
