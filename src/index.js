@@ -622,8 +622,29 @@ export default {
       if (rota === '/api/cadastro' && req.method === 'GET') {
         const prod = await env.DB.prepare(
           'SELECT * FROM produtores WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
-        const faz = await env.DB.prepare(
-          'SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
+        // app novo manda kml_tenho=id~atualizado_em dos mapas que já guarda: só vai o KML das fazendas que mudaram.
+        // Sem o parâmetro (app antigo, painel), vai tudo como antes.
+        const tenho = url.searchParams.get('kml_tenho');
+        let faz;
+        if (tenho === null) faz = await env.DB.prepare('SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
+        else {
+          const conhecidos = {};
+          String(tenho).split(',').forEach((x) => { const i = x.lastIndexOf('~'); if (i > 0) conhecidos[x.slice(0, i)] = x.slice(i + 1); });
+          faz = await env.DB.prepare(`SELECT id, usuario_id, produtor_id, nome, municipio, uf, area_ha, n_talhoes, criado_em, atualizado_em,
+              (talhoes IS NOT NULL AND talhoes != '') AS tem_kml FROM fazendas WHERE usuario_id = ? ORDER BY nome`).bind(me.id).all();
+          const lista = faz.results || [], precisa = lista.filter((f) => Number(f.tem_kml) && conhecidos[f.id] !== String(f.atualizado_em || '')).map((f) => f.id);
+          const kml = {};
+          for (let i = 0; i < precisa.length; i += 50) {
+            const parte = precisa.slice(i, i + 50);
+            const r = await env.DB.prepare('SELECT id, talhoes FROM fazendas WHERE id IN (' + parte.map(() => '?').join(',') + ')').bind(...parte).all();
+            (r.results || []).forEach((x) => { kml[x.id] = x.talhoes || ''; });
+          }
+          lista.forEach((f) => {
+            if (Number(f.tem_kml) && !(f.id in kml)) f.kml_igual = 1;   // o aparelho já tem este mapa
+            else f.talhoes = kml[f.id] || '';
+            delete f.tem_kml;
+          });
+        }
         const saf = await env.DB.prepare(
           'SELECT * FROM safras WHERE usuario_id = ? ORDER BY nome DESC').bind(me.id).all();
         let resp = { results: [] };
