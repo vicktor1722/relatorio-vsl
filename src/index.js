@@ -258,6 +258,16 @@ export default {
 
       // raio-X do armazenamento: só totais (quantidade e tamanho por tipo), sem nomes nem arquivos
       if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
+      // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
+      if (rota === '/api/status/tamanhos') {
+        const q = async (sql) => { try { return (await env.DB.prepare(sql).all()).results || []; } catch (e) { return [{ erro: String(e.message || e).slice(0, 120) }]; } };
+        return json({
+          fazendas: await q("SELECT substr(id,1,6) id, length(talhoes) kml_bytes, (SELECT COUNT(*) FROM plantio p WHERE p.fazenda_id = f.id) plantio, (SELECT COUNT(*) FROM recomendacoes r WHERE r.fazenda_id = f.id) recs FROM fazendas f ORDER BY length(talhoes) DESC LIMIT 12"),
+          totais: await q("SELECT (SELECT COUNT(*) FROM fazendas) fazendas, (SELECT COALESCE(SUM(length(talhoes)),0) FROM fazendas) kml_total, (SELECT COUNT(*) FROM plantio) plantio, (SELECT MAX(length(lanc)) FROM plantio) maior_lanc, (SELECT MAX(length(partes)) FROM plantio) maior_partes, (SELECT COUNT(*) FROM recomendacoes) recs, (SELECT MAX(length(dados)) FROM recomendacoes) maior_rec, (SELECT COALESCE(SUM(length(dados)),0) FROM recomendacoes) recs_total"),
+          estoque: await q("SELECT COUNT(*) n FROM estoque_agro"),
+          maiores_recs: await q("SELECT substr(id,1,6) id, substr(fazenda_id,1,6) faz, length(dados) bytes FROM recomendacoes ORDER BY length(dados) DESC LIMIT 6")
+        });
+      }
 
       if (rota === '/api/status') {
         const e = await espaco(env).catch(function () { return {}; });
