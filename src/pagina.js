@@ -456,6 +456,12 @@ const SCRIPT_PPT = String.raw`
     await lib();
     var P = new window.PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.title = D.titulo; P.company = D.empresa;
     var logo = await imagem(D.logo, 600);
+    // fotos preparadas 4 por vez (bem mais rápido que uma a uma)
+    var FOT = {}, lista = [];
+    D.grupos.forEach(function(g){ g.itens.forEach(function(i){ if (i.tipo === 'foto' && i.src && lista.indexOf(i.src) < 0) lista.push(i.src); }); });
+    var prox = 0, feitas = 0;
+    async function trabalhador(){ while (prox < lista.length) { var u = lista[prox++]; FOT[u] = await imagem(u, 1600); feitas++; btn.textContent = 'Gerando… ' + feitas + '/' + lista.length; } }
+    await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
 
     // capa
     var c = P.addSlide(); c.background = { color: VERDE };
@@ -540,8 +546,7 @@ const SCRIPT_PPT = String.raw`
           { x: 0.6, y: 1.25, w: 12.1, h: 5.6, fontSize: 17, color: TEXTO, fontFace: 'Arial', valign: 'top' });
       }
       for (var fi = 0; fi < fotos.length; fi++) {
-        btn.textContent = 'Gerando… ' + g.titulo;
-        var f = fotos[fi], im = await imagem(f.src, 1600), sf = P.addSlide();
+        var f = fotos[fi], im = FOT[f.src] || null, sf = P.addSlide();
         faixa(sf, g.titulo, (g.area ? g.area + '  ·  ' : '') + 'foto ' + (fi + 1) + ' de ' + fotos.length);
         if (im) sf.addImage(caber(im, 0.45, 1.2, 8.4, 5.75));
         else sf.addText('Foto indisponível', { x: 0.45, y: 1.2, w: 8.4, h: 5.75, align: 'center', color: CINZA, fontSize: 14, fill: { color: 'F2F4F2' } });
@@ -584,53 +589,30 @@ const SCRIPT_PPT = String.raw`
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 60000);
   }
-  // folha "PowerPoint pronto": aparece só quando o celular não deixou abrir sozinho (o toque ficou antigo
-  // enquanto gerava) ou quando ele baixa em vez de compartilhar (Android). Um toque aqui abre na hora.
-  function fecharFolha(){ var f = document.getElementById('pptFolha'); if (f) f.remove(); }
-  function folha(blob, baixado){
-    fecharFolha();
-    var arq = arquivoDe(blob), share = compartilha(arq);
-    var f = document.createElement('div'); f.id = 'pptFolha';
-    f.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
-    var bt = 'display:block;width:100%;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:700;margin-top:10px;cursor:pointer;font-family:inherit';
-    f.innerHTML = '<div style="background:#fff;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px rgba(0,0,0,.2)">' +
-      '<div style="font-size:18px;font-weight:800;color:#146034">' + (baixado ? '✅ PowerPoint salvo' : '📊 PowerPoint pronto') + '</div>' +
-      '<div style="font-size:14px;color:#55655c;margin-top:6px;line-height:1.4">' + (baixado
-        ? 'O arquivo foi para a pasta <b>Downloads</b>. Toque em <b>Abrir</b> no aviso de download, ou abra pelo app <b>Arquivos</b>.'
-        : 'Toque abaixo para salvar no celular ou mandar pelo WhatsApp.') + '</div>' +
-      (share ? '<button data-p="share" style="' + bt + ';background:#1B7A43;color:#fff">📤 Salvar / Compartilhar</button>' : '') +
-      '<button data-p="baixar" style="' + bt + ';background:' + (share ? '#fff;color:#1B7A43;border:1px solid #1B7A43' : '#1B7A43;color:#fff') + '">⬇️ ' + (baixado ? 'Baixar de novo' : 'Baixar o arquivo') + '</button>' +
-      '<button data-p="fechar" style="' + bt + ';background:none;color:#6B7B72;font-weight:600">Fechar</button></div>';
-    f.addEventListener('click', function(ev){
-      var b = ev.target.closest('[data-p]');
-      if (!b) { if (ev.target === f) fecharFolha(); return; }
-      var o = b.getAttribute('data-p');
-      if (o === 'share') { navigator.share({ files: [arq], title: D.titulo }).then(fecharFolha, function(e){ if (!e || e.name !== 'AbortError') { baixar(blob); fecharFolha(); } }); }
-      else if (o === 'baixar') { baixar(blob); fecharFolha(); }
-      else fecharFolha();
-    });
-    document.body.appendChild(f);
-  }
-  // abre direto: compartilhar (iPhone: "Salvar em Arquivos", WhatsApp...) ou baixar (Android não compartilha .pptx)
+  // abre direto no mesmo toque: compartilhar (iPhone: "Salvar em Arquivos", WhatsApp...) ou baixar (o Android
+  // não compartilha .pptx). Se o celular bloquear por o toque ter ficado antigo, o mesmo botão vira
+  // "Salvar PowerPoint" e o próximo toque abre na hora.
   function abrir(blob){
     var arq = arquivoDe(blob);
     if (compartilha(arq)) {
-      navigator.share({ files: [arq], title: D.titulo }).catch(function(e){
-        if (e && e.name === 'AbortError') return;   // a pessoa fechou a janela de compartilhar
-        folha(blob, false);                          // o celular não deixou abrir sozinho: um toque na folha abre
+      navigator.share({ files: [arq], title: D.titulo }).then(function(){ btn.textContent = rotulo; }, function(e){
+        btn.textContent = (e && e.name === 'AbortError') ? rotulo : 'Salvar PowerPoint';
       });
       return;
     }
-    baixar(blob); folha(blob, true);
+    baixar(blob); btn.textContent = rotulo;
   }
   var rotulo = btn.textContent, gerando = false;
   btn.addEventListener('click', function(){
     if (arquivo) { abrir(arquivo); return; }   // já gerado: abre de novo na hora
     if (gerando) return; gerando = true; btn.textContent = 'Gerando…'; btn.disabled = true;
-    gerar().then(function(blob){ arquivo = blob; btn.textContent = rotulo; abrir(blob); }, function(e){
+    gerar().then(function(blob){ arquivo = blob; abrir(blob); }, function(e){
       btn.textContent = rotulo; alert('Não consegui gerar a apresentação' + (e && e.message ? ': ' + e.message : '') + '. Tente de novo com internet.');
     }).then(function(){ gerando = false; btn.disabled = false; });
   });
+  // deixa a biblioteca já baixada (pequena), para gerar mais rápido e abrir ainda dentro do mesmo toque
+  function aquecer(){ setTimeout(function(){ lib().catch(function(){}); }, 2500); }
+  if (document.readyState === 'complete') aquecer(); else window.addEventListener('load', aquecer);
 })();
 `;
 
