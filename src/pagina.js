@@ -400,8 +400,8 @@ const DICT = {
 // roda no navegador do cliente: escolhe o idioma (o do aparelho, ou o que ele já tinha escolhido),
 // reescreve os rótulos e pede a tradução das legendas e observações
 // ---------- apresentação em PowerPoint (gerada no aparelho de quem abriu o relatório) ----------
-// A biblioteca só é baixada quando alguém toca no botão. No iPhone, salvar/compartilhar precisa de um
-// toque recente: o primeiro toque gera o arquivo, e o botão vira "Salvar PowerPoint" para o segundo toque.
+// A biblioteca só é baixada quando alguém toca no botão. Ao terminar de gerar, já abre para salvar/compartilhar;
+// se o celular bloquear (o toque ficou antigo enquanto gerava), aparece a folha "PowerPoint pronto" (um toque abre).
 const SCRIPT_PPT = String.raw`
 (function(){
   var btn = document.getElementById('btnPpt'), D = null;
@@ -577,17 +577,57 @@ const SCRIPT_PPT = String.raw`
       { x: 0.75, y: 6.5, w: 11.8, h: 0.5, fontSize: 12, color: 'FFFFFF', fontFace: 'Arial' });
     return P.write({ outputType: 'blob' });
   }
-  function salvar(blob){
-    var arq = null; try { arq = new File([blob], nome, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }); } catch (e) {}
-    if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) { navigator.share({ files: [arq], title: D.titulo }).catch(function(){}); return; }
+  var MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  function arquivoDe(blob){ try { return new File([blob], nome, { type: MIME }); } catch (e) { return null; } }
+  function compartilha(arq){ try { return !!(arq && navigator.canShare && navigator.canShare({ files: [arq] })); } catch (e) { return false; } }
+  function baixar(blob){
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+  }
+  // folha "PowerPoint pronto": aparece só quando o celular não deixou abrir sozinho (o toque ficou antigo
+  // enquanto gerava) ou quando ele baixa em vez de compartilhar (Android). Um toque aqui abre na hora.
+  function fecharFolha(){ var f = document.getElementById('pptFolha'); if (f) f.remove(); }
+  function folha(blob, baixado){
+    fecharFolha();
+    var arq = arquivoDe(blob), share = compartilha(arq);
+    var f = document.createElement('div'); f.id = 'pptFolha';
+    f.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
+    var bt = 'display:block;width:100%;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:700;margin-top:10px;cursor:pointer;font-family:inherit';
+    f.innerHTML = '<div style="background:#fff;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px rgba(0,0,0,.2)">' +
+      '<div style="font-size:18px;font-weight:800;color:#146034">' + (baixado ? '✅ PowerPoint salvo' : '📊 PowerPoint pronto') + '</div>' +
+      '<div style="font-size:14px;color:#55655c;margin-top:6px;line-height:1.4">' + (baixado
+        ? 'O arquivo foi para a pasta <b>Downloads</b>. Toque em <b>Abrir</b> no aviso de download, ou abra pelo app <b>Arquivos</b>.'
+        : 'Toque abaixo para salvar no celular ou mandar pelo WhatsApp.') + '</div>' +
+      (share ? '<button data-p="share" style="' + bt + ';background:#1B7A43;color:#fff">📤 Salvar / Compartilhar</button>' : '') +
+      '<button data-p="baixar" style="' + bt + ';background:' + (share ? '#fff;color:#1B7A43;border:1px solid #1B7A43' : '#1B7A43;color:#fff') + '">⬇️ ' + (baixado ? 'Baixar de novo' : 'Baixar o arquivo') + '</button>' +
+      '<button data-p="fechar" style="' + bt + ';background:none;color:#6B7B72;font-weight:600">Fechar</button></div>';
+    f.addEventListener('click', function(ev){
+      var b = ev.target.closest('[data-p]');
+      if (!b) { if (ev.target === f) fecharFolha(); return; }
+      var o = b.getAttribute('data-p');
+      if (o === 'share') { navigator.share({ files: [arq], title: D.titulo }).then(fecharFolha, function(e){ if (!e || e.name !== 'AbortError') { baixar(blob); fecharFolha(); } }); }
+      else if (o === 'baixar') { baixar(blob); fecharFolha(); }
+      else fecharFolha();
+    });
+    document.body.appendChild(f);
+  }
+  // abre direto: compartilhar (iPhone: "Salvar em Arquivos", WhatsApp...) ou baixar (Android não compartilha .pptx)
+  function abrir(blob){
+    var arq = arquivoDe(blob);
+    if (compartilha(arq)) {
+      navigator.share({ files: [arq], title: D.titulo }).catch(function(e){
+        if (e && e.name === 'AbortError') return;   // a pessoa fechou a janela de compartilhar
+        folha(blob, false);                          // o celular não deixou abrir sozinho: um toque na folha abre
+      });
+      return;
+    }
+    baixar(blob); folha(blob, true);
   }
   var rotulo = btn.textContent, gerando = false;
   btn.addEventListener('click', function(){
-    if (arquivo) { salvar(arquivo); return; }   // segundo toque: salva/compartilha o que já foi gerado
+    if (arquivo) { abrir(arquivo); return; }   // já gerado: abre de novo na hora
     if (gerando) return; gerando = true; btn.textContent = 'Gerando…'; btn.disabled = true;
-    gerar().then(function(blob){ arquivo = blob; btn.textContent = 'Salvar PowerPoint'; }, function(e){
+    gerar().then(function(blob){ arquivo = blob; btn.textContent = rotulo; abrir(blob); }, function(e){
       btn.textContent = rotulo; alert('Não consegui gerar a apresentação' + (e && e.message ? ': ' + e.message : '') + '. Tente de novo com internet.');
     }).then(function(){ gerando = false; btn.disabled = false; });
   });
