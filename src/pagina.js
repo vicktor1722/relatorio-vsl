@@ -400,8 +400,8 @@ const DICT = {
 // roda no navegador do cliente: escolhe o idioma (o do aparelho, ou o que ele já tinha escolhido),
 // reescreve os rótulos e pede a tradução das legendas e observações
 // ---------- apresentação em PowerPoint (gerada no aparelho de quem abriu o relatório) ----------
-// A biblioteca só é baixada quando alguém toca no botão. No iPhone, salvar/compartilhar precisa de um
-// toque recente: o primeiro toque gera o arquivo, e o botão vira "Salvar PowerPoint" para o segundo toque.
+// A biblioteca só é baixada quando alguém toca no botão. Ao terminar de gerar, já abre para salvar/compartilhar;
+// se o celular bloquear (o toque ficou antigo enquanto gerava), aparece a folha "PowerPoint pronto" (um toque abre).
 const SCRIPT_PPT = String.raw`
 (function(){
   var btn = document.getElementById('btnPpt'), D = null;
@@ -456,6 +456,12 @@ const SCRIPT_PPT = String.raw`
     await lib();
     var P = new window.PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.title = D.titulo; P.company = D.empresa;
     var logo = await imagem(D.logo, 600);
+    // fotos preparadas 4 por vez (bem mais rápido que uma a uma)
+    var FOT = {}, lista = [];
+    D.grupos.forEach(function(g){ g.itens.forEach(function(i){ if (i.tipo === 'foto' && i.src && lista.indexOf(i.src) < 0) lista.push(i.src); }); });
+    var prox = 0, feitas = 0;
+    async function trabalhador(){ while (prox < lista.length) { var u = lista[prox++]; FOT[u] = await imagem(u, 1600); feitas++; btn.textContent = 'Gerando… ' + feitas + '/' + lista.length; } }
+    await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
 
     // capa
     var c = P.addSlide(); c.background = { color: VERDE };
@@ -540,8 +546,7 @@ const SCRIPT_PPT = String.raw`
           { x: 0.6, y: 1.25, w: 12.1, h: 5.6, fontSize: 17, color: TEXTO, fontFace: 'Arial', valign: 'top' });
       }
       for (var fi = 0; fi < fotos.length; fi++) {
-        btn.textContent = 'Gerando… ' + g.titulo;
-        var f = fotos[fi], im = await imagem(f.src, 1600), sf = P.addSlide();
+        var f = fotos[fi], im = FOT[f.src] || null, sf = P.addSlide();
         faixa(sf, g.titulo, (g.area ? g.area + '  ·  ' : '') + 'foto ' + (fi + 1) + ' de ' + fotos.length);
         if (im) sf.addImage(caber(im, 0.45, 1.2, 8.4, 5.75));
         else sf.addText('Foto indisponível', { x: 0.45, y: 1.2, w: 8.4, h: 5.75, align: 'center', color: CINZA, fontSize: 14, fill: { color: 'F2F4F2' } });
@@ -577,20 +582,37 @@ const SCRIPT_PPT = String.raw`
       { x: 0.75, y: 6.5, w: 11.8, h: 0.5, fontSize: 12, color: 'FFFFFF', fontFace: 'Arial' });
     return P.write({ outputType: 'blob' });
   }
-  function salvar(blob){
-    var arq = null; try { arq = new File([blob], nome, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }); } catch (e) {}
-    if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) { navigator.share({ files: [arq], title: D.titulo }).catch(function(){}); return; }
+  var MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  function arquivoDe(blob){ try { return new File([blob], nome, { type: MIME }); } catch (e) { return null; } }
+  function compartilha(arq){ try { return !!(arq && navigator.canShare && navigator.canShare({ files: [arq] })); } catch (e) { return false; } }
+  function baixar(blob){
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+  }
+  // abre direto no mesmo toque: compartilhar (iPhone: "Salvar em Arquivos", WhatsApp...) ou baixar (o Android
+  // não compartilha .pptx). Se o celular bloquear por o toque ter ficado antigo, o mesmo botão vira
+  // "Salvar PowerPoint" e o próximo toque abre na hora.
+  function abrir(blob){
+    var arq = arquivoDe(blob);
+    if (compartilha(arq)) {
+      navigator.share({ files: [arq], title: D.titulo }).then(function(){ btn.textContent = rotulo; }, function(e){
+        btn.textContent = (e && e.name === 'AbortError') ? rotulo : 'Salvar PowerPoint';
+      });
+      return;
+    }
+    baixar(blob); btn.textContent = rotulo;
   }
   var rotulo = btn.textContent, gerando = false;
   btn.addEventListener('click', function(){
-    if (arquivo) { salvar(arquivo); return; }   // segundo toque: salva/compartilha o que já foi gerado
+    if (arquivo) { abrir(arquivo); return; }   // já gerado: abre de novo na hora
     if (gerando) return; gerando = true; btn.textContent = 'Gerando…'; btn.disabled = true;
-    gerar().then(function(blob){ arquivo = blob; btn.textContent = 'Salvar PowerPoint'; }, function(e){
+    gerar().then(function(blob){ arquivo = blob; abrir(blob); }, function(e){
       btn.textContent = rotulo; alert('Não consegui gerar a apresentação' + (e && e.message ? ': ' + e.message : '') + '. Tente de novo com internet.');
     }).then(function(){ gerando = false; btn.disabled = false; });
   });
+  // deixa a biblioteca já baixada (pequena), para gerar mais rápido e abrir ainda dentro do mesmo toque
+  function aquecer(){ setTimeout(function(){ lib().catch(function(){}); }, 2500); }
+  if (document.readyState === 'complete') aquecer(); else window.addEventListener('load', aquecer);
 })();
 `;
 
