@@ -1288,7 +1288,8 @@
   function pdfCh(s) { return global.PlanoPDF.ch(s); }
   function pdfRodape(pgs, W, M) { return global.PlanoPDF.rodape(pgs, W, M); }
   function pdfBytes(pgs, logo, W, H) { return global.PlanoPDF.bytes(pgs, logo, W, H); }
-  function entregarPdf(bytes, nome, titulo) { return global.PlanoPDF.entregar(bytes, nome, titulo, toast); }
+  // sem o compartilhar de arquivo (alguns Android): o PDF sobe e vai o link pelo WhatsApp
+  function entregarPdf(bytes, nome, titulo) { return global.PlanoPDF.entregar(bytes, nome, titulo, toast, function (b, n) { return global.Sync.subirPdf(b, n); }); }
   function nomeArq(s) { return global.PlanoPDF.nomeArq(s); }
   function pdfOrdem(r) {
     var o = dadosOrdem(r), W = 595, H = 842, M = 40, pgs = [[]], y = 0, logo = LOGO_PDF, ch = pdfCh;

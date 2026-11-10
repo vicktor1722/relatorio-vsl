@@ -64,15 +64,69 @@
     return bytes;
   }
   // compartilha (WhatsApp, e-mail...) ou baixa o PDF
-  function entregar(dados, nome, titulo, aviso) {
-    var blob = new Blob([dados], { type: 'application/pdf' });
-    try {
-      var arq = new File([blob], nome, { type: 'application/pdf' });
-      if (navigator.canShare && navigator.canShare({ files: [arq] })) { navigator.share({ files: [arq], title: titulo }).catch(function () {}); return; }
-    } catch (e) { /* cai no download */ }
+  /* entrega o PDF: abre o "compartilhar" do celular (WhatsApp, e-mail…). Onde o navegador não deixa
+     compartilhar arquivo (Samsung Internet, Firefox, alguns Android) ou o compartilhar falha, mostra uma
+     folha com "Enviar pelo WhatsApp" (sobe o PDF e manda o link), "Compartilhar" e "Baixar".
+     subir(bytes, nome) → Promise<url> (opcional, só no app). Sem subir e sem compartilhar: baixa direto. */
+  function baixar(blob, nome, aviso) {
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
-    if (aviso) aviso('PDF baixado');
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    if (aviso) aviso('PDF salvo em Downloads');
+  }
+  function entregar(dados, nome, titulo, aviso, subir) {
+    var blob = new Blob([dados], { type: 'application/pdf' }), arq = null, podeArq = false;
+    try { arq = new File([blob], nome, { type: 'application/pdf' }); } catch (e) { arq = null; }
+    try { podeArq = !!(arq && navigator.canShare && navigator.canShare({ files: [arq] })); } catch (e) { podeArq = false; }
+    if (podeArq) {
+      navigator.share({ files: [arq], title: titulo }).catch(function (e) { if (!e || e.name !== 'AbortError') folha(); });
+      return;
+    }
+    if (!subir) { baixar(blob, nome, aviso); return; }
+    folha();
+
+    function folha() {
+      var ov = document.createElement('div');
+      ov.setAttribute('style', 'position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center');
+      var bt = 'display:flex;align-items:center;gap:10px;width:100%;padding:14px;margin:0 0 8px;border-radius:12px;font:inherit;font-size:15.5px;text-align:left;cursor:pointer;';
+      ov.innerHTML = '<div style="background:#fff;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font-family:inherit">' +
+        '<div style="font-weight:700;font-size:17px;margin:0 0 4px;color:#1B2B22">📄 PDF pronto</div>' +
+        '<div style="font-size:13px;color:#5F6F66;margin:0 0 12px">' + titulo.replace(/[<>&]/g, '') + '</div>' +
+        '<button type="button" data-p="zap" style="' + bt + 'border:0;background:#25D366;color:#fff;font-weight:700">💬 Enviar pelo WhatsApp</button>' +
+        '<div data-p="zapok" style="display:none;margin:0 0 8px"></div>' +
+        (navigator.share ? '<button type="button" data-p="comp" style="' + bt + 'border:1.5px solid #D5DED8;background:#fff;color:#1B2B22">📤 Compartilhar…</button>' : '') +
+        '<button type="button" data-p="baixar" style="' + bt + 'border:1.5px solid #D5DED8;background:#fff;color:#1B2B22">⬇️ Baixar o PDF</button>' +
+        '<button type="button" data-p="fechar" style="' + bt + 'justify-content:center;border:0;background:none;color:#5F6F66">Fechar</button></div>';
+      document.body.appendChild(ov);
+      var link = '';
+      ov.onclick = function (ev) {
+        if (ev.target === ov) { ov.remove(); return; }
+        var b = ev.target.closest('[data-p]'); if (!b) return;
+        var p = b.getAttribute('data-p');
+        if (p === 'fechar') { ov.remove(); return; }
+        if (p === 'baixar') { baixar(blob, nome, aviso); ov.remove(); return; }
+        if (p === 'comp') {
+          var tenta = podeArq ? navigator.share({ files: [arq], title: titulo }) : link ? navigator.share({ title: titulo, text: titulo + ': ' + link }) : null;
+          if (!tenta) { b.textContent = 'Este celular não compartilha arquivo: use o WhatsApp ou Baixar'; return; }
+          tenta.then(function () { ov.remove(); }).catch(function () {});
+          return;
+        }
+        if (p === 'zap') {
+          if (!subir) return;
+          if (!navigator.onLine) { b.textContent = 'Sem internet: use Baixar e envie depois'; return; }
+          b.disabled = true; b.textContent = '⏳ Preparando o link do PDF…';
+          subir(dados, nome).then(function (url) {
+            link = url;
+            var txt = encodeURIComponent(titulo + ': ' + url);
+            b.style.display = 'none';
+            var ok = ov.querySelector('[data-p="zapok"]');
+            ok.style.display = 'block';
+            // o WhatsApp abre num toque novo (o celular só deixa abrir outro app a partir de um toque)
+            ok.innerHTML = '<a href="https://wa.me/?text=' + txt + '" target="_blank" rel="noopener" style="' + bt + 'justify-content:center;border:0;background:#25D366;color:#fff;font-weight:700;text-decoration:none">💬 Abrir o WhatsApp</a>' +
+              '<div style="font-size:12px;color:#5F6F66;word-break:break-all;padding:0 4px">' + url + '</div>';
+          }).catch(function (e) { b.disabled = false; b.textContent = '💬 Tentar de novo (' + ((e && e.message) || 'falhou') + ')'; });
+        }
+      };
+    }
   }
   function nomeArq(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pdf'; }
   var COR_PDF = { vis: [0.482, 0.247, 0.749], lem: [0.851, 0.51, 0.169], prev: [0.231, 0.471, 0.765], apl: [0.184, 0.62, 0.357],

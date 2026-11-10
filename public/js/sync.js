@@ -428,6 +428,14 @@
     return String(link || '').replace(/^https?:\/\/[^/]*\.workers\.dev/i, DOMINIO_PUBLICO);
   }
 
+  // PDF gerado no celular → nuvem, para mandar o link pelo WhatsApp (celular que não compartilha arquivo)
+  async function subirPdf(bytes, nome) {
+    const r = await chamar('/api/pdf', { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'X-Nome': encodeURIComponent(nome || 'relatorio.pdf') },
+      body: new Blob([bytes], { type: 'application/pdf' }), timeout: 60000 });
+    if (!r || !r.url) throw new Error('não subiu');
+    return linkPublico(r.url);
+  }
+
   async function urlMidia(item) {
     if (!item || !item.midia) return null;
     const c = await conf();
@@ -734,7 +742,7 @@
 
   global.Sync = {
     conf, salvarConf, entrar, registrar, sair, logado, quemSou,
-    pausar, cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
+    pausar, subirPdf, cadastroLocal, baixarCadastro, salvarProdutor, salvarFazenda, salvarSafra, salvarResponsavel, apagarCadastro,
     sincronizarCadastro, foiSemRede: function () { return salvoSemRede; }, cadastroPendente: async function () { return (await filaCad()).length; },
     salvarPerfil, baixarPerfil,
     meuId, fixarDono, limparIdentidadeLocal, limparDadosLocais, restaurarDaNuvem, baseLink, linkPublico, foiRepetido: function () { return repetidoNoServidor; }, urlMidia, liberarSincronizados, sincronizar, publicar, marcarParaEnvio, cancelarEnvio, publicarPendentes, rodada,
