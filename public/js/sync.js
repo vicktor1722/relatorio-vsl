@@ -286,6 +286,35 @@
     return feitos;
   }
 
+  // talhão que mudou de nome no servidor: ajusta uma vez as cópias do aparelho (mapa dos relatórios e talhão dos registros)
+  async function aplicarRenomeios(lista) {
+    if (!lista.length) return;
+    const feitos = (await DB.cfg('renomeios_feitos')) || {};
+    const novos = lista.filter(function (x) { return !feitos[x.chave + '|' + x.fazenda_id]; });
+    if (!novos.length) return;
+    const rels = await DB.all('relatorios'), itens = await DB.all('itens');
+    for (const x of novos) {
+      const M = x.mapa || {}, troca = function (s) { return Object.prototype.hasOwnProperty.call(M, s) ? M[s] : s; };
+      const ids = {};
+      for (const r of rels) {
+        if (r.fazenda_id !== x.fazenda_id) continue;
+        ids[r.id] = 1;
+        if (r.talhoes && r.talhoes.features) {
+          let n = 0;
+          r.talhoes.features.forEach(function (ft) { const p = ft && ft.properties; if (p && M[p.nome]) { p.nome = troca(p.nome); n++; } });
+          if (n) await DB.put('relatorios', r);
+        }
+      }
+      for (const it of itens) {
+        if (!ids[it.relatorio_id] || !M[it.talhao]) continue;
+        it.talhao = troca(it.talhao);
+        await DB.put('itens', it);
+      }
+      feitos[x.chave + '|' + x.fazenda_id] = new Date().toISOString();
+    }
+    await DB.cfg('renomeios_feitos', feitos);
+  }
+
   async function baixarCadastro() {
     // manda a versão dos mapas que o aparelho já tem: o servidor só devolve o KML das fazendas que mudaram
     const antes = await cadastroLocal(), guardado = {};
@@ -299,6 +328,7 @@
         try { f.talhoes = JSON.parse(f.talhoes); } catch (e) { f.talhoes = null; }
       }
     });
+    await aplicarRenomeios(r.renomeios || []).catch(function () {});
     aplicarFila(dados, await filaCad());   // o que foi feito sem internet e ainda não subiu continua aparecendo
     await DB.cfg('cadastro', dados);
     emitir({ tipo: 'cadastro' });
