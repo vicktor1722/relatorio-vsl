@@ -31,7 +31,7 @@ binding = "AI"
 [assets]
 directory = "./site"
 binding = "ASSETS"
-run_worker_first = ["/", "/r/*", "/img/*", "/api/*", "/oauth/*", "/admin", "/admin/*", "/termos", "/termos/", "/portal", "/portal/", "/portal-sw.js", "/portal.webmanifest"]
+run_worker_first = ["/", "/r/*", "/p/*", "/img/*", "/api/*", "/oauth/*", "/admin", "/admin/*", "/termos", "/termos/", "/portal", "/portal/", "/portal-sw.js", "/portal.webmanifest"]
 
 # todo dia às 5h00 de Mato Grosso (9h00 UTC) o aviso do operador e às 5h40 (9h40 UTC) o do consultor
 [triggers]

@@ -188,6 +188,19 @@ async function garantirPos(env) {
   posOk = true;
 }
 
+// PDFs enviados por link vencem em 30 dias (cron da madrugada apaga)
+async function limparPdfs(env) {
+  if (!env.MIDIA) return;
+  const limite = Date.now() - 30 * 864e5;
+  let cursor, voltas = 0;
+  do {
+    const l = await env.MIDIA.list({ prefix: 'pdf/', cursor, limit: 500 });
+    const velhos = (l.objects || []).filter((o) => new Date(o.uploaded).getTime() < limite).map((o) => o.key);
+    if (velhos.length) await env.MIDIA.delete(velhos);
+    cursor = l.truncated ? l.cursor : null;
+  } while (cursor && ++voltas < 20);
+}
+
 // quadros pesados guardados prontos (segundos até vencer); ver quadros.js
 const QUADROS = { '/api/painel/fazendas': 1800, '/api/painel/fazenda': 1800, '/api/agro/admin/plantio': 3600, '/api/agro/comparativo': 3600, '/api/agro/colheita-prevista': 3600 };
 
@@ -305,6 +318,15 @@ export default {
         const compras = {}; (cc.results || []).forEach(function (r) { const v = JSON.parse(r.valor); compras[r.chave.slice(13)] = { itens: v.itens, fazendas: v.fazendas_grupo, sem_preco: v.sem_preco, total: v.total }; });
         const tk = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'carga:sp_lasting'").first().catch(function () { return null; });
         return json({ ok: true, midia: e.modo || null, usado: e.usado || 0, limite: e.limite || 0, carga_estoque: cg ? JSON.parse(cg.valor).itens : 0, troca_glifosato: tg ? JSON.parse(tg.valor).linhas : null, volta_lasting: tk ? { linhas: JSON.parse(tk.valor).linhas, karate: JSON.parse(tk.valor).karate_restante } : null, troca_zapp: tz ? JSON.parse(tz.valor).linhas : null, tipos: tt ? JSON.parse(tt.valor) : null, compras, aviso_clima: av ? JSON.parse(av.valor) : null });
+      }
+
+      // PDF enviado pelo link (celular que não compartilha arquivo): /p/<id>/<nome>.pdf, guardado 30 dias
+      if (rota.startsWith('/p/')) {
+        const id = (rota.split('/')[2] || '').replace(/[^a-z0-9]/gi, '');
+        const obj = id && env.MIDIA ? await env.MIDIA.get('pdf/' + id + '.pdf') : null;
+        if (!obj) return html(paginaSimples('PDF não encontrado', 'O link venceu (fica 30 dias) ou está errado. Peça um novo ao consultor.'), 404);
+        const nome = decodeURIComponent((rota.split('/')[3] || 'planejamento.pdf')).replace(/[^\w.\-]/g, '_');
+        return new Response(obj.body, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="' + nome + '"', 'Cache-Control': 'private, max-age=3600' } });
       }
 
       if (rota.startsWith('/img/')) {
@@ -848,6 +870,20 @@ export default {
         return json({ ok: true });
       }
 
+      if (rota === '/api/pdf' && req.method === 'POST') {
+        if (!env.MIDIA) return json({ erro: 'armazenamento indisponível' }, 503);
+        const dados = await req.arrayBuffer();
+        if (!dados.byteLength || dados.byteLength > 15 * 1024 * 1024) return json({ erro: 'PDF vazio ou grande demais' }, 400);
+        if (new TextDecoder().decode(new Uint8Array(dados.slice(0, 5))) !== '%PDF-') return json({ erro: 'arquivo não é PDF' }, 400);
+        const id = novoId('p') + Math.random().toString(36).slice(2, 10);
+        let nome = 'documento.pdf';
+        try { nome = decodeURIComponent(req.headers.get('X-Nome') || nome); } catch (e) { /* nome padrão */ }
+        nome = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]/g, '-').slice(0, 80) || 'documento.pdf';
+        if (!/\.pdf$/i.test(nome)) nome += '.pdf';
+        await env.MIDIA.put('pdf/' + id + '.pdf', dados, { httpMetadata: { contentType: 'application/pdf' }, customMetadata: { usuario: me.id, em: new Date().toISOString() } });
+        return json({ ok: true, url: origem + '/p/' + id + '/' + encodeURIComponent(nome) });
+      }
+
       if (rota === '/api/upload' && req.method === 'POST') {
         const itemId = req.headers.get('X-Item-Id');
         const relId = req.headers.get('X-Rel-Id');
@@ -924,7 +960,7 @@ export default {
 
   // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; 4h30 a chuva dos próximos 15 dias; a cada 15 min o aviso 2 h antes das visitas
   async scheduled(evento, env, ctx) {
-    if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env)); return; }
+    if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env).then(() => limparPdfs(env)).catch(() => {})); return; }
     if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env).then(() => preencherResumos(env, 400000)).catch(() => {})); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
