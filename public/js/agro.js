@@ -922,7 +922,7 @@
     var cards = l.map(function (x) {
       valor += Math.max(0, x.saldo) * x.custo; gasto += x.apl * x.custo;
       var falta = x.sobra < -0.0001;
-      return '<div class="ag-est' + (falta ? ' falta' : '') + '" data-a="entrada" data-v="' + esc(x.nome) + '|' + x.un + '">' +
+      return '<div class="ag-est' + (falta ? ' falta' : '') + '" data-a="prodest" data-v="' + esc(x.nome) + '|' + x.un + '">' +
         '<div class="ag-est-top"><b>' + esc(x.nome) + '</b><em' + (x.saldo < 0 ? ' class="neg"' : '') + '>' + qtdTxt(x.saldo, x.un) + '</em></div>' +
         '<div class="ag-est-l"><span>Entradas ' + qtdTxt(x.ent, x.un) + '</span><span>Aplicado ' + qtdTxt(x.apl, x.un) + '</span><span>A aplicar ' + qtdTxt(x.prev, x.un) + '</span></div>' +
         '<div class="ag-est-l"><span class="' + (falta ? 'neg' : '') + '">' + (falta ? '⚠️ Faltam ' + qtdTxt(-x.sobra, x.un) + ' para as recomendações' : 'Sobra depois das recomendações: ' + qtdTxt(x.sobra, x.un)) + '</span>' +
@@ -941,6 +941,57 @@
         : '<div class="aviso" style="margin-top:10px">Nenhum produto ainda. Lance as entradas (compras) desta fazenda; as recomendações aplicadas dão baixa sozinhas.</div>') +
       (hist ? '<h2>Entradas lançadas</h2>' + hist : '') +
       '<div class="ag-nota">A baixa é automática: ao marcar uma recomendação como aplicada, dose × área sai do estoque. Desmarcar devolve. O preço médio das entradas vira o custo usado no comparativo do painel.</div>');
+  }
+  // toque no produto do estoque: trocar o nome (em todas as entradas dele), excluir o produto (todas as
+  // entradas), abrir uma entrada para corrigir ou lançar outra. Vale para o estoque da fazenda (ou do grupo).
+  function modalProdEstoque(v) {
+    var i0 = String(v || '').lastIndexOf('|'), nome0 = v.slice(0, i0), un = v.slice(i0 + 1) || 'L', gIds = grupoIds(R.faz);
+    var ents = (ST.estoque || []).filter(function (e) { return gIds.indexOf(e.fazenda_id) >= 0 && chaveProd(e.produto) === chaveProd(nome0) && (e.unidade || 'L') === un; })
+      .sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; });
+    var sd = saldoFaz(R.faz).filter(function (x) { return chaveProd(x.nome) === chaveProd(nome0) && x.un === un; })[0] || { apl: 0, prev: 0, ent: 0 };
+    var emRec = sd.apl > 0.0001 || sd.prev > 0.0001;
+    var nomes = {}; ST.produtos.forEach(function (x) { nomes[x.nome] = 1; }); saldoFaz(R.faz).forEach(function (x) { nomes[x.nome] = 1; });
+    var ov = document.createElement('div'); ov.className = 'ag-ov';
+    ov.innerHTML = '<div class="ag-mod"><h3>' + esc(nome0) + '</h3>' +
+      (ents.length
+        ? '<div class="campo"><label>Nome do produto</label><input id="peNome" list="peLista" value="' + esc(nome0) + '" autocomplete="off">' +
+          '<datalist id="peLista">' + Object.keys(nomes).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist></div>' +
+          '<div class="ag-dica">O nome muda em ' + (ents.length === 1 ? 'a entrada' : 'todas as ' + ents.length + ' entradas') + ' deste produto. Para a baixa automática, use o mesmo nome da recomendação.</div>' +
+          '<button class="btn" data-m="nome">Salvar o nome</button>' +
+          '<div style="font-weight:700;font-size:14px;margin:16px 0 4px">Entradas deste produto</div>' + ents.map(function (e) {
+            return '<div class="lista-item" data-m="ent" data-id="' + esc(e.id) + '"><div class="txt"><b>' + dataBR(e.data) + '</b><span>' + (e.obs ? esc(e.obs) : 'toque para corrigir') + '</span></div>' +
+              '<span class="badge">' + (Number(e.qtd) < 0 ? '' : '+') + qtdTxt(Number(e.qtd) || 0, e.unidade || 'L') + (Number(e.valor) ? ' · ' + brl(e.valor) : '') + '</span></div>'; }).join('')
+        : '<div class="ag-dica">Este produto não tem entrada lançada: ele aparece porque está em recomendações. Para ele sair da lista, corrija o nome na recomendação.</div>') +
+      '<button class="btn secundario" data-m="nova">+ Nova entrada deste produto</button>' +
+      (ents.length ? '<button class="btn perigo" data-m="del">Excluir produto do estoque</button>' : '') +
+      '<button class="btn secundario" data-m="no">Fechar</button></div>';
+    document.body.appendChild(ov);
+    ov.onclick = function (ev) {
+      var alvo = ev.target.closest ? ev.target.closest('[data-m]') : null, m = alvo && alvo.dataset.m;
+      if (m === 'no' || ev.target === ov) { ov.remove(); return; }
+      if (m === 'nova') { ov.remove(); modalEntrada(null, v); return; }
+      if (m === 'ent') { var e1 = ents.filter(function (x) { return x.id === alvo.dataset.id; })[0]; ov.remove(); if (e1) modalEntrada(e1, null); return; }
+      if (m === 'nome') {
+        var novo = $('#peNome', ov).value.trim().replace(/\s+/g, ' ');
+        if (!novo) { toast('Informe o nome do produto'); return; }
+        if (novo === nome0) { ov.remove(); return; }
+        var jaTem = chaveProd(novo) !== chaveProd(nome0) && (ST.estoque || []).some(function (e) { return gIds.indexOf(e.fazenda_id) >= 0 && chaveProd(e.produto) === chaveProd(novo) && (e.unidade || 'L') === un; });
+        if (jaTem && !confirm('Já existe "' + novo + '" no estoque. Juntar as entradas de "' + nome0 + '" com ele?')) return;
+        ents.forEach(function (e) { e.produto = novo; enfileirar('/api/agro/estoque', { id: e.id, fazenda_id: e.fazenda_id, produto: novo, unidade: e.unidade || 'L', qtd: Number(e.qtd) || 0, valor: Number(e.valor) || 0, data: e.data || hoje(), obs: e.obs || '' }); });
+        gravar(); ov.remove(); pintarRecs();
+        toast(emRec ? 'Nome trocado nas entradas. As recomendações continuam com "' + nome0 + '"' : 'Nome do produto atualizado');
+        return;
+      }
+      if (m === 'del') {
+        var tot = ents.reduce(function (s, e) { return s + (Number(e.qtd) || 0); }, 0);
+        if (!confirm('Excluir "' + nome0 + '" do estoque?\n\n' + (ents.length === 1 ? 'A entrada lançada' : 'As ' + ents.length + ' entradas lançadas') + ' (' + qtdTxt(tot, un) + ') ' + (ents.length === 1 ? 'será apagada' : 'serão apagadas') + '.' +
+          (emRec ? '\n\nEle está em recomendações: continua na lista, sem estoque.' : ''))) return;
+        var ids = {}; ents.forEach(function (e) { ids[e.id] = 1; });
+        ST.estoque = ST.estoque.filter(function (x) { return !ids[x.id]; });
+        ents.forEach(function (e) { enfileirar('/api/agro/estoque/apagar', { id: e.id }); });
+        gravar(); ov.remove(); pintarRecs(); toast('Produto excluído do estoque');
+      }
+    };
   }
   function modalEntrada(e, pre) {
     var novo = !e, p0 = pre ? pre.split('|') : [];
@@ -2005,6 +2056,7 @@
     }
     if (a === 'aba') { R.view = v; R.inicio = false; pintarRecs(); topoRolagem(tR); return; }
     if (a === 'entrada') { modalEntrada(null, v); return; }
+    if (a === 'prodest') { modalProdEstoque(v); return; }
     if (a === 'push') { ativarAvisos(); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
