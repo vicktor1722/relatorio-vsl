@@ -408,7 +408,7 @@ const SCRIPT_PPT = String.raw`
   try { D = JSON.parse(document.getElementById('pptDados').textContent); } catch (e) {}
   if (!btn || !D) return;
   var VERDE = '1B7A43', ESCURO = '146034', CLARO = 'E8F4EC', CINZA = '6B7B72', TEXTO = '1B2B22';
-  var arquivo = null, nome = 'relatorio-' + String(D.fazenda || 'visita').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pptx';
+  var LOGO = null, arquivo = null, nome = 'relatorio-' + String(D.fazenda || 'visita').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pptx';
   function lib(){ return new Promise(function(ok, erro){
     if (window.PptxGenJS) return ok();
     var sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
@@ -447,7 +447,16 @@ const SCRIPT_PPT = String.raw`
   function faixa(sl, titulo, sub){
     sl.background = { color: 'FFFFFF' };
     sl.addShape('rect', { x: 0, y: 0, w: 13.333, h: 0.95, fill: { color: VERDE }, line: { color: VERDE } });
-    sl.addText(titulo, { x: 0.45, y: 0.12, w: 9.6, h: 0.72, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle' });
+    // logo da empresa do usuário no cantinho (caixa branca), e o título logo depois
+    var tx = 0.45;
+    if (LOGO) {
+      var lg = caber(LOGO, 0.34, 0.2, 1.5, 0.55);
+      lg.x = 0.34;   // encostado à esquerda
+      sl.addShape('roundRect', { x: lg.x - 0.09, y: lg.y - 0.07, w: lg.w + 0.18, h: lg.h + 0.14, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF' }, rectRadius: 0.08 });
+      sl.addImage(lg);
+      tx = lg.x + lg.w + 0.3;
+    }
+    sl.addText(titulo, { x: tx, y: 0.12, w: 10.05 - tx, h: 0.72, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle', fit: 'shrink' });
     if (sub) sl.addText(sub, { x: 9.8, y: 0.12, w: 3.1, h: 0.72, fontSize: 13, color: 'FFFFFF', fontFace: 'Arial', align: 'right', valign: 'middle' });
     sl.addText(D.empresa + '  ·  ' + D.fazenda, { x: 0.45, y: 7.08, w: 9, h: 0.3, fontSize: 9, color: CINZA, fontFace: 'Arial' });
     sl.addText('AMVS Relatório de Campo', { x: 9.4, y: 7.08, w: 3.5, h: 0.3, fontSize: 9, color: VERDE, bold: true, fontFace: 'Arial', align: 'right' });
@@ -455,7 +464,7 @@ const SCRIPT_PPT = String.raw`
   async function gerar(){
     await lib();
     var P = new window.PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.title = D.titulo; P.company = D.empresa;
-    var logo = await imagem(D.logo, 600);
+    var logo = await imagem(D.logo, 600); LOGO = logo;
     // fotos preparadas 4 por vez (bem mais rápido que uma a uma)
     var FOT = {}, lista = [];
     D.grupos.forEach(function(g){ g.itens.forEach(function(i){ if (i.tipo === 'foto' && i.src && lista.indexOf(i.src) < 0) lista.push(i.src); }); });
