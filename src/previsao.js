@@ -30,7 +30,10 @@ export function previsaoTalhao(p, area, cicloDe, colhido) {
   const pt = partesDe(p, area), dias = plantioPorDia(p, area);
   const dia1 = dias.map((x) => x.d).sort()[0] || '';
   let itens;
-  if (pt.length > 1 && !lerLanc(p).length) {
+  if (lerLanc(p).some((x) => x.v)) {
+    // fazenda lançou mais de uma variedade no plantio do dia: cada dia com a variedade dele
+    itens = dias.map((x) => ({ v: x.v || p.variedade || '', d: x.d, ha: x.ha }));
+  } else if (pt.length > 1 && !lerLanc(p).length) {
     // sem lançamento por dia: cada parte com data de plantio (igual à evolução do plantio)
     itens = pt.filter((x) => x.data_plantio).map((x) => ({ v: x.variedade, d: x.data_plantio, ha: x.ha }));
   } else if (pt.length > 1) {

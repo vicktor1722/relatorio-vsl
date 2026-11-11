@@ -616,12 +616,16 @@ export async function rotasPortal(env, req, rota, url, ctx) {
       const falta = Math.round(Math.max(0, area - outros) * 100) / 100;
       if (!(ha > 0)) ha = falta;                       // sem hectares → o que falta do talhão
       if (area && ha > falta) ha = falta;              // passou da área → lança só o que faltava
-      if (ha > 0) l.push(Object.assign({ d: dataOk, ha, por: (a.nome || a.login) + ' (fazenda)' }, sem ? { sem } : {}, esp ? { esp } : {}));
+      // variedade diferente da principal do talhão: fica marcada no lançamento (talhão com mais de uma variedade)
+      const vNova = variedadePadrao(txt(b.variedade, 80), txt(b.cultura, 20) || (ant && ant.cultura) || 'soja');
+      const vOutra = vNova && ant && ant.variedade && vNova !== ant.variedade ? { v: vNova } : {};
+      if (ha > 0) l.push(Object.assign({ d: dataOk, ha, por: (a.nome || a.login) + ' (fazenda)' }, sem ? { sem } : {}, esp ? { esp } : {}, vOutra));
       // talhão já todo plantado: nada a somar (salva o resto normalmente)
     }
     l.sort((x, y) => (x.d < y.d ? -1 : 1));
     const cultura = txt(b.cultura, 20) || (ant && ant.cultura) || 'soja';
-    const variedade = variedadePadrao(txt(b.variedade, 80) || (ant && ant.variedade) || '', cultura);
+    // a variedade principal do talhão não muda ao lançar outra: a outra fica no lançamento do dia (lanc[].v)
+    const variedade = (ant && ant.variedade) || variedadePadrao(txt(b.variedade, 80), cultura);
     // data de plantio do talhão = primeiro dia lançado (é dela que sai a previsão de colheita)
     const dp = l.length ? l[0].d : (ant ? ant.data_plantio || '' : '');
     // germinação (emergência) automática: 4 dias depois do plantio; se o consultor mudou a data à mão, fica a dele
