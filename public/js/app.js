@@ -517,7 +517,7 @@
 
     const setas = st.ordem && podeMover(it) ? '<div class="ord-setas"><button type="button" data-ord="sobe" data-id="' + it.id + '" aria-label="Subir">▲</button>' +
       '<button type="button" data-ord="desce" data-id="' + it.id + '" aria-label="Descer">▼</button></div>' : '';
-    return '<div class="msg eu' + (setas ? ' ord' : '') + '" data-id="' + it.id + '"><div class="bolha">' +
+    return '<div class="msg eu' + (setas ? ' ord' : '') + '" data-id="' + it.id + '"><div class="bolha com-midia">' +
       '<div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '" style="aspect-ratio:' + (PROP[it.id] || 0.75) + '"></div>' +
       chip +
       (it.legenda ? '<div class="legenda">' + ZAP.html(esc(it.legenda)) + '</div>' : '') +
