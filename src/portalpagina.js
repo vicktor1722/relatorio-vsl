@@ -977,7 +977,7 @@ body.sem-rolar{overflow:hidden}
   function grafHtml(st, so) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true, so: so }) + '</div>' : ''; }
   function vistaPlantio() {
     var areas = areasMapa(), pl = {}, lanc = [];
-    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por, sem: x.sem, esp: x.esp }); }); });
+    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; var mv = (p.lanc || []).some(function (x) { return x.v; }); (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por, sem: x.sem, esp: x.esp, vv: mv ? (x.v || p.variedade || '') : '' }); }); });
     lanc.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : porNome(a.t, b.t); });
     var nomes = Object.keys(areas).concat(Object.keys(pl).filter(function (t) { return !(t in areas); })).sort(porNome);
     var lin = nomes.map(function (t) {
@@ -993,7 +993,7 @@ body.sem-rolar{overflow:hidden}
       (D.graf && D.graf.linha && D.graf.linha.length ? grafHtml(GR.plantio, 'p') : D.blocos.evolucao || '<div class="vazio">A evolução do plantio aparece quando a área plantada for lançada.</div>') +
       (lin ? '<h2 class="talhao">Talhões</h2><div class="tab"><table><tr><th>Talhão</th><th style="text-align:left">Cultura / variedade</th><th>Plantado</th><th>Plantio</th><th>DAE</th></tr>' + lin + '</table></div>' : '');
     if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
-      return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' +
+      return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + (x.vv ? '🌾 ' + esc(x.vv) + ' · ' : '') +
         (x.sem ? '🌱 ' + n(x.sem, 1) + ' sem/m · ' + n(x.esp) + ' cm · ' + n(x.sem * 1000000 / x.esp) + ' sem/ha · ' : '') + esc(x.por || 'lançado') + '</small></div>' +
         (gerente && !D.todas ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
     }).join('');
@@ -1038,20 +1038,44 @@ body.sem-rolar{overflow:hidden}
       '<div id="pVarBox"></div>' +
       '<button class="btn" id="pOk">✔ Salvar</button><button class="btn sec" id="pNao">Cancelar</button></div>';
     document.body.appendChild(v);
-    var st = { emp: '', vari: '' };
+    var st = { emp: '', vari: '', outra: false, tal: null };
+    // variedades que o talhão já tem (a principal e as outras já lançadas)
+    function varsDoTalhao(p) {
+      var l = []; if (p.variedade) l.push(p.variedade);
+      (p.partes || []).forEach(function (x) { if (x.variedade && l.indexOf(x.variedade) < 0) l.push(x.variedade); });
+      (p.lanc || []).forEach(function (x) { if (x.v && l.indexOf(x.v) < 0) l.push(x.v); });
+      return l;
+    }
     function pintarVar() {
-      var t = v.querySelector('#pTal').value, p = pl[t] || {}, box = v.querySelector('#pVarBox');
-      if (p.variedade) { box.innerHTML = '<div class="campo"><label class="l">Variedade</label><div class="sem" style="padding:6px 2px">' + esc(p.variedade) + ' (já lançada neste talhão)</div></div>'; return; }
+      var t = v.querySelector('#pTal').value, p = pl[t] || {}, box = v.querySelector('#pVarBox'), ja = varsDoTalhao(p);
+      if (st.tal !== t) {   // trocou de talhão: começa na variedade do último lançamento dele (ou a principal)
+        st.tal = t; st.outra = false; st.emp = '';
+        var ul = (p.lanc || []).slice().sort(function (a, b) { return a.d < b.d ? -1 : 1; }).pop();
+        st.vari = ja.length ? ((ul && ul.v) || ja[0]) : '';
+      }
+      var sel = '';
+      if (ja.length) {
+        // talhão que já tem variedade: escolhe uma das dele ou lança outra (talhão com mais de uma variedade)
+        sel = '<div class="campo"><label class="l">Variedade</label><select id="pVarJa">' + ja.map(function (x) {
+          return '<option' + (!st.outra && x === st.vari ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') +
+          '<option value="*"' + (st.outra ? ' selected' : '') + '>＋ Outra variedade neste talhão</option></select></div>';
+        if (!st.outra) {
+          box.innerHTML = sel;
+          box.querySelector('#pVarJa').onchange = function () { if (this.value === '*') { st.outra = true; st.vari = ''; st.emp = ''; } else st.vari = this.value; pintarVar(); };
+          return;
+        }
+      }
       if (v.querySelector('#pCult').value !== 'soja' || !CULT || !CULT.length || st.emp === '*') {
-        box.innerHTML = (CULT && CULT.length && v.querySelector('#pCult').value === 'soja' ? '<div class="campo"><label class="l">Variedade: empresa</label><select id="pEmp"><option value="">— escolher —</option>' + CULT.map(function (e) { return '<option>' + esc(e[0]) + '</option>'; }).join('') + '<option value="*" selected>Outra / digitar</option></select></div>' : '') +
-          '<div class="campo"><label class="l">Variedade (opcional)</label><input id="pVarTxt" value="' + esc(st.vari) + '" placeholder="ex.: NEO 790 IPRO"></div>';
+        box.innerHTML = sel + (CULT && CULT.length && v.querySelector('#pCult').value === 'soja' ? '<div class="campo"><label class="l">Variedade: empresa</label><select id="pEmp"><option value="">— escolher —</option>' + CULT.map(function (e) { return '<option>' + esc(e[0]) + '</option>'; }).join('') + '<option value="*" selected>Outra / digitar</option></select></div>' : '') +
+          '<div class="campo"><label class="l">' + (sel ? 'Nome da outra variedade' : 'Variedade (opcional)') + '</label><input id="pVarTxt" value="' + esc(st.vari) + '" placeholder="ex.: NEO 790 IPRO"></div>';
       } else {
         var it = st.emp ? ((CULT.filter(function (e) { return e[0] === st.emp; })[0] || [0, []])[1]).slice().sort(porNome) : [];
-        box.innerHTML = '<div class="campo"><label class="l">Variedade: empresa</label><select id="pEmp"><option value="">— escolher —</option>' + CULT.map(function (e) {
+        box.innerHTML = sel + '<div class="campo"><label class="l">' + (sel ? 'Outra variedade: empresa' : 'Variedade: empresa') + '</label><select id="pEmp"><option value="">— escolher —</option>' + CULT.map(function (e) {
           return '<option' + (e[0] === st.emp ? ' selected' : '') + '>' + esc(e[0]) + '</option>'; }).join('') + '<option value="*">Outra / digitar</option></select></div>' +
           (st.emp ? '<div class="campo"><label class="l">Variedade</label><select id="pVar"><option value="">— escolher —</option>' + it.map(function (x) {
             return '<option' + (x === st.vari ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>' : '');
       }
+      var vj = box.querySelector('#pVarJa'); if (vj) vj.onchange = function () { if (this.value === '*') return; st.outra = false; st.vari = this.value; pintarVar(); };
       var e = box.querySelector('#pEmp'); if (e) e.onchange = function () { st.emp = e.value; st.vari = ''; pintarVar(); };
       var s2 = box.querySelector('#pVar'); if (s2) s2.onchange = function () { st.vari = s2.value; };
       var tx = box.querySelector('#pVarTxt'); if (tx) tx.oninput = function () { st.vari = tx.value; };

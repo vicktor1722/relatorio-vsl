@@ -8,7 +8,8 @@ export function lerLanc(p) {
   let l = [];
   try { l = JSON.parse((p && p.lanc) || '[]'); } catch (e) { l = []; }
   return (Array.isArray(l) ? l : []).filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.d) && Number(x.ha) > 0)
-    .map((x) => Object.assign({ d: x.d, ha: Number(x.ha), por: x.por || '' }, Number(x.sem) > 0 ? { sem: Number(x.sem) } : {}, Number(x.esp) > 0 ? { esp: Number(x.esp) } : {}))
+    .map((x) => Object.assign({ d: x.d, ha: Number(x.ha), por: x.por || '' }, Number(x.sem) > 0 ? { sem: Number(x.sem) } : {}, Number(x.esp) > 0 ? { esp: Number(x.esp) } : {},
+      x.v && typeof x.v === 'string' ? { v: x.v } : {}))
     .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
 }
 
@@ -23,7 +24,7 @@ export function plantioPorDia(p, area) {
     return p.data_plantio && area > 0 ? [{ d: p.data_plantio, ha: area }] : [];
   }
   let resto = area > 0 ? area : Infinity;
-  return l.map((x) => { const ha = Math.min(x.ha, resto); resto -= ha; return { d: x.d, ha }; }).filter((x) => x.ha > 0);
+  return l.map((x) => { const ha = Math.min(x.ha, resto); resto -= ha; return Object.assign({ d: x.d, ha }, x.v ? { v: x.v } : {}); }).filter((x) => x.ha > 0);
 }
 
 export function haPlantada(p, area) { return plantioPorDia(p, area).reduce((s, x) => s + x.ha, 0); }
@@ -44,7 +45,27 @@ export function haAplicada(d, t, ha) {
 /* ---------------- mais de uma variedade no mesmo talhão ----------------
    plantio.partes = JSON [{variedade, ha, data_plantio}] quando o talhão foi plantado em partes
    (variedades diferentes). Sem partes, o talhão inteiro é da variedade da linha. */
+// variedades lançadas pela fazenda no plantio do dia (lanc[].v = variedade diferente da principal do talhão):
+// com mais de uma, cada variedade vira uma parte com a área já plantada dela e o 1º dia em que foi plantada
+export function partesDoLanc(p) {
+  const l = lerLanc(p);
+  if (!l.some((x) => x.v)) return [];
+  const g = {}, ordem = [], principal = (p && p.variedade) || '';
+  l.forEach((x) => {
+    const v = x.v || principal;
+    if (!g[v]) { g[v] = { variedade: v, ha: 0, data_plantio: x.d }; ordem.push(v); }
+    g[v].ha += x.ha;
+  });
+  if (ordem.length < 2 && ordem[0] === principal) return [];   // só a principal: talhão inteiro dela
+  ordem.sort((a, b) => (a === principal ? -1 : b === principal ? 1 : 0));   // a principal primeiro; as outras na ordem em que entraram
+  return ordem.map((v) => Object.assign(g[v], { ha: Math.round(g[v].ha * 100) / 100 }));
+}
 export function partesDe(p, area) {
+  const dl = partesDoLanc(p);
+  if (dl.length) {
+    let resto = area > 0 ? area : Infinity;
+    return dl.map((x) => { const ha = Math.min(x.ha, resto); resto -= ha; return Object.assign(x, { ha }); }).filter((x) => x.ha > 0);
+  }
   let l = [];
   try { l = typeof (p && p.partes) === 'string' ? JSON.parse(p.partes || '[]') : ((p && p.partes) || []); } catch (e) { l = []; }
   l = (Array.isArray(l) ? l : []).filter((x) => x && Number(x.ha) > 0)

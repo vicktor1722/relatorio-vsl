@@ -246,7 +246,20 @@
   // plantio lançado por dia pela fazenda (r.lanc): soma os hectares; sem lançamentos, data de plantio = talhão todo
   function lancDe(r) { var l = r && r.lanc; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } } return Array.isArray(l) ? l.filter(function (x) { return x && x.d && Number(x.ha) > 0; }) : []; }
   // talhão em partes (mais de uma variedade): [{variedade, ha, data_plantio}]; sem partes = o talhão todo da variedade da linha
+  // a fazenda pode lançar outra variedade no plantio do dia (lanc[].v): com mais de uma, cada variedade é uma parte
+  // (área já plantada dela e o 1º dia), igual ao servidor
+  function partesDoLanc(r) {
+    var l = lancDe(r); if (!l.some(function (x) { return x.v; })) return [];
+    var g = {}, ordem = [], pr = (r && r.variedade) || '';
+    l.slice().sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; }).forEach(function (x) {
+      var v = x.v || pr; if (!g[v]) { g[v] = { variedade: v, ha: 0, data_plantio: x.d }; ordem.push(v); } g[v].ha += Number(x.ha);
+    });
+    if (ordem.length < 2 && ordem[0] === pr) return [];
+    ordem.sort(function (a, b) { return a === pr ? -1 : b === pr ? 1 : 0; });
+    return ordem.map(function (v) { g[v].ha = Math.round(g[v].ha * 100) / 100; return g[v]; });
+  }
   function partesDe(r) {
+    var dl = partesDoLanc(r); if (dl.length) return dl;
     var l = r && r.partes; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } }
     return Array.isArray(l) ? l.filter(function (x) { return x && Number(x.ha) > 0; }) : [];
   }
@@ -627,7 +640,7 @@
   function lancTxt(t) {
     var l = lancDe(linhaPlantio(P.faz, P.safra, P.nome)); if (!l.length) return '';
     var tot = l.reduce(function (s, x) { return s + Number(x.ha); }, 0);
-    return '<div class="ag-dica">🌱 <b>Plantio por dia (lançado pela fazenda):</b> ' + l.map(function (x) { return curta(x.d) + ' ' + fmt(x.ha) + ' ha' + (x.sem ? ' (' + fmt(x.sem, 1) + ' sem/m' + (x.esp ? ' a ' + fmt(x.esp) + ' cm' : '') + ')' : ''); }).join(' · ') +
+    return '<div class="ag-dica">🌱 <b>Plantio por dia (lançado pela fazenda):</b> ' + l.map(function (x) { return curta(x.d) + ' ' + fmt(x.ha) + ' ha' + (x.v ? ' ' + esc(x.v) : '') + (x.sem ? ' (' + fmt(x.sem, 1) + ' sem/m' + (x.esp ? ' a ' + fmt(x.esp) + ' cm' : '') + ')' : ''); }).join(' · ') +
       ' = ' + fmt(tot) + (t.ha ? ' de ' + fmt(t.ha) + ' ha' : ' ha') + '</div>';
   }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }
