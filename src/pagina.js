@@ -442,6 +442,23 @@ const SCRIPT_PPT = String.raw`
     im.onerror = function(){ ok(null); };
     im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(cl));
   } catch (err) { ok(null); } }); }
+  // mapa da capa: só o contorno dos talhões em verde-limão, fundo transparente, sem nomes; pontos das fotos
+  function svgContorno(svg, larg){ return new Promise(function(ok){ try {
+    var vb = (svg.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number), w = vb[2] || 1000, h = vb[3] || 600;
+    var cl = svg.cloneNode(true);
+    [].slice.call(cl.querySelectorAll('text')).forEach(function(t){ t.remove(); });
+    [].slice.call(cl.querySelectorAll('path')).forEach(function(pt){ pt.setAttribute('fill', 'rgba(163,230,53,.13)'); pt.setAttribute('stroke', '#A3E635'); pt.setAttribute('stroke-width', '3'); pt.setAttribute('stroke-linejoin', 'round'); });
+    [].slice.call(cl.querySelectorAll('circle')).forEach(function(ci){ ci.setAttribute('fill', '#A3E635'); ci.setAttribute('stroke', 'none'); ci.setAttribute('r', '6'); });
+    cl.setAttribute('xmlns', 'http://www.w3.org/2000/svg'); cl.setAttribute('width', w); cl.setAttribute('height', h); cl.removeAttribute('style');
+    var im = new Image();
+    im.onload = function(){ try {
+      var e = larg / w, cv = document.createElement('canvas'); cv.width = Math.round(w * e); cv.height = Math.round(h * e);
+      cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+      ok({ data: cv.toDataURL('image/png'), w: cv.width, h: cv.height });
+    } catch (err) { ok(null); } };
+    im.onerror = function(){ ok(null); };
+    im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(cl));
+  } catch (err) { ok(null); } }); }
   function hex(cor){ var m = String(cor || '').match(/\d+/g); return m && m.length >= 3 ? m.slice(0, 3).map(function(n){ return ('0' + Number(n).toString(16)).slice(-2); }).join('').toUpperCase() : '999999'; }
   function caber(im, x, y, bw, bh){ var e = Math.min(bw / im.w, bh / im.h), w = im.w * e, h = im.h * e; return { data: im.data, x: x + (bw - w) / 2, y: y + (bh - h) / 2, w: w, h: h }; }
   function faixa(sl, titulo, sub){
@@ -472,19 +489,39 @@ const SCRIPT_PPT = String.raw`
     async function trabalhador(){ while (prox < lista.length) { var u = lista[prox++]; FOT[u] = await imagem(u, 1600); feitas++; btn.textContent = 'Gerando… ' + feitas + '/' + lista.length; } }
     await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
 
-    // capa
-    var c = P.addSlide(); c.background = { color: VERDE };
-    if (logo) { var lg = caber(logo, 0.75, 0.6, 2.4, 1.1); c.addShape('roundRect', { x: lg.x - 0.12, y: lg.y - 0.12, w: lg.w + 0.24, h: lg.h + 0.24, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF' }, rectRadius: 0.08 }); c.addImage(lg); }
-    c.addText([{ text: D.empresa, options: { bold: true, fontSize: 20, breakLine: true } }, { text: [D.cidade, D.contato].filter(Boolean).join('  ·  '), options: { fontSize: 13 } }],
-      { x: logo ? 3.6 : 0.75, y: 0.55, w: 9, h: 1.2, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle' });
-    c.addText(D.fazenda, { x: 0.75, y: 2.3, w: 11.8, h: 1.2, fontSize: 48, bold: true, color: 'FFFFFF', fontFace: 'Arial' });
-    c.addText(D.servico, { x: 0.75, y: 3.45, w: 11.8, h: 0.6, fontSize: 22, color: 'D6EEDD', fontFace: 'Arial' });
-    var info = [['Produtor', D.produtor], ['Safra', D.safra], ['Período', D.periodo], ['Responsável', D.responsavel]];
+    // capa "Mapa Tech": fundo escuro com grade fina, contorno da fazenda em verde-limão à direita
+    var NOITE = '0A2016', LIMA = 'A3E635', GRADE = '10301F';
+    var c = P.addSlide(); c.background = { color: NOITE };
+    for (var gx = 0; gx <= 13.4; gx += 0.55) c.addShape('line', { x: gx, y: 0, w: 0, h: 7.5, line: { color: GRADE, width: 0.5 } });
+    for (var gy = 0; gy <= 7.5; gy += 0.55) c.addShape('line', { x: 0, y: gy, w: 13.333, h: 0, line: { color: GRADE, width: 0.5 } });
+    var svgCapa = document.querySelector('.mapa > svg'), mc = svgCapa ? await svgContorno(svgCapa, 1600) : null;
+    if (mc) {
+      c.addImage(caber(mc, 6.75, 0.85, 6.3, 4.0));
+      var nt = D.ntalhoes ? D.ntalhoes + (D.ntalhoes === 1 ? ' talhão mapeado' : ' talhões mapeados') : '';
+      if (D.ha) c.addText([{ text: D.ha + ' ha', options: { fontSize: 22, bold: true, color: 'FFFFFF', breakLine: !!nt } }].concat(nt ? [{ text: nt, options: { fontSize: 11, color: LIMA } }] : []),
+        { x: 9.8, y: 4.95, w: 3.25, h: 0.8, fontFace: 'Arial', align: 'right', valign: 'top' });
+    }
+    var tx = 0.75;
+    if (logo) {
+      var lc = caber(logo, 0.75, 0.6, 1.9, 0.6); lc.x = 0.75;
+      c.addShape('roundRect', { x: lc.x - 0.1, y: lc.y - 0.08, w: lc.w + 0.2, h: lc.h + 0.16, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF' }, rectRadius: 0.08 });
+      c.addImage(lc); tx = lc.x + lc.w + 0.35;
+    }
+    c.addText([{ text: D.empresa || '', options: { bold: true, fontSize: 12, color: 'FFFFFF', breakLine: true } }, { text: [D.cidade, D.contato].filter(Boolean).join('  ·  '), options: { fontSize: 10, color: '8FB3A0' } }],
+      { x: tx, y: 0.5, w: 12.4 - tx, h: 0.8, fontFace: 'Arial', valign: 'middle' });
+    c.addText('RELATÓRIO TÉCNICO DE CAMPO', { x: 0.75, y: 2.2, w: 6, h: 0.35, fontSize: 11, bold: true, color: LIMA, charSpacing: 4, fontFace: 'Arial' });
+    c.addShape('rect', { x: 0.75, y: 2.68, w: 0.07, h: 1.6, fill: { color: LIMA }, line: { color: LIMA } });
+    var nf = String(D.fazenda || '').length, tf = nf <= 13 ? 44 : nf <= 18 ? 36 : nf <= 24 ? 30 : nf <= 32 ? 26 : 22;
+    c.addText(D.fazenda, { x: 0.98, y: 2.6, w: 5.9, h: 1.0, fontSize: tf, bold: true, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle' });
+    c.addText((D.servico || '') + (D.safra ? '  ·  Safra ' + D.safra : ''), { x: 0.98, y: 3.6, w: 5.9, h: 0.6, fontSize: 18, color: 'A9C7B6', fontFace: 'Arial', valign: 'top' });
+    var info = [['PRODUTOR', D.produtor], ['SAFRA', D.safra], ['PERÍODO', D.periodo], ['RESPONSÁVEL', D.responsavel]];
     info.forEach(function(it, i){
-      c.addText([{ text: it[0].toUpperCase(), options: { fontSize: 11, color: 'BFE3CB', breakLine: true } }, { text: it[1] || '—', options: { fontSize: 18, bold: true, color: 'FFFFFF' } }],
-        { x: 0.75 + i * 3.05, y: 4.75, w: 2.95, h: 1.0, fontFace: 'Arial', valign: 'top' });
+      var ix = 0.75 + i * 1.95;
+      if (i) c.addShape('line', { x: ix - 0.15, y: 5.15, w: 0, h: 0.8, line: { color: '24513A', width: 1 } });
+      c.addText([{ text: it[0], options: { fontSize: 9, color: LIMA, bold: true, charSpacing: 2, breakLine: true } }, { text: it[1] || '—', options: { fontSize: 14, bold: true, color: 'FFFFFF' } }],
+        { x: ix, y: 5.1, w: 1.85, h: 0.95, fontFace: 'Arial', valign: 'top' });
     });
-    if (D.publicado) c.addText('Publicado em ' + D.publicado, { x: 0.75, y: 6.6, w: 8, h: 0.4, fontSize: 12, color: 'D6EEDD', fontFace: 'Arial' });
+    c.addText((D.publicado ? 'Publicado em ' + D.publicado + '   ·   ' : '') + 'Gerado por AMVS Tecnologia', { x: 0.75, y: 6.75, w: 8, h: 0.35, fontSize: 9, color: '6E9481', fontFace: 'Arial' });
 
     // mapa da fazenda (talhões do KML, com os pontos das fotos)
     var svgGeral = document.querySelector('.mapa > svg');
@@ -810,6 +847,8 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
     fazenda: rel.fazenda || 'Relatório de visita', servico: rel.servico || 'Relatório de visita técnica',
     produtor: rel.produtor || '', safra: safraPadrao(rel.safra) || '', responsavel: rel.responsavel || '',
     area: areaTotal ? areaTotal.toFixed(0) + ' ha mapeados' : '',
+    ha: areaTotal ? String(Math.round(areaTotal)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '',
+    ntalhoes: ((talhoes && talhoes.features) || []).length,
     periodo: rel.data_inicio ? fmtData(rel.data_inicio) + (rel.data_fim && rel.data_fim !== rel.data_inicio ? ' a ' + fmtData(rel.data_fim) : '') : '',
     publicado: rel.publicado_em ? fmtData(noFuso(rel.publicado_em)) : '',
     obs: [rel.observacoes].concat(gNotas ? gNotas.itens.map(i => i.legenda) : []).map(t => semZap(String(t || '').trim())).filter(Boolean),
