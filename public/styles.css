@@ -26,11 +26,15 @@ html,body{height:100%;margin:0}
    COR de fundo do html, do body e das telas inteiras é verde, e o claro de sempre é pintado por cima como imagem
    (linear-gradient de uma cor só): o visual não muda, mas a cor que o sistema lê é a verde. O cabeçalho é sticky. */
 html{background-color:var(--verde)}
-/* no app instalado do iOS 26 a página fica mais curta que a tela: a sobra de baixo continua na cor clara */
-body::after{content:"";position:fixed;left:0;right:0;top:100%;height:160px;background:var(--fundo);pointer-events:none}
+/* iOS 26 (app instalado): o sistema embaça o que fica logo abaixo da hora/bateria. O cabeçalho ganha 20px a mais
+   em cima para o título ficar fora dessa faixa. Só no iPhone com iOS 26 ou mais novo (anchor-name chegou no
+   Safari 26) e só quando existe a margem de cima (app instalado). */
+@supports (-webkit-touch-callout:none) and (anchor-name:--a){
+  :root{--topo-extra:min(20px,env(safe-area-inset-top,0px))}
+}
 /* teclado aberto: a margem de baixo do iPhone não é mais necessária (o campo de texto encosta no teclado) */
 html.teclado{--safe-bottom:0px}
-@media print{html{background:#fff}body::after{display:none}}
+@media print{html{background:#fff}}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   background:linear-gradient(var(--fundo),var(--fundo)) var(--verde);color:var(--texto);
@@ -48,7 +52,7 @@ input,textarea,select{font:inherit}
 
 /* ---------- Header ---------- */
 .topo{
-  background:var(--verde);color:#fff;padding:calc(8px + var(--safe-top)) 10px 8px;
+  background:var(--verde);color:#fff;padding:calc(8px + var(--safe-top) + var(--topo-extra,0px)) 10px 8px;
   display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:20;
   position:sticky;top:0;
 }
@@ -107,6 +111,8 @@ input,textarea,select{font:inherit}
   box-shadow:0 1px .5px rgba(0,0,0,.13);position:relative
 }
 .msg.eu .bolha{background:var(--verde-claro)}
+/* foto e vídeo na conversa: bolha mais estreita (proporção parecida com a do WhatsApp); a legenda acompanha a largura */
+.bolha.com-midia{width:64%;max-width:340px}
 .bolha.so-texto{padding:6px 9px 6px}
 .bolha .midia{position:relative;border-radius:6px;overflow:hidden;background:#000;display:block;max-height:60vh}
 .bolha .midia img,.bolha .midia video{display:block;width:100%;height:100%;object-fit:cover}
