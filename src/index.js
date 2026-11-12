@@ -4,6 +4,7 @@
    ============================================================ */
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
+import { apagarObservacaoAntiga } from './limpeza.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
@@ -226,7 +227,8 @@ export default {
     // aviso único às contas do app: mapa da chuva na previsão do tempo (sai uma vez só, ver avisarNovidade)
     if (!avisoTentado) { avisoTentado = true; ctx.waitUntil(avisarNovidade(env, 'aviso:novidade_clima', NOVIDADE_CLIMA).catch((e) => console.log('aviso novidade:', e.message))); }
     if (!cargaTentada) { cargaTentada = true; ctx.waitUntil(garantirAgro(env).then(() => cargaEstoqueSantaPaula(env)).then(() => trocarGlifosatoSantaPaula(env)).then(() => voltarLastingSantaPaula(env)).then(() => trocarZappSantaPaula(env)).then(() => tiposSantaPaula(env)).then(() => cargaComprasGerais(env)).catch((e) => console.log('carga do estoque:', e.message)));
-      ctx.waitUntil(garantirAgro(env).then(() => renomearTalhoesPindaituba(env)).catch((e) => console.log('renomeio de talhões:', e.message))); }
+      ctx.waitUntil(garantirAgro(env).then(() => renomearTalhoesPindaituba(env)).catch((e) => console.log('renomeio de talhões:', e.message)));
+      ctx.waitUntil(apagarObservacaoAntiga(env).catch((e) => console.log('limpeza da observação:', e.message))); }
 
     try {
       /* ================= público ================= */
@@ -298,6 +300,7 @@ export default {
       if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
       // preenche os resumos dos mapas que faltam (lotes pequenos; o cron também faz)
       if (rota === '/api/status/resumos') return json(await preencherResumos(env, 600000));
+      if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
