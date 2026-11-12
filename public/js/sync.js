@@ -410,7 +410,17 @@
   }
   async function salvarSigs() { try { await DB.cfg('sigRel', sigs); } catch (e) {} }
 
-  async function enviarItem(item) {
+  /* Envia UM registro. Sempre lê o registro de novo no aparelho antes de enviar e antes de marcar "enviado":
+     a rodada de envio pode durar minutos (fotos, sinal fraco) e, nesse tempo, a pessoa pode ter editado a
+     observação/legenda ou apagado o registro. Antes, a cópia antiga guardada no começo da rodada era gravada
+     por cima e a edição se perdia (no aparelho e na nuvem). Agora: apagado → não envia; editado durante o
+     envio → continua na fila e sobe de novo com o texto novo. */
+  async function enviarItem(ref) {
+    const item = await DB.get('itens', ref.id);
+    if (!item) return 'apagado';
+    if (item.sync_state === 'ok') { Object.assign(ref, item); return 'ok'; }
+    item.sync_state = 'enviando'; await DB.put('itens', item);
+    const enviado = { legenda: item.legenda || '', talhao: item.talhao || null, talhao_id: item.talhao_id || null, pos: item.pos != null ? item.pos : null };
     let midia = item.midia || null;
     if (item.tipo !== 'texto' && !midia) {
       const blob = await DB.lerMidia(item.id);
@@ -434,10 +444,16 @@
       talhao: item.talhao, talhao_id: item.talhao_id,
       capturado_em: item.capturado_em, ordem: item.ordem, pos: item.pos != null ? item.pos : null
     });
-    item.midia = midia;
-    item.sync_state = 'ok';
-    item.erro = null;
-    await DB.put('itens', item);
+    const agora = await DB.get('itens', item.id);
+    if (!agora) return 'apagado';                      // apagado enquanto subia: não volta para o aparelho
+    const mudou = (agora.legenda || '') !== enviado.legenda || (agora.talhao || null) !== enviado.talhao ||
+      (agora.talhao_id || null) !== enviado.talhao_id || (agora.pos != null ? agora.pos : null) !== enviado.pos;
+    agora.midia = agora.midia || midia;
+    agora.sync_state = mudou ? 'pendente' : 'ok';      // editado durante o envio: sobe de novo com o texto novo
+    agora.erro = null;
+    await DB.put('itens', agora);
+    Object.assign(ref, agora);
+    return agora.sync_state;
   }
 
 
@@ -619,7 +635,7 @@
       await new Promise(function (r) { setTimeout(r, 300); });
     }
     rodando = true; emitir({ tipo: 'inicio' });
-    let enviados = 0, falhas = 0;
+    let enviados = 0, falhas = 0, refazer = false;
     try {
       await carregarSigs();
       const relatorios = await DB.all('relatorios');
@@ -642,13 +658,16 @@
           while (prox < itens.length) {
             const item = itens[prox++];
             try {
-              item.sync_state = 'enviando'; await DB.put('itens', item);
               emitir({ tipo: 'item', id: item.id, estado: 'enviando' });
-              await enviarItem(item);
+              const res = await enviarItem(item);
+              if (res === 'apagado') continue;
+              if (res === 'pendente') { refazer = true; emitir({ tipo: 'item', id: item.id, estado: 'pendente' }); continue; }
               enviados++; emitir({ tipo: 'item', id: item.id, estado: 'ok' });
               try { await liberarItem(item); } catch (e) {}
             } catch (e) {
-              item.sync_state = 'erro'; item.erro = e.message; await DB.put('itens', item);
+              // grava o erro no registro como está AGORA no aparelho (não na cópia do começo da rodada)
+              const at = await DB.get('itens', item.id).catch(function () { return null; });
+              if (at) { at.sync_state = 'erro'; at.erro = e.message; await DB.put('itens', at); }
               falhas++; emitir({ tipo: 'item', id: item.id, estado: 'erro', msg: e.message });
             }
           }
@@ -661,6 +680,8 @@
       await salvarSigs();
       emitir({ tipo: 'fim', enviados, falhas });
     }
+    // algum registro foi editado enquanto subia: nova rodada logo em seguida para levar o texto novo
+    if (refazer) setTimeout(function () { sincronizar().catch(function () {}); }, 1500);
     return { enviados, falhas };
   }
 
@@ -671,6 +692,12 @@
       if (i.sync_state === 'preparando') { i.sync_state = 'pendente'; await DB.put('itens', i); }
     }
     await sincronizar(rel.id);
+    // registro editado enquanto subia (ou que ficou para trás sem erro): tenta de novo antes de desistir
+    for (let n = 0; n < 2; n++) {
+      const resto = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
+      if (!resto.length || resto.some(i => i.sync_state === 'erro') || !navigator.onLine) break;
+      await sincronizar(rel.id);
+    }
     const pend = (await DB.itensDoRelatorio(rel.id)).filter(i => i.sync_state !== 'ok');
     if (pend.length) throw new Error(pend.length + ' item(ns) ainda não subiram. Tente de novo com internet.');
 

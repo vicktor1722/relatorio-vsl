@@ -1662,9 +1662,12 @@
       // algum arquivo não sobe: mostra qual é e deixa excluir só ele para publicar o resto
       try {
         if (jaPerguntou || !navigator.onLine) return;
-        const presos = (await DB.itensDoRelatorio(rel.id)).filter(function (i) { return i.sync_state !== 'ok'; });
+        // só oferece excluir ARQUIVO (foto, vídeo, áudio) que tentou subir e deu erro. Observação escrita nunca
+        // entra: ela sempre sobe quando o sinal volta, e excluir apagava o texto do aparelho. O que só está
+        // esperando a vez (sem erro) também fica de fora.
+        const presos = (await DB.itensDoRelatorio(rel.id)).filter(function (i) { return i.sync_state === 'erro' && i.tipo !== 'texto'; });
         if (!presos.length) return;
-        const nomeTipo = { foto: 'Foto', video: 'Vídeo', nota: 'Nota', audio: 'Áudio' };
+        const nomeTipo = { foto: 'Foto', video: 'Vídeo', audio: 'Áudio' };
         const lista = presos.slice(0, 6).map(function (i) {
           const hora = i.capturado_em ? new Date(i.capturado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
           return '• ' + (nomeTipo[i.tipo] || i.tipo || 'Item') + (i.talhao ? ' · ' + i.talhao : '') + (hora ? ' · ' + hora : '') +
@@ -2212,9 +2215,13 @@
     folha.querySelector('#edOk').onclick = async function () {
       const novo = campo.value.trim();
       if (item.tipo === 'texto' && !novo) { toast('A observação não pode ficar vazia'); return; }
-      item.legenda = novo;
-      if (item.sync_state === 'ok') item.sync_state = 'pendente';
-      await DB.put('itens', item);
+      // grava em cima do registro como está AGORA no aparelho (o envio pode ter mexido nele enquanto a folha
+      // estava aberta) e sempre volta para a fila, mesmo se estiver subindo neste instante
+      const atual = (await DB.get('itens', item.id)) || item;
+      atual.legenda = novo; atual.erro = null;
+      if (atual.sync_state !== 'preparando') atual.sync_state = 'pendente';   // vídeo ainda sendo reduzido: sobe quando terminar
+      item.legenda = novo; item.sync_state = 'pendente';
+      await DB.put('itens', atual);
       sair();
       await renderChat(); atualizarSync();
       if (navigator.onLine) Sync.sincronizar(st.rel.id);
