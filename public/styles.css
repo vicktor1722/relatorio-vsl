@@ -465,6 +465,7 @@ input,textarea,select{font:inherit}
 .ag-poly{fill:#CFE3D5;stroke:#fff;stroke-width:3;cursor:pointer}
 .ag-poly.feito{fill:#A8D5B5}
 .ag-poly.on{fill:var(--verde-acento);stroke:var(--verde-escuro);stroke-width:4}
+.ag-chesc{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--texto-fraco);margin:6px 60px 10px 2px}.ag-chesc i{flex:1;height:9px;border-radius:5px;background:linear-gradient(90deg,#D6EAF8,#82BAE8,#3480CC,#0E2F66)}
 .ag-mapa text{font-size:24px;font-weight:700;fill:#10331f;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:4px}
 .ag-est{background:#fff;border-radius:12px;padding:10px 12px;margin:8px 0;border-left:4px solid var(--verde);cursor:pointer}
 .ag-est.falta{border-left-color:var(--erro)}
