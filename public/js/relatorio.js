@@ -88,7 +88,8 @@
       lista.forEach(function (i) { diasDistintos[String(i.capturado_em).slice(0, 10)] = 1; });
       return {
         chave: k,
-        titulo: k === '\u0000notas' ? 'Observações gerais' : k === '\u0000fora' ? 'Fora dos talhões' : k,
+        // fazenda sem mapa: não existe "fora dos talhões", são os registros da visita
+        titulo: k === '\u0000notas' ? 'Observações gerais' : k === '\u0000fora' ? (Object.keys(ordem).length ? 'Fora dos talhões' : 'Registros da visita') : k,
         area: areas[k] || 0,
         varioDia: Object.keys(diasDistintos).length > 1,
         itens: lista
