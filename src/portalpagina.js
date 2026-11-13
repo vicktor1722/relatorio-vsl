@@ -115,6 +115,12 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .parc{font-size:12.5px;color:#9A6400;margin-top:2px}.parc button{border:0;background:none;color:#C0392B;text-decoration:underline;font-size:12px;padding:0 4px}
 .folha .campo input,.folha .campo textarea{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;font-family:inherit}
 .folha .campo select{width:100%;font-size:16px;padding:10px;border:1px solid #CFD8D3;border-radius:10px;background:#fff;font-family:inherit}
+/* iPhone: o campo de data tem largura e altura próprias e passava por cima do campo ao lado; aqui ele cabe na coluna e fica da mesma altura */
+.campo input{min-width:0;max-width:100%}
+.campo input[type=date]{-webkit-appearance:none;appearance:none;display:block;height:46px;line-height:normal;text-align:left;background:#fff}
+.folha .campo input[type=date],.folha .g2 .campo input{height:44px}
+.campo input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
+.g2>.campo{min-width:0;overflow:hidden}
 .lanc{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:14px}
 .lanc .t{flex:1;min-width:0}.lanc small{display:block;color:var(--fraco);font-size:12px}
 .lanc button{border:0;background:none;color:#C0392B;font-size:13px;text-decoration:underline;padding:4px}
@@ -1074,8 +1080,9 @@ body.sem-rolar{overflow:hidden}
     var areas = areasMapa(), nomes = Object.keys(areas).sort(porNome), sel = PLV.sel.slice();
     var v = document.createElement('div'); v.className = 'veu';
     v.innerHTML = '<div class="folha"><h3>🌧️ Lançar chuva</h3>' +
-      '<div class="g2"><div class="campo"><label class="l">Data *</label><input type="date" id="plvData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
-      '<div class="campo"><label class="l">Milímetros *</label><input id="plvMm" inputmode="decimal" placeholder="ex.: 25"></div></div>' +
+      // um embaixo do outro: no iPhone o campo de data é largo e ficava por cima dos milímetros
+      '<div class="campo"><label class="l">Data *</label><input type="date" id="plvData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
+      '<div class="campo"><label class="l">Milímetros *</label><input id="plvMm" inputmode="decimal" placeholder="ex.: 25"></div>' +
       '<div class="campo" style="margin-bottom:4px"><label class="l">Talhões * <span id="plvConta" style="float:right;color:#1F6FB5;font-weight:700"></span></label></div>' +
       '<div class="plv-tal"><button data-plvt="*" class="todos">Todos</button>' + nomes.map(function (t) { return '<button data-plvt="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
       '<div class="sem" style="font-size:12.5px;margin:2px 0 6px">Lançar de novo a mesma data no mesmo talhão corrige o valor.</div>' +
