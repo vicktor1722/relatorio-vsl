@@ -24,9 +24,10 @@ header.capa img.logo{width:auto;max-width:210px;height:76px;object-fit:contain;b
 @media (max-width:420px){header.capa img.logo{height:68px;max-width:150px}}
 header.capa .marca b{display:block;font-size:18px;line-height:1.25}
 header.capa .marca span{font-size:11.5px;opacity:.85}
-/* telefone e e-mail: uma linha só, na largura toda do cabeçalho (abaixo do logo e do nome) */
-header.capa .contato{font-size:11.5px;opacity:.9;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-header.capa .contato a,footer small a{color:inherit;text-decoration:none}
+/* telefone e e-mail ao lado do logo, cada um numa linha só (o e-mail comprido diminui a letra para caber) */
+header.capa .marca .txt{min-width:0;flex:1}
+header.capa .marca small.ct{display:block;font-size:11.5px;opacity:.9;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.capa .marca small.ct a,footer small a{color:inherit;text-decoration:none}
 header.capa h1{margin:16px 0 2px;font-size:25px;line-height:1.2}
 header.capa p.sub{margin:0;font-size:13.5px;opacity:.9}
 .painel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--linha)}
@@ -609,16 +610,52 @@ const SCRIPT_PPT = String.raw`
       }
     }
 
-    // observações gerais (quebra em mais de um slide se for longo)
+    // observações gerais: cabem num slide só. Cada linha escrita vira uma linha do slide (sem marcador em toda linha,
+    // recuos mantidos) e a letra diminui até caber; se for muito longo, usa duas colunas. Só em último caso
+    // (texto enorme) passa para outro slide.
     if (D.obs.length) {
-      var blocos = [], atual = [], tam = 0;
-      D.obs.forEach(function(o){ if (tam + o.length > 900 && atual.length) { blocos.push(atual); atual = []; tam = 0; } atual.push(o); tam += o.length; });
-      if (atual.length) blocos.push(atual);
-      blocos.forEach(function(b, i){
-        var sl = P.addSlide(); faixa(sl, 'Observações gerais', blocos.length > 1 ? (i + 1) + ' de ' + blocos.length : '');
-        sl.addText(b.map(function(t){ return { text: t, options: { bullet: true, breakLine: true, paraSpaceAfter: 10 } }; }),
-          { x: 0.6, y: 1.25, w: 12.1, h: 5.6, fontSize: 17, color: TEXTO, fontFace: 'Arial', valign: 'top' });
-      });
+      var AREA_H = 5.65, AREA_W = 12.2;
+      // linhas de cada observação; entre uma observação e outra, um espaço
+      var pars = [];
+      D.obs.forEach(function(o, k){ String(o).split('\n').forEach(function(l, j){ pars.push({ t: l.replace(/\s+$/, ''), novo: k > 0 && j === 0 }); }); });
+      var altura = function(lista, f, w){
+        var cpl = Math.max(10, Math.floor(w / (f * 0.55 / 72)));   // letras por linha nessa largura
+        return lista.reduce(function(s, p){ return s + Math.max(1, Math.ceil((p.t.length || 1) / cpl)) * (f * 1.22 / 72) + (p.novo ? f * 0.7 / 72 : 0); }, 0);
+      };
+      var runs = function(lista, f){ return lista.map(function(p){ return { text: p.t || ' ', options: { breakLine: true, paraSpaceBefore: p.novo ? Math.round(f * 0.7) : 0 } }; }); };
+      var caixa = function(sl, lista, f, x, w){ sl.addText(runs(lista, f), { x: x, y: 1.2, w: w, h: AREA_H, fontSize: f, color: TEXTO, fontFace: 'Arial', valign: 'top', margin: 0.05 }); };
+      var f1 = 0, f2 = 0, corte = 0;
+      for (var ff = 18; ff >= 10; ff--) { if (altura(pars, ff, AREA_W) <= AREA_H) { f1 = ff; break; } }
+      if (f1 < 14) {
+        // duas colunas (quando a letra numa coluna só ficaria pequena): corta entre linhas para as colunas
+        // ficarem parecidas; fica com as duas colunas só se a letra sair maior que numa coluna só
+        var meioCol = (AREA_W - 0.4) / 2;
+        for (var f3 = 16; f3 >= 9 && !f2; f3--) {
+          var tot = altura(pars, f3, meioCol), ac = 0, melhor = -1;
+          for (var i = 0; i < pars.length; i++) { ac = altura(pars.slice(0, i + 1), f3, meioCol); if (ac >= tot / 2) { melhor = i + 1; break; } }
+          if (melhor < 0) melhor = pars.length;
+          var a1 = pars.slice(0, melhor), a2 = pars.slice(melhor).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; });
+          // começa a 2ª coluna numa linha em branco ou no começo de uma observação, quando dá
+          for (var dj = 0; dj < 6 && melhor + dj < pars.length; dj++) { if (!pars[melhor + dj].t.trim() || pars[melhor + dj].novo) { melhor = melhor + dj + (pars[melhor + dj].t.trim() ? 0 : 1); break; } }
+          a1 = pars.slice(0, melhor); a2 = pars.slice(melhor).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; });
+          if (altura(a1, f3, meioCol) <= AREA_H && altura(a2, f3, meioCol) <= AREA_H) { f2 = f3; corte = melhor; }
+        }
+      }
+      if (f2 && f1 && f2 <= f1) f2 = 0;
+      if (f1 && !f2) { var so = P.addSlide(); faixa(so, 'Observações gerais', ''); caixa(so, pars, f1, 0.55, AREA_W); }
+      else if (f2) {
+        var s2 = P.addSlide(); faixa(s2, 'Observações gerais', '');
+        var mc = (AREA_W - 0.4) / 2;
+        caixa(s2, pars.slice(0, corte), f2, 0.55, mc);
+        s2.addShape('line', { x: 0.55 + mc + 0.2, y: 1.3, w: 0, h: AREA_H - 0.2, line: { color: 'D5DED9', width: 1 } });
+        caixa(s2, pars.slice(corte).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; }), f2, 0.55 + mc + 0.4, mc);
+      } else {
+        // texto muito grande: vários slides em duas colunas, letra 10
+        var blocos = [], at = [];
+        pars.forEach(function(p){ at.push(p); if (altura(at, 10, AREA_W) > AREA_H) { at.pop(); blocos.push(at); at = [{ t: p.t, novo: false }]; } });
+        if (at.length) blocos.push(at);
+        blocos.forEach(function(b, i){ var sb = P.addSlide(); faixa(sb, 'Observações gerais', (i + 1) + ' de ' + blocos.length); caixa(sb, b, 10, 0.55, AREA_W); });
+      }
     }
 
     // um slide por foto, por talhão; observações do talhão num slide de texto
@@ -838,6 +875,9 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
     tel ? `<a href="tel:${esc(tel.replace(/[^0-9+]/g, ''))}">${esc(tel)}</a>` : '',
     mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : ''
   ].filter(Boolean).join(' · ');
+  // cabeçalho: telefone numa linha e e-mail em outra, ao lado do logo (cada um numa linha só)
+  const contatoLinhas = (tel ? `<small class="ct"><a href="tel:${esc(tel.replace(/[^0-9+]/g, ''))}">${esc(tel)}</a></small>` : '') +
+    (mail ? `<small class="ct"><a href="mailto:${esc(mail)}">${esc(mail)}</a></small>` : '');
   let talhoes = null;
   try { talhoes = rel.talhoes ? JSON.parse(rel.talhoes) : null; } catch (e) {}
 
@@ -919,8 +959,7 @@ ${capa ? `<meta property="og:image" content="${origem}/img/${encodeURIComponent(
 <header class="capa">
   <div class="marca">${logo
       ? `<img class="logo" src="${esc(logo)}" alt="">`
-      : '<div class="logo">🌱</div>'}<div><b>${esc(empresa)}</b><span>${esc(cidade)}</span></div></div>
-  ${contato ? `<div class="contato">${contato}</div>` : ''}
+      : '<div class="logo">🌱</div>'}<div class="txt"><b>${esc(empresa)}</b><span>${esc(cidade)}</span>${contatoLinhas}</div></div>
   <h1>${esc(rel.fazenda || 'Relatório de visita')}</h1>
   <p class="sub"${rel.servico ? ' data-tr' : ' data-i="sub_padrao"'}>${esc(rel.servico || 'Relatório de visita técnica')}</p>
 </header>
@@ -1042,6 +1081,7 @@ ${BANDEIRA}</footer>
 ${ag ? '<script>' + AGRO_REL_JS + '</script>' : ''}
 <script>${ZAP_JS}${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
 <script type="application/json" id="pptDados">${JSON.stringify(pptDados).replace(/</g, '\\u003c')}</script>
+<script>(function(){function caber(){[].slice.call(document.querySelectorAll('header.capa small.ct')).forEach(function(e){e.style.fontSize='';var f=parseFloat(getComputedStyle(e).fontSize)||11.5;while(e.scrollWidth>e.clientWidth+1&&f>8.5){f-=0.5;e.style.fontSize=f+'px';}});}caber();var im=document.querySelector('header.capa img.logo');if(im)im.addEventListener('load',caber);addEventListener('resize',caber);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(caber);})();</script>
 <script>${SCRIPT_LOGO}</script>
 <script>${SCRIPT_PPT}</script>
 </div></body></html>`;
