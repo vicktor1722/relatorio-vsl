@@ -8,6 +8,7 @@
        estiver ligada E (2) o administrador marcou o módulo para aquela conta.
    ============================================================ */
 
+import { listarChuva } from './chuvatalhao.js';
 import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
@@ -569,6 +570,13 @@ export async function rotasAgro(env, req, me, rota, url) {
     if (mod.admin) return json(await plantioGeral(env));
     if (mod.plantio) return json(Object.assign(await plantioGeral(env, me.id), { propria: true }));
     return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
+  }
+
+  /* ----- chuva lançada por talhão pela fazenda (o consultor só vê) ----- */
+  if (rota === '/api/agro/chuva' && req.method === 'GET') {
+    const fid = txt(url.searchParams.get('fazenda_id'), 80);
+    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    return json(Object.assign({ ok: true }, await listarChuva(env, me.id, fid, safraPadrao(txt(url.searchParams.get('safra'), 40)))));
   }
 
   /* ----- plantio ----- */

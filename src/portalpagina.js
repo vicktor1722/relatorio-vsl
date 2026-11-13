@@ -63,6 +63,14 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin:8px 2px 4px}.leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .tg{display:flex;gap:6px;margin-bottom:8px}.tg button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:6px 12px;font-size:13px}
 .tg button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.plv-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}.plv-chips span{background:#EEF4FB;color:#1F4E79;border-radius:999px;padding:5px 10px;font-size:12.5px}
+.plv-esc{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--fraco);margin-top:8px}.plv-esc i{flex:1;height:9px;border-radius:5px;background:linear-gradient(90deg,#D6EAF8,#82BAE8,#3480CC,#0E2F66)}
+.plv-l{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #EDF1EE}.plv-l:first-of-type{border-top:0}
+.plv-l .mm{min-width:64px;text-align:center;background:#EAF3FC;color:#1F5FA8;border-radius:10px;padding:6px 4px;font-weight:800;font-size:15px}
+.plv-l .t{flex:1;min-width:0;font-size:14px}.plv-l .t small{display:block;color:var(--fraco);font-size:12px;margin-top:1px}
+.plv-l button{border:0;background:none;color:#C0392B;font-size:12.5px;text-decoration:underline;padding:4px}
+.plv-tal{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}.plv-tal button{border:1.5px solid #CFE0EE;background:#fff;border-radius:999px;padding:7px 12px;font-size:13.5px;color:#1F4E79;font-weight:600}
+.plv-tal button.on{background:#1F6FB5;border-color:#1F6FB5;color:#fff}.plv-tal button.todos{border-style:dashed}
 .rot{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap;text-align:center;line-height:1.15}
 .rot small{display:block;font-size:11px;font-weight:600}
 .fz-tit{margin-top:18px}
@@ -329,18 +337,19 @@ body.sem-rolar{overflow:hidden}
   /* ---------- mapa (satélite + talhões) ---------- */
   var CORES = ['#2E7D32', '#F9A825', '#1565C0', '#C62828', '#6A1B9A', '#00838F', '#EF6C00', '#558B2F', '#AD1457', '#4E342E'];
   // etiqueta (opcional): o que vai escrito dentro do talhão; sem ela, só o nome
-  function desenharMapa(el, estilo, rotulo, etiqueta) {
+  function desenharMapa(el, estilo, rotulo, etiqueta, clicar) {
     if (!window.L || !D.mapa || !D.mapa.features || !D.mapa.features.length) { el.innerHTML = '<div class="vazio" style="border:0">Mapa da fazenda ainda não cadastrado (KML).</div>'; return null; }
     var m = L.map(el, { scrollWheelZoom: false });
     var esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
     L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagens © Esri' }).addTo(m);
     var g = L.geoJSON(D.mapa);
     m.fitBounds(g.getBounds(), { padding: [16, 16], maxZoom: 17 });   // enquadra antes de desenhar
-    L.geoJSON(D.mapa, {
+    m.camada = L.geoJSON(D.mapa, {
       style: function (f) { return estilo((f.properties || {}).nome || ''); },
       onEachFeature: function (f, c) {
         var nm = (f.properties || {}).nome || '';
-        c.bindPopup(rotulo(nm, f.properties || {}));
+        if (clicar) c.on('click', function () { clicar(nm); });
+        else c.bindPopup(rotulo(nm, f.properties || {}));
         var curto = D.todas ? nm.split(' · ').slice(1).join(' · ') || nm : nm;
         c.bindTooltip(etiqueta ? etiqueta(curto, f.properties || {}) : esc(curto), { permanent: true, direction: 'center', className: 'rot' });
       }
@@ -785,7 +794,7 @@ body.sem-rolar{overflow:hidden}
   /* ---------- visão da fazenda ---------- */
   function abas() {
     if (eu.papel === 'operador') return '';
-    return '<div class="abas">' + [['inicio', 'Início'], ['apl', 'Aplicações'], ['mapa', 'Mapas'], ['plantio', 'Plantio'], ['colh', 'Colheita'], ['est', 'Estoque e custos']].map(function (x) {
+    return '<div class="abas">' + [['inicio', 'Início'], ['apl', 'Aplicações'], ['mapa', 'Mapas'], ['clima', '🌧️ Clima'], ['plantio', 'Plantio'], ['colh', 'Colheita'], ['est', 'Estoque e custos']].map(function (x) {
       return '<button data-aba="' + x[0] + '" class="' + (aba === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>';
   }
   function ligarAbas() { document.querySelectorAll('[data-aba]').forEach(function (b) { b.onclick = function () { aba = b.dataset.aba; pintar(); window.scrollTo(0, 0); }; }); }
@@ -798,6 +807,7 @@ body.sem-rolar{overflow:hidden}
     else if (aba === 'plantio') vistaPlantio();
     else if (aba === 'est') vistaEstoque();
     else if (aba === 'colh') vistaColheita();
+    else if (aba === 'clima') vistaClima();
     else {
       var seg = '<div class="seg apmodo"><button data-apm="ver" class="' + (apModo === 'ver' ? 'on' : '') + '">📋 Programação</button>' +
         '<button data-apm="lancar" class="' + (apModo === 'lancar' ? 'on' : '') + '">✔ Lançar aplicação</button></div>';
@@ -976,6 +986,127 @@ body.sem-rolar{overflow:hidden}
   function porNome(a, b) { return String(a).localeCompare(String(b), 'pt-BR', { numeric: true }); }
   // gráfico com troca para o lado (plantio ⇄ previsão de colheita); st = estado da aba
   function grafHtml(st, so) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true, so: so }) + '</div>' : ''; }
+  /* ---------- Clima: chuva lançada por talhão (pluviômetro) e o mapa da chuva acumulada ---------- */
+  var PLV = { chave: '', dados: null, carregando: false, erro: '', per: 'safra', sel: [] };
+  var DSEM = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  function plvCarregar(forcar) {
+    var k = $('#selFaz').value + '|' + (D.safra || '');
+    if (PLV.carregando || (!forcar && PLV.chave === k)) return Promise.resolve();
+    if (PLV.chave !== k) PLV.sel = [];
+    PLV.carregando = true; PLV.erro = '';
+    return api('/api/portal/pluvio?fazenda=' + encodeURIComponent($('#selFaz').value) + '&safra=' + encodeURIComponent(D.safra || ''))
+      .then(function (r) { PLV.dados = r; PLV.chave = k; }, function (e) { PLV.erro = e.message; PLV.chave = k; PLV.dados = null; })
+      .then(function () { PLV.carregando = false; if (D && aba === 'clima') pintar(); });
+  }
+  function plvDesde() { return PLV.per === '30' ? somaDias(hoje(), -29) : PLV.per === '7' ? somaDias(hoje(), -6) : ''; }
+  // soma por talhão no período escolhido
+  function plvSoma() {
+    var de = plvDesde(), tot = {}, lotes = {}, ult = null;
+    ((PLV.dados && PLV.dados.chuvas) || []).forEach(function (c) {
+      if (de && c.data < de) return;
+      tot[c.talhao] = (tot[c.talhao] || 0) + Number(c.mm);
+      lotes[c.lote] = 1; if (!ult || c.data > ult.data) ult = c;
+    });
+    return { tot: tot, n: Object.keys(lotes).length, ult: ult };
+  }
+  // azul claro (pouca) → azul escuro (muita), relativo ao maior acumulado do período
+  function corChuva(mm, max) {
+    var paradas = [[0, [214, 234, 248]], [0.35, [130, 186, 232]], [0.65, [52, 128, 204]], [1, [14, 47, 102]]], t = max > 0 ? Math.min(1, mm / max) : 0;
+    for (var i = 1; i < paradas.length; i++) if (t <= paradas[i][0]) {
+      var a = paradas[i - 1], b = paradas[i], u = (t - a[0]) / (b[0] - a[0] || 1);
+      return 'rgb(' + [0, 1, 2].map(function (j) { return Math.round(a[1][j] + (b[1][j] - a[1][j]) * u); }).join(',') + ')';
+    }
+    return 'rgb(14,47,102)';
+  }
+  function vistaClima() {
+    if (D.todas) { $('#conteudo').innerHTML = abas() + '<div class="vazio">Para ver e lançar a chuva por talhão, escolha uma fazenda no topo.</div>'; return; }
+    plvCarregar();
+    var areas = areasMapa(), S = plvSoma(), max = 0, somaHa = 0, somaMmHa = 0;
+    Object.keys(S.tot).forEach(function (t) { max = Math.max(max, S.tot[t]); if (areas[t]) { somaHa += areas[t]; somaMmHa += S.tot[t] * areas[t]; } });
+    var media = somaHa ? somaMmHa / somaHa : 0, nSel = PLV.sel.length;
+    var titulo = PLV.per === 'safra' ? 'safra ' + (D.safra || '') : 'últimos ' + PLV.per + ' dias';
+    var h = abas() + '<button class="btn" id="plvLancar" style="margin-bottom:12px">🌧️ Lançar chuva' + (nSel ? ' em ' + nSel + (nSel === 1 ? ' talhão' : ' talhões') : '') + '</button>' +
+      '<div class="ini-card"><h3 style="margin:0 0 8px;font-size:15.5px;color:var(--verde-escuro)">Chuva acumulada · ' + esc(titulo) + '</h3>' +
+      '<div class="plv-chips">' + (S.n ? '<span>Média ' + (Object.keys(S.tot).length < Object.keys(areas).length ? 'dos talhões com chuva' : 'da fazenda') + ' <b>' + n(media) + ' mm</b></span><span><b>' + S.n + '</b> ' + (S.n === 1 ? 'chuva lançada' : 'chuvas lançadas') + '</span>' +
+        (S.ult ? '<span>Última: <b>' + dataBR(S.ult.data) + ' · ' + n(S.ult.mm, S.ult.mm % 1 ? 1 : 0) + ' mm</b></span>' : '') : '<span>Nenhuma chuva lançada ' + (PLV.per === 'safra' ? 'nesta safra' : 'no período') + '</span>') + '</div>' +
+      '<div class="tg">' + [['safra', 'Safra'], ['30', '30 dias'], ['7', '7 dias']].map(function (x) { return '<button data-plvp="' + x[0] + '" class="' + (PLV.per === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="mapa-sat" id="mapaChuva"></div>' +
+      (max ? '<div class="plv-esc"><span>0</span><i></i><span>' + n(max) + ' mm</span></div>' : '') +
+      '<div class="sem" style="font-size:12.5px;margin-top:6px">👆 Toque nos talhões do mapa para marcar onde lançar a chuva.' + (nSel ? ' <a href="#" id="plvLimpar">Desmarcar</a>' : '') + '</div></div>';
+    // lançamentos (um por lote: data, mm e talhões)
+    var lotes = {}, ordem = [];
+    ((PLV.dados && PLV.dados.chuvas) || []).forEach(function (c) {
+      var l = lotes[c.lote]; if (!l) { l = lotes[c.lote] = { lote: c.lote, data: c.data, mm: c.mm, por: c.por, tal: [] }; ordem.push(l); }
+      l.tal.push(c.talhao);
+    });
+    ordem.sort(function (a, b) { return a.data < b.data ? 1 : a.data > b.data ? -1 : 0; });
+    var nTal = Object.keys(areas).length;
+    h += '<div class="ini-card"><h3 style="margin:0 0 6px;font-size:15.5px;color:var(--verde-escuro)">Chuvas lançadas</h3>' + (ordem.length ? ordem.slice(0, 60).map(function (l) {
+      l.tal.sort(porNome);
+      return '<div class="plv-l"><div class="mm">' + n(l.mm, l.mm % 1 ? 1 : 0) + ' mm</div><div class="t"><b>' + dataBR(l.data) + ' · ' + DSEM[new Date(l.data + 'T12:00:00').getDay()] + '</b><small>' +
+        (nTal && l.tal.length === nTal ? 'Todos os talhões (' + nTal + ')' : esc(l.tal.join(', '))) + (l.por ? ' · ' + esc(String(l.por).split(' (fazenda)').join('')) : '') + '</small></div>' +
+        '<button data-plva="' + esc(l.lote) + '">apagar</button></div>';
+    }).join('') : '<div class="sem" style="padding:6px 0">' + (PLV.carregando ? 'Carregando…' : PLV.erro ? 'Não deu para carregar: ' + esc(PLV.erro) : 'Ainda não há chuva lançada nesta safra. Toque em <b>Lançar chuva</b>.') + '</div>') + '</div>';
+    $('#conteudo').innerHTML = h;
+    ligarAbas();
+    var estilo = function (nm) {
+      var mm = S.tot[nm] || 0, sel = PLV.sel.indexOf(nm) >= 0;
+      return { color: sel ? '#FFD400' : '#FFFFFF', weight: sel ? 4 : 2, fillColor: mm ? corChuva(mm, max) : '#9AA5A0', fillOpacity: mm ? 0.85 : 0.35 };
+    };
+    var mm1 = desenharMapa($('#mapaChuva'), estilo, function () { return ''; }, function (nm) {
+      var mm = S.tot[nm] || 0; return esc(nm) + '<small>' + (mm ? n(mm, mm % 1 ? 1 : 0) + ' mm' : '—') + '</small>';
+    }, function (nm) {
+      var i = PLV.sel.indexOf(nm); if (i >= 0) PLV.sel.splice(i, 1); else PLV.sel.push(nm);
+      if (mm1 && mm1.camada) mm1.camada.setStyle(function (f) { return estilo((f.properties || {}).nome || ''); });
+      var b = $('#plvLancar'); if (b) b.textContent = '🌧️ Lançar chuva' + (PLV.sel.length ? ' em ' + PLV.sel.length + (PLV.sel.length === 1 ? ' talhão' : ' talhões') : '');
+    });
+    document.querySelectorAll('[data-plvp]').forEach(function (b) { b.onclick = function () { PLV.per = b.dataset.plvp; pintar(); }; });
+    var lp = $('#plvLimpar'); if (lp) lp.onclick = function (ev) { ev.preventDefault(); PLV.sel = []; pintar(); };
+    $('#plvLancar').onclick = function () { folhaChuva(); };
+    document.querySelectorAll('[data-plva]').forEach(function (b) { b.onclick = async function () {
+      var l = lotes[b.dataset.plva]; if (!l || !confirm('Apagar a chuva de ' + dataBR(l.data) + ' (' + n(l.mm, l.mm % 1 ? 1 : 0) + ' mm em ' + l.tal.length + (l.tal.length === 1 ? ' talhão' : ' talhões') + ')?')) return;
+      try { await api('/api/portal/pluvio/apagar', { fazenda: $('#selFaz').value, lote: l.lote }); toast('Chuva apagada'); await plvCarregar(true); }
+      catch (e) { toast(e.rede ? 'Sem internet agora: tente de novo com sinal' : 'Não deu para apagar: ' + e.message); }
+    }; });
+  }
+  function folhaChuva() {
+    var areas = areasMapa(), nomes = Object.keys(areas).sort(porNome), sel = PLV.sel.slice();
+    var v = document.createElement('div'); v.className = 'veu';
+    v.innerHTML = '<div class="folha"><h3>🌧️ Lançar chuva</h3>' +
+      '<div class="g2"><div class="campo"><label class="l">Data *</label><input type="date" id="plvData" value="' + hoje() + '" max="' + hoje() + '"></div>' +
+      '<div class="campo"><label class="l">Milímetros *</label><input id="plvMm" inputmode="decimal" placeholder="ex.: 25"></div></div>' +
+      '<div class="campo" style="margin-bottom:4px"><label class="l">Talhões * <span id="plvConta" style="float:right;color:#1F6FB5;font-weight:700"></span></label></div>' +
+      '<div class="plv-tal"><button data-plvt="*" class="todos">Todos</button>' + nomes.map(function (t) { return '<button data-plvt="' + esc(t) + '">' + esc(t) + '</button>'; }).join('') + '</div>' +
+      '<div class="sem" style="font-size:12.5px;margin:2px 0 6px">Lançar de novo a mesma data no mesmo talhão corrige o valor.</div>' +
+      '<button class="btn" id="plvOk">✔ Salvar chuva</button><button class="btn sec" id="plvNao">Cancelar</button></div>';
+    document.body.appendChild(v);
+    var marcar = function () {
+      v.querySelectorAll('[data-plvt]').forEach(function (b) { var t = b.dataset.plvt; b.classList.toggle('on', t === '*' ? sel.length === nomes.length && nomes.length > 0 : sel.indexOf(t) >= 0); });
+      var ha = sel.reduce(function (s, t) { return s + (areas[t] || 0); }, 0);
+      $('#plvConta').textContent = sel.length ? sel.length + (sel.length === 1 ? ' selecionado' : ' selecionados') + (ha ? ' · ' + n(ha) + ' ha' : '') : '';
+    };
+    v.querySelectorAll('[data-plvt]').forEach(function (b) { b.onclick = function () {
+      var t = b.dataset.plvt;
+      if (t === '*') sel = sel.length === nomes.length ? [] : nomes.slice();
+      else { var i = sel.indexOf(t); if (i >= 0) sel.splice(i, 1); else sel.push(t); }
+      marcar();
+    }; });
+    marcar();
+    v.querySelector('#plvNao').onclick = function () { v.remove(); };
+    v.querySelector('#plvOk').onclick = async function () {
+      var mm = Number(String(v.querySelector('#plvMm').value || '').replace(',', '.')), d = v.querySelector('#plvData').value;
+      if (!(mm > 0)) { toast('Informe quantos milímetros choveu'); v.querySelector('#plvMm').focus(); return; }
+      if (!sel.length) { toast('Escolha os talhões onde choveu'); return; }
+      this.disabled = true;
+      try {
+        await api('/api/portal/pluvio', { fazenda: $('#selFaz').value, data: d, mm: mm, talhoes: sel });
+        toast('✔ Chuva lançada: ' + n(mm, mm % 1 ? 1 : 0) + ' mm em ' + sel.length + (sel.length === 1 ? ' talhão' : ' talhões'));
+        v.remove(); PLV.sel = []; await plvCarregar(true);
+      } catch (e) { toast(e.rede ? 'Sem internet agora: tente de novo com sinal' : 'Não deu para salvar: ' + e.message); this.disabled = false; }
+    };
+    setTimeout(function () { var m = v.querySelector('#plvMm'); if (m) m.focus(); }, 150);
+  }
+
   function vistaPlantio() {
     var areas = areasMapa(), pl = {}, lanc = [];
     (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; var mv = (p.lanc || []).some(function (x) { return x.v; }); (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por, sem: x.sem, esp: x.esp, vv: mv ? (x.v || p.variedade || '') : '' }); }); });

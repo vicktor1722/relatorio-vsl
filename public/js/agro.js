@@ -288,7 +288,51 @@
       (fora ? '<br><span style="color:#6B7B72;font-size:13px">Fora da conta (pastagem/pousio): ' + fmt(fora) + ' ha · ' + esc(nomesFora.join(', ')) + '</span>' : '') + '</div>';
   }
 
+  /* chuva lançada por talhão pela fazenda (portal do dono/gerente): o consultor só vê, no mapa da tela do plantio */
+  var CHV = { dados: {}, carregando: '', per: 'safra' };
+  function chuvaCarregar(fid, safra) {
+    var k = fid + '|' + safra;
+    if (CHV.dados[k] || CHV.carregando === k || !navigator.onLine) return;
+    CHV.carregando = k;
+    chamar('/api/agro/chuva?fazenda_id=' + encodeURIComponent(fid) + '&safra=' + encodeURIComponent(safra))
+      .then(function (r) { CHV.dados[k] = r.chuvas || []; }, function () { CHV.dados[k] = { erro: true }; })
+      .then(function () { CHV.carregando = ''; if (P.mapa === 'chuva') pintarPlantio(); });
+  }
+  function corChuva(mm, max) {
+    var par = [[0, [214, 234, 248]], [0.35, [130, 186, 232]], [0.65, [52, 128, 204]], [1, [14, 47, 102]]], t = max > 0 ? Math.min(1, mm / max) : 0;
+    for (var i = 1; i < par.length; i++) if (t <= par[i][0]) {
+      var a = par[i - 1], b = par[i], u = (t - a[0]) / (b[0] - a[0] || 1);
+      return 'rgb(' + [0, 1, 2].map(function (j) { return Math.round(a[1][j] + (b[1][j] - a[1][j]) * u); }).join(',') + ')';
+    }
+    return 'rgb(14,47,102)';
+  }
+  function mapaChuva(f, tl) {
+    chuvaCarregar(P.faz, P.safra);
+    var l = CHV.dados[P.faz + '|' + P.safra], tot = {}, lotes = {}, ult = null, max = 0;
+    var de = CHV.per === '30' ? addDias(hoje(), -29) : CHV.per === '7' ? addDias(hoje(), -6) : '';
+    (Array.isArray(l) ? l : []).forEach(function (c) { if (de && c.data < de) return; tot[c.talhao] = (tot[c.talhao] || 0) + Number(c.mm); lotes[c.lote] = 1; if (!ult || c.data > ult.data) ult = c; });
+    var ha = 0, mmha = 0;
+    tl.forEach(function (t) { var v = tot[t.nome]; if (v) { max = Math.max(max, v); if (t.ha) { ha += t.ha; mmha += v * t.ha; } } });
+    var cores = {}; Object.keys(tot).forEach(function (k) { cores[k] = { fill: corChuva(tot[k], max), txt: fmt(tot[k], tot[k] % 1 ? 1 : 0) + ' mm' }; });
+    var n = Object.keys(lotes).length;
+    var info = !Array.isArray(l) ? (l && l.erro ? 'Não deu para carregar a chuva agora.' : !navigator.onLine ? 'Sem internet: a chuva aparece quando conectar.' : 'Carregando a chuva…')
+      : n ? '🌧️ Média ' + (Object.keys(tot).length < tl.length ? 'dos talhões com chuva' : 'da fazenda') + ' <b>' + fmt(ha ? mmha / ha : 0) + ' mm</b> · ' + n + (n === 1 ? ' chuva lançada' : ' chuvas lançadas') +
+        (ult ? ' · última ' + curta(ult.data) + ' (' + fmt(ult.mm, ult.mm % 1 ? 1 : 0) + ' mm)' : '')
+      : 'Nenhuma chuva lançada ' + (CHV.per === 'safra' ? 'nesta safra' : 'no período') + '. Quem lança é a fazenda, no portal (aba Clima).';
+    return '<div class="ag-chips">' + [['safra', 'Safra'], ['30', '30 dias'], ['7', '7 dias']].map(function (x) {
+        return '<button class="ag-chip' + (CHV.per === x[0] ? ' on' : '') + '" data-a="chper" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="ag-dica">' + info + '</div><div class="ag-mapa">' + mapaSVG(f, [], 'chnada', null, cores) + '</div>' +
+      (max ? '<div class="ag-chesc"><span>0</span><i></i><span>' + fmt(max) + ' mm</span></div>' : '');
+  }
+  function abasMapa() {
+    return '<div class="ag-abas"><button class="' + (P.mapa !== 'chuva' ? 'on' : '') + '" data-a="pmapa" data-v="plantio">🌱 Plantio</button>' +
+      '<button class="' + (P.mapa === 'chuva' ? 'on' : '') + '" data-a="pmapa" data-v="chuva">🌧️ Clima</button></div>';
+  }
   function mapaPlantio(f, tl) {
+    if (P.mapa === 'chuva') return abasMapa() + mapaChuva(f, tl);
+    return abasMapa() + mapaPlantio0(f, tl);
+  }
+  function mapaPlantio0(f, tl) {
     var feitos = tl.filter(function (t) { var r = linhaPlantio(P.faz, P.safra, t.nome); return r && (r.cultura || r.variedade || r.data_plantio); }).map(function (t) { return t.nome; });
     P.sel = P.sel.filter(function (n) { return tl.some(function (t) { return t.nome === n; }); });
     return '<div class="ag-dica">👆 Toque nos talhões do mapa para marcar onde lançar o plantio (pode marcar vários). Mais claro = já informado. Para os talhões pequenos, amplie com + / − ou com dois dedos.</div><div class="ag-mapa">' + mapaSVG(f, P.sel, 'ptog', feitos) + '</div>' +
@@ -731,6 +775,9 @@
     if (a === 'cdel') { removerMaterial(v); return; }
     if (a === 'salvarciclos') { gravarCiclos(); return; }
     if (a === 'salvarcolh') { gravarColheita(); return; }
+    if (a === 'pmapa') { P.mapa = v; pintarPlantio(); return; }
+    if (a === 'chper') { CHV.per = v; pintarPlantio(); return; }
+    if (a === 'chnada') return;
     if (a === 'ptog') { var kp = P.sel.indexOf(v); if (kp >= 0) P.sel.splice(kp, 1); else P.sel.push(v); pintarPlantio(); return; }
     if (a === 'ptodos') { P.sel = talhoesDe(fazDe(P.faz)).map(function (t) { return t.nome; }); pintarPlantio(); return; }
     if (a === 'plimpar') { P.sel = []; pintarPlantio(); return; }
@@ -1763,7 +1810,7 @@
     document.addEventListener('mouseup', function () { if (mouse && mouse.mov) zSupr = Date.now(); mouse = null; });
   }
 
-  function mapaSVG(f, sel, act, feitos) {
+  function mapaSVG(f, sel, act, feitos, cores) {
     var feats = (f && f.talhoes && f.talhoes.features) || [], minX = 180, minY = 90, maxX = -180, maxY = -90;
     var each = function (ft, cb) { var g = ft.geometry; if (!g) return; (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(cb); };
     feats.forEach(function (ft) { each(ft, function (rings) { rings.forEach(function (rg) { rg.forEach(function (p) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }); }); }); });
@@ -1779,8 +1826,11 @@
       each(ft, function (rings) {
         d += rings.map(function (rg, ri) { if (ri === 0) rg.forEach(function (q) { cx += px(q[0]); cy += py(q[1]); n++; }); return 'M' + rg.map(function (q) { return px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1); }).join('L') + 'Z'; }).join(' ');
       });
-      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v="' + esc(nome) + '" d="' + d + '"/>';
-      if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
+      var cr = cores && cores[nome];
+      s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v="' + esc(nome) + '" d="' + d + '"' +
+        (cores ? ' style="fill:' + (cr ? cr.fill : '#E3E8E5') + ';cursor:default"' : '') + '/>';
+      if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) +
+        (cores ? '<tspan x="' + (cx / n).toFixed(0) + '" dy="26" style="font-size:21px">' + esc(cr ? cr.txt : '—') + '</tspan>' : '') + '</text>';
     });
     return s + txt + '</svg><div class="ag-zb"><button type="button" data-z="in" title="Ampliar">+</button><button type="button" data-z="out" title="Reduzir">−</button><button type="button" data-z="reset" title="Mapa inteiro">⤢</button></div></div>';
   }

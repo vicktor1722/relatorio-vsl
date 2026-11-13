@@ -23,6 +23,7 @@ import { safraPadrao } from './safras.js';
 import { grupoDaFazenda, mapaGrupos } from './estoquegrupo.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
+import { apagarChuva, lancarChuva, listarChuva } from './chuvatalhao.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200,
@@ -584,6 +585,27 @@ export async function rotasPortal(env, req, rota, url, ctx) {
   }
 
   // gerente da fazenda lança a área plantada no dia (ou apaga um lançamento)
+  /* ----- chuva por talhão (aba Clima): o dono/gerente lança; operador não ----- */
+  if (rota.startsWith('/api/portal/pluvio')) {
+    if (a.papel === 'operador') return json({ erro: 'a chuva é lançada pelo acesso da fazenda' }, 403);
+    const b = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const fid = txt(req.method === 'POST' ? b.fazenda : url.searchParams.get('fazenda'), 80);
+    if (!a.lista.includes(fid)) return json({ erro: 'fazenda não liberada para este acesso' }, 403);
+    if (rota === '/api/portal/pluvio' && req.method === 'GET') return json(Object.assign({ ok: true }, await listarChuva(env, a.dono_id, fid, safraPadrao(txt(url.searchParams.get('safra'), 40)))));
+    if (rota === '/api/portal/pluvio' && req.method === 'POST') {
+      const f = await areasDaFazenda(env, fid, a.dono_id);
+      if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
+      const data = dia(b.data), mm = Math.round(Number(String(b.mm == null ? '' : b.mm).replace(',', '.')) * 10) / 10;
+      if (!data || data > hojeMT()) return json({ erro: 'informe a data da chuva (hoje ou antes)' }, 400);
+      if (!(mm > 0 && mm <= 500)) return json({ erro: 'informe os milímetros (de 0,1 a 500)' }, 400);
+      const tal = [...new Set((Array.isArray(b.talhoes) ? b.talhoes : []).map((t) => txt(t, 80)))].filter((t) => t in f.areas);
+      if (!tal.length) return json({ erro: 'escolha os talhões' }, 400);
+      return json(Object.assign({ ok: true, mm, data }, await lancarChuva(env, a.dono_id, fid, data, mm, tal, (a.nome || a.login) + ' (fazenda)')));
+    }
+    if (rota === '/api/portal/pluvio/apagar' && req.method === 'POST') return json(Object.assign({ ok: true }, await apagarChuva(env, a.dono_id, fid, txt(b.lote, 60))));
+    return json({ erro: 'rota não encontrada' }, 404);
+  }
+
   if (rota === '/api/portal/plantio' && req.method === 'POST') {
     if (a.papel === 'operador') return json({ erro: 'o plantio por dia é lançado pelo acesso da fazenda' }, 403);
     const b = await req.json().catch(() => ({}));
