@@ -22,9 +22,9 @@ header.capa .marca{display:flex;align-items:center;gap:12px}
 header.capa .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:22px;flex:none}
 header.capa img.logo{width:auto;max-width:210px;height:76px;object-fit:contain;background:#fff;padding:6px;border-radius:10px;display:block;flex:none}
 @media (max-width:420px){header.capa img.logo{height:68px;max-width:150px}}
-header.capa .marca b{display:block;font-size:14.5px}
-header.capa .marca span{font-size:11.5px;opacity:.85}
-header.capa .marca small{display:block;font-size:11.5px;opacity:.9;margin-top:2px}
+header.capa .marca b{display:block;font-size:18px;line-height:1.25}
+header.capa .marca span{font-size:12.5px;opacity:.85}
+header.capa .marca small{display:block;font-size:12.5px;opacity:.9;margin-top:2px;overflow-wrap:anywhere}
 header.capa .marca small a,footer small a{color:inherit;text-decoration:none}
 header.capa h1{margin:16px 0 2px;font-size:25px;line-height:1.2}
 header.capa p.sub{margin:0;font-size:13.5px;opacity:.9}
