@@ -301,7 +301,7 @@ export default {
       if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
       // preenche os resumos dos mapas que faltam (lotes pequenos; o cron também faz)
       if (rota === '/api/status/resumos') return json(await preencherResumos(env, 600000));
-      if (rota === '/api/status/calib') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'calib:pontes-1311'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
+      if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento

@@ -36,16 +36,23 @@ export async function apagarObservacaoAntiga(env) {
   return out;
 }
 
-/* 13/11/2026: o consultor passou a cotação real da soja disponível em Pontes e Lacerda (R$ 128,00/sc).
-   Recalibra o ponto de Pontes e Lacerda com o mercado de hoje (porto, Chicago e dólar do dia), do mesmo jeito
-   que o botão do painel faz. Só marca como feito quando der certo (sem o preço do porto, tenta na próxima). */
-const CHAVE_CAL = 'calib:pontes-1311';
+/* 13/11/2026: o consultor passou as cotações reais da soja disponível (R$/sc): Pontes e Lacerda 128,00 e
+   Comodoro 129,00. Recalibra cada município com o mercado do dia (porto, Chicago e dólar), do mesmo jeito que o
+   botão do painel faz. Cada um só é marcado como feito quando der certo (sem o preço do porto, tenta na próxima). */
+const COTACOES_1311 = [
+  { chave: 'calib:pontes-1311', municipio: 'Pontes e Lacerda', disp: 128 },
+  { chave: 'calib:comodoro-1311', municipio: 'Comodoro', disp: 129 }
+];
 export async function calibrarPontes1311(env) {
-  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_CAL).first().catch(() => null);
-  if (feito) return JSON.parse(feito.valor);
-  const cal = await salvarCalibracao(env, { municipio: 'Pontes e Lacerda', uf: 'MT', disp: 128 });
-  const p = (cal.pontos || []).filter((x) => x.municipio === 'Pontes e Lacerda')[0] || null;
-  const out = { em: new Date().toISOString(), ponto: p };
-  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_CAL, JSON.stringify(out)).run();
+  const out = {};
+  for (const c of COTACOES_1311) {
+    const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(c.chave).first().catch(() => null);
+    if (feito) { out[c.municipio] = JSON.parse(feito.valor); continue; }
+    const cal = await salvarCalibracao(env, { municipio: c.municipio, uf: 'MT', disp: c.disp });
+    const p = (cal.pontos || []).filter((x) => x.municipio === c.municipio)[0] || null;
+    const r = { em: new Date().toISOString(), ponto: p };
+    await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(c.chave, JSON.stringify(r)).run();
+    out[c.municipio] = r;
+  }
   return out;
 }
