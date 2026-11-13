@@ -7,6 +7,7 @@
    versão nova (completa). Em qualquer outro caso não mexe em nada e guarda o motivo.
    Resultado em /api/status/limpeza.
    ============================================================ */
+import { salvarCalibracao } from './mercado.js';
 const CHAVE = 'limpeza:protocolos-1211';
 
 export async function apagarObservacaoAntiga(env) {
@@ -32,5 +33,19 @@ export async function apagarObservacaoAntiga(env) {
     out.apagado = true; out.id = x.id; out.relatorio_id = x.relatorio_id; out.capturado_em = x.capturado_em; out.tamanho = String(x.legenda).length;
   } else out.motivo = alvo.length ? 'mais de um registro parecido: nada foi apagado' : 'nenhum registro com os sinais da versão antiga';
   await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE, JSON.stringify(out)).run();
+  return out;
+}
+
+/* 13/11/2026: o consultor passou a cotação real da soja disponível em Pontes e Lacerda (R$ 128,00/sc).
+   Recalibra o ponto de Pontes e Lacerda com o mercado de hoje (porto, Chicago e dólar do dia), do mesmo jeito
+   que o botão do painel faz. Só marca como feito quando der certo (sem o preço do porto, tenta na próxima). */
+const CHAVE_CAL = 'calib:pontes-1311';
+export async function calibrarPontes1311(env) {
+  const feito = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_CAL).first().catch(() => null);
+  if (feito) return JSON.parse(feito.valor);
+  const cal = await salvarCalibracao(env, { municipio: 'Pontes e Lacerda', uf: 'MT', disp: 128 });
+  const p = (cal.pontos || []).filter((x) => x.municipio === 'Pontes e Lacerda')[0] || null;
+  const out = { em: new Date().toISOString(), ponto: p };
+  await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_CAL, JSON.stringify(out)).run();
   return out;
 }
