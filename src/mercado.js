@@ -245,8 +245,8 @@ export function lerPortos(html) {
   return out;
 }
 
-async function yahoo(simbolo, div) {
-  const j = await buscar('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(simbolo) + '?range=1mo&interval=1d', 1200);
+async function yahoo(simbolo, div, ttl) {
+  const j = await buscar('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(simbolo) + '?range=1mo&interval=1d', ttl || 1200);
   const r = j.chart && j.chart.result && j.chart.result[0];
   if (!r) throw new Error('sem dados ' + simbolo);
   const ts = r.timestamp || [], cl = (r.indicators && r.indicators.quote && r.indicators.quote[0] && r.indicators.quote[0].close) || [];
@@ -407,6 +407,20 @@ export function calibrado(m, cal, local) {
       cbot_ref: f.ref.cbot, cbot_hoje: m.cbot_fut.preco, usd: r2(usd), brl: f.brl_sc && m.dolar ? r2(usd * m.dolar.preco * (1 + prem)) : null, prem: r2(prem * 100) };
   }
   return out.disp || out.futuro ? out : null;
+}
+
+// futuro calibrado AGORA (para o alerta em tempo real): contrato de Chicago e dólar com no máximo 4 minutos
+// de cache, no mesmo cálculo do card de mercado (base da região sobre Chicago e prêmio do dólar a termo)
+export async function futuroAgora(env) {
+  const cal = await calibracao(env), f = cal && cal.futuro;
+  if (!f) return null;
+  const [zf, usd] = await Promise.all([yahoo(f.contrato, 100, 240), yahoo('BRL=X', 1, 240).catch(() => null)]);
+  const base = f.usd_sc / BU_SC - f.ref.cbot;
+  const prem = f.brl_sc ? f.brl_sc / (f.usd_sc * f.ref.dolar) - 1 : 0;
+  const fator = f.brl_sc && usd ? usd.preco * (1 + prem) : null;           // R$ por US$ (dólar a termo de agora)
+  const conv = (c) => r2((c + base) * BU_SC * (fator || 1));
+  return { venc: f.venc, contrato: f.contrato, moeda: fator ? 'R$' : 'US$', preco: conv(zf.preco), cbot: zf.preco, dolar: usd ? usd.preco : null,
+    dias: (zf.dias || []).map((x) => ({ d: x[0], p: conv(x[1]) })) };
 }
 
 export function km(a, b) {
