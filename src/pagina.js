@@ -407,9 +407,7 @@ const SCRIPT_PPT = String.raw`
   var btn = document.getElementById('btnPpt'), D = null;
   try { D = JSON.parse(document.getElementById('pptDados').textContent); } catch (e) {}
   if (!btn || !D) return;
-  // estilo escuro em todos os slides (o mesmo da capa): fundo verde-noite, texto claro e destaques em verde-limão
-  var VERDE = '1B7A43', ESCURO = 'A3E635', CLARO = '123524', CINZA = '8FB3A0', TEXTO = 'E8F1EC';
-  var NOITE = '0A2016', LIMA = 'A3E635', GRADE = '10301F', BORDA = '24513A', FAIXA = '0F3B26';
+  var VERDE = '1B7A43', ESCURO = '146034', CLARO = 'E8F4EC', CINZA = '6B7B72', TEXTO = '1B2B22';
   var LOGO = null, arquivo = null, nome = 'relatorio-' + String(D.fazenda || 'visita').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pptx';
   function lib(){ return new Promise(function(ok, erro){
     if (window.PptxGenJS) return ok();
@@ -463,21 +461,9 @@ const SCRIPT_PPT = String.raw`
   } catch (err) { ok(null); } }); }
   function hex(cor){ var m = String(cor || '').match(/\d+/g); return m && m.length >= 3 ? m.slice(0, 3).map(function(n){ return ('0' + Number(n).toString(16)).slice(-2); }).join('').toUpperCase() : '999999'; }
   function caber(im, x, y, bw, bh){ var e = Math.min(bw / im.w, bh / im.h), w = im.w * e, h = im.h * e; return { data: im.data, x: x + (bw - w) / 2, y: y + (bh - h) / 2, w: w, h: h }; }
-  // fundo escuro com a grade fina (capa e encerramento)
-  function grade(sl){
-    sl.background = { color: NOITE };
-    for (var gx = 0; gx <= 13.4; gx += 0.55) sl.addShape('line', { x: gx, y: 0, w: 0, h: 7.5, line: { color: GRADE, width: 0.5 } });
-    for (var gy = 0; gy <= 7.5; gy += 0.55) sl.addShape('line', { x: 0, y: gy, w: 13.333, h: 0, line: { color: GRADE, width: 0.5 } });
-  }
-  // mapas e gráficos têm cores e rótulos feitos para fundo claro: entram num cartão branco de cantos arredondados
-  function cartao(sl, im, x, y, w, h){
-    sl.addShape('roundRect', { x: x, y: y, w: w, h: h, fill: { color: 'FFFFFF' }, line: { color: 'FFFFFF' }, rectRadius: 0.12 });
-    sl.addImage(caber(im, x + 0.15, y + 0.15, w - 0.3, h - 0.3));
-  }
   function faixa(sl, titulo, sub){
-    sl.background = { color: NOITE };
-    sl.addShape('rect', { x: 0, y: 0, w: 13.333, h: 0.95, fill: { color: FAIXA }, line: { color: FAIXA } });
-    sl.addShape('rect', { x: 0, y: 0.95, w: 13.333, h: 0.04, fill: { color: LIMA }, line: { color: LIMA } });
+    sl.background = { color: 'FFFFFF' };
+    sl.addShape('rect', { x: 0, y: 0, w: 13.333, h: 0.95, fill: { color: VERDE }, line: { color: VERDE } });
     // logo da empresa do usuário no cantinho (caixa branca), e o título logo depois
     var tx = 0.45;
     if (LOGO) {
@@ -488,9 +474,9 @@ const SCRIPT_PPT = String.raw`
       tx = lg.x + lg.w + 0.3;
     }
     sl.addText(titulo, { x: tx, y: 0.12, w: 10.05 - tx, h: 0.72, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Arial', valign: 'middle', fit: 'shrink' });
-    if (sub) sl.addText(sub, { x: 9.8, y: 0.12, w: 3.1, h: 0.72, fontSize: 13, color: LIMA, fontFace: 'Arial', align: 'right', valign: 'middle' });
+    if (sub) sl.addText(sub, { x: 9.8, y: 0.12, w: 3.1, h: 0.72, fontSize: 13, color: 'FFFFFF', fontFace: 'Arial', align: 'right', valign: 'middle' });
     sl.addText(D.empresa + '  ·  ' + D.fazenda, { x: 0.45, y: 7.08, w: 9, h: 0.3, fontSize: 9, color: CINZA, fontFace: 'Arial' });
-    sl.addText('AMVS Relatório de Campo', { x: 9.4, y: 7.08, w: 3.5, h: 0.3, fontSize: 9, color: LIMA, bold: true, fontFace: 'Arial', align: 'right' });
+    sl.addText('AMVS Relatório de Campo', { x: 9.4, y: 7.08, w: 3.5, h: 0.3, fontSize: 9, color: VERDE, bold: true, fontFace: 'Arial', align: 'right' });
   }
   async function gerar(){
     await lib();
@@ -504,7 +490,10 @@ const SCRIPT_PPT = String.raw`
     await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
 
     // capa "Mapa Tech": fundo escuro com grade fina, contorno da fazenda em verde-limão à direita
-    var c = P.addSlide(); grade(c);
+    var NOITE = '0A2016', LIMA = 'A3E635', GRADE = '10301F';
+    var c = P.addSlide(); c.background = { color: NOITE };
+    for (var gx = 0; gx <= 13.4; gx += 0.55) c.addShape('line', { x: gx, y: 0, w: 0, h: 7.5, line: { color: GRADE, width: 0.5 } });
+    for (var gy = 0; gy <= 7.5; gy += 0.55) c.addShape('line', { x: 0, y: gy, w: 13.333, h: 0, line: { color: GRADE, width: 0.5 } });
     var svgCapa = document.querySelector('.mapa > svg'), mc = svgCapa ? await svgContorno(svgCapa, 1600) : null;
     if (mc) {
       c.addImage(caber(mc, 6.75, 0.85, 6.3, 4.0));
@@ -539,7 +528,7 @@ const SCRIPT_PPT = String.raw`
     if (svgGeral) {
       btn.textContent = 'Gerando… mapas';
       var mg = await svgImagem(svgGeral, 2000);
-      if (mg) { var sm = P.addSlide(); faixa(sm, 'Mapa da fazenda', D.area); cartao(sm, mg, 0.45, 1.2, 12.43, 5.75); }
+      if (mg) { var sm = P.addSlide(); faixa(sm, 'Mapa da fazenda', D.area); sm.addImage(caber(mg, 0.45, 1.15, 12.4, 5.8)); }
     }
     // mapa por variedade, com a legenda ao lado
     var svgVar = document.querySelector('.mapa-cli svg');
@@ -547,7 +536,7 @@ const SCRIPT_PPT = String.raw`
       var mv = await svgImagem(svgVar, 2000);
       if (mv) {
         var sv = P.addSlide(); faixa(sv, 'Mapa por variedade', D.safra);
-        cartao(sv, mv, 0.45, 1.2, 8.9, 5.75);
+        sv.addImage(caber(mv, 0.45, 1.15, 8.9, 5.8));
         var leg = [];
         [].slice.call(document.querySelectorAll('.leg-var .lv-g')).forEach(function(gr){
           var cat = gr.querySelector('.lv-c');
@@ -573,11 +562,11 @@ const SCRIPT_PPT = String.raw`
         if (linhas.length) se.addText(linhas, { x: 0.5, y: 1.1, w: 12.3, h: 0.95, fontFace: 'Arial', valign: 'top' });
         var ev = []; try { ev = JSON.parse(document.getElementById('plDados').textContent); } catch (e) {}
         var comTabela = ev.length && ev.length <= 14;
-        cartao(se, ge, 0.45, 2.1, comTabela ? 7.9 : 12.43, 4.85);
+        se.addImage(caber(ge, 0.45, 2.1, comTabela ? 7.9 : 12.4, 4.85));
         if (comTabela) {
           var cabE = [['Data', 'Talhões', 'ha', 'Acumulado'].map(function(t){ return { text: t, options: { bold: true, color: 'FFFFFF', fill: { color: VERDE } } }; })];
           se.addTable(cabE.concat(ev.map(function(e){ return [e.d, e.tal, e.ha, e.cum + ' (' + e.pc + '%)']; })),
-            { x: 8.55, y: 2.1, w: 4.35, colW: [0.75, 1.5, 0.8, 1.3], fontSize: 10, fontFace: 'Arial', color: TEXTO, border: { type: 'solid', color: BORDA, pt: 1 } });
+            { x: 8.55, y: 2.1, w: 4.35, colW: [0.75, 1.5, 0.8, 1.3], fontSize: 10, fontFace: 'Arial', color: TEXTO, border: { type: 'solid', color: 'E4E9E6', pt: 1 } });
         }
       }
     }
@@ -606,7 +595,7 @@ const SCRIPT_PPT = String.raw`
         var f = fotos[fi], im = FOT[f.src] || null, sf = P.addSlide();
         faixa(sf, g.titulo, (g.area ? g.area + '  ·  ' : '') + 'foto ' + (fi + 1) + ' de ' + fotos.length);
         if (im) sf.addImage(caber(im, 0.45, 1.2, 8.4, 5.75));
-        else sf.addText('Foto indisponível', { x: 0.45, y: 1.2, w: 8.4, h: 5.75, align: 'center', color: CINZA, fontSize: 14, fill: { color: CLARO } });
+        else sf.addText('Foto indisponível', { x: 0.45, y: 1.2, w: 8.4, h: 5.75, align: 'center', color: CINZA, fontSize: 14, fill: { color: 'F2F4F2' } });
         sf.addShape('rect', { x: 9.1, y: 1.2, w: 3.8, h: 5.75, fill: { color: CLARO }, line: { color: CLARO } });
         sf.addText([
           { text: f.quando || '', options: { fontSize: 13, color: CINZA, breakLine: true } },
@@ -621,22 +610,21 @@ const SCRIPT_PPT = String.raw`
       sa.addText([{ text: a.quando, options: { fontSize: 16, bold: true, color: ESCURO, breakLine: true } },
         { text: 'Talhões: ' + a.talhoes + (a.ha ? '  ·  ' + a.ha : ''), options: { fontSize: 14, color: TEXTO, breakLine: true } },
         { text: a.calda || '', options: { fontSize: 13, color: CINZA, breakLine: true } },
-        { text: a.prox || '', options: { fontSize: 13, color: LIMA, bold: true } }],
+        { text: a.prox || '', options: { fontSize: 13, color: VERDE, bold: true } }],
         { x: 0.6, y: 1.2, w: 12.1, h: 1.6, fontFace: 'Arial', valign: 'top' });
       var cab = [['Produto', 'Dose/ha', 'Total'].map(function(t){ return { text: t, options: { bold: true, color: 'FFFFFF', fill: { color: VERDE } } }; })];
       sa.addTable(cab.concat(a.prods.map(function(p){ return [p[0], p[1], p[2] || '—']; })),
-        { x: 0.6, y: 3.0, w: 12.1, colW: [6.5, 2.8, 2.8], fontSize: 14, fontFace: 'Arial', color: TEXTO, border: { type: 'solid', color: BORDA, pt: 1 }, autoPage: true });
+        { x: 0.6, y: 3.0, w: 12.1, colW: [6.5, 2.8, 2.8], fontSize: 14, fontFace: 'Arial', color: TEXTO, border: { type: 'solid', color: 'E4E9E6', pt: 1 }, autoPage: true });
     });
 
     // encerramento
-    var fz = P.addSlide(); grade(fz);
-    fz.addShape('rect', { x: 0.75, y: 1.72, w: 0.07, h: 0.78, fill: { color: LIMA }, line: { color: LIMA } });
-    fz.addText('Serviço concluído', { x: 0.98, y: 1.6, w: 11.5, h: 1, fontSize: 40, bold: true, color: 'FFFFFF', fontFace: 'Arial' });
+    var fz = P.addSlide(); fz.background = { color: VERDE };
+    fz.addText('Serviço concluído', { x: 0.75, y: 1.6, w: 11.8, h: 1, fontSize: 40, bold: true, color: 'FFFFFF', fontFace: 'Arial' });
     fz.addText([{ text: D.empresa, options: { bold: true, fontSize: 20, breakLine: true } }, { text: [D.cidade, D.contato].filter(Boolean).join('  ·  '), options: { fontSize: 14, breakLine: true } },
-      { text: 'Relatório completo, com vídeos e mapa de satélite: ' + location.href.split('?')[0], options: { fontSize: 12, color: LIMA } }],
+      { text: 'Relatório completo, com vídeos e mapa de satélite: ' + location.href.split('?')[0], options: { fontSize: 12, color: 'D6EEDD' } }],
       { x: 0.75, y: 2.8, w: 11.8, h: 1.8, color: 'FFFFFF', fontFace: 'Arial', valign: 'top' });
-    fz.addText([{ text: 'Gerado por ', options: { color: '8FB3A0' } }, { text: 'AMVS Tecnologia', options: { bold: true } },
-      { text: '  ·  WhatsApp (65) 99918-9847  ·  amvsdiretoria@gmail.com  ·  amvs.ia.br', options: { color: '8FB3A0' } }],
+    fz.addText([{ text: 'Gerado por ', options: { color: 'D6EEDD' } }, { text: 'AMVS Tecnologia', options: { bold: true } },
+      { text: '  ·  WhatsApp (65) 99918-9847  ·  amvsdiretoria@gmail.com  ·  amvs.ia.br', options: { color: 'D6EEDD' } }],
       { x: 0.75, y: 6.5, w: 11.8, h: 0.5, fontSize: 12, color: 'FFFFFF', fontFace: 'Arial' });
     return P.write({ outputType: 'blob' });
   }
