@@ -498,6 +498,17 @@ const SCRIPT_PPT = String.raw`
     im.onerror = function(){ ok(null); };
     im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(cl));
   } catch (err) { ok(null); } }); }
+  // fundo da capa (verde-noite com a grade fina) como imagem PNG, no formato que o PowerPoint aceita
+  function gradeFundo(cor, corLinha){ try {
+    var W = 1600, H = 900, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var x = cv.getContext('2d'); x.fillStyle = '#' + cor; x.fillRect(0, 0, W, H);
+    x.strokeStyle = '#' + corLinha; x.lineWidth = 1.2; x.beginPath();
+    var passo = W * 0.55 / 13.333;
+    for (var gx = 0; gx <= W; gx += passo) { x.moveTo(Math.round(gx) + 0.5, 0); x.lineTo(Math.round(gx) + 0.5, H); }
+    for (var gy = 0; gy <= H; gy += passo) { x.moveTo(0, Math.round(gy) + 0.5); x.lineTo(W, Math.round(gy) + 0.5); }
+    x.stroke();
+    return cv.toDataURL('image/png').replace(/^data:/, '');
+  } catch (e) { return ''; } }
   function hex(cor){ var m = String(cor || '').match(/\d+/g); return m && m.length >= 3 ? m.slice(0, 3).map(function(n){ return ('0' + Number(n).toString(16)).slice(-2); }).join('').toUpperCase() : '999999'; }
   function caber(im, x, y, bw, bh){ var e = Math.min(bw / im.w, bh / im.h), w = im.w * e, h = im.h * e; return { data: im.data, x: x + (bw - w) / 2, y: y + (bh - h) / 2, w: w, h: h }; }
   function faixa(sl, titulo, sub){
@@ -530,9 +541,10 @@ const SCRIPT_PPT = String.raw`
 
     // capa "Mapa Tech": fundo escuro com grade fina, contorno da fazenda em verde-limão à direita
     var NOITE = '0A2016', LIMA = 'A3E635', GRADE = '10301F';
-    var c = P.addSlide(); c.background = { color: NOITE };
-    for (var gx = 0; gx <= 13.4; gx += 0.55) c.addShape('line', { x: gx, y: 0, w: 0, h: 7.5, line: { color: GRADE, width: 0.5 } });
-    for (var gy = 0; gy <= 7.5; gy += 0.55) c.addShape('line', { x: 0, y: gy, w: 13.333, h: 0, line: { color: GRADE, width: 0.5 } });
+    // a grade fina vai desenhada numa imagem de fundo: com dezenas de linhas soltas, o visualizador do iPhone
+    // (e o do WhatsApp) desenhava as linhas da capa por cima das fotos dos slides seguintes
+    var c = P.addSlide(), fundo = gradeFundo(NOITE, GRADE);
+    c.background = fundo ? { data: fundo } : { color: NOITE };
     var svgCapa = document.querySelector('.mapa > svg'), mc = svgCapa ? await svgContorno(svgCapa, 1600) : null;
     if (mc) {
       c.addImage(caber(mc, 6.75, 0.85, 6.3, 4.0));
@@ -556,7 +568,7 @@ const SCRIPT_PPT = String.raw`
     var info = [['PRODUTOR', D.produtor], ['SAFRA', D.safra], ['PERÍODO', D.periodo], ['RESPONSÁVEL', D.responsavel]];
     info.forEach(function(it, i){
       var ix = 0.75 + i * 1.95;
-      if (i) c.addShape('line', { x: ix - 0.15, y: 5.15, w: 0, h: 0.8, line: { color: '24513A', width: 1 } });
+      if (i) c.addShape('rect', { x: ix - 0.155, y: 5.15, w: 0.012, h: 0.8, fill: { color: '24513A' }, line: { color: '24513A', width: 0 } });
       c.addText([{ text: it[0], options: { fontSize: 9, color: LIMA, bold: true, charSpacing: 2, breakLine: true } }, { text: it[1] || '—', options: { fontSize: 14, bold: true, color: 'FFFFFF' } }],
         { x: ix, y: 5.1, w: 1.85, h: 0.95, fontFace: 'Arial', valign: 'top' });
     });
@@ -647,7 +659,7 @@ const SCRIPT_PPT = String.raw`
         var s2 = P.addSlide(); faixa(s2, 'Observações gerais', '');
         var mc = (AREA_W - 0.4) / 2;
         caixa(s2, pars.slice(0, corte), f2, 0.55, mc);
-        s2.addShape('line', { x: 0.55 + mc + 0.2, y: 1.3, w: 0, h: AREA_H - 0.2, line: { color: 'D5DED9', width: 1 } });
+        s2.addShape('rect', { x: 0.55 + mc + 0.194, y: 1.3, w: 0.012, h: AREA_H - 0.2, fill: { color: 'D5DED9' }, line: { color: 'D5DED9', width: 0 } });
         caixa(s2, pars.slice(corte).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; }), f2, 0.55 + mc + 0.4, mc);
       } else {
         // texto muito grande: vários slides em duas colunas, letra 10
