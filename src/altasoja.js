@@ -14,7 +14,7 @@ import { enviarParaConta } from './push.js';
 import { resumosDe, lerResumo } from './resumokml.js';
 
 const CHAVE = 'alta:soja';
-const DIAS = 30, MIN_HIST = 10, PASSO = 1;   // máxima de 30 dias; precisa de 10 fechamentos antes; R$ 1,00 entre avisos
+const DIAS = 30, MIN_HIST = 8, PASSO = 1;   // máxima de 30 dias; precisa de 8 fechamentos antes (a fonte do porto mostra uns 9 dias; o resto o histórico guarda); R$ 1,00 entre avisos
 const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const r2 = (v) => Math.round(v * 100) / 100;
 const brl = (v) => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
