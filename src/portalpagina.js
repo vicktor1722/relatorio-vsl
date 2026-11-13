@@ -284,7 +284,7 @@ body.sem-rolar{overflow:hidden}
     try {
       var r = await api('/api/portal/entrar', { login: $('#lgLogin').value, senha: $('#lgSenha').value });
       tok = r.token; try { localStorage.setItem(CH, tok); } catch (e) {}
-      $('#lgSenha').value = ''; await iniciar();
+      $('#lgSenha').value = ''; await iniciar(); convidarAlerta();
     } catch (e) { $('#lgMsg').textContent = e.message; }
     b.disabled = false;
   };
@@ -1451,6 +1451,30 @@ body.sem-rolar{overflow:hidden}
       : '📈 Receba no celular o <b>alerta de alta da soja</b>: quando o disponível da sua região ou o futuro 30/04 bater o maior valor dos últimos 30 dias.') +
       '</span><button class="btn" id="btnPush">' + (op ? 'Receber avisos' : 'Receber alerta') + '</button></div>';
   }
+  /* dono/gerente: ao abrir o portal, convite em destaque para ligar o alerta de alta da soja (o celular só liga
+     as notificações com o toque da própria pessoa). Se fechar sem ligar, pergunta de novo depois de 3 dias,
+     até 3 vezes. Com o aviso já liberado, não aparece. */
+  function convidarAlerta() {
+    try {
+      if (!eu || eu.papel === 'operador' || document.getElementById('veuAlerta')) return;
+      var K = CH + ':convite-alta', st = {}; try { st = JSON.parse(localStorage.getItem(K) || '{}'); } catch (e) { st = {}; }
+      if (st.n >= 3 || (st.em && Date.now() - st.em < 3 * 864e5)) return;
+      var ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      if (pushPossivel() && Notification.permission !== 'default') return;   // já liberado (ou bloqueado nos ajustes)
+      if (!pushPossivel() && !(ios && !instalado())) return;                  // navegador sem notificação
+      var v = document.createElement('div'); v.className = 'veu'; v.id = 'veuAlerta';
+      v.innerHTML = '<div class="folha"><div style="font-size:34px;line-height:1">📈</div><h3 style="margin:8px 0 6px">Alerta de alta da soja</h3>' +
+        '<div class="q" style="margin-bottom:12px">Receba no celular quando a soja bater o <b>maior valor dos últimos 30 dias</b>: o disponível da sua região e o futuro 30/04.</div>' +
+        (pushPossivel()
+          ? '<button class="btn" id="alSim">🔔 Ativar o alerta</button>'
+          : '<div class="push" style="margin-bottom:10px">No iPhone: toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra pelo ícone <b>AMVS Fazenda</b>. Lá o portal pede para ativar.</div>') +
+        '<button class="btn sec" id="alNao">Agora não</button></div>';
+      document.body.appendChild(v);
+      var fechar = function () { st.n = (st.n || 0) + 1; st.em = Date.now(); try { localStorage.setItem(K, JSON.stringify(st)); } catch (e) {} v.remove(); };
+      v.querySelector('#alNao').onclick = fechar;
+      var sim = v.querySelector('#alSim'); if (sim) sim.onclick = function () { st.n = 3; try { localStorage.setItem(K, JSON.stringify(st)); } catch (e) {} v.remove(); ativarAvisos(); };
+    } catch (e) { /* sem convite */ }
+  }
   function chaveBytes(b) { var x = String(b).replace(/-/g, '+').replace(/_/g, '/'), bin = atob(x + '==='.slice((x.length + 3) % 4)), o = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return o; }
   async function assinarPush() {
     var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
@@ -1477,6 +1501,7 @@ body.sem-rolar{overflow:hidden}
     if (eu) {   // operador (aplicações) e gerente (alerta de alta da soja): renova a assinatura do aviso
       if (pushPossivel() && Notification.permission === 'granted' && navigator.onLine) assinarPush().catch(function () {});
     }
+    convidarAlerta();
   }).catch(function (e) {
     if (e && e.rede) { $('#telaLogin').classList.add('oculto'); $('#telaApp').classList.remove('oculto'); $('#conteudo').innerHTML = '<div class="vazio">Sem internet e o portal ainda não foi aberto neste celular com sinal. Abra uma vez com internet.</div>'; }
   });
