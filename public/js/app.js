@@ -241,16 +241,56 @@
   }
   function hojeISO() { return diaISO(); }
 
+  /* Visita nova na mesma conversa: antes do 1º registro pergunta a safra (primeiro) e o motivo da visita.
+     Texto pode cancelar (a mensagem continua no campo); foto/vídeo/áudio não têm "cancelar" para o
+     arquivo não se perder. Várias fotos de uma vez esperam a mesma resposta. */
+  let perguntaVisita = null;
+  function perguntarNovaVisita(base, podeCancelar) {
+    if (perguntaVisita) return perguntaVisita;
+    perguntaVisita = new Promise(function (ok) {
+      const dados = (window.Conta && Conta.dados && Conta.dados()) || {};
+      const sp = function (x) { return window.Conta && Conta.safraPadrao ? Conta.safraPadrao(x) : String(x || ''); };
+      const atual = sp(base.safra || dados.safra_atual || '');
+      const nomes = (dados.safras || []).map(function (x) { return sp(x.nome); }).filter(Boolean);
+      if (atual && nomes.indexOf(atual) < 0) nomes.unshift(atual);
+      const motivos = {};
+      (st.visitas || []).forEach(function (v) { if (v.servico) motivos[v.servico] = 1; });
+      const veu = document.createElement('div'); veu.className = 'veu';
+      const folha = document.createElement('div'); folha.className = 'folha';
+      folha.innerHTML = '<div class="alca"></div>' +
+        '<h2 style="margin-top:0">Nova visita · ' + esc(dataCurta(hojeISO())) + '</h2>' +
+        '<div style="font-size:13px;color:#667781;margin:-4px 0 10px">' + esc(base.fazenda || '') + '</div>' +
+        '<div class="campo"><label>Safra</label><select id="nvSafra">' + (nomes.length ? nomes.map(function (n) {
+          return '<option' + (n === atual ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') : '<option value="">—</option>') + '</select></div>' +
+        '<div class="campo"><label>Motivo da visita</label><input id="nvMotivo" list="nvMotivos" autocomplete="off" placeholder="' +
+          esc(base.servico ? 'Ex.: ' + base.servico : 'Ex.: Avaliação de emergência, aplicação, monitoramento') + '">' +
+          '<datalist id="nvMotivos">' + Object.keys(motivos).map(function (m) { return '<option value="' + esc(m) + '">'; }).join('') + '</datalist></div>' +
+        '<button class="btn" id="nvOk">Começar a visita</button>' +
+        (podeCancelar ? '<button class="btn secundario" id="nvNao">Cancelar</button>' : '');
+      veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
+      const fim = function (r) { veu.remove(); folha.remove(); perguntaVisita = null; ok(r); };
+      folha.querySelector('#nvOk').onclick = function () {
+        fim({ safra: folha.querySelector('#nvSafra').value || base.safra || '', servico: folha.querySelector('#nvMotivo').value.trim() || base.servico || '' });
+      };
+      const nao = folha.querySelector('#nvNao'); if (nao) nao.onclick = function () { fim(null); };
+      setTimeout(function () { const m = folha.querySelector('#nvMotivo'); if (m) m.focus(); }, 200);
+    });
+    return perguntaVisita;
+  }
+
   // a visita que recebe os registros de agora; cria uma nova se a última foi fechada
-  async function visitaAberta() {
+  async function visitaAberta(tipo) {
     if (st.rel && !visitaFechada(st.rel)) return st.rel;
     const base = st.rel || (st.visitas && st.visitas[st.visitas.length - 1]);
     if (!base) { toast('Abra ou crie um relatório primeiro'); return null; }
+    const resp = await perguntarNovaVisita(base, tipo === 'texto');
+    if (!resp) return null;
+    if (st.rel && !visitaFechada(st.rel)) return st.rel;   // outra foto do mesmo lote já abriu a visita
     const novo = {
       id: novoId(),
       produtor_id: base.produtor_id || null, fazenda_id: base.fazenda_id || null,
       produtor: base.produtor || '', fazenda: base.fazenda || '',
-      safra: base.safra || '', servico: base.servico || '',
+      safra: resp.safra, servico: resp.servico,
       responsavel: base.responsavel || '', talhoes: base.talhoes || null,
       data_inicio: hojeISO(), data_fim: hojeISO(), observacoes: '',
       status: 'rascunho', criado_em: new Date().toISOString()
@@ -571,7 +611,7 @@
     if (!st.rel) { toast('Crie ou abra um relatório primeiro'); return null; }
     st.rolarFim = true;   // registro novo: a conversa desce até ele
     // visita fechada? abre uma nova na mesma conversa, com a data de hoje
-    const alvo = await visitaAberta();
+    const alvo = await visitaAberta(tipo);
     if (!alvo) return null;
     const t = talhaoAtual();
     const item = Object.assign({
