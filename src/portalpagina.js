@@ -1010,7 +1010,8 @@ body.sem-rolar{overflow:hidden}
     return { tot: tot, n: Object.keys(lotes).length, ult: ult };
   }
   // azul claro (pouca) → azul escuro (muita), relativo ao maior acumulado do período
-  function corChuva(mm, max) {
+  // (nome próprio: corChuva já é a escala da previsão de chuva no Início)
+  function corPluvio(mm, max) {
     var paradas = [[0, [214, 234, 248]], [0.35, [130, 186, 232]], [0.65, [52, 128, 204]], [1, [14, 47, 102]]], t = max > 0 ? Math.min(1, mm / max) : 0;
     for (var i = 1; i < paradas.length; i++) if (t <= paradas[i][0]) {
       var a = paradas[i - 1], b = paradas[i], u = (t - a[0]) / (b[0] - a[0] || 1);
@@ -1051,7 +1052,7 @@ body.sem-rolar{overflow:hidden}
     ligarAbas();
     var estilo = function (nm) {
       var mm = S.tot[nm] || 0, sel = PLV.sel.indexOf(nm) >= 0;
-      return { color: sel ? '#FFD400' : '#FFFFFF', weight: sel ? 4 : 2, fillColor: mm ? corChuva(mm, max) : '#9AA5A0', fillOpacity: mm ? 0.85 : 0.35 };
+      return { color: sel ? '#FFD400' : '#FFFFFF', weight: sel ? 4 : 2, fillColor: mm ? corPluvio(mm, max) : '#9AA5A0', fillOpacity: mm ? 0.85 : 0.35 };
     };
     var mm1 = desenharMapa($('#mapaChuva'), estilo, function () { return ''; }, function (nm) {
       var mm = S.tot[nm] || 0; return esc(nm) + '<small>' + (mm ? n(mm, mm % 1 ? 1 : 0) + ' mm' : '—') + '</small>';
