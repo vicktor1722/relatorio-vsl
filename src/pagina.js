@@ -20,7 +20,8 @@ body{margin:0;background:#F2F4F2;color:var(--texto);line-height:1.5;overflow-wra
 header.capa{background:var(--verde);color:#fff;padding:22px 22px 18px}
 header.capa .marca{display:flex;align-items:center;gap:12px}
 header.capa .logo{width:46px;height:46px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:22px;flex:none}
-header.capa img.logo{width:auto;max-width:120px;height:46px;object-fit:contain;background:#fff;padding:4px;border-radius:8px;display:block}
+header.capa img.logo{width:auto;max-width:210px;height:76px;object-fit:contain;background:#fff;padding:6px;border-radius:10px;display:block;flex:none}
+@media (max-width:420px){header.capa img.logo{height:68px;max-width:150px}}
 header.capa .marca b{display:block;font-size:14.5px}
 header.capa .marca span{font-size:11.5px;opacity:.85}
 header.capa .marca small{display:block;font-size:11.5px;opacity:.9;margin-top:2px}
@@ -402,6 +403,41 @@ const DICT = {
 // ---------- apresentação em PowerPoint (gerada no aparelho de quem abriu o relatório) ----------
 // A biblioteca só é baixada quando alguém toca no botão. Ao terminar de gerar, já abre para salvar/compartilhar;
 // se o celular bloquear (o toque ficou antigo enquanto gerava), aparece a folha "PowerPoint pronto" (um toque abre).
+// logo da empresa no cabeçalho: muitas imagens de logo vêm com uma margem branca (ou transparente) grande em volta
+// e o desenho aparecia pequeno. Aqui a margem é cortada no aparelho de quem abre, e o logo ocupa a caixa inteira.
+// O PowerPoint usa o mesmo logo já cortado. Se não der (imagem sem margem, erro), fica como veio.
+const SCRIPT_LOGO = String.raw`
+(function(){
+  var im = document.querySelector('header.capa img.logo'); if (!im) return;
+  function aparar(){
+    im.removeEventListener('load', aparar);
+    try {
+      var w = im.naturalWidth, h = im.naturalHeight; if (!w || !h) return;
+      var e = Math.min(1, 700 / Math.max(w, h)), c = document.createElement('canvas');
+      var W = c.width = Math.max(1, Math.round(w * e)), H = c.height = Math.max(1, Math.round(h * e));
+      var x = c.getContext('2d'); x.drawImage(im, 0, 0, W, H);
+      var d = x.getImageData(0, 0, W, H).data, x0 = W, y0 = H, x1 = -1, y1 = -1;
+      for (var yy = 0; yy < H; yy++) for (var xx = 0; xx < W; xx++) {
+        var k = (yy * W + xx) * 4;
+        if (d[k + 3] < 16) continue;                                        // transparente
+        if (d[k] > 240 && d[k + 1] > 240 && d[k + 2] > 240) continue;       // branco
+        if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy;
+      }
+      if (x1 < 0) return;                                                   // imagem toda branca: não mexe
+      var m = Math.round(Math.max(x1 - x0, y1 - y0) * 0.04) + 1;            // respiro pequeno em volta
+      x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(W - 1, x1 + m); y1 = Math.min(H - 1, y1 + m);
+      var bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      if (bw * bh > W * H * 0.85) return;                                   // quase sem margem: fica como veio
+      var o = document.createElement('canvas'); o.width = bw; o.height = bh;
+      var ox = o.getContext('2d'); ox.fillStyle = '#fff'; ox.fillRect(0, 0, bw, bh); ox.drawImage(c, x0, y0, bw, bh, 0, 0, bw, bh);
+      var url = o.toDataURL('image/png');
+      window.amvsLogoAparado = url; im.src = url;
+    } catch (err) {}
+  }
+  if (im.complete && im.naturalWidth) aparar(); else im.addEventListener('load', aparar);
+})();
+`;
+
 const SCRIPT_PPT = String.raw`
 (function(){
   var btn = document.getElementById('btnPpt'), D = null;
@@ -481,7 +517,7 @@ const SCRIPT_PPT = String.raw`
   async function gerar(){
     await lib();
     var P = new window.PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.title = D.titulo; P.company = D.empresa;
-    var logo = await imagem(D.logo, 600); LOGO = logo;
+    var logo = await imagem(window.amvsLogoAparado || D.logo, 600); LOGO = logo;
     // fotos preparadas 4 por vez (bem mais rápido que uma a uma)
     var FOT = {}, lista = [];
     D.grupos.forEach(function(g){ g.itens.forEach(function(i){ if (i.tipo === 'foto' && i.src && lista.indexOf(i.src) < 0) lista.push(i.src); }); });
@@ -1003,6 +1039,7 @@ ${BANDEIRA}</footer>
 ${ag ? '<script>' + AGRO_REL_JS + '</script>' : ''}
 <script>${ZAP_JS}${SCRIPT_IDIOMA.replace('__DICT__', () => JSON.stringify(DICT))}</script>
 <script type="application/json" id="pptDados">${JSON.stringify(pptDados).replace(/</g, '\\u003c')}</script>
+<script>${SCRIPT_LOGO}</script>
 <script>${SCRIPT_PPT}</script>
 </div></body></html>`;
 }
