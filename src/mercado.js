@@ -419,8 +419,8 @@ export async function futuroAgora(env) {
   const prem = f.brl_sc ? f.brl_sc / (f.usd_sc * f.ref.dolar) - 1 : 0;
   const fator = f.brl_sc && usd ? usd.preco * (1 + prem) : null;           // R$ por US$ (dólar a termo de agora)
   const conv = (c) => r2((c + base) * BU_SC * (fator || 1));
-  return { venc: f.venc, contrato: f.contrato, moeda: fator ? 'R$' : 'US$', preco: conv(zf.preco), cbot: zf.preco, dolar: usd ? usd.preco : null,
-    dias: (zf.dias || []).map((x) => ({ d: x[0], p: conv(x[1]) })) };
+  return { venc: f.venc, contrato: f.contrato, moeda: fator ? 'R$' : 'US$', preco: conv(zf.preco), cbot: zf.preco, em: zf.em,
+    dolar: usd ? usd.preco : null, dolar_var: usd ? usd.var : null, dias: (zf.dias || []).map((x) => ({ d: x[0], p: conv(x[1]) })) };
 }
 
 export function km(a, b) {
