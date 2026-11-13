@@ -5,6 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
+import { alertaAltaSoja, statusAlta } from './altasoja.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
 import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
@@ -301,6 +302,7 @@ export default {
       if (rota === '/api/status/armazenamento') return json(await raioX(env, url.searchParams.get('novo') === '1'));
       // preenche os resumos dos mapas que faltam (lotes pequenos; o cron também faz)
       if (rota === '/api/status/resumos') return json(await preencherResumos(env, 600000));
+      if (rota === '/api/status/alta') { if (env.ADMIN_KEY && url.searchParams.get('key') === env.ADMIN_KEY && url.searchParams.get('forcar')) return json(await alertaAltaSoja(env, true)); return json(await statusAlta(env)); }
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
@@ -971,7 +973,7 @@ export default {
   // crons (wrangler.toml): 5h00 de MT o aviso do operador; 5h40 o do consultor; 4h30 a chuva dos próximos 15 dias; a cada 15 min o aviso 2 h antes das visitas
   async scheduled(evento, env, ctx) {
     if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env).then(() => limparPdfs(env)).catch(() => {})); return; }
-    if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env).then(() => preencherResumos(env, 400000)).catch(() => {})); ctx.waitUntil(calibrarPontes1311(env).catch(() => {})); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
+    if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env).then(() => preencherResumos(env, 400000)).catch(() => {})); ctx.waitUntil(calibrarPontes1311(env).catch(() => {})); ctx.waitUntil(alertaAltaSoja(env).catch((e) => console.log('alerta de alta:', e.message))); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
   }
 };

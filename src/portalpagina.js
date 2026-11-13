@@ -773,10 +773,11 @@ body.sem-rolar{overflow:hidden}
     if (R.at) al.push('⏰<div><b>' + R.at + (R.at === 1 ? ' aplicação atrasada' : ' aplicações atrasadas') + '</b>: veja na aba Aplicações</div>');
     if (al.length) h += '<div class="ini-card"><div class="ini-ct"><h3>🔔 Atenção</h3></div>' + al.map(function (x) { return '<div class="ini-al">' + x + '</div>'; }).join('') + '</div>';
     var hAt = h;
-    h = hTopo + secao('Lavoura') + hLav + hAt + secao('Mercado') + cartaoMercado() + cartaoFormacao() + secao('Clima') + cartaoClima(false) + cartaoChuva() + (hCusto ? secao('Custos') + hCusto : '');
+    h = hTopo + cartaoPush() + secao('Lavoura') + hLav + hAt + secao('Mercado') + cartaoMercado() + cartaoFormacao() + secao('Clima') + cartaoClima(false) + cartaoChuva() + (hCusto ? secao('Custos') + hCusto : '');
     $('#conteudo').innerHTML = h;
     document.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { aba = b.dataset.ir; pintar(); window.scrollTo(0, 0); }; });
     var sl = document.getElementById('iniLoc'); if (sl) sl.onchange = function () { INI.loc = sl.value; iniCarregar(); };
+    var bpi = document.getElementById('btnPush'); if (bpi) bpi.onclick = ativarAvisos;
     ligarFormacao();
     ligarChuva();
   }
@@ -1438,13 +1439,17 @@ body.sem-rolar{overflow:hidden}
   function instalado() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
   function perguntado() { try { return !!localStorage.getItem(CH + ':push'); } catch (e) { return false; } }
   function cartaoPush() {
-    if (!eu || eu.papel !== 'operador' || perguntado()) return '';
+    if (!eu || perguntado()) return '';
     if (pushPossivel() && Notification.permission !== 'default') return '';
+    var op = eu.papel === 'operador';
     if (!pushPossivel()) {
       if (!/iPhone|iPad|iPod/.test(navigator.userAgent) || instalado()) return '';
-      return '<div class="push">🔔 Para receber às 5h o aviso das aplicações do dia: no Safari toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra pelo ícone <b>AMVS Fazenda</b>.</div>';
+      return '<div class="push">🔔 Para receber ' + (op ? 'às 5h o aviso das aplicações do dia' : 'o alerta de alta da soja') + ': no Safari toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra pelo ícone <b>AMVS Fazenda</b>.</div>';
     }
-    return '<div class="push"><span>🔔 Receba às 5h da manhã, no celular, as aplicações do dia — mesmo com o portal fechado.</span><button class="btn" id="btnPush">Receber avisos</button></div>';
+    // gerente/dono: alerta de alta da soja (disponível da região e futuro 30/04)
+    return '<div class="push"><span>' + (op ? '🔔 Receba às 5h da manhã, no celular, as aplicações do dia — mesmo com o portal fechado.'
+      : '📈 Receba no celular o <b>alerta de alta da soja</b>: quando o disponível da sua região ou o futuro 30/04 bater o maior valor dos últimos 30 dias.') +
+      '</span><button class="btn" id="btnPush">' + (op ? 'Receber avisos' : 'Receber alerta') + '</button></div>';
   }
   function chaveBytes(b) { var x = String(b).replace(/-/g, '+').replace(/_/g, '/'), bin = atob(x + '==='.slice((x.length + 3) % 4)), o = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return o; }
   async function assinarPush() {
@@ -1456,7 +1461,7 @@ body.sem-rolar{overflow:hidden}
     try { localStorage.setItem(CH + ':push', '1'); } catch (e) {}   // pergunta uma vez só
     Notification.requestPermission().then(async function (p) {
       if (p !== 'granted') { toast('Avisos bloqueados. Dá para liberar nos Ajustes do celular.'); pintar(); return; }
-      try { await assinarPush(); toast('🔔 Pronto! Às 5h chegam as aplicações do dia.'); } catch (e) { toast('Não deu para ligar os avisos: ' + e.message); }
+      try { await assinarPush(); toast(eu && eu.papel !== 'operador' ? '📈 Pronto! O alerta de alta da soja chega no celular.' : '🔔 Pronto! Às 5h chegam as aplicações do dia.'); } catch (e) { toast('Não deu para ligar os avisos: ' + e.message); }
       pintar();
     });
   }
@@ -1469,7 +1474,7 @@ body.sem-rolar{overflow:hidden}
   // sessão guardada: abre mesmo sem internet (dados do aparelho); só sai se o servidor recusar o login
   if (tok) iniciar().then(function () {
     if (eu) enviarFila();   // o que ficou guardado sem internet (operador ou gerente)
-    if (eu && eu.papel === 'operador') {
+    if (eu) {   // operador (aplicações) e gerente (alerta de alta da soja): renova a assinatura do aviso
       if (pushPossivel() && Notification.permission === 'granted' && navigator.onLine) assinarPush().catch(function () {});
     }
   }).catch(function (e) {

@@ -374,7 +374,7 @@ export async function salvarCalibracao(env, b) {
   return atual;
 }
 // preço calibrado para um local: ponto mais perto (até 150 km) e futuro (até 250 km de algum ponto)
-function calibrado(m, cal, local) {
+export function calibrado(m, cal, local) {
   if (!cal || !local) return null;
   let pt = null, dmin = Infinity;
   (cal.pontos || []).forEach((p) => { const d = km([local.lat, local.lon], [p.lat, p.lon]); if (d < dmin) { dmin = d; pt = p; } });
@@ -409,7 +409,7 @@ function calibrado(m, cal, local) {
   return out.disp || out.futuro ? out : null;
 }
 
-function km(a, b) {
+export function km(a, b) {
   const R = 6371, rad = Math.PI / 180, dLa = (b[0] - a[0]) * rad, dLo = (b[1] - a[1]) * rad;
   const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLo / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
