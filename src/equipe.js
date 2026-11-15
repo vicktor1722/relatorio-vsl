@@ -106,7 +106,7 @@ export async function timeline(env, me, adm, antes) {
   const ids = await contasVisiveis(env, me, adm);
   const filtro = ids ? ' AND r.usuario_id IN (' + marcas(ids) + ')' : '';
   const corte = /^\d{4}-\d{2}-\d{2}/.test(String(antes || '')) ? String(antes) : '9999';
-  const { results: rels } = await env.DB.prepare(`SELECT r.id, r.usuario_id, r.fazenda, r.produtor, r.servico, r.status, r.data_inicio, r.observacoes,
+  const { results: rels } = await env.DB.prepare(`SELECT r.id, r.usuario_id, r.fazenda, r.produtor, r.servico, r.responsavel, r.status, r.data_inicio, r.observacoes,
         COALESCE(r.publicado_em, r.atualizado_em, r.criado_em) AS quando, u.nome AS autor, u.email AS autor_email
       FROM relatorios r LEFT JOIN usuarios u ON u.id = r.usuario_id
      WHERE COALESCE(r.publicado_em, r.atualizado_em, r.criado_em) < ?${filtro}
@@ -125,6 +125,7 @@ export async function timeline(env, me, adm, antes) {
     return {
       id: r.id, fazenda: r.fazenda || 'Relatório', produtor: r.produtor || '', servico: r.servico || '', status: r.status,
       data: r.data_inicio || String(r.quando || '').slice(0, 10), quando: r.quando, autor: r.autor || r.autor_email || '',
+      responsavel: String(r.responsavel || '').trim(),
       link: r.status === 'publicado' ? '/r/' + r.id : null,
       pode_corrigir: !!(adm || r.usuario_id === me.id || (eq && eq.papel === 'adm' && eq.ids.includes(r.usuario_id))),
       obs: [r.observacoes].concat(l.filter((i) => i.tipo === 'texto').map((i) => i.legenda)).map((t) => String(t || '').trim()).filter(Boolean),
