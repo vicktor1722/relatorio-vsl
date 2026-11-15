@@ -5,7 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
-import { criarComum, definirAdm, lerCorrecao, listarEquipe, salvarCorrecao, timeline } from './equipe.js';
+import { apagarComentario, comentar, compartilhou, contarNaoLidas, criarComum, curtir, definirAdm, lerCorrecao, listarEquipe, marcarLidas, notificacoes, salvarCorrecao, timeline } from './equipe.js';
 import { alertaAltaSoja, statusAlta } from './altasoja.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
@@ -544,6 +544,12 @@ export default {
           if (rota === '/api/admin/equipe' && req.method === 'GET') return json(await listarEquipe(env, me));
           if (rota === '/api/admin/equipe/usuario' && req.method === 'POST') return json(await criarComum(env, me, await req.json()));
           if (rota === '/api/admin/timeline') return json(await timeline(env, me, adm, url.searchParams.get('antes')));
+          if (rota === '/api/admin/curtir' && req.method === 'POST') return json(await curtir(env, me, adm, (await req.json()).id));
+          if (rota === '/api/admin/comentar' && req.method === 'POST') { const b = await req.json(); return json(await comentar(env, me, adm, b.id, b.texto)); }
+          if (rota === '/api/admin/comentario/apagar' && req.method === 'POST') return json(await apagarComentario(env, me, adm, (await req.json()).id));
+          if (rota === '/api/admin/compartilhou' && req.method === 'POST') return json(await compartilhou(env, me, adm, (await req.json()).id));
+          if (rota === '/api/admin/notificacoes' && req.method === 'GET') return json(url.searchParams.get('so') === 'n' ? await contarNaoLidas(env, me) : await notificacoes(env, me));
+          if (rota === '/api/admin/notificacoes/lidas' && req.method === 'POST') return json(await marcarLidas(env, me));
           if (rota === '/api/admin/corrigir' && req.method === 'GET') return json(await lerCorrecao(env, me, adm, url.searchParams.get('id') || ''));
           if (rota === '/api/admin/corrigir' && req.method === 'POST') { const r = await salvarCorrecao(env, me, adm, await req.json()); await mudouDados(env).catch(() => {}); return json(r); }
         } catch (e) { return json({ erro: e.message }, 400); }

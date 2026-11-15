@@ -132,6 +132,8 @@ export async function timeline(env, me, adm, antes) {
       midias: l.filter((i) => i.tipo !== 'texto').slice(0, 30).map((i) => ({ tipo: i.tipo, src: '/img/' + encodeURIComponent(i.midia), legenda: i.legenda || '', talhao: i.talhao || '', hora: i.capturado_em }))
     };
   });
+  const soc = await socialDosPosts(env, me, posts.map((p) => p.id)).catch(() => ({}));
+  posts.forEach((p) => Object.assign(p, soc[p.id] || { curtidas: 0, eu_curti: false, curtiu: [], comentarios: [] }));
   return { ok: true, posts, mais: lista.length === 8 ? lista[lista.length - 1].quando : null };
 }
 
@@ -161,4 +163,120 @@ export async function salvarCorrecao(env, me, adm, b) {
   }
   if (cmds.length) await env.DB.batch(cmds);
   return { ok: true, itens: lista.length };
+}
+
+/* ============================================================
+   curtir, comentar e compartilhar na timeline + notificações (sininho do painel)
+   Quem pode: quem vê o relatório (a própria equipe; o administrador geral vê todos).
+   Quem recebe a notificação: o autor do relatório e o Adm da equipe dele, menos quem fez a ação.
+   ============================================================ */
+let socialPronto = false;
+async function garantirSocial(env) {
+  if (socialPronto) return;
+  await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS tl_curtida (relatorio_id TEXT NOT NULL, usuario_id TEXT NOT NULL, criado_em TEXT, PRIMARY KEY (relatorio_id, usuario_id))'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS tl_comentario (id TEXT PRIMARY KEY, relatorio_id TEXT NOT NULL, usuario_id TEXT NOT NULL, texto TEXT NOT NULL, criado_em TEXT)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS tl_com_rel ON tl_comentario (relatorio_id, criado_em)'),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS tl_notif (id TEXT PRIMARY KEY, para_id TEXT NOT NULL, de_id TEXT, de_nome TEXT, tipo TEXT NOT NULL,
+      relatorio_id TEXT, fazenda TEXT, texto TEXT, criado_em TEXT, lida INTEGER DEFAULT 0)`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS tl_notif_para ON tl_notif (para_id, criado_em)')
+  ]);
+  socialPronto = true;
+}
+// relatório que esta conta pode ver (para curtir/comentar/compartilhar)
+async function relVisivel(env, me, adm, id) {
+  const r = await env.DB.prepare('SELECT id, usuario_id, fazenda, status FROM relatorios WHERE id = ?').bind(String(id || '').slice(0, 60)).first();
+  if (!r) throw new Error('relatório não encontrado');
+  if (!adm && !(await equipeDe(env, me.id)).ids.includes(r.usuario_id)) throw new Error('este relatório não é da sua equipe');
+  return r;
+}
+async function nomeDe(env, id) { const u = await env.DB.prepare('SELECT nome, email FROM usuarios WHERE id = ?').bind(id).first(); return u ? (u.nome || String(u.email).split('@')[0]) : ''; }
+async function notificar(env, me, r, tipo, texto) {
+  const dono = await equipeDe(env, r.usuario_id);
+  const para = [...new Set([r.usuario_id, dono.adm_id].filter(Boolean))].filter((x) => x !== me.id);
+  if (!para.length) return;
+  const nome = await nomeDe(env, me.id), em = new Date().toISOString();
+  await env.DB.batch(para.map((p) => env.DB.prepare('INSERT INTO tl_notif (id, para_id, de_id, de_nome, tipo, relatorio_id, fazenda, texto, criado_em, lida) VALUES (?,?,?,?,?,?,?,?,?,0)')
+    .bind(novoId('n'), p, me.id, nome, tipo, r.id, r.fazenda || '', texto || null, em)));
+}
+
+export async function curtir(env, me, adm, id) {
+  await garantirSocial(env);
+  const r = await relVisivel(env, me, adm, id);
+  const ja = await env.DB.prepare('SELECT 1 FROM tl_curtida WHERE relatorio_id = ? AND usuario_id = ?').bind(r.id, me.id).first();
+  if (ja) await env.DB.prepare('DELETE FROM tl_curtida WHERE relatorio_id = ? AND usuario_id = ?').bind(r.id, me.id).run();
+  else {
+    await env.DB.prepare('INSERT INTO tl_curtida (relatorio_id, usuario_id, criado_em) VALUES (?,?,?)').bind(r.id, me.id, new Date().toISOString()).run();
+    // curtiu, descurtiu e curtiu de novo: não repete a notificação ainda não lida
+    const rep = await env.DB.prepare("SELECT 1 FROM tl_notif WHERE de_id = ? AND relatorio_id = ? AND tipo = 'curtiu' AND lida = 0").bind(me.id, r.id).first();
+    if (!rep) await notificar(env, me, r, 'curtiu');
+  }
+  const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM tl_curtida WHERE relatorio_id = ?').bind(r.id).first()).n;
+  return { ok: true, curtiu: !ja, curtidas: n };
+}
+
+export async function comentar(env, me, adm, id, texto) {
+  await garantirSocial(env);
+  const r = await relVisivel(env, me, adm, id);
+  const t = String(texto || '').trim().slice(0, 1000);
+  if (!t) throw new Error('escreva o comentário');
+  const c = { id: novoId('c'), texto: t, criado_em: new Date().toISOString(), autor: await nomeDe(env, me.id), meu: true };
+  await env.DB.prepare('INSERT INTO tl_comentario (id, relatorio_id, usuario_id, texto, criado_em) VALUES (?,?,?,?,?)').bind(c.id, r.id, me.id, t, c.criado_em).run();
+  await notificar(env, me, r, 'comentou', t.slice(0, 140));
+  return { ok: true, comentario: c };
+}
+
+export async function apagarComentario(env, me, adm, cid) {
+  await garantirSocial(env);
+  const c = await env.DB.prepare('SELECT id, usuario_id FROM tl_comentario WHERE id = ?').bind(String(cid || '').slice(0, 60)).first();
+  if (!c) throw new Error('comentário não encontrado');
+  if (!adm && c.usuario_id !== me.id) throw new Error('só dá para apagar o próprio comentário');
+  await env.DB.prepare('DELETE FROM tl_comentario WHERE id = ?').bind(c.id).run();
+  return { ok: true };
+}
+
+export async function compartilhou(env, me, adm, id) {
+  await garantirSocial(env);
+  const r = await relVisivel(env, me, adm, id);
+  await notificar(env, me, r, 'compartilhou');
+  return { ok: true };
+}
+
+export async function notificacoes(env, me) {
+  await garantirSocial(env);
+  const { results } = await env.DB.prepare('SELECT id, de_nome, tipo, relatorio_id, fazenda, texto, criado_em, lida FROM tl_notif WHERE para_id = ? ORDER BY criado_em DESC LIMIT 60').bind(me.id).all();
+  const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM tl_notif WHERE para_id = ? AND lida = 0').bind(me.id).first()).n;
+  // foto do relatório para a miniatura
+  const ids = [...new Set((results || []).map((x) => x.relatorio_id).filter(Boolean))];
+  const fotos = {};
+  if (ids.length) {
+    const { results: fs } = await env.DB.prepare(`SELECT relatorio_id, midia FROM itens WHERE tipo = 'foto' AND midia IS NOT NULL AND relatorio_id IN (${ids.map(() => '?').join(',')}) ORDER BY capturado_em`).bind(...ids).all();
+    (fs || []).forEach((f) => { if (!fotos[f.relatorio_id]) fotos[f.relatorio_id] = '/img/' + encodeURIComponent(f.midia); });
+  }
+  return { ok: true, nao_lidas: n, lista: (results || []).map((x) => Object.assign(x, { foto: fotos[x.relatorio_id] || '' })) };
+}
+export async function contarNaoLidas(env, me) {
+  await garantirSocial(env);
+  return { ok: true, nao_lidas: (await env.DB.prepare('SELECT COUNT(*) AS n FROM tl_notif WHERE para_id = ? AND lida = 0').bind(me.id).first()).n };
+}
+export async function marcarLidas(env, me) {
+  await garantirSocial(env);
+  await env.DB.prepare('UPDATE tl_notif SET lida = 1 WHERE para_id = ? AND lida = 0').bind(me.id).run();
+  return { ok: true };
+}
+
+// curtidas e comentários dos posts da timeline
+export async function socialDosPosts(env, me, ids) {
+  await garantirSocial(env);
+  if (!ids.length) return {};
+  const q = ids.map(() => '?').join(',');
+  const [cu, co] = await Promise.all([
+    env.DB.prepare(`SELECT c.relatorio_id, c.usuario_id, u.nome, u.email FROM tl_curtida c LEFT JOIN usuarios u ON u.id = c.usuario_id WHERE c.relatorio_id IN (${q}) ORDER BY c.criado_em`).bind(...ids).all(),
+    env.DB.prepare(`SELECT c.id, c.relatorio_id, c.usuario_id, c.texto, c.criado_em, u.nome, u.email FROM tl_comentario c LEFT JOIN usuarios u ON u.id = c.usuario_id WHERE c.relatorio_id IN (${q}) ORDER BY c.criado_em`).bind(...ids).all()
+  ]);
+  const out = {};
+  ids.forEach((id) => { out[id] = { curtidas: 0, eu_curti: false, curtiu: [], comentarios: [] }; });
+  (cu.results || []).forEach((c) => { const o = out[c.relatorio_id]; o.curtidas++; if (c.usuario_id === me.id) o.eu_curti = true; o.curtiu.push(c.nome || String(c.email || '').split('@')[0]); });
+  (co.results || []).forEach((c) => { out[c.relatorio_id].comentarios.push({ id: c.id, texto: c.texto, criado_em: c.criado_em, autor: c.nome || String(c.email || '').split('@')[0], meu: c.usuario_id === me.id }); });
+  return out;
 }
