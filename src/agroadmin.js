@@ -709,6 +709,7 @@ ${MAPA_CHUVA_JS}
     if (DP.faz && !DP.faz.length) DP.faz = null;
     var S = dpFiltrado(S0);
     var pc = S.total_ha ? S.plantado_ha / S.total_ha * 100 : 0;
+    var nFz = S.fazendas.reduce(function (a, f) { return a + (f.n || 1); }, 0);   // "Demais usuários" junta várias fazendas
     var sel = '<select id="dpSafra" aria-label="Safra">' + DP.dados.safras.map(function (s) {
       return '<option value="' + esc(s.safra) + '"' + (s.safra === DP.safra ? ' selected' : '') + '>Safra ' + esc(s.safra) + '</option>'; }).join('') + '</select>';
     var h = '<div class="cab-caixa"><h2>' + (DP.dados.propria ? 'Evolução do plantio' : 'Plantio das áreas') + '</h2>' + sel + '</div>';
@@ -728,7 +729,7 @@ ${MAPA_CHUVA_JS}
     }
     h += '<div class="dp-kpis"><div class="dp-k"><b>' + dpN(pc, 1) + '%</b><span>plantado</span></div>' +
       '<div class="dp-k"><b>' + dpN(S.plantado_ha) + ' <small>ha</small></b><span>de ' + dpN(S.total_ha) + ' ha</span></div>' +
-      '<div class="dp-k"><b>' + S.fazendas.length + '</b><span>' + (S.fazendas.length === 1 ? 'fazenda com plantio' : 'fazendas com plantio') + '</span></div>' +
+      '<div class="dp-k"><b>' + nFz + '</b><span>' + (nFz === 1 ? 'fazenda com plantio' : 'fazendas com plantio') + '</span></div>' +
       '<div class="dp-k"><b>' + S.variedades.length + '</b><span>' + (S.variedades.length === 1 ? 'variedade' : 'variedades') + '</span></div></div>';
     h += '<div class="dp-barra"><i style="width:' + Math.min(100, pc).toFixed(1) + '%"></i></div>';
     if (S.fora_ha) h += '<p class="nota">Pastagem e pousio ficam fora da área de plantio: ' + dpN(S.fora_ha) + ' ha.</p>';
@@ -751,7 +752,7 @@ ${MAPA_CHUVA_JS}
 
     // "Por fazenda" fica recolhido (a lista é longa); o painel lembra se a pessoa deixou aberto
     var fzAberto = !!DP.fazAberto;   // ao abrir o painel vem recolhido
-    h += '<details class="dp-det" id="dpFaz"' + (fzAberto ? ' open' : '') + '><summary><h3 class="dp-t">Por fazenda <span>' + S.fazendas.length + (S.fazendas.length === 1 ? ' fazenda' : ' fazendas') + '</span></h3><em></em></summary>' +
+    h += '<details class="dp-det" id="dpFaz"' + (fzAberto ? ' open' : '') + '><summary><h3 class="dp-t">Por fazenda <span>' + nFz + (nFz === 1 ? ' fazenda' : ' fazendas') + '</span></h3><em></em></summary>' +
       '<div class="rolagem"><table class="dp-tab"><tr><th>Fazenda</th><th>Andamento</th><th>Período</th><th>Variedades</th></tr>' +
       S.fazendas.map(function (f) {
         var p = f.total_ha ? f.plantado_ha / f.total_ha * 100 : 0;
