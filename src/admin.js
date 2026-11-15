@@ -11,7 +11,7 @@ import { contagemAcessos } from './acessos.js';
 import { espaco } from './midia.js';
 import { TERMOS_VERSAO, garantirTermos } from './termos.js';
 import { AGRO_ABAS, AGRO_CSS, AGRO_JS, AGRO_PAINEIS } from './agroadmin.js';
-import { equipeDe, garantirEquipe } from './equipe.js';
+import { equipeDe, garantirEquipe, contasDoAdmin } from './equipe.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -486,13 +486,15 @@ export async function webhookPicPay(env, req) {
 export async function resumoAdmin(env, me, adm) {
   // conta comum: enxerga o que é dela e da equipe (Adm e colegas); administrador enxerga tudo
   await garantirEquipe(env).catch(() => {});
+  // administrador geral: os dados só da conta dele, da equipe e das contas criadas com "visualizar dados";
+  // das demais, só os números (quantidade de relatórios) na lista de contas
   const eq = adm ? null : await equipeDe(env, me.id).catch(() => ({ ids: [me.id], papel: null }));
-  const ids = adm ? [] : eq.ids;
-  const meu = adm ? '' : ' AND r.usuario_id IN (' + ids.map(() => '?').join(',') + ')';
-  const arg = adm ? [] : ids;
+  const ids = adm ? await contasDoAdmin(env, me).catch(() => [me.id]) : eq.ids;
+  const meu = ' AND r.usuario_id IN (' + ids.map(() => '?').join(',') + ')';
+  const arg = ids;
   await garantirTermos(env).catch(() => {});
   const contas = await env.DB.prepare(`
-    SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin, u.papel, u.cota, u.equipe_id,
+    SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin, u.papel, u.cota, u.equipe_id, COALESCE(u.admin_ve,0) AS admin_ve,
            (SELECT t.aceito_em FROM termos_aceite t WHERE t.usuario_id = u.id AND t.versao = '${TERMOS_VERSAO}') AS termos_em,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id) AS relatorios,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id AND r.status='publicado') AS publicados,
@@ -551,6 +553,8 @@ export async function resumoAdmin(env, me, adm) {
     r.ultimo_acesso = a.ultimo || null;
   });
 
+  // espaço ocupado é número (não mostra conteúdo): o administrador continua vendo o total e o de cada conta
+  const tudo = adm ? '' : meu, argT = adm ? [] : arg;
   const itens = adm
     ? await env.DB.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes FROM itens').first()
     : await env.DB.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(i.bytes),0) AS bytes FROM itens i
@@ -560,9 +564,9 @@ export async function resumoAdmin(env, me, adm) {
   const usoTipo = await env.DB.prepare(`
     SELECT r.usuario_id AS uid, i.tipo, COUNT(*) AS n, COALESCE(SUM(i.bytes),0) AS bytes
       FROM itens i JOIN relatorios r ON r.id = i.relatorio_id
-     WHERE i.tipo != 'texto'${meu}
+     WHERE i.tipo != 'texto'${tudo}
      GROUP BY r.usuario_id, i.tipo
-  `).bind(...arg).all();
+  `).bind(...argT).all();
   const porTipo = {};
   const contaPor = new Map((contas.results || []).map((c) => [c.id, c]));
   (usoTipo.results || []).forEach((u) => {
@@ -585,7 +589,9 @@ export async function resumoAdmin(env, me, adm) {
     pontos: pontos.results || [],
     totais: {
       contas: (contas.results || []).length,
-      relatorios: (relatorios.results || []).length,
+      // administrador: a quantidade de todas as contas (só o número); a lista acima traz só os relatórios liberados
+      relatorios: adm ? (contas.results || []).reduce((a, c) => a + Number(c.relatorios || 0), 0) : (relatorios.results || []).length,
+      publicados: adm ? (contas.results || []).reduce((a, c) => a + Number(c.publicados || 0), 0) : null,
       registros: Number(itens && itens.n || 0),
       bytes: Number(itens && itens.bytes || 0),
       porTipo,
@@ -597,14 +603,15 @@ export async function resumoAdmin(env, me, adm) {
 // áreas (talhões do KML importado) das fazendas, para desenhar no mapa do painel.
 // conta comum vê só as dela; administrador vê todas. As coordenadas vão com 5 casas (~1 m) para pesar menos.
 export async function areasAdmin(env, me, adm) {
+  const ids = adm ? await contasDoAdmin(env, me).catch(() => [me.id]) : [me.id];   // admin: só as contas liberadas
   const { results } = await env.DB.prepare(`
     SELECT f.id, f.nome, f.area_ha, f.talhoes, u.email AS conta, p.nome AS produtor
       FROM fazendas f
       LEFT JOIN usuarios u ON u.id = f.usuario_id
       LEFT JOIN produtores p ON p.id = f.produtor_id
-     WHERE f.talhoes IS NOT NULL AND f.talhoes != ''${adm ? '' : ' AND f.usuario_id = ?'}
+     WHERE f.talhoes IS NOT NULL AND f.talhoes != '' AND f.usuario_id IN (${ids.map(() => '?').join(',')})
      LIMIT 400
-  `).bind(...(adm ? [] : [me.id])).all();
+  `).bind(...ids).all();
   const arred = (c) => Array.isArray(c)
     ? (typeof c[0] === 'number' ? c.slice(0, 2).map((v) => Math.round(v * 1e5) / 1e5) : c.map(arred))
     : c;
@@ -635,6 +642,8 @@ export async function criarConta(env, corpo) {
   const id = novoId('u');
   await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin) VALUES (?,?,?,?,?)')
     .bind(id, email, await hashSenha(senha), String(corpo.nome || '').trim(), corpo.admin ? 1 : 0).run();
+  // "visualizar dados": o administrador geral passa a ver os relatórios desta conta (as antigas ficam só com os números)
+  if (corpo.ver_dados) { try { await garantirEquipe(env); await env.DB.prepare('UPDATE usuarios SET admin_ve = 1 WHERE id = ?').bind(id).run(); } catch (e) {} }
   try { await definirPrazo(env, id, prazo); } catch (e) { /* a conta já existe; o prazo pode ser ajustado depois */ }
   return { ok: true, id, email, prazo_dias: prazo };
 }
@@ -954,6 +963,10 @@ ${AGRO_CSS}
         <div style="font-size:12px;color:var(--fraco);margin:-4px 0 12px">
           Quando a conta completar esse período, ela aparece em "Prazos e renovações", aqui nesta aba. O acesso dela não é bloqueado.
         </div>
+        <label style="display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;font-size:14px;cursor:pointer">
+          <input id="nVer" type="checkbox" style="width:20px;height:20px;margin:1px 0 0;flex:none">
+          <span><b>Quero visualizar os dados desta conta</b><br><span style="font-size:12px;color:var(--fraco)">Relatórios, timeline e mapa dela aparecem no seu painel. Sem marcar, você vê só a quantidade de relatórios.</span></span>
+        </label>
         <button class="btn" id="btnCriar">Criar conta</button>
         <div id="nMsg"></div>
       </div>
@@ -1179,7 +1192,7 @@ ${AGRO_CSS}
 
   function desenharKpis() {
     var t = dados.totais;
-    var pub = dados.relatorios.filter(function (r) { return r.status === 'publicado'; }).length;
+    var pub = t.publicados != null ? t.publicados : dados.relatorios.filter(function (r) { return r.status === 'publicado'; }).length;
     var adm = !!(dados.eu && dados.eu.admin);
     // recolhido: só o círculo do armazenamento; tocando abre os números
     var pc = t.limite ? Math.min(100, t.bytes / t.limite * 100) : 0, aberto = false;
@@ -1228,6 +1241,7 @@ ${AGRO_CSS}
         (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') +
         (c.papel === 'adm' ? ' <span class="selo pub">Adm · até ' + (Number(c.cota) || 0) + ' usuário' + (Number(c.cota) === 1 ? '' : 's') + '</span>' : '') +
         (c.equipe_id ? ' <span class="selo">equipe de ' + esc(c.equipe_nome || '') + '</span>' : '') +
+        (Number(c.admin_ve) === 1 ? ' <span class="selo">👁 dados visíveis</span>' : '') +
         '<br>' + (c.termos_em ? '<span class="peq">✔ termos aceitos em ' + dataBR(c.termos_em) + '</span>' : '<span class="selo perto">termos pendentes</span>') +
         ((c.responsaveis || []).length ? '<br><span class="peq">👥 ' + c.responsaveis.length + (c.responsaveis.length > 1 ? ' responsáveis: ' : ' responsável: ') + esc(c.responsaveis.join(', ')) + '</span>' : '') + '</td>' +
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
@@ -2275,9 +2289,10 @@ ${AGRO_CSS}
         email: $('#nEmail').value.trim(),
         senha: $('#nSenha').value,
         admin: $('#nAdmin').value === '1',
-        prazo_dias: $('#nPrazo').value
+        prazo_dias: $('#nPrazo').value,
+        ver_dados: $('#nVer').checked
       });
-      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365';
+      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365'; $('#nVer').checked = false;
       aviso(msg, 'Conta criada.');
       await abrirPainel();
       document.querySelector('.abas button[data-aba="contas"]').click();
