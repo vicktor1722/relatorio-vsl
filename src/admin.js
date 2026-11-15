@@ -543,6 +543,21 @@ export async function resumoAdmin(env, me, adm) {
      LIMIT 1000
   `).bind(...arg).all();
 
+  // administrador geral: as visitas das outras contas entram no mapa só como ponto (local aproximado, data e situação),
+  // sem fazenda, produtor, conta nem link do relatório
+  let pontosOutros = [];
+  if (adm) {
+    try {
+      const { results } = await env.DB.prepare(`
+        SELECT ROUND(AVG(i.lat), 3) AS lat, ROUND(AVG(i.lon), 3) AS lon, r.status, substr(COALESCE(r.data_inicio, r.criado_em), 1, 10) AS data
+          FROM itens i JOIN relatorios r ON r.id = i.relatorio_id
+         WHERE i.lat IS NOT NULL AND i.lon IS NOT NULL AND r.usuario_id NOT IN (${ids.map(() => '?').join(',')})
+         GROUP BY i.relatorio_id
+         LIMIT 2000`).bind(...ids).all();
+      pontosOutros = results || [];
+    } catch (e) { /* o mapa segue com os pontos liberados */ }
+  }
+
   const acessos = await contagemAcessos(env);
   // corrigir textos: o autor, o Adm da equipe e o administrador geral
   (relatorios.results || []).forEach((r) => { r.meu = r.usuario_id === me.id; r.pode_corrigir = !!(adm || r.meu || (eq && eq.papel === 'adm')); });
@@ -590,6 +605,7 @@ export async function resumoAdmin(env, me, adm) {
     contas: contas.results || [],
     relatorios: relatorios.results || [],
     pontos: pontos.results || [],
+    pontosOutros,
     visitasDia,
     totais: {
       contas: (contas.results || []).length,
@@ -952,7 +968,7 @@ ${AGRO_CSS}
         <div class="cab-caixa"><h2>Onde foram as visitas</h2><button class="btn-mini" id="btnTelaCheia">⛶ Tela cheia</button></div>
         <div id="mapa"></div>
         <div style="font-size:11.5px;color:var(--fraco);margin-top:8px">
-          🟢 visita enviada · 🟠 ainda em aberto · cada ponto é a média das fotos daquela visita · área verde = KML importado da fazenda
+          🟢 visita enviada · 🟠 ainda em aberto · cada ponto é a média das fotos daquela visita · área verde = KML importado da fazenda<span id="legOutros"></span>
         </div>
       </div>
     </section>
@@ -2248,8 +2264,18 @@ ${AGRO_CSS}
     if (camada) mapa.removeLayer(camada);
     if (camadaAreas) { mapa.removeLayer(camadaAreas); camadaAreas = null; }
     carregarAreas(pts);
-    if (!pts.length) return;
-    camada = L.layerGroup(pts.map(function (p) {
+    // visitas das outras contas (administrador geral): só o ponto, sem nome e sem abrir o relatório
+    var outros = (dados.pontosOutros || []).filter(function (p) { return p.lat != null && p.lon != null; });
+    var marcasOutros = outros.map(function (p) {
+      return L.circleMarker([p.lat, p.lon], {
+        radius: 7, color: '#fff', weight: 2, fillColor: p.status === 'publicado' ? '#1B7A43' : '#F0A202', fillOpacity: .55
+      }).bindPopup('<b>Visita de outro usuário</b><br>' + dataBR(p.data) +
+        '<br><span style="color:#6B7B72;font-size:11px">só a localização · relatório não liberado</span>');
+    });
+    var lo = $('#legOutros'); if (lo) lo.textContent = outros.length ? ' · ponto mais claro = visita de outro usuário (só a localização)' : '';
+    var todosPts = pts.concat(outros);
+    if (!todosPts.length) return;
+    camada = L.layerGroup(marcasOutros.concat(pts.map(function (p) {
       var cor = p.status === 'publicado' ? '#1B7A43' : '#F0A202';
       return L.circleMarker([p.lat, p.lon], {
         radius: 8, color: '#fff', weight: 2, fillColor: cor, fillOpacity: .9
@@ -2259,8 +2285,8 @@ ${AGRO_CSS}
         '<br><span style="color:#6B7B72;font-size:11px">' + esc(p.conta || '') + '</span>' +
         (p.status === 'publicado' ? '<br><a href="/r/' + esc(p.id) + '?sc=1" target="_blank">abrir relatório</a>' : '')
       );
-    })).addTo(mapa);
-    mapa.fitBounds(L.latLngBounds(pts.map(function (p) { return [p.lat, p.lon]; })).pad(0.25));
+    }))).addTo(mapa);
+    mapa.fitBounds(L.latLngBounds(todosPts.map(function (p) { return [p.lat, p.lon]; })).pad(0.25));
   }
 
   // desenha no mapa os talhões dos KMLs importados (buscados à parte, porque pesam mais)
