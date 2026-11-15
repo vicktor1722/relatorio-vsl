@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { listarChuva } from './chuvatalhao.js';
-import { contaTitular } from './equipe.js';
+import { contaTitular, contasDoAdmin } from './equipe.js';
 import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
@@ -339,23 +339,26 @@ const SEM_PLANTIO = { pastagem: 1, pousio: 1 };
 
 // junta o plantio de todas as contas: por safra, área plantada x área total, evolução por data,
 // variedades e andamento de cada fazenda. Só entram fazendas com KML (precisa da área de cada talhão).
-// uid: só as fazendas daquela conta (painel da conta comum); sem uid, todas (administrador)
+// uid: só as fazendas daquela conta (painel da conta comum). Também pode ser uma lista de contas (administrador geral: a dele e as liberadas com "visualizar dados")
 export async function plantioGeral(env, uid) {
   await garantir(env);
+  const propria = typeof uid === 'string';
+  const uids = uid ? [].concat(uid) : [];
+  const inq = uids.map(() => '?').join(',') || "''";
   const [pl, fz, mu] = await Promise.all([
-    uid ? env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? LIMIT 30000').bind(uid).all() : env.DB.prepare('SELECT * FROM plantio LIMIT 30000').all(),
+    env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inq + ') LIMIT 30000').bind(...uids).all(),
     comResumo(env, () => env.DB.prepare(`SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
         FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id LEFT JOIN produtores p ON p.id = f.produtor_id
-       WHERE f.talhoes IS NOT NULL AND f.talhoes != ''` + (uid ? ' AND f.usuario_id = ?' : '') + ' LIMIT 1000').bind(...(uid ? [uid] : [])).all()),
+       WHERE f.talhoes IS NOT NULL AND f.talhoes != '' AND f.usuario_id IN (` + inq + ') LIMIT 1000').bind(...uids).all()),
     env.DB.prepare('SELECT usuario_id FROM modulos_usuario WHERE plantio = 1').all()
   ]);
   const resumos = await resumosDe(env, (fz && fz.results) || []);   // nome e área dos talhões sem abrir o KML
   // para a previsão de colheita: ciclo dos materiais, regra do GMR e talhões já colhidos
-  const ondeU = uid ? ' WHERE usuario_id = ?' : '', argU = uid ? [uid] : [];
+  const ondeU = ' WHERE usuario_id IN (' + inq + ')', argU = uids;
   const [cic, reg, colh] = await Promise.all([
     env.DB.prepare('SELECT usuario_id, variedade, dias, gmr FROM ciclos' + ondeU).bind(...argU).all().catch(() => ({ results: [] })),
     env.DB.prepare('SELECT usuario_id, gmr, dias, ponto FROM ciclo_regra' + ondeU).bind(...argU).all().catch(() => ({ results: [] })),
-    env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0' + (uid ? ' AND usuario_id = ?' : '')).bind(...argU).all().catch(() => ({ results: [] }))
+    env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0 AND usuario_id IN (' + inq + ')').bind(...argU).all().catch(() => ({ results: [] }))
   ]);
   const linhasCic = {}, regras = {}, cicloConta = {}, colhidos = {};
   ((cic && cic.results) || []).forEach((c) => { (linhasCic[c.usuario_id] = linhasCic[c.usuario_id] || []).push(c); });
@@ -373,7 +376,7 @@ export async function plantioGeral(env, uid) {
     Object.keys(areas).forEach((k) => { total += Number(areas[k]) || 0; });
     if (!total) return;
     faz[f.id] = { id: f.id, nome: f.nome || '', produtor: f.produtor || '', conta: f.conta_nome || f.conta || '', dono: f.usuario_id,
-      areas, total, ativa: !!uid || Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
+      areas, total, ativa: propria || Number(f.adm) === 1 || !!comModulo[f.usuario_id] };
   });
 
   // junta as grafias da mesma variedade (ex.: "Olimpo" e "BMX Olimpo IPRO"): vale o nome mais completo
@@ -485,10 +488,12 @@ const chaveProd = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase
 export async function comparativo(env, me, adm, safraPedida) {
   await garantir(env);
   let safra = safraPadrao(safraPedida || '');
-  const onde = adm ? '' : ' WHERE usuario_id = ?';
-  const arg = adm ? [] : [me.id];
+  // administrador geral: a conta dele e as liberadas com "visualizar dados"; conta comum: só a dela
+  const ids = adm ? await contasDoAdmin(env, me) : [me.id];
+  const onde = ' WHERE usuario_id IN (' + ids.map(() => '?').join(',') + ')';
+  const arg = ids;
   const [faz, recs, ent, col, pla, contas] = await Promise.all([
-    comResumo(env, () => env.DB.prepare('SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.usuario_id, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id' + (adm ? '' : ' WHERE f.usuario_id = ?')).bind(...arg).all()),
+    comResumo(env, () => env.DB.prepare('SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.usuario_id, p.nome AS produtor FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.usuario_id IN (' + ids.map(() => '?').join(',') + ')').bind(...arg).all()),
     env.DB.prepare('SELECT fazenda_id, safra, operacao, dados FROM recomendacoes' + onde).bind(...arg).all(),
     env.DB.prepare('SELECT fazenda_id, produto, unidade, qtd, valor FROM estoque_agro' + onde).bind(...arg).all(),
     env.DB.prepare('SELECT fazenda_id, safra, talhao, sc_ha FROM colheita' + onde).bind(...arg).all(),
@@ -570,7 +575,7 @@ export async function rotasAgro(env, req, me, rota, url) {
   /* ----- visão geral para o painel do administrador ----- */
   if (rota === '/api/agro/admin/plantio' && req.method === 'GET') {
     // administrador vê todas as contas; conta com o módulo de plantio vê a evolução das fazendas dela
-    if (mod.admin) return json(await plantioGeral(env));
+    if (mod.admin) return json(await plantioGeral(env, await contasDoAdmin(env, me)));
     if (mod.plantio) return json(Object.assign(await plantioGeral(env, me.id), { propria: true }));
     return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   }

@@ -521,7 +521,7 @@ export default {
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
       if (req.method === 'GET' && QUADROS[rota]) {
-        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|' + url.search;
+        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|p2|' + url.search;   // p2: admin só vê as contas liberadas
         return await quadroPronto(env, ctx, req, chave, QUADROS[rota], async () => {
           const r = rota.startsWith('/api/painel/') ? await rotasPainelFaz(env, req, me, rota, url) : await rotasAgro(env, req, me, rota, url);
           return r.status === 200 ? await r.json() : r;
@@ -538,7 +538,7 @@ export default {
         // qualquer conta vê o próprio painel; admin vê o de todos
         if (rota === '/api/admin/resumo') return json(await resumoAdmin(env, me, adm));
         // mapa das fazendas da Visão geral (desenho de todos os KMLs): quadro pronto; muda quando um KML muda (versão dos dados)
-        if (rota === '/api/admin/areas') return await quadroPronto(env, ctx, req, 'areas|' + me.id + '|' + (adm ? 1 : 0), 21600, () => areasAdmin(env, me, adm));
+        if (rota === '/api/admin/areas') return await quadroPronto(env, ctx, req, 'areas2|' + me.id + '|' + (adm ? 1 : 0), 21600, () => areasAdmin(env, me, adm));
         // equipe (Adm e usuários comuns), timeline e correção de textos: qualquer conta, cada uma com o que pode
         try {
           if (rota === '/api/admin/equipe' && req.method === 'GET') return json(await listarEquipe(env, me));
@@ -559,7 +559,7 @@ export default {
           try { return json(await definirAdm(env, String(b.id || ''), !!b.adm, b.cota)); } catch (e) { return json({ erro: e.message }, 400); }
         }
         if (rota === '/api/admin/usuario' && req.method === 'POST') {
-          try { return json(await criarConta(env, await req.json())); }
+          try { const r = await criarConta(env, await req.json()); await mudouDados(env).catch(() => {}); return json(r); }
           catch (e) { return json({ erro: e.message }, 400); }
         }
         if (rota === '/api/admin/promover' && req.method === 'POST') {

@@ -6,6 +6,7 @@ import { dadosPainelLote, dadosParaPainel } from './portal.js';
 import { calibracao, climaVarios, climaDe, localDaFazenda, mercadoDaFazenda, mercadoGeral, salvarCalibracao } from './mercado.js';
 import { chuvaDaFazenda, mapaGuardado } from './chuva.js';
 import { comCentro, comResumo, resumosDe } from './resumokml.js';
+import { contasDoAdmin } from './equipe.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
@@ -62,15 +63,17 @@ function mediaUF(tab, uf) {
 
 export async function rotasPainelFaz(env, req, me, rota, url) {
   const mod = await modulosDe(env, me.id);
-  const admin = mod.admin && !!me.cf;   // admin vê todas as fazendas; as demais contas, só as delas (com ou sem módulo de lavoura)
+  const admin = mod.admin && !!me.cf;   // admin: a conta dele e as liberadas com "visualizar dados"; as demais contas, só as delas
+  const contas = admin ? await contasDoAdmin(env, me) : [me.id];
+  const inq = contas.map(() => '?').join(',');
 
   if (rota === '/api/painel/fazendas') {
     const q = `SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.municipio, f.uf, f.usuario_id, p.nome AS produtor, u.nome AS conta
                  FROM fazendas f LEFT JOIN produtores p ON p.id = f.produtor_id LEFT JOIN usuarios u ON u.id = f.usuario_id
-                WHERE ` + (admin ? '' : 'f.usuario_id = ? AND ') + `((f.talhoes IS NOT NULL AND f.talhoes != '') OR (f.municipio IS NOT NULL AND f.municipio != '')
+                WHERE f.usuario_id IN (` + inq + `) AND ((f.talhoes IS NOT NULL AND f.talhoes != '') OR (f.municipio IS NOT NULL AND f.municipio != '')
                    OR EXISTS (SELECT 1 FROM recomendacoes r WHERE r.fazenda_id = f.id) OR EXISTS (SELECT 1 FROM plantio pl WHERE pl.fazenda_id = f.id))
                 ORDER BY f.nome LIMIT 300`;
-    const { results } = await comResumo(env, () => (admin ? env.DB.prepare(q) : env.DB.prepare(q).bind(me.id)).all());
+    const { results } = await comResumo(env, () => env.DB.prepare(q).bind(...contas).all());
     const faz = results || [];
     const rsm = await resumosDe(env, faz);   // centro e áreas sem abrir os KMLs
     faz.forEach((f) => { f.centro = rsm[f.id] ? rsm[f.id].centro : null; });
@@ -113,7 +116,7 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
     const fid = String(url.searchParams.get('id') || '').slice(0, 80);
     const f = await comCentro(env, await comResumo(env, () => env.DB.prepare(`SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.municipio, f.uf, f.usuario_id, p.nome AS produtor FROM fazendas f
         LEFT JOIN produtores p ON p.id = f.produtor_id WHERE f.id = ?`).bind(fid).first()));
-    if (!f || (!admin && f.usuario_id !== me.id)) return json({ erro: 'fazenda não encontrada' }, 404);
+    if (!f || !contas.includes(f.usuario_id)) return json({ erro: 'fazenda não encontrada' }, 404);
     const fr = await fretes(env);
     const local = await localDaFazenda(f).catch(() => null);
     const [d, clima, chuva, mercado] = await Promise.all([

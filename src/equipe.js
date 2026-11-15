@@ -12,7 +12,8 @@ import { hashSenha, novoId } from './auth.js';
 let pronto = false;
 export async function garantirEquipe(env) {
   if (pronto) return;
-  for (const sql of ['ALTER TABLE usuarios ADD COLUMN papel TEXT', 'ALTER TABLE usuarios ADD COLUMN cota INTEGER', 'ALTER TABLE usuarios ADD COLUMN equipe_id TEXT']) {
+  for (const sql of ['ALTER TABLE usuarios ADD COLUMN papel TEXT', 'ALTER TABLE usuarios ADD COLUMN cota INTEGER', 'ALTER TABLE usuarios ADD COLUMN equipe_id TEXT',
+    'ALTER TABLE usuarios ADD COLUMN admin_ve INTEGER']) {
     try { await env.DB.prepare(sql).run(); } catch (e) { /* já existe */ }
   }
   try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS usuarios_equipe ON usuarios (equipe_id)').run(); } catch (e) {}
@@ -89,13 +90,31 @@ export async function criarComum(env, me, b) {
   return { ok: true, id, email, nome };
 }
 
+/* ---------- privacidade do administrador geral ----------
+   O administrador geral só vê os DADOS (relatórios, timeline, pontos no mapa, lavoura) da própria conta, da equipe
+   dela e das contas que ele criou marcando "visualizar dados" (usuarios.admin_ve = 1), mais a equipe dessas contas.
+   Das demais ele vê só os números (quantidade de relatórios etc.) na lista de contas. */
+export async function contasDoAdmin(env, me) {
+  await garantirEquipe(env);
+  const { results } = await env.DB.prepare('SELECT id FROM usuarios WHERE admin_ve = 1').all();
+  const base = new Set([me.id].concat((results || []).map((r) => r.id)));
+  (await equipeDe(env, me.id)).ids.forEach((x) => base.add(x));
+  const lista = [...base];
+  if (lista.length) {
+    const { results: eqs } = await env.DB.prepare('SELECT id FROM usuarios WHERE equipe_id IN (' + lista.map(() => '?').join(',') + ')').bind(...lista).all();
+    (eqs || []).forEach((r) => base.add(r.id));
+  }
+  return [...base];
+}
+
 /* ---------- quem vê e quem corrige ---------- */
 async function contasVisiveis(env, me, adm) {
-  if (adm) return null;   // administrador geral: todas
+  if (adm) return await contasDoAdmin(env, me);   // administrador geral: a dele e as liberadas
   return (await equipeDe(env, me.id)).ids;
 }
 async function podeCorrigir(env, me, adm, dono) {
-  if (adm || dono === me.id) return true;
+  if (dono === me.id) return true;
+  if (adm) return (await contasDoAdmin(env, me)).includes(dono);
   const eq = await equipeDe(env, me.id);
   return eq.papel === 'adm' && eq.ids.includes(dono);
 }
@@ -104,14 +123,14 @@ const marcas = (ids) => ids.map(() => '?').join(',');
 /* ---------- timeline: um post por relatório, com as fotos e vídeos e as legendas ---------- */
 export async function timeline(env, me, adm, antes) {
   const ids = await contasVisiveis(env, me, adm);
-  const filtro = ids ? ' AND r.usuario_id IN (' + marcas(ids) + ')' : '';
+  const filtro = ' AND r.usuario_id IN (' + marcas(ids) + ')';
   const corte = /^\d{4}-\d{2}-\d{2}/.test(String(antes || '')) ? String(antes) : '9999';
   const { results: rels } = await env.DB.prepare(`SELECT r.id, r.usuario_id, r.fazenda, r.produtor, r.servico, r.responsavel, r.status, r.data_inicio, r.observacoes,
         COALESCE(r.publicado_em, r.atualizado_em, r.criado_em) AS quando, u.nome AS autor, u.email AS autor_email
       FROM relatorios r LEFT JOIN usuarios u ON u.id = r.usuario_id
      WHERE COALESCE(r.publicado_em, r.atualizado_em, r.criado_em) < ?${filtro}
        AND EXISTS (SELECT 1 FROM itens i WHERE i.relatorio_id = r.id AND i.tipo IN ('foto','video') AND i.midia IS NOT NULL)
-     ORDER BY quando DESC LIMIT 8`).bind(corte, ...(ids || [])).all();
+     ORDER BY quando DESC LIMIT 8`).bind(corte, ...ids).all();
   const lista = rels || [];
   if (!lista.length) return { ok: true, posts: [], mais: null };
   const { results: its } = await env.DB.prepare(`SELECT id, relatorio_id, tipo, legenda, midia, talhao, capturado_em, pos FROM itens
@@ -127,7 +146,7 @@ export async function timeline(env, me, adm, antes) {
       data: r.data_inicio || String(r.quando || '').slice(0, 10), quando: r.quando, autor: r.autor || r.autor_email || '',
       responsavel: String(r.responsavel || '').trim(),
       link: r.status === 'publicado' ? '/r/' + r.id : null,
-      pode_corrigir: !!(adm || r.usuario_id === me.id || (eq && eq.papel === 'adm' && eq.ids.includes(r.usuario_id))),
+      pode_corrigir: !!(adm || r.usuario_id === me.id || (eq && eq.papel === 'adm' && eq.ids.includes(r.usuario_id))),   // adm: ids já são só as contas liberadas
       obs: [r.observacoes].concat(l.filter((i) => i.tipo === 'texto').map((i) => i.legenda)).map((t) => String(t || '').trim()).filter(Boolean),
       midias: l.filter((i) => i.tipo !== 'texto').slice(0, 30).map((i) => ({ tipo: i.tipo, src: '/img/' + encodeURIComponent(i.midia), legenda: i.legenda || '', talhao: i.talhao || '', hora: i.capturado_em }))
     };
@@ -187,7 +206,7 @@ async function garantirSocial(env) {
 async function relVisivel(env, me, adm, id) {
   const r = await env.DB.prepare('SELECT id, usuario_id, fazenda, status FROM relatorios WHERE id = ?').bind(String(id || '').slice(0, 60)).first();
   if (!r) throw new Error('relatório não encontrado');
-  if (!adm && !(await equipeDe(env, me.id)).ids.includes(r.usuario_id)) throw new Error('este relatório não é da sua equipe');
+  if (!(await contasVisiveis(env, me, adm)).includes(r.usuario_id)) throw new Error('este relatório não é da sua equipe');
   return r;
 }
 async function nomeDe(env, id) { const u = await env.DB.prepare('SELECT nome, email FROM usuarios WHERE id = ?').bind(id).first(); return u ? (u.nome || String(u.email).split('@')[0]) : ''; }
