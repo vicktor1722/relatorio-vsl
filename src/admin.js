@@ -832,6 +832,21 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 .corr-it .vd{width:70px;height:70px;border-radius:10px;background:#222;color:#fff;display:grid;place-items:center;flex:none;font-size:22px}
 .corr-it textarea,.corr textarea{width:100%;font:inherit;font-size:14px;border:1px solid #CFD8D3;border-radius:10px;padding:8px;resize:vertical;min-height:58px}
 .corr-it small{display:block;color:var(--fraco);font-size:11.5px;margin-bottom:3px}
+.sino{position:relative;font-size:19px;line-height:1;padding:6px 10px !important}
+.sino b{position:absolute;top:-4px;right:-4px;background:#E53935;color:#fff;font-size:11px;border-radius:10px;padding:1px 6px;font-weight:800;line-height:16px}
+.post .acs{display:flex;gap:4px;padding:6px 6px 0;border-top:1px solid #EEF2EF}
+.post .acs button{flex:1;border:0;background:none;padding:9px 2px;border-radius:9px;font:inherit;font-size:13.5px;font-weight:600;color:#33443A;cursor:pointer;white-space:nowrap}
+.post .acs button:active{background:#F1F4F2}.post .acs button.on{color:#E53935}.post .acs button[disabled]{opacity:.45}
+.post .cur{padding:2px 12px 0;font-size:13px;color:#3E4F45}
+.post .coms{padding:4px 12px 0}.post .cm{font-size:13.5px;padding:3px 0;line-height:1.35}.post .cm b{margin-right:5px}.post .cm small{color:var(--fraco);margin-left:4px;font-size:11.5px}
+.post .cm button{border:0;background:none;color:var(--fraco);font-size:11.5px;cursor:pointer;padding:0 0 0 6px;text-decoration:underline}
+.post .ncm{display:flex;gap:8px;align-items:center;padding:8px 12px 12px}
+.post .ncm input{flex:1;font:inherit;font-size:14px;border:1px solid #D5DED9;border-radius:999px;padding:8px 12px;min-width:0}
+.post .ncm button{border:0;background:none;color:var(--verde);font-weight:700;font-size:14px;cursor:pointer}
+.nts{margin:-6px -6px 0}.nt{display:flex;gap:10px;padding:10px 8px;border-bottom:1px solid #EEF2EF;align-items:center;cursor:pointer;border-radius:10px}
+.nt.nova{background:#F1F8F3}.nt .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px;flex:none}
+.nt .t{flex:1;font-size:13.5px;min-width:0}.nt .t small{display:block;color:var(--fraco);font-size:12px;margin-top:2px}
+.nt img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;background:#eee}
 .marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;margin:2px 0 12px}
 .marcar input{width:18px;height:18px;accent-color:var(--verde)}
 @media(max-width:560px){ .linha2{grid-template-columns:1fr} #mapa{height:300px} }
@@ -886,6 +901,7 @@ ${AGRO_CSS}
 <div id="telaPainel" style="display:none">
   <header class="topo">
     <div style="flex:1"><h1 id="titulo">Administração<small id="quem"></small></h1></div>
+    <button id="btnSino" class="sino" aria-label="Notificações" title="Notificações">🔔<b id="sinoN" style="display:none"></b></button>
     <button id="btnAtualizar">Atualizar</button>
     <button id="btnSair">Sair</button>
   </header>
@@ -1143,6 +1159,7 @@ ${AGRO_CSS}
     $('#abaEquipe').style.display = dados.eu && dados.eu.papel === 'adm' ? '' : 'none';
     FEED.carregado = false;
     if ($('#pTimeline').classList.contains('on')) carregarFeed(true);
+    contarSino();
     $('#hRels').textContent = adm ? 'Todos os relatórios' : temEquipe ? 'Relatórios da equipe' : 'Meus relatórios';
     if (!adm && $('#pContas').classList.contains('on')) document.querySelector('.abas button[data-aba="dash"]').click();
     pg = null;
@@ -1869,16 +1886,35 @@ ${AGRO_CSS}
         : '<img src="' + esc(m.src) + '?capa=1" loading="lazy" alt="">') + (n > 1 ? '<span class="n">' + (i + 1) + '/' + n + '</span>' : '') + '</div>';
     }).join('');
     var m0 = p.midias[0] || {};
+    POSTS[p.id] = p;
     return '<article class="post" data-post="' + esc(p.id) + '">' +
       // perfil do post: quem fez (responsável da visita ou o usuário); a fazenda e a data embaixo
       '<div class="ph"><div class="av">' + esc(iniciais(p.responsavel || p.autor || p.fazenda)) + '</div><div><b>' + esc(p.responsavel || p.autor || p.fazenda) + '</b><small>' + esc(p.fazenda) + ' · ' + dataBR(p.data) + (p.servico ? ' · ' + esc(p.servico) : '') + '</small></div>' +
         '<div class="ac">' + (p.pode_corrigir ? '<button class="selo" data-corr="' + esc(p.id) + '" style="cursor:pointer">✏️ corrigir</button>' : '') + '</div></div>' +
       '<div class="car">' + slides + '</div>' +
+      '<div class="acs"><button data-curtir="' + esc(p.id) + '" class="' + (p.eu_curti ? 'on' : '') + '">' + (p.eu_curti ? '❤️' : '🤍') + ' Curtir</button>' +
+        '<button data-comentar="' + esc(p.id) + '">💬 Comentar</button>' +
+        '<button data-compart="' + esc(p.id) + '"' + (p.link ? '' : ' disabled title="O relatório ainda não foi publicado"') + '>↗️ Compartilhar</button></div>' +
+      '<div class="cur" data-cur="' + esc(p.id) + '">' + curtidasTxt(p) + '</div>' +
       '<div class="lg"><span class="lgtxt">' + legendaHtml(m0) + '</span>' +
         (p.obs.length ? '<div class="obs"><b>Observações gerais</b><br>' + esc(p.obs.join(' · ')).slice(0, 600) + '</div>' : '') +
         (p.link ? '<div style="margin-top:6px"><a href="' + esc(p.link) + '?sc=1" target="_blank">Ver relatório completo ›</a></div>' : '<div class="peq" style="margin-top:6px">relatório ainda em aberto</div>') + '</div>' +
+      '<div class="coms" data-coms="' + esc(p.id) + '">' + (p.comentarios || []).map(comentarioHtml).join('') + '</div>' +
+      '<div class="ncm"><input data-ncm="' + esc(p.id) + '" placeholder="Escreva um comentário…" maxlength="1000"><button data-enviar="' + esc(p.id) + '">Enviar</button></div>' +
       '<script type="application/json" class="pdados">' + JSON.stringify(p.midias.map(function (m) { return { l: m.legenda, t: m.talhao }; })).split('<').join('&lt;') + '<' + '/script></article>';
   }
+  function curtidasTxt(p) {
+    var n = p.curtidas || 0; if (!n) return '';
+    var nomes = (p.curtiu || []).slice(-1);
+    return 'Curtido por <b>' + esc(nomes[0] || '') + '</b>' + (n > 1 ? ' e <b>mais ' + (n - 1) + '</b>' : '');
+  }
+  function quandoTxt(iso) {
+    var d = new Date(iso), s = (Date.now() - d.getTime()) / 1000;
+    if (isNaN(s)) return ''; if (s < 60) return 'agora'; if (s < 3600) return Math.floor(s / 60) + ' min'; if (s < 86400) return Math.floor(s / 3600) + ' h';
+    if (s < 172800) return 'ontem'; return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+  function comentarioHtml(c) { return '<div class="cm" data-cm="' + esc(c.id) + '"><b>' + esc(c.autor || '') + '</b>' + esc(c.texto) + '<small>' + quandoTxt(c.criado_em) + '</small>' + (c.meu ? '<button data-apcm="' + esc(c.id) + '">apagar</button>' : '') + '</div>'; }
+  var POSTS = {};
   function legendaHtml(m) { return (m.talhao || m.t ? '<span class="tal">📍 ' + esc(m.talhao || m.t) + '</span>' : '') + esc(m.legenda != null ? m.legenda : (m.l || '')); }
   function ligarPosts() {
     document.querySelectorAll('#feed .post').forEach(function (el) {
@@ -1891,7 +1927,81 @@ ${AGRO_CSS}
       }, { passive: true });
     });
     document.querySelectorAll('#feed [data-corr]').forEach(function (b) { b.onclick = function () { abrirCorrecao(b.dataset.corr); }; });
+    document.querySelectorAll('#feed [data-curtir]').forEach(function (b) { b.onclick = async function () {
+      var p = POSTS[b.dataset.curtir]; if (!p || b.disabled) return; b.disabled = true;
+      try {
+        var r = await api('/api/admin/curtir', { id: p.id });
+        var eu = (dados.eu && (dados.eu.nome || dados.eu.email)) || 'você';
+        p.eu_curti = r.curtiu; p.curtidas = r.curtidas;
+        p.curtiu = (p.curtiu || []).filter(function (x) { return x !== eu; }); if (r.curtiu) p.curtiu.push(eu);
+        b.classList.toggle('on', r.curtiu); b.textContent = (r.curtiu ? '❤️' : '🤍') + ' Curtir';
+        var c = document.querySelector('[data-cur="' + p.id + '"]'); if (c) c.innerHTML = curtidasTxt(p);
+      } catch (e) { alert(e.message); }
+      b.disabled = false;
+    }; });
+    document.querySelectorAll('#feed [data-comentar]').forEach(function (b) { b.onclick = function () { var i = document.querySelector('[data-ncm="' + b.dataset.comentar + '"]'); if (i) i.focus(); }; });
+    document.querySelectorAll('#feed [data-enviar]').forEach(function (b) {
+      var id = b.dataset.enviar, inp = document.querySelector('[data-ncm="' + id + '"]');
+      var enviar = async function () {
+        var t = (inp.value || '').trim(); if (!t || b.disabled) return; b.disabled = true;
+        try {
+          var r = await api('/api/admin/comentar', { id: id, texto: t });
+          inp.value = ''; var box = document.querySelector('[data-coms="' + id + '"]');
+          if (box) { box.insertAdjacentHTML('beforeend', comentarioHtml(r.comentario)); ligarApagarComentarios(); }
+        } catch (e) { alert(e.message); }
+        b.disabled = false;
+      };
+      b.onclick = enviar;
+      inp.onkeydown = function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); enviar(); } };
+    });
+    document.querySelectorAll('#feed [data-compart]').forEach(function (b) { b.onclick = async function () {
+      var p = POSTS[b.dataset.compart]; if (!p || !p.link) return;
+      var url = location.origin + p.link, titulo = 'Relatório de visita — ' + p.fazenda;
+      try {
+        if (navigator.share) await navigator.share({ title: titulo, text: titulo, url: url });
+        else { await navigator.clipboard.writeText(url); alert('Link do relatório copiado.'); }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+      api('/api/admin/compartilhou', { id: p.id }).catch(function () {});
+    }; });
+    ligarApagarComentarios();
   }
+  function ligarApagarComentarios() {
+    document.querySelectorAll('#feed [data-apcm]').forEach(function (b) { b.onclick = async function () {
+      if (!confirm('Apagar este comentário?')) return;
+      try { await api('/api/admin/comentario/apagar', { id: b.dataset.apcm }); var el = document.querySelector('[data-cm="' + b.dataset.apcm + '"]'); if (el) el.remove(); }
+      catch (e) { alert(e.message); }
+    }; });
+  }
+
+  /* ---------- sininho: quem curtiu, comentou e compartilhou os relatórios ---------- */
+  function sinoN(n) { var b = $('#sinoN'); b.textContent = n > 99 ? '99+' : String(n || ''); b.style.display = n ? '' : 'none'; }
+  async function contarSino() { try { var r = await api('/api/admin/notificacoes?so=n'); sinoN(r.nao_lidas); } catch (e) {} }
+  setInterval(function () { if (token && $('#telaPainel').style.display !== 'none' && !document.hidden) contarSino(); }, 60000);
+  $('#btnSino').onclick = async function () {
+    var m = modalBase(true);
+    m.cx.innerHTML = '<h2 style="margin:0 0 10px">🔔 Notificações</h2><p class="peq">Carregando…</p>';
+    var N;
+    try { N = await api('/api/admin/notificacoes'); } catch (e) { m.cx.innerHTML = '<p>' + esc(e.message) + '</p>'; return; }
+    var ic = { curtiu: ['❤️', '#FDE7E7'], comentou: ['💬', '#E7F0FD'], compartilhou: ['↗️', '#E8F4EC'] };
+    var txt = function (x) {
+      return '<b>' + esc(x.de_nome || 'Alguém') + '</b> ' + (x.tipo === 'curtiu' ? 'curtiu o relatório da <b>' + esc(x.fazenda) + '</b>'
+        : x.tipo === 'comentou' ? 'comentou: “' + esc(x.texto || '') + '”' : 'compartilhou o relatório da <b>' + esc(x.fazenda) + '</b>');
+    };
+    m.cx.innerHTML = '<h2 style="margin:0 0 10px">🔔 Notificações</h2>' + (N.lista.length ? '<div class="nts">' + N.lista.map(function (x) {
+      var i = ic[x.tipo] || ['🔔', '#eee'];
+      return '<div class="nt' + (x.lida ? '' : ' nova') + '" data-nt="' + esc(x.relatorio_id || '') + '"><div class="ic" style="background:' + i[1] + '">' + i[0] + '</div>' +
+        '<div class="t">' + txt(x) + '<small>' + quandoTxt(x.criado_em) + (x.tipo === 'comentou' ? ' · ' + esc(x.fazenda) : '') + '</small></div>' + (x.foto ? '<img src="' + esc(x.foto) + '?capa=1" alt="">' : '') + '</div>';
+    }).join('') + '</div>' : '<p class="peq">Nenhuma notificação ainda. Quando alguém da equipe curtir, comentar ou compartilhar um relatório seu, aparece aqui.</p>') +
+      '<button class="btn sec" id="ntFecha" style="margin-top:12px">Fechar</button>';
+    m.cx.querySelector('#ntFecha').onclick = m.sair;
+    m.cx.querySelectorAll('[data-nt]').forEach(function (el) { el.onclick = function () {
+      m.sair(); var id = el.dataset.nt, bt = document.querySelector('#subabas button[data-aba="timeline"]');
+      if (bt) bt.click();
+      var achar = function (n) { var post = document.querySelector('#feed [data-post="' + id + '"]'); if (post) post.scrollIntoView({ behavior: 'smooth', block: 'start' }); else if (n > 0) setTimeout(function () { achar(n - 1); }, 500); };
+      achar(8);
+    }; });
+    if (N.nao_lidas) { api('/api/admin/notificacoes/lidas', {}).catch(function () {}); sinoN(0); }
+  };
   $('#feedMais').onclick = function () { carregarFeed(false); };
 
   /* ---------- Corrigir legendas e observações gerais (autor, Adm da equipe e administrador) ---------- */
