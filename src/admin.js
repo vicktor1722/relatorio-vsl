@@ -580,6 +580,9 @@ export async function resumoAdmin(env, me, adm) {
     }
   });
   const lim = adm ? await espaco(env).catch(() => ({})) : {};
+  // visitas por dia de TODAS as contas (só a quantidade) para o gráfico do administrador geral
+  const visitasDia = adm ? ((await env.DB.prepare(`SELECT substr(COALESCE(data_inicio, criado_em), 1, 10) AS d, COUNT(*) AS n
+      FROM relatorios WHERE COALESCE(data_inicio, criado_em) IS NOT NULL GROUP BY d ORDER BY d DESC LIMIT 30`).all().catch(() => ({}))).results || null) : null;
 
   return {
     ok: true,
@@ -587,6 +590,7 @@ export async function resumoAdmin(env, me, adm) {
     contas: contas.results || [],
     relatorios: relatorios.results || [],
     pontos: pontos.results || [],
+    visitasDia,
     totais: {
       contas: (contas.results || []).length,
       // administrador: a quantidade de todas as contas (só o número); a lista acima traz só os relatórios liberados
@@ -932,6 +936,7 @@ ${AGRO_CSS}
       <div class="cartoes" id="kpis"></div>
       <div class="caixa">
         <h2>Visitas por dia</h2>
+        <div id="barrasNota" style="font-size:12px;color:var(--fraco);margin:-6px 0 6px"></div>
         <div class="barras" id="barras"></div>
         <div class="legenda-barras"></div>
       </div>
@@ -2154,10 +2159,17 @@ ${AGRO_CSS}
 
   function desenharBarras() {
     var porDia = {};
-    dados.relatorios.forEach(function (r) {
-      var d = String(r.data_inicio || r.criado_em || '').slice(0, 10);
-      if (d) porDia[d] = (porDia[d] || 0) + 1;
-    });
+    if (dados.visitasDia) {
+      // administrador geral: a quantidade de todas as contas (vem pronta do servidor)
+      dados.visitasDia.forEach(function (x) { if (x.d) porDia[x.d] = Number(x.n) || 0; });
+    } else {
+      dados.relatorios.forEach(function (r) {
+        var d = String(r.data_inicio || r.criado_em || '').slice(0, 10);
+        if (d) porDia[d] = (porDia[d] || 0) + 1;
+      });
+    }
+    var leg = $('#barrasNota');
+    if (leg) leg.textContent = dados.visitasDia ? 'Todas as contas · só a quantidade de visitas' : '';
     var dias = Object.keys(porDia).sort().slice(-30);
     if (!dias.length) { $('#barras').innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma visita registrada ainda.</div>'; return; }
     var max = Math.max.apply(null, dias.map(function (d) { return porDia[d]; }));
