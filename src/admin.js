@@ -793,6 +793,10 @@ tr:last-child td{border-bottom:none}
 .resp-linha .num{text-align:right;white-space:nowrap}
 .cab-caixa{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
 .cab-caixa h2{margin:0}
+.prz-cab{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;text-align:left;font:inherit;font-size:14px;background:var(--fundo,#F4F7F5);border:1px solid #E1E7E3;border-radius:12px;padding:12px 14px;cursor:pointer;color:inherit}
+.prz-cab span{line-height:1.5}.prz-cab i{font-style:normal;font-size:13px;color:#1B7A43;font-weight:700;white-space:nowrap}
+.prz-v{color:#C62828}.prz-p{color:#8A5A00}
+#przLista{margin-top:12px}
 .btn-mini{border:1px solid var(--linha);background:#fff;color:var(--verde-escuro);border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .btn-mini:hover{background:#f1f6f2}
 .caixa.cheia{position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;margin:0;border-radius:0;display:flex;flex-direction:column;padding:12px}
@@ -1460,7 +1464,15 @@ ${AGRO_CSS}
       el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma conta com prazo vencido ou para vencer nos próximos 30 dias.</div>';
       return;
     }
-    el.innerHTML = lista.map(function (c) {
+    // recolhido por padrão: só o resumo; tocando abre a lista (lembra a escolha neste aparelho)
+    var venc = lista.filter(function (c) { return c.restam <= 0; }).length, perto = lista.length - venc, abertoP = false;
+    try { abertoP = localStorage.getItem('vsl-prazos') === '1'; } catch (e) {}
+    var resumoP = '<button class="prz-cab" id="przAbre" aria-expanded="' + abertoP + '"><span>' +
+      (venc ? '<b class="prz-v">⚠️ ' + venc + (venc === 1 ? ' vencido' : ' vencidos') + '</b>' : '') +
+      (venc && perto ? ' · ' : '') +
+      (perto ? '<b class="prz-p">⏳ ' + perto + ' para vencer em 30 dias</b>' : '') +
+      '</span><i>' + (abertoP ? 'recolher ▴' : 'ver lista ▾') + '</i></button>';
+    el.innerHTML = resumoP + '<div id="przLista"' + (abertoP ? '' : ' hidden') + '>' + lista.map(function (c) {
       var nome = '<b>' + esc(c.nome || c.email) + '</b>';
       var ref = c.prazo_dias === 365 ? '1 ano de uso' : 'o prazo de ' + diasTxt(c.prazo_dias);
       var txt, cls = '';
@@ -1476,7 +1488,14 @@ ${AGRO_CSS}
       return '<div class="aviso' + cls + '">' + txt +
         '<div class="pg-linha"><button class="selo" data-gerar="' + esc(c.id) + '">' + (p.aberta ? 'ver link de renovação' : 'gerar link de renovação') + '</button>' +
         '<button class="selo" data-prazo="' + esc(c.id) + '">ajustar prazo</button></div></div>';
-    }).join('');
+    }).join('') + '</div>';
+    $('#przAbre').onclick = function () {
+      var l = $('#przLista'), abre = l.hidden;
+      l.hidden = !abre;
+      this.setAttribute('aria-expanded', abre);
+      this.querySelector('i').textContent = abre ? 'recolher ▴' : 'ver lista ▾';
+      try { localStorage.setItem('vsl-prazos', abre ? '1' : '0'); } catch (e) {}
+    };
     ligarPrazos();
     ligarPagto();
   }
