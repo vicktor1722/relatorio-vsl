@@ -11,7 +11,7 @@ import { contagemAcessos } from './acessos.js';
 import { espaco } from './midia.js';
 import { TERMOS_VERSAO, garantirTermos } from './termos.js';
 import { AGRO_ABAS, AGRO_CSS, AGRO_JS, AGRO_PAINEIS } from './agroadmin.js';
-import { equipeDe, garantirEquipe, contasDoAdmin } from './equipe.js';
+import { equipeDe, garantirEquipe, contasDoAdmin, definirAdm } from './equipe.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -643,10 +643,14 @@ export async function criarConta(env, corpo) {
   const existe = await env.DB.prepare('SELECT id FROM usuarios WHERE email = ?').bind(email).first();
   if (existe) throw new Error('já existe uma conta com esse e-mail');
   const prazo = lerPrazo(corpo.prazo_dias, corpo.admin ? 0 : PRAZO_PADRAO);
+  // Adm de equipe: confere a quantidade de usuários comuns antes de criar a conta
+  const cota = Math.floor(Number(corpo.cota));
+  if (corpo.equipe_adm && !(cota >= 0 && cota <= 500)) throw new Error('informe quantos usuários comuns o Adm pode criar (0 a 500)');
   const id = novoId('u');
   await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin) VALUES (?,?,?,?,?)')
     .bind(id, email, await hashSenha(senha), String(corpo.nome || '').trim(), corpo.admin ? 1 : 0).run();
   // "visualizar dados": o administrador geral passa a ver os relatórios desta conta (as antigas ficam só com os números)
+  if (corpo.equipe_adm && !corpo.admin) { try { await definirAdm(env, id, true, cota); } catch (e) { /* a conta já existe; o Adm pode ser marcado depois em Contas */ } }
   if (corpo.ver_dados) { try { await garantirEquipe(env); await env.DB.prepare('UPDATE usuarios SET admin_ve = 1 WHERE id = ?').bind(id).run(); } catch (e) {} }
   try { await definirPrazo(env, id, prazo); } catch (e) { /* a conta já existe; o prazo pode ser ajustado depois */ }
   return { ok: true, id, email, prazo_dias: prazo };
@@ -963,8 +967,12 @@ ${AGRO_CSS}
         <div class="linha2">
           <div class="campo"><label>Senha</label><input id="nSenha" type="text" placeholder="mínimo 6 caracteres"></div>
           <div class="campo"><label>Acesso</label>
-            <select id="nAdmin"><option value="0">Usuário comum</option><option value="1">Administrador</option></select>
+            <select id="nAdmin"><option value="0">Usuário comum</option><option value="adm">Adm de equipe</option><option value="1">Administrador</option></select>
           </div>
+        </div>
+        <div class="campo" id="nCotaBox" hidden><label>Quantos usuários comuns este Adm pode criar</label>
+          <input id="nCota" type="number" min="0" max="500" value="3" inputmode="numeric">
+          <div style="font-size:12px;color:var(--fraco);margin-top:6px">O Adm de equipe só cria usuários comuns, dentro desse limite. Eles seguem o prazo e os módulos dele.</div>
         </div>
         <div class="campo"><label>Período de uso, em dias (365 = 1 ano · 0 = sem prazo)</label>
           <input id="nPrazo" type="number" min="0" max="3650" value="365" inputmode="numeric">
@@ -2311,6 +2319,7 @@ ${AGRO_CSS}
   aplicarResp();
 
   /* ---------- criar conta ---------- */
+  $('#nAdmin').onchange = function () { $('#nCotaBox').hidden = this.value !== 'adm'; };
   $('#btnCriar').onclick = async function () {
     var msg = $('#nMsg');
     aviso(msg, 'Criando…');
@@ -2320,10 +2329,12 @@ ${AGRO_CSS}
         email: $('#nEmail').value.trim(),
         senha: $('#nSenha').value,
         admin: $('#nAdmin').value === '1',
+        equipe_adm: $('#nAdmin').value === 'adm',
+        cota: $('#nCota').value,
         prazo_dias: $('#nPrazo').value,
         ver_dados: $('#nVer').checked
       });
-      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365'; $('#nVer').checked = false;
+      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365'; $('#nVer').checked = false; $('#nAdmin').value = '0'; $('#nCota').value = '3'; $('#nCotaBox').hidden = true;
       aviso(msg, 'Conta criada.');
       await abrirPainel();
       document.querySelector('.abas button[data-aba="contas"]').click();
