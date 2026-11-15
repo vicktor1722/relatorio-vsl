@@ -337,28 +337,59 @@ export async function dadosParaRelatorio(env, rel) {
 
 const SEM_PLANTIO = { pastagem: 1, pousio: 1 };
 
+// fazendas de contas que o administrador não libera: viram uma linha só, sem nome, com a soma das áreas,
+// das datas (evolução do plantio), das culturas, das variedades e da colheita prevista
+function ocultarDemais(S, faz, ver, r1) {
+  const minhas = [], outras = [];
+  S.fazendas.forEach((f) => ((faz[f.id] && ver.has(faz[f.id].dono)) ? minhas : outras).push(f));
+  S.sem_lancamento = (S.sem_lancamento || []).filter((f) => faz[f.id] && ver.has(faz[f.id].dono));
+  if (!outras.length) { S.fazendas = minhas; return; }
+  const D = { id: '_demais', nome: 'Demais usuários', produtor: outras.length + (outras.length === 1 ? ' fazenda' : ' fazendas') + ' · só os totais',
+    conta: '', n: outras.length, oculta: true, total_ha: 0, plantado_ha: 0, fora_ha: 0, primeira: '', ultima: '', variedades: [] };
+  const lin = {}, cu = {}, va = {}, prev = [];
+  outras.forEach((f) => {
+    D.total_ha += f.total_ha; D.plantado_ha += f.plantado_ha; D.fora_ha += f.fora_ha || 0;
+    if (f.primeira && (!D.primeira || f.primeira < D.primeira)) D.primeira = f.primeira;
+    if (f.ultima && (!D.ultima || f.ultima > D.ultima)) D.ultima = f.ultima;
+    (f.linha || []).forEach((x) => { lin[x.d] = (lin[x.d] || 0) + x.ha; });
+    (f.culturas || []).forEach((c) => { const o = cu[c.cultura] || (cu[c.cultura] = { cultura: c.cultura, ha: 0, plantado: 0 }); o.ha += c.ha; o.plantado += c.plantado; });
+    (f.vars || []).forEach((v) => { const k = v.cultura + '|' + v.variedade, o = va[k] || (va[k] = { cultura: v.cultura, variedade: v.variedade, ha: 0, plantado: 0 }); o.ha += v.ha; o.plantado += v.plantado; });
+    prev.push(...(f.prev || []));
+  });
+  D.total_ha = r1(D.total_ha); D.plantado_ha = r1(D.plantado_ha); D.fora_ha = r1(D.fora_ha);
+  D.linha = Object.keys(lin).sort().map((d) => ({ d, ha: r1(lin[d]) }));
+  D.culturas = Object.values(cu).map((c) => ({ cultura: c.cultura, ha: r1(c.ha), plantado: r1(c.plantado) }));
+  D.vars = Object.values(va).map((v) => ({ cultura: v.cultura, variedade: v.variedade, ha: r1(v.ha), plantado: r1(v.plantado) }));
+  D.prev = juntarPrevisao(prev);
+  S.fazendas = minhas.concat([D]);
+}
+
 // junta o plantio de todas as contas: por safra, área plantada x área total, evolução por data,
 // variedades e andamento de cada fazenda. Só entram fazendas com KML (precisa da área de cada talhão).
 // uid: só as fazendas daquela conta (painel da conta comum). Também pode ser uma lista de contas (administrador geral: a dele e as liberadas com "visualizar dados")
-export async function plantioGeral(env, uid) {
+// uid '*' + visiveis (administrador geral): soma todas as contas, mas as fazendas fora de "visiveis" vão juntas,
+// sem nome, numa linha só ("Demais usuários") — só as áreas e datas, nunca o nome da fazenda ou do produtor
+export async function plantioGeral(env, uid, visiveis) {
   await garantir(env);
-  const propria = typeof uid === 'string';
-  const uids = uid ? [].concat(uid) : [];
+  const todas = uid === '*';
+  const propria = typeof uid === 'string' && !todas;
+  const uids = todas ? [] : uid ? [].concat(uid) : [];
   const inq = uids.map(() => '?').join(',') || "''";
+  const so = (campo) => (todas ? '' : ' AND ' + campo + ' IN (' + inq + ')');
   const [pl, fz, mu] = await Promise.all([
-    env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inq + ') LIMIT 30000').bind(...uids).all(),
+    env.DB.prepare('SELECT * FROM plantio WHERE 1=1' + so('usuario_id') + ' LIMIT 30000').bind(...uids).all(),
     comResumo(env, () => env.DB.prepare(`SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.usuario_id, u.nome AS conta_nome, u.email AS conta, u.admin AS adm, p.nome AS produtor
         FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id LEFT JOIN produtores p ON p.id = f.produtor_id
-       WHERE f.talhoes IS NOT NULL AND f.talhoes != '' AND f.usuario_id IN (` + inq + ') LIMIT 1000').bind(...uids).all()),
+       WHERE f.talhoes IS NOT NULL AND f.talhoes != ''` + so('f.usuario_id') + ' LIMIT 3000').bind(...uids).all()),
     env.DB.prepare('SELECT usuario_id FROM modulos_usuario WHERE plantio = 1').all()
   ]);
   const resumos = await resumosDe(env, (fz && fz.results) || []);   // nome e área dos talhões sem abrir o KML
   // para a previsão de colheita: ciclo dos materiais, regra do GMR e talhões já colhidos
-  const ondeU = ' WHERE usuario_id IN (' + inq + ')', argU = uids;
+  const ondeU = ' WHERE 1=1' + so('usuario_id'), argU = uids;
   const [cic, reg, colh] = await Promise.all([
     env.DB.prepare('SELECT usuario_id, variedade, dias, gmr FROM ciclos' + ondeU).bind(...argU).all().catch(() => ({ results: [] })),
     env.DB.prepare('SELECT usuario_id, gmr, dias, ponto FROM ciclo_regra' + ondeU).bind(...argU).all().catch(() => ({ results: [] })),
-    env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0 AND usuario_id IN (' + inq + ')').bind(...argU).all().catch(() => ({ results: [] }))
+    env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0' + so('usuario_id')).bind(...argU).all().catch(() => ({ results: [] }))
   ]);
   const linhasCic = {}, regras = {}, cicloConta = {}, colhidos = {};
   ((cic && cic.results) || []).forEach((c) => { (linhasCic[c.usuario_id] = linhasCic[c.usuario_id] || []).push(c); });
@@ -467,6 +498,7 @@ export async function plantioGeral(env, uid) {
       fazendas, sem_lancamento: sem
     };
   });
+  if (visiveis) safras.forEach((S) => ocultarDemais(S, faz, new Set(visiveis), r1));
   return { ok: true, safras };
 }
 
@@ -575,7 +607,7 @@ export async function rotasAgro(env, req, me, rota, url) {
   /* ----- visão geral para o painel do administrador ----- */
   if (rota === '/api/agro/admin/plantio' && req.method === 'GET') {
     // administrador vê todas as contas; conta com o módulo de plantio vê a evolução das fazendas dela
-    if (mod.admin) return json(await plantioGeral(env, await contasDoAdmin(env, me)));
+    if (mod.admin) return json(await plantioGeral(env, '*', await contasDoAdmin(env, me)));   // totais de todas as contas; detalhe só das liberadas
     if (mod.plantio) return json(Object.assign(await plantioGeral(env, me.id), { propria: true }));
     return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   }

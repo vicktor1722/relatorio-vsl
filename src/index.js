@@ -521,7 +521,7 @@ export default {
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
       if (req.method === 'GET' && QUADROS[rota]) {
-        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|p2|' + url.search;   // p2: admin só vê as contas liberadas
+        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|p3|' + url.search;   // p3: admin vê totais de todas as contas, detalhe só das liberadas
         return await quadroPronto(env, ctx, req, chave, QUADROS[rota], async () => {
           const r = rota.startsWith('/api/painel/') ? await rotasPainelFaz(env, req, me, rota, url) : await rotasAgro(env, req, me, rota, url);
           return r.status === 200 ? await r.json() : r;
