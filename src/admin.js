@@ -1870,7 +1870,8 @@ ${AGRO_CSS}
     }).join('');
     var m0 = p.midias[0] || {};
     return '<article class="post" data-post="' + esc(p.id) + '">' +
-      '<div class="ph"><div class="av">' + esc(iniciais(p.fazenda)) + '</div><div><b>' + esc(p.fazenda) + '</b><small>' + esc(p.autor || '') + ' · ' + dataBR(p.data) + (p.servico ? ' · ' + esc(p.servico) : '') + '</small></div>' +
+      // perfil do post: quem fez (responsável da visita ou o usuário); a fazenda e a data embaixo
+      '<div class="ph"><div class="av">' + esc(iniciais(p.responsavel || p.autor || p.fazenda)) + '</div><div><b>' + esc(p.responsavel || p.autor || p.fazenda) + '</b><small>' + esc(p.fazenda) + ' · ' + dataBR(p.data) + (p.servico ? ' · ' + esc(p.servico) : '') + '</small></div>' +
         '<div class="ac">' + (p.pode_corrigir ? '<button class="selo" data-corr="' + esc(p.id) + '" style="cursor:pointer">✏️ corrigir</button>' : '') + '</div></div>' +
       '<div class="car">' + slides + '</div>' +
       '<div class="lg"><span class="lgtxt">' + legendaHtml(m0) + '</span>' +
