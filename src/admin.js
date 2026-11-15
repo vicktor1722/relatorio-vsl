@@ -11,6 +11,7 @@ import { contagemAcessos } from './acessos.js';
 import { espaco } from './midia.js';
 import { TERMOS_VERSAO, garantirTermos } from './termos.js';
 import { AGRO_ABAS, AGRO_CSS, AGRO_JS, AGRO_PAINEIS } from './agroadmin.js';
+import { equipeDe, garantirEquipe } from './equipe.js';
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -72,7 +73,15 @@ async function aplicarPrazos(env, contas) {
     (results || []).forEach((r) => mapa.set(r.usuario_id, Number(r.dias)));
   } catch (e) { mapa = new Map(); }
   const agora = Date.now();
+  const porId = new Map(contas.map((c) => [c.id, c]));
   contas.forEach((c) => {
+    // usuário comum de uma equipe: o prazo é o da conta do Adm (só o administrador geral define prazo)
+    const tit = c.equipe_id && porId.get(c.equipe_id);
+    if (c.equipe_id) {
+      c.dias_conta = null; c.prazo_dias = null; c.prazo_proprio = false; c.restam = null; c.vence_em = null;
+      c.equipe_nome = tit ? (tit.nome || tit.email) : '';
+      return;
+    }
     const criado = criadoEm(c.criado_em);
     const dias = mapa.has(c.id) ? mapa.get(c.id) : (Number(c.admin) === 1 ? 0 : PRAZO_PADRAO);
     c.dias_conta = isNaN(criado) ? null : Math.max(0, Math.floor((agora - criado) / 86400000));
@@ -475,12 +484,15 @@ export async function webhookPicPay(env, req) {
 }
 
 export async function resumoAdmin(env, me, adm) {
-  // conta comum: só enxerga o que é dela; administrador enxerga tudo
-  const meu = adm ? '' : ' AND r.usuario_id = ?';
-  const arg = adm ? [] : [me.id];
+  // conta comum: enxerga o que é dela e da equipe (Adm e colegas); administrador enxerga tudo
+  await garantirEquipe(env).catch(() => {});
+  const eq = adm ? null : await equipeDe(env, me.id).catch(() => ({ ids: [me.id], papel: null }));
+  const ids = adm ? [] : eq.ids;
+  const meu = adm ? '' : ' AND r.usuario_id IN (' + ids.map(() => '?').join(',') + ')';
+  const arg = adm ? [] : ids;
   await garantirTermos(env).catch(() => {});
   const contas = await env.DB.prepare(`
-    SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin,
+    SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin, u.papel, u.cota, u.equipe_id,
            (SELECT t.aceito_em FROM termos_aceite t WHERE t.usuario_id = u.id AND t.versao = '${TERMOS_VERSAO}') AS termos_em,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id) AS relatorios,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id AND r.status='publicado') AS publicados,
@@ -501,7 +513,7 @@ export async function resumoAdmin(env, me, adm) {
   } catch (e) { /* tabela ainda não criada */ }
 
   const relatorios = await env.DB.prepare(`
-    SELECT r.id, r.fazenda, r.produtor, r.safra, r.servico, r.responsavel,
+    SELECT r.id, r.usuario_id, r.fazenda, r.produtor, r.safra, r.servico, r.responsavel,
            r.data_inicio, r.data_fim, r.status, r.publicado_em, r.criado_em,
            u.email AS conta, u.nome AS conta_nome,
            (SELECT COUNT(*) FROM itens i WHERE i.relatorio_id = r.id) AS registros,
@@ -530,6 +542,8 @@ export async function resumoAdmin(env, me, adm) {
   `).bind(...arg).all();
 
   const acessos = await contagemAcessos(env);
+  // corrigir textos: o autor, o Adm da equipe e o administrador geral
+  (relatorios.results || []).forEach((r) => { r.meu = r.usuario_id === me.id; r.pode_corrigir = !!(adm || r.meu || (eq && eq.papel === 'adm')); });
   (relatorios.results || []).forEach((r) => {
     const a = acessos[r.id] || {};
     r.acessos = Number(a.total || 0);
@@ -540,7 +554,7 @@ export async function resumoAdmin(env, me, adm) {
   const itens = adm
     ? await env.DB.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes FROM itens').first()
     : await env.DB.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(i.bytes),0) AS bytes FROM itens i
-        JOIN relatorios r ON r.id = i.relatorio_id WHERE r.usuario_id = ?`).bind(me.id).first();
+        JOIN relatorios r ON r.id = i.relatorio_id WHERE 1=1${meu}`).bind(...arg).first();
 
   // espaço de cada conta, separado por tipo (foto, vídeo, áudio)
   const usoTipo = await env.DB.prepare(`
@@ -565,7 +579,7 @@ export async function resumoAdmin(env, me, adm) {
 
   return {
     ok: true,
-    eu: { admin: !!adm, id: me.id, nome: me.nome || '', email: me.email || '' },
+    eu: { admin: !!adm, id: me.id, nome: me.nome || '', email: me.email || '', papel: eq ? eq.papel : null, equipe: eq && eq.papel ? eq.ids.length : 0 },
     contas: contas.results || [],
     relatorios: relatorios.results || [],
     pontos: pontos.results || [],
@@ -791,6 +805,33 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
  align-items:center;justify-content:center;padding:16px}
 .modal{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:380px;
  box-shadow:0 10px 40px rgba(0,0,0,.25)}
+/* ---------- timeline (estilo Instagram), equipe e correção de textos ---------- */
+#feed{max-width:520px;margin:0 auto}
+.post{background:#fff;border:1px solid var(--linha);border-radius:14px;margin-bottom:14px;overflow:hidden}
+.post .ph{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.post .av{width:38px;height:38px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px;background:linear-gradient(135deg,#1B7A43,#7BC24A);box-shadow:0 0 0 2px #fff,0 0 0 4px #1B7A43}
+.post .ph b{display:block;font-size:14.5px}.post .ph small{font-size:12px;color:var(--fraco)}
+.post .ph .ac{margin-left:auto;display:flex;gap:6px}
+.post .car{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;background:#111}
+.post .car::-webkit-scrollbar{display:none}
+.post .sl{flex:0 0 100%;scroll-snap-align:start;position:relative}
+.post .sl img,.post .sl video{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#111}
+.post .sl .n{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11.5px;border-radius:10px;padding:2px 8px}
+.post .lg{padding:9px 12px 12px;font-size:14px;line-height:1.4}
+.post .lg .tal{display:inline-block;font-size:11.5px;background:#E8F4EC;color:#146034;border-radius:999px;padding:2px 8px;margin:0 6px 4px 0;font-weight:600}
+.post .lg .obs{margin-top:8px;padding-top:8px;border-top:1px solid #EEF2EF;color:#3E4F45;font-size:13px;white-space:pre-wrap}
+.post .lg a{color:var(--verde);font-weight:700;text-decoration:none}
+.feedvz{background:#fff;border:1px dashed var(--linha);border-radius:12px;padding:22px;text-align:center;color:var(--fraco)}
+.eq-cota{display:flex;align-items:center;gap:10px;margin:2px 0 12px;font-size:13px;color:var(--fraco)}
+.eq-cota .bar{flex:1;height:8px;border-radius:5px;background:#E3EAE5;overflow:hidden}.eq-cota .bar i{display:block;height:100%;background:var(--verde)}
+.eq-u{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #EEF2EF}.eq-u:first-child{border-top:0}
+.eq-u .av{width:36px;height:36px;border-radius:50%;background:#DDEFE3;color:#146034;display:grid;place-items:center;font-weight:800;flex:none;font-size:13px}
+.eq-u .t{flex:1;min-width:0}.eq-u .t b{display:block;font-size:14px}.eq-u .t small{color:var(--fraco);font-size:12px}
+.modal.corr{max-width:620px;max-height:92vh;overflow-y:auto}
+.corr-it{display:flex;gap:10px;padding:10px 0;border-top:1px solid #EEF2EF}.corr-it img{width:70px;height:70px;border-radius:10px;object-fit:cover;flex:none;background:#eee}
+.corr-it .vd{width:70px;height:70px;border-radius:10px;background:#222;color:#fff;display:grid;place-items:center;flex:none;font-size:22px}
+.corr-it textarea,.corr textarea{width:100%;font:inherit;font-size:14px;border:1px solid #CFD8D3;border-radius:10px;padding:8px;resize:vertical;min-height:58px}
+.corr-it small{display:block;color:var(--fraco);font-size:11.5px;margin-bottom:3px}
 .marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;margin:2px 0 12px}
 .marcar input{width:18px;height:18px;accent-color:var(--verde)}
 @media(max-width:560px){ .linha2{grid-template-columns:1fr} #mapa{height:300px} }
@@ -853,6 +894,8 @@ ${AGRO_CSS}
     <button class="on" data-aba="dash">Visão geral</button>
     <button data-aba="contas" id="abaContas">Contas</button>
     <button data-aba="rels">Relatórios</button>
+    <button data-aba="timeline">Timeline</button>
+    <button data-aba="equipe" id="abaEquipe" style="display:none">Equipe</button>
     ${AGRO_ABAS}
   </div>
   <main>
@@ -922,6 +965,16 @@ ${AGRO_CSS}
         <div class="campo"><input id="filtro" placeholder="filtrar por fazenda, produtor ou safra"></div>
         <div id="chipResp"></div>
         <div class="rolagem"><table id="tRels"></table></div>
+      </div>
+    </section>
+    <section class="painel" id="pTimeline">
+      <div id="feed"></div>
+      <div style="text-align:center;margin:6px 0 20px"><button class="btn-mini" id="feedMais" style="display:none">Carregar mais</button></div>
+    </section>
+    <section class="painel" id="pEquipe">
+      <div class="caixa" style="max-width:620px">
+        <h2 id="hEquipe">Sua equipe</h2>
+        <div id="eqCorpo"></div>
       </div>
     </section>
     ${AGRO_PAINEIS}
@@ -1005,15 +1058,17 @@ ${AGRO_CSS}
   var SVG = function (d) { return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>'; };
   var ICONES = {
     visao: SVG('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
+    timeline: SVG('<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor"/>'),
     campo: SVG('<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'),
     lavoura: SVG('<path d="M12 21V11"/><path d="M12 11c0-4 2.5-6 7-6 0 4-2.5 6-7 6z"/><path d="M12 14c0-3-2-5-6-5 0 3.2 2 5 6 5z"/>'),
     gestao: SVG('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .6 3.2 2.3 3.5 5.2"/>')
   };
   var AREAS = [
     { id: 'visao', nome: 'Visão geral', abas: ['dash'] },
+    { id: 'timeline', nome: 'Timeline', abas: ['timeline'] },
     { id: 'campo', nome: 'Campo', abas: ['rels', 'agenda'] },
     { id: 'lavoura', nome: 'Lavoura', abas: ['plantio', 'recs', 'custo', 'acessos'] },
-    { id: 'gestao', nome: 'Gestão', abas: ['contas', 'modulos'] }
+    { id: 'gestao', nome: 'Gestão', abas: ['contas', 'modulos', 'equipe'] }
   ];
   var gestaoN = 0, ultimaAba = {};
   function abaOk(k) { var b = document.querySelector('#subabas button[data-aba="' + k + '"]'); return !!b && b.style.display !== 'none'; }
@@ -1059,6 +1114,8 @@ ${AGRO_CSS}
       ultimaAba[areaDe(b.dataset.aba).id] = b.dataset.aba;
       montarNav();
       if (b.dataset.aba === 'dash' && mapa) setTimeout(function () { mapa.invalidateSize(); }, 60);
+      if (b.dataset.aba === 'timeline' && !FEED.carregado) carregarFeed(true);
+      if (b.dataset.aba === 'equipe') carregarEquipe();
     };
   });
 
@@ -1077,12 +1134,16 @@ ${AGRO_CSS}
     $('#telaEntrar').style.display = 'none';
     $('#telaPainel').style.display = '';
     var adm = !!(dados.eu && dados.eu.admin);
-    $('#titulo').firstChild.nodeValue = adm ? 'Administração' : 'Meus relatórios';
+    var temEquipe = !adm && dados.eu && dados.eu.papel;
+    $('#titulo').firstChild.nodeValue = adm ? 'Administração' : temEquipe ? 'Relatórios da equipe' : 'Meus relatórios';
     $('#quem').textContent = adm
       ? dados.totais.contas + ' contas · ' + dados.totais.relatorios + ' relatórios'
       : (dados.eu.nome || dados.eu.email) + ' · ' + dados.totais.relatorios + ' relatórios';
     $('#abaContas').style.display = adm ? '' : 'none';
-    $('#hRels').textContent = adm ? 'Todos os relatórios' : 'Meus relatórios';
+    $('#abaEquipe').style.display = dados.eu && dados.eu.papel === 'adm' ? '' : 'none';
+    FEED.carregado = false;
+    if ($('#pTimeline').classList.contains('on')) carregarFeed(true);
+    $('#hRels').textContent = adm ? 'Todos os relatórios' : temEquipe ? 'Relatórios da equipe' : 'Meus relatórios';
     if (!adm && $('#pContas').classList.contains('on')) document.querySelector('.abas button[data-aba="dash"]').click();
     pg = null;
     if (adm) { try { pg = await api('/api/admin/pagamentos'); } catch (e) { pg = null; } }
@@ -1148,6 +1209,8 @@ ${AGRO_CSS}
     var linhas = dados.contas.map(function (c) {
       return '<tr><td><b>' + esc(c.nome || '—') + '</b><br><span style="color:var(--fraco);font-size:12px">' + esc(c.email) + '</span>' +
         (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') +
+        (c.papel === 'adm' ? ' <span class="selo pub">Adm · até ' + (Number(c.cota) || 0) + ' usuário' + (Number(c.cota) === 1 ? '' : 's') + '</span>' : '') +
+        (c.equipe_id ? ' <span class="selo">equipe de ' + esc(c.equipe_nome || '') + '</span>' : '') +
         '<br>' + (c.termos_em ? '<span class="peq">✔ termos aceitos em ' + dataBR(c.termos_em) + '</span>' : '<span class="selo perto">termos pendentes</span>') +
         ((c.responsaveis || []).length ? '<br><span class="peq">👥 ' + c.responsaveis.length + (c.responsaveis.length > 1 ? ' responsáveis: ' : ' responsável: ') + esc(c.responsaveis.join(', ')) + '</span>' : '') + '</td>' +
         '<td>' + c.relatorios + '<br><span style="color:var(--fraco);font-size:11.5px">' + c.publicados + ' enviados</span></td>' +
@@ -1160,7 +1223,8 @@ ${AGRO_CSS}
           '<button class="selo" data-cobr="' + esc(c.id) + '">cobrança</button> ' +
           '<button class="selo" data-gerar="' + esc(c.id) + '">gerar link</button> ' +
           '<button class="selo" data-pago="' + esc(c.id) + '">marcar pago</button> ' +
-          '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ' +
+          (c.equipe_id ? '' : '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ') +
+          (c.equipe_id ? '' : '<button class="selo" data-adm="' + esc(c.id) + '">' + (c.papel === 'adm' ? 'Adm: usuários' : 'tornar Adm') + '</button> ') +
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
           '<button class="selo" data-kml="' + esc(c.id) + '" data-nome="' + esc(c.nome || c.email) + '">📐 mapa KML</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
@@ -1171,6 +1235,7 @@ ${AGRO_CSS}
     }).join('');
     $('#tContas').innerHTML =
       '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Espaço</th><th>Tempo de uso</th><th>Pagamento</th><th>Última atividade</th><th></th></tr>' + linhas;
+    document.querySelectorAll('[data-adm]').forEach(function (b) { b.onclick = function () { abrirAdm(b.dataset.adm); }; });
     document.querySelectorAll('[data-prom]').forEach(function (b) {
       b.onclick = async function () {
         b.disabled = true;
@@ -1722,6 +1787,149 @@ ${AGRO_CSS}
   var filtroResp = null;
   function nomeResp(r) { return String(r.responsavel || '').trim().replace(/ +/g, ' ').toLowerCase(); }
 
+  /* ---------- Adm de equipe (administrador geral define e dá a cota) ---------- */
+  function abrirAdm(id) {
+    var c = (dados.contas || []).filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    var n = (dados.contas || []).filter(function (x) { return x.equipe_id === id; }).length;
+    var m = modalBase();
+    m.cx.innerHTML = '<h2 style="margin:0 0 4px">Adm de equipe</h2>' +
+      '<p style="margin:0 0 14px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) + (c.papel === 'adm' ? ' · já tem ' + n + ' usuário' + (n === 1 ? '' : 's') + ' na equipe' : '') + '</p>' +
+      '<div class="campo"><label>Quantos usuários comuns ele pode criar</label><input id="admCota" type="number" min="0" max="500" inputmode="numeric" value="' + (c.papel === 'adm' ? (Number(c.cota) || 0) : 3) + '"></div>' +
+      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--fraco)">O Adm cria só usuários comuns. Eles seguem o prazo e os módulos desta conta; o prazo continua sendo só seu.</p>' +
+      '<div id="admMsg"></div><button class="btn" id="admOk">' + (c.papel === 'adm' ? 'Salvar' : 'Tornar Adm') + '</button>' +
+      (c.papel === 'adm' ? '<button class="btn sec" id="admTira" style="margin-top:8px">Tirar o Adm</button>' : '') +
+      '<button class="btn sec" id="admNao" style="margin-top:8px">Cancelar</button>';
+    var msg = m.cx.querySelector('#admMsg');
+    m.cx.querySelector('#admNao').onclick = m.sair;
+    m.cx.querySelector('#admOk').onclick = async function () {
+      try { await api('/api/admin/adm', { id: id, adm: true, cota: m.cx.querySelector('#admCota').value }); m.sair(); await abrirPainel(); }
+      catch (e) { aviso(msg, e.message, true); }
+    };
+    var tira = m.cx.querySelector('#admTira');
+    if (tira) tira.onclick = async function () {
+      try { await api('/api/admin/adm', { id: id, adm: false }); m.sair(); await abrirPainel(); }
+      catch (e) { aviso(msg, e.message, true); }
+    };
+  }
+
+  /* ---------- Equipe (o Adm cria usuários comuns dentro da cota) ---------- */
+  function iniciais(t) { var p = String(t || '?').trim().split(' ').filter(Boolean); return ((p[0] || '?').charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : '')).toUpperCase(); }
+  async function carregarEquipe() {
+    var box = $('#eqCorpo'); box.innerHTML = '<div class="peq">Carregando…</div>';
+    var E;
+    try { E = await api('/api/admin/equipe'); } catch (e) { box.innerHTML = '<div class="peq">' + esc(e.message) + '</div>'; return; }
+    if (E.papel !== 'adm') { box.innerHTML = '<div class="peq">Esta conta não é Adm de equipe.</div>'; return; }
+    var pc = E.cota ? Math.min(100, E.usados / E.cota * 100) : 100, sobra = Math.max(0, (E.cota || 0) - E.usados);
+    box.innerHTML = '<div class="eq-cota"><div class="bar"><i style="width:' + pc.toFixed(0) + '%"></i></div><span><b>' + E.usados + ' de ' + (E.cota || 0) + '</b> usuários</span></div>' +
+      E.membros.map(function (u) {
+        return '<div class="eq-u"><div class="av">' + esc(iniciais(u.nome || u.email)) + '</div><div class="t"><b>' + esc(u.nome || u.email) + '</b><small>' +
+          (u.eu ? 'você · ' : '') + esc(u.email) + ' · ' + (u.relatorios || 0) + ' relatório' + (u.relatorios === 1 ? '' : 's') + '</small></div>' +
+          '<span class="selo' + (u.papel === 'adm' ? ' pub' : '') + '">' + (u.papel === 'adm' ? 'Adm' : 'comum') + '</span></div>';
+      }).join('') +
+      (sobra ? '<h2 style="margin:18px 0 8px;font-size:15px">Novo usuário (comum)</h2>' +
+        '<div class="campo"><label>Nome</label><input id="eqNome" autocomplete="off"></div>' +
+        '<div class="campo"><label>E-mail (é o login no app)</label><input id="eqEmail" type="email" autocomplete="off"></div>' +
+        '<div class="campo"><label>Senha (6 ou mais caracteres)</label><input id="eqSenha" type="text" autocomplete="off"></div>' +
+        '<div id="eqMsg"></div><button class="btn" id="eqOk">Criar usuário</button>' +
+        '<p class="peq" style="margin-top:8px">Você pode criar mais ' + sobra + '. O limite é definido pelo administrador do AMVS. O usuário entra no app com esse e-mail e senha e vê os relatórios dele e da equipe.</p>'
+        : '<p class="peq" style="margin-top:12px">A equipe chegou ao limite de ' + (E.cota || 0) + ' usuários. Para mais, fale com o administrador do AMVS.</p>');
+    var ok = $('#eqOk');
+    if (ok) ok.onclick = async function () {
+      ok.disabled = true;
+      try {
+        await api('/api/admin/equipe/usuario', { nome: $('#eqNome').value, email: $('#eqEmail').value, senha: $('#eqSenha').value });
+        await carregarEquipe(); aviso($('#eqCorpo').querySelector('#eqMsg') || $('#eqCorpo'), 'Usuário criado. Passe o e-mail e a senha para ele entrar no app.', false);
+      } catch (e) { aviso($('#eqMsg'), e.message, true); ok.disabled = false; }
+    };
+  }
+
+  /* ---------- Timeline: um post por relatório (fazenda como perfil, fotos e vídeos com as legendas) ---------- */
+  var FEED = { carregado: false, mais: null, carregando: false };
+  async function carregarFeed(reset) {
+    if (FEED.carregando) return;
+    FEED.carregando = true;
+    var box = $('#feed'), btn = $('#feedMais');
+    if (reset) { box.innerHTML = '<div class="feedvz">Carregando…</div>'; FEED.mais = null; }
+    try {
+      var r = await api('/api/admin/timeline' + (!reset && FEED.mais ? '?antes=' + encodeURIComponent(FEED.mais) : ''));
+      if (reset) box.innerHTML = '';
+      if (!r.posts.length && reset) box.innerHTML = '<div class="feedvz">Ainda não há fotos nem vídeos sincronizados nos relatórios.</div>';
+      box.insertAdjacentHTML('beforeend', r.posts.map(postHtml).join(''));
+      FEED.mais = r.mais; FEED.carregado = true;
+      btn.style.display = r.mais ? '' : 'none';
+      ligarPosts();
+    } catch (e) { if (reset) box.innerHTML = '<div class="feedvz">' + esc(e.message) + '</div>'; }
+    FEED.carregando = false;
+  }
+  function postHtml(p) {
+    var n = p.midias.length;
+    var slides = p.midias.map(function (m, i) {
+      return '<div class="sl" data-i="' + i + '">' + (m.tipo === 'video'
+        ? '<video src="' + esc(m.src) + '" controls playsinline preload="metadata"></video>'
+        : '<img src="' + esc(m.src) + '?capa=1" loading="lazy" alt="">') + (n > 1 ? '<span class="n">' + (i + 1) + '/' + n + '</span>' : '') + '</div>';
+    }).join('');
+    var m0 = p.midias[0] || {};
+    return '<article class="post" data-post="' + esc(p.id) + '">' +
+      '<div class="ph"><div class="av">' + esc(iniciais(p.fazenda)) + '</div><div><b>' + esc(p.fazenda) + '</b><small>' + esc(p.autor || '') + ' · ' + dataBR(p.data) + (p.servico ? ' · ' + esc(p.servico) : '') + '</small></div>' +
+        '<div class="ac">' + (p.pode_corrigir ? '<button class="selo" data-corr="' + esc(p.id) + '" style="cursor:pointer">✏️ corrigir</button>' : '') + '</div></div>' +
+      '<div class="car">' + slides + '</div>' +
+      '<div class="lg"><span class="lgtxt">' + legendaHtml(m0) + '</span>' +
+        (p.obs.length ? '<div class="obs"><b>Observações gerais</b><br>' + esc(p.obs.join(' · ')).slice(0, 600) + '</div>' : '') +
+        (p.link ? '<div style="margin-top:6px"><a href="' + esc(p.link) + '?sc=1" target="_blank">Ver relatório completo ›</a></div>' : '<div class="peq" style="margin-top:6px">relatório ainda em aberto</div>') + '</div>' +
+      '<script type="application/json" class="pdados">' + JSON.stringify(p.midias.map(function (m) { return { l: m.legenda, t: m.talhao }; })).split('<').join('&lt;') + '<' + '/script></article>';
+  }
+  function legendaHtml(m) { return (m.talhao || m.t ? '<span class="tal">📍 ' + esc(m.talhao || m.t) + '</span>' : '') + esc(m.legenda != null ? m.legenda : (m.l || '')); }
+  function ligarPosts() {
+    document.querySelectorAll('#feed .post').forEach(function (el) {
+      if (el.dataset.ligado) return; el.dataset.ligado = '1';
+      var car = el.querySelector('.car'), leg = el.querySelector('.lgtxt'), dd = [];
+      try { dd = JSON.parse(el.querySelector('.pdados').textContent.split('&lt;').join('<')); } catch (e) { dd = []; }
+      car.addEventListener('scroll', function () {
+        var i = Math.round(car.scrollLeft / Math.max(1, car.clientWidth));
+        if (dd[i]) leg.innerHTML = legendaHtml(dd[i]);
+      }, { passive: true });
+    });
+    document.querySelectorAll('#feed [data-corr]').forEach(function (b) { b.onclick = function () { abrirCorrecao(b.dataset.corr); }; });
+  }
+  $('#feedMais').onclick = function () { carregarFeed(false); };
+
+  /* ---------- Corrigir legendas e observações gerais (autor, Adm da equipe e administrador) ---------- */
+  async function abrirCorrecao(id) {
+    var m = modalBase(true); m.cx.classList.add('corr');
+    m.cx.innerHTML = '<p class="peq">Carregando…</p>';
+    var C;
+    try { C = await api('/api/admin/corrigir?id=' + encodeURIComponent(id)); } catch (e) { m.cx.innerHTML = '<p>' + esc(e.message) + '</p><button class="btn sec" id="crNao">Fechar</button>'; m.cx.querySelector('#crNao').onclick = m.sair; return; }
+    var R = C.relatorio, textos = C.itens.filter(function (i) { return i.tipo === 'texto'; }), midias = C.itens.filter(function (i) { return i.tipo !== 'texto'; });
+    var hora = function (h) { var d = new Date(h); return isNaN(d) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    m.cx.innerHTML = '<h2 style="margin:0 0 2px">✏️ Corrigir relatório · ' + esc(R.fazenda || '') + '</h2>' +
+      '<p class="peq" style="margin:0 0 10px">' + dataBR(R.data) + ' · ' + esc(R.autor || '') + ' · ' + (R.status === 'publicado' ? 'publicado' : 'em aberto') + '</p>' +
+      '<div class="aviso-box" style="background:#FFF7E0;border:1px solid #F1D98A;color:#6B5200;border-radius:10px;padding:8px 10px;font-size:12.5px;margin-bottom:10px">As correções aparecem no link do cliente na hora. Fotos e vídeos não mudam, só os textos. No celular de quem fez o relatório a conversa continua com o texto antigo.</div>' +
+      ((R.observacoes || textos.length) ? '<h3 style="margin:10px 0 6px;font-size:15px">Observações gerais</h3>' : '') +
+      (R.observacoes ? '<textarea data-obs="1" rows="3">' + esc(R.observacoes) + '</textarea>' : '') +
+      textos.map(function (t) { return '<div style="margin-top:8px"><small class="peq">' + hora(t.hora) + '</small><textarea data-it="' + esc(t.id) + '" rows="4">' + esc(t.legenda) + '</textarea></div>'; }).join('') +
+      (midias.length ? '<h3 style="margin:16px 0 4px;font-size:15px">Legendas das fotos e vídeos</h3>' : '') +
+      midias.map(function (i) {
+        return '<div class="corr-it">' + (i.tipo === 'foto' && i.src ? '<img src="' + esc(i.src) + '?capa=1" loading="lazy" alt="">' : '<div class="vd">' + (i.tipo === 'video' ? '▶' : '🎤') + '</div>') +
+          '<div style="flex:1;min-width:0"><small>' + esc(i.talhao || 'sem talhão') + ' · ' + hora(i.hora) + '</small><textarea data-it="' + esc(i.id) + '" rows="2">' + esc(i.legenda) + '</textarea></div></div>';
+      }).join('') +
+      '<div id="crMsg" style="margin-top:8px"></div><button class="btn" id="crOk" style="margin-top:6px">Salvar correções</button><button class="btn sec" id="crNao" style="margin-top:8px">Cancelar</button>';
+    m.cx.querySelector('#crNao').onclick = m.sair;
+    m.cx.querySelector('#crOk').onclick = async function () {
+      var b = this, corpo = { id: R.id, itens: [] }, obs = m.cx.querySelector('[data-obs]');
+      if (obs) corpo.observacoes = obs.value;
+      m.cx.querySelectorAll('[data-it]').forEach(function (t) {
+        var orig = C.itens.filter(function (i) { return i.id === t.dataset.it; })[0];
+        if (orig && orig.legenda !== t.value) corpo.itens.push({ id: t.dataset.it, legenda: t.value });
+      });
+      b.disabled = true;
+      try {
+        await api('/api/admin/corrigir', corpo); m.sair();
+        if (FEED.carregado) carregarFeed(true);
+        alert('Correções salvas.');
+      } catch (e) { aviso(m.cx.querySelector('#crMsg'), e.message, true); b.disabled = false; }
+    };
+  }
+
   function desenharRelatorios() {
     var termo = ($('#filtro').value || '').toLowerCase();
     var chip = $('#chipResp');
@@ -1747,14 +1955,16 @@ ${AGRO_CSS}
         '<td>' + esc(r.safra || '—') + '</td>' +
         '<td>' + (r.responsavel ? esc(r.responsavel) : '<span style="color:var(--fraco)">—</span>') + '</td>' +
         '<td>' + r.registros + '<br><span style="color:var(--fraco);font-size:11.5px">' + r.fotos + ' fotos · ' + r.videos + ' vídeos</span></td>' +
-        '<td>' + esc(r.conta || '—') + '</td>' +
+        '<td>' + esc(r.conta_nome || r.conta || '—') + (r.meu === false && !(dados.eu && dados.eu.admin) ? '<br><span class="peq">equipe</span>' : '') + '</td>' +
         '<td>' + sel + '</td>' +
         '<td>' + acessosCel(r) + '</td>' +
-        '<td>' + (r.status === 'publicado' ? '<a href="/r/' + esc(r.id) + '?sc=1" target="_blank">abrir</a>' : '—') + '</td></tr>';
+        '<td style="white-space:nowrap">' + (r.status === 'publicado' ? '<a href="/r/' + esc(r.id) + '?sc=1" target="_blank">abrir</a>' : '—') +
+          (r.pode_corrigir ? '<br><button class="selo" data-corr="' + esc(r.id) + '" style="cursor:pointer;margin-top:4px">✏️ corrigir</button>' : '') + '</td></tr>';
     }).join('');
     $('#tRels').innerHTML =
       '<tr><th>Data</th><th>Fazenda</th><th>Safra</th><th>Responsável</th><th>Registros</th><th>Conta</th><th>Status</th><th>Acessos</th><th></th></tr>' +
       (linhas || '<tr><td colspan="9" style="color:var(--fraco)">Nada encontrado.</td></tr>');
+    document.querySelectorAll('[data-corr]').forEach(function (b) { b.onclick = function () { abrirCorrecao(b.dataset.corr); }; });
   }
   $('#filtro').addEventListener('input', function () { if (dados) desenharRelatorios(); });
 

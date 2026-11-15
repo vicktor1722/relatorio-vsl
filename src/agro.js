@@ -9,6 +9,7 @@
    ============================================================ */
 
 import { listarChuva } from './chuvatalhao.js';
+import { contaTitular } from './equipe.js';
 import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
@@ -213,8 +214,10 @@ export async function modulosDe(env, usuarioId) {
   if (!usuarioId) return { plantio: false, recomendacoes: false, admin: false };
   if (await ehAdm(env, usuarioId)) return { plantio: true, recomendacoes: true, admin: true };
   if (!(await liberadoGeral(env))) return { plantio: false, recomendacoes: false, admin: false };
+  // usuário comum de uma equipe: os módulos são os da conta do Adm
+  const titular = await contaTitular(env, usuarioId);
   const r = await env.DB.prepare('SELECT plantio, recomendacoes FROM modulos_usuario WHERE usuario_id = ?')
-    .bind(usuarioId).first();
+    .bind(titular).first();
   return { plantio: !!(r && r.plantio), recomendacoes: !!(r && r.recomendacoes), admin: false };
 }
 
