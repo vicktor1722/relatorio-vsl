@@ -5,7 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
-import { apagarComentario, comentar, compartilhou, contarNaoLidas, criarComum, curtir, definirAdm, lerCorrecao, listarEquipe, marcarLidas, notificacoes, salvarCorrecao, timeline } from './equipe.js';
+import { apagarComentario, apagarLeitor, comentar, compartilhou, contarNaoLidas, criarComum, criarLeitor, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
 import { alertaAltaSoja, statusAlta } from './altasoja.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
@@ -32,7 +32,7 @@ import { UFS_LINHAS } from './ufs.js';
 import { atualizarChuva, mapaRapido } from './chuva.js';
 import { rotasPainelFaz } from './painelfaz.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
-import { areasAdmin, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
+import { areasAdmin, resumoLeitor, cancelarCobranca, criarCobranca, criarConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -488,6 +488,11 @@ export default {
           admSemCodigo.delete(u.id);
           return json({ ok: true, token: await criarToken(env, u, null, { cf: 1 }), nome: u.nome, email: u.email });
         }
+        // acesso só à Timeline: entra só no painel (/admin), nunca no app de campo
+        if (u.leitor_de) {
+          if (!b.painel) return json({ erro: 'Este acesso é só para ver a Timeline: entre pelo painel, em amvs.ia.br/admin' }, 403);
+          return json({ ok: true, token: await criarToken(env, u, null, { lt: 1 }), nome: u.nome, email: u.email });
+        }
         return json({ ok: true, token: await criarToken(env, u), nome: u.nome, email: u.email });
       }
 
@@ -498,6 +503,16 @@ export default {
         if (!me) return json({ erro: 'sessão expirada, entre de novo' }, 401);
         await padronizarSafras(env);   // dados antigos "2026/27" → "2026/2027" (uma vez por instância)
         await padronizarVariedades(env);
+      }
+
+      // acesso só à Timeline: só as rotas da Timeline (e o sininho); o resto é recusado
+      if (me && me.lt && rota.startsWith('/api/')) {
+        const dono = await leitorDe(env, me.id).catch(() => null);
+        if (!dono) return json({ erro: 'este acesso foi removido' }, 401);
+        if (rota === '/api/admin/resumo') return json(await resumoLeitor(env, me, dono));
+        const livres = ['/api/eu', '/api/admin/timeline', '/api/admin/curtir', '/api/admin/comentar', '/api/admin/comentario/apagar',
+          '/api/admin/compartilhou', '/api/admin/notificacoes', '/api/admin/notificacoes/lidas'];
+        if (livres.indexOf(rota) < 0) return json({ erro: 'este acesso é só para ver a Timeline' }, 403);
       }
 
       if (rota === '/api/eu') return json({ ok: true, id: me.id, nome: me.nome, email: me.email });
@@ -541,6 +556,10 @@ export default {
         if (rota === '/api/admin/areas') return await quadroPronto(env, ctx, req, 'areas2|' + me.id + '|' + (adm ? 1 : 0), 21600, () => areasAdmin(env, me, adm));
         // equipe (Adm e usuários comuns), timeline e correção de textos: qualquer conta, cada uma com o que pode
         try {
+          if (rota === '/api/admin/leitores' && req.method === 'GET') return json(await listarLeitores(env, me, adm));
+          if (rota === '/api/admin/leitores' && req.method === 'POST') return json(await criarLeitor(env, me, adm, await req.json()));
+          if (rota === '/api/admin/leitores/apagar' && req.method === 'POST') return json(await apagarLeitor(env, me, (await req.json()).id));
+          if (rota === '/api/admin/leitores/senha' && req.method === 'POST') { const b = await req.json(); return json(await trocarSenhaLeitor(env, me, b.id, b.senha)); }
           if (rota === '/api/admin/equipe' && req.method === 'GET') return json(await listarEquipe(env, me));
           if (rota === '/api/admin/equipe/usuario' && req.method === 'POST') return json(await criarComum(env, me, await req.json()));
           if (rota === '/api/admin/timeline') return json(await timeline(env, me, adm, url.searchParams.get('antes')));
