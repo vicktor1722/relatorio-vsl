@@ -5,7 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
-import { apagarComentario, apagarLeitor, comentar, compartilhou, contarNaoLidas, criarComum, criarLeitor, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
+import { apagarComentario, apagarLeitor, comentar, compartilhou, contaTitular, contarNaoLidas, criarComum, criarLeitor, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
 import { alertaAltaSoja, statusAlta } from './altasoja.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
@@ -207,6 +207,22 @@ async function limparPdfs(env) {
 
 // quadros pesados guardados prontos (segundos até vencer); ver quadros.js
 const QUADROS = { '/api/painel/fazendas': 1800, '/api/painel/fazenda': 1800, '/api/agro/admin/plantio': 3600, '/api/agro/comparativo': 3600, '/api/agro/colheita-prevista': 3600 };
+
+// logo e nome da empresa que saem no relatório (e no PowerPoint): os da conta; o usuário comum de uma equipe
+// que não subiu os dele usa os do Adm (se o Adm trocar o logo, a equipe toda passa a usar o novo).
+// Telefone e e-mail de contato continuam sendo os de cada conta (lerContato).
+async function perfilDoRelatorio(env, uid) {
+  if (!uid) return {};
+  const ler = (id) => env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?').bind(id).first();
+  const p = Object.assign({}, (await ler(uid)) || {});
+  if (p.logo && String(p.empresa || '').trim()) return p;
+  const titular = await contaTitular(env, uid).catch(() => uid);
+  if (!titular || titular === uid) return p;
+  const t = (await ler(titular).catch(() => null)) || {};
+  if (!p.logo && t.logo) p.logo = t.logo;
+  if (!String(p.empresa || '').trim() && t.empresa) { p.empresa = t.empresa; if (!String(p.cidade || '').trim()) p.cidade = t.cidade || ''; }
+  return p;
+}
 
 export default {
   async fetch(req, env, ctx) {
@@ -436,12 +452,7 @@ export default {
           if (querTraduzir) {
             return json(await traduzirRelatorio(env, [juntarRelatorios(rels), ...rels], todos || [], url.searchParams.get('lang')));
           }
-          let perfilJ = null;
-          if (rels[0].usuario_id) {
-            perfilJ = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
-              .bind(rels[0].usuario_id).first();
-          }
-          perfilJ = Object.assign({}, perfilJ || {}, await lerContato(env, rels[0].usuario_id));
+          const perfilJ = Object.assign({}, await perfilDoRelatorio(env, rels[0].usuario_id), await lerContato(env, rels[0].usuario_id));
           if (req.method === 'GET' && url.searchParams.get('sc') !== '1') {
             ids.forEach((i) => ctx.waitUntil(registrarAcesso(env, req, i)));
           }
@@ -457,12 +468,7 @@ export default {
         const { results } = await env.DB.prepare(
           'SELECT * FROM itens WHERE relatorio_id = ? ORDER BY capturado_em ASC').bind(id).all();
         if (querTraduzir) return json(await traduzirRelatorio(env, [rel], results || [], url.searchParams.get('lang')));
-        let perfil = null;
-        if (rel.usuario_id) {
-          perfil = await env.DB.prepare('SELECT empresa,cidade,logo FROM perfis WHERE usuario_id = ?')
-            .bind(rel.usuario_id).first();
-        }
-        perfil = Object.assign({}, perfil || {}, await lerContato(env, rel.usuario_id));
+        const perfil = Object.assign({}, await perfilDoRelatorio(env, rel.usuario_id), await lerContato(env, rel.usuario_id));
         // conta a visualização (o admin abre com ?sc=1 para não se contar)
         if (req.method === 'GET' && url.searchParams.get('sc') !== '1') ctx.waitUntil(registrarAcesso(env, req, id));
         const agro = await dadosParaRelatorio(env, rel);
