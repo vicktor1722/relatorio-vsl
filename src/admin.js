@@ -483,6 +483,17 @@ export async function webhookPicPay(env, req) {
   return { status: 200, corpo: { ok: true } };
 }
 
+// acesso só à Timeline: o painel recebe só quem é a pessoa e de quem é a Timeline (nenhum dado de relatório ou conta)
+export async function resumoLeitor(env, me, dono) {
+  const d = await env.DB.prepare('SELECT nome, email FROM usuarios WHERE id = ?').bind(dono).first();
+  return {
+    ok: true,
+    eu: { admin: false, leitor: true, id: me.id, nome: me.nome || '', email: me.email || '', papel: null, equipe: 0, dono: d ? (d.nome || d.email) : '' },
+    contas: [], relatorios: [], pontos: [], pontosOutros: [], visitasDia: null,
+    totais: { contas: 0, relatorios: 0, registros: 0, bytes: 0, porTipo: {}, limite: 0 }
+  };
+}
+
 export async function resumoAdmin(env, me, adm) {
   // conta comum: enxerga o que é dela e da equipe (Adm e colegas); administrador enxerga tudo
   await garantirEquipe(env).catch(() => {});
@@ -502,7 +513,7 @@ export async function resumoAdmin(env, me, adm) {
            (SELECT COUNT(*) FROM fazendas f WHERE f.usuario_id = u.id) AS fazendas,
            (SELECT MAX(r.atualizado_em) FROM relatorios r WHERE r.usuario_id = u.id) AS ultima_atividade
       FROM usuarios u
-     WHERE ${adm ? '1=1' : 'u.id = ?'}
+     WHERE ${adm ? 'u.leitor_de IS NULL' : 'u.id = ?'}
      ORDER BY u.criado_em DESC
   `).bind(...(adm ? [] : [me.id])).all();
 
@@ -1030,6 +1041,7 @@ ${AGRO_CSS}
       </div>
     </section>
     <section class="painel" id="pTimeline">
+      <div id="ltBarra" style="display:none;max-width:620px;margin:0 auto 10px;text-align:right"><button class="btn-mini" id="btnLeitores">👥 Acessos à Timeline</button></div>
       <div id="feed"></div>
       <div style="text-align:center;margin:6px 0 20px"><button class="btn-mini" id="feedMais" style="display:none">Carregar mais</button></div>
     </section>
@@ -1195,8 +1207,22 @@ ${AGRO_CSS}
     }
     $('#telaEntrar').style.display = 'none';
     $('#telaPainel').style.display = '';
+    // acesso só à Timeline: esconde todo o resto do painel (nada mais é carregado)
+    if (dados.eu && dados.eu.leitor) {
+      document.body.classList.add('so-timeline');
+      $('#titulo').firstChild.nodeValue = 'Timeline';
+      $('#quem').textContent = (dados.eu.nome || dados.eu.email) + (dados.eu.dono ? ' · equipe de ' + dados.eu.dono : '');
+      document.querySelectorAll('#subabas button[data-aba]').forEach(function (b) { b.style.display = b.dataset.aba === 'timeline' ? '' : 'none'; });
+      var bt = document.querySelector('#subabas button[data-aba="timeline"]');
+      FEED.carregado = false;
+      if (bt && !$('#pTimeline').classList.contains('on')) bt.click(); else carregarFeed(true);
+      contarSino();
+      montarNav();
+      return;
+    }
     var adm = !!(dados.eu && dados.eu.admin);
     var temEquipe = !adm && dados.eu && dados.eu.papel;
+    $('#ltBarra').style.display = adm || (dados.eu && dados.eu.papel === 'adm') ? '' : 'none';
     $('#titulo').firstChild.nodeValue = adm ? 'Administração' : temEquipe ? 'Relatórios da equipe' : 'Meus relatórios';
     $('#quem').textContent = adm
       ? dados.totais.contas + ' contas · ' + dados.totais.relatorios + ' relatórios'
@@ -1889,6 +1915,46 @@ ${AGRO_CSS}
       try { await api('/api/admin/adm', { id: id, adm: false }); m.sair(); await abrirPainel(); }
       catch (e) { aviso(msg, e.message, true); }
     };
+  }
+
+  /* ---------- Acessos só à Timeline (login próprio para os responsáveis) ---------- */
+  $('#btnLeitores').onclick = function () { abrirLeitores(); };
+  async function abrirLeitores() {
+    var m = modalBase();
+    m.cx.innerHTML = '<div class="peq">Carregando…</div>';
+    var R;
+    try { R = await api('/api/admin/leitores'); } catch (e) { m.cx.innerHTML = '<div class="peq">' + esc(e.message) + '</div>'; return; }
+    var lista = R.leitores || [];
+    m.cx.innerHTML = '<h2 style="margin:0 0 4px">Acessos à Timeline</h2>' +
+      '<p style="margin:0 0 14px;font-size:13px;color:var(--fraco)">Cada pessoa entra em <b>amvs.ia.br/admin</b> com o próprio e-mail e senha e vê só a Timeline da sua equipe: fotos, legendas, curtidas e comentários. Não vê Visão geral, Campo, mapa, contas, prazos nem cadastros, e não usa o app de campo.</p>' +
+      (lista.length ? lista.map(function (u) {
+        return '<div class="eq-u"><div class="av">' + esc(iniciais(u.nome || u.email)) + '</div><div class="t"><b>' + esc(u.nome || u.email) + '</b><small>' + esc(u.email) + '</small></div>' +
+          '<button class="selo" data-ltsenha="' + esc(u.id) + '">senha</button> <button class="selo" data-ltapaga="' + esc(u.id) + '" data-nome="' + esc(u.nome || u.email) + '">remover</button></div>';
+      }).join('') : '<div class="peq" style="margin-bottom:6px">Nenhum acesso criado ainda.</div>') +
+      '<h2 style="margin:18px 0 8px;font-size:15px">Novo acesso</h2>' +
+      '<div class="campo"><label>Nome</label><input id="ltNome" autocomplete="off" placeholder="Nome do responsável"></div>' +
+      '<div class="campo"><label>E-mail (é o login)</label><input id="ltEmail" type="email" autocomplete="off" placeholder="pessoa@exemplo.com"></div>' +
+      '<div class="campo"><label>Senha</label><input id="ltSenha" type="text" autocomplete="off" placeholder="mínimo 6 caracteres"></div>' +
+      '<div id="ltMsg"></div><button class="btn" id="ltCriar">Criar acesso</button>' +
+      '<button class="btn sec" id="ltFecha" style="margin-top:8px">Fechar</button>';
+    var msg = m.cx.querySelector('#ltMsg');
+    m.cx.querySelector('#ltFecha').onclick = m.sair;
+    m.cx.querySelector('#ltCriar').onclick = async function () {
+      aviso(msg, 'Criando…');
+      try {
+        await api('/api/admin/leitores', { nome: m.cx.querySelector('#ltNome').value.trim(), email: m.cx.querySelector('#ltEmail').value.trim(), senha: m.cx.querySelector('#ltSenha').value });
+        m.sair(); abrirLeitores();
+      } catch (e) { aviso(msg, e.message, true); }
+    };
+    m.cx.querySelectorAll('[data-ltapaga]').forEach(function (b) { b.onclick = async function () {
+      if (!confirm('Remover o acesso de ' + b.dataset.nome + '? Ele deixa de entrar na Timeline.')) return;
+      try { await api('/api/admin/leitores/apagar', { id: b.dataset.ltapaga }); m.sair(); abrirLeitores(); } catch (e) { aviso(msg, e.message, true); }
+    }; });
+    m.cx.querySelectorAll('[data-ltsenha]').forEach(function (b) { b.onclick = async function () {
+      var nova = prompt('Nova senha (mínimo 6 caracteres):');
+      if (!nova) return;
+      try { await api('/api/admin/leitores/senha', { id: b.dataset.ltsenha, senha: nova }); aviso(msg, 'Senha trocada.'); } catch (e) { aviso(msg, e.message, true); }
+    }; });
   }
 
   /* ---------- Equipe (o Adm cria usuários comuns dentro da cota) ---------- */

@@ -228,6 +228,8 @@ export async function modulosAdmin(env) {
     SELECT u.id, u.email, u.nome, u.admin, m.plantio, m.recomendacoes
       FROM usuarios u LEFT JOIN modulos_usuario m ON m.usuario_id = u.id
      ORDER BY u.criado_em`).all();
+  // acessos só à Timeline não usam módulos: ficam fora da lista
+  try { const { results: lt } = await env.DB.prepare('SELECT id FROM usuarios WHERE leitor_de IS NOT NULL').all(); const fora = new Set((lt || []).map((x) => x.id)); results.splice(0, results.length, ...results.filter((u) => !fora.has(u.id))); } catch (e) {}
   return {
     ok: true,
     liberado: await liberadoGeral(env),

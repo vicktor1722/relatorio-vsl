@@ -13,7 +13,7 @@ let pronto = false;
 export async function garantirEquipe(env) {
   if (pronto) return;
   for (const sql of ['ALTER TABLE usuarios ADD COLUMN papel TEXT', 'ALTER TABLE usuarios ADD COLUMN cota INTEGER', 'ALTER TABLE usuarios ADD COLUMN equipe_id TEXT',
-    'ALTER TABLE usuarios ADD COLUMN admin_ve INTEGER']) {
+    'ALTER TABLE usuarios ADD COLUMN admin_ve INTEGER', 'ALTER TABLE usuarios ADD COLUMN leitor_de TEXT']) {
     try { await env.DB.prepare(sql).run(); } catch (e) { /* já existe */ }
   }
   try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS usuarios_equipe ON usuarios (equipe_id)').run(); } catch (e) {}
@@ -107,8 +107,62 @@ export async function contasDoAdmin(env, me) {
   return [...base];
 }
 
+/* ---------- acesso só à Timeline (leitor) ----------
+   Login próprio (e-mail e senha da pessoa) que só vê a Timeline da conta que o criou e da equipe dela:
+   curte, comenta e compartilha. Não usa o app de campo nem vê Visão geral, Campo, mapa, contas ou cadastros.
+   usuarios.leitor_de = id da conta dona. Quem cria: o administrador geral (para a própria conta) e o Adm de equipe. */
+const MAX_LEITORES = 30;
+export async function leitorDe(env, uid) {
+  await garantirEquipe(env);
+  const u = await env.DB.prepare('SELECT leitor_de FROM usuarios WHERE id = ?').bind(uid).first();
+  return (u && u.leitor_de) || null;
+}
+async function podeTerLeitores(env, me, adm) {
+  if (adm) return true;
+  return (await equipeDe(env, me.id)).papel === 'adm';
+}
+export async function listarLeitores(env, me, adm) {
+  if (!(await podeTerLeitores(env, me, adm))) return { ok: true, pode: false, leitores: [] };
+  const { results } = await env.DB.prepare('SELECT id, nome, email, criado_em FROM usuarios WHERE leitor_de = ? ORDER BY criado_em').bind(me.id).all();
+  return { ok: true, pode: true, max: MAX_LEITORES, leitores: results || [] };
+}
+export async function criarLeitor(env, me, adm, b) {
+  if (!(await podeTerLeitores(env, me, adm))) throw new Error('só o administrador e o Adm de equipe criam acessos à Timeline');
+  const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM usuarios WHERE leitor_de = ?').bind(me.id).first()).n;
+  if (n >= MAX_LEITORES) throw new Error('limite de ' + MAX_LEITORES + ' acessos à Timeline');
+  const email = String(b.email || '').trim().toLowerCase(), senha = String(b.senha || ''), nome = String(b.nome || '').trim().slice(0, 80);
+  if (!nome) throw new Error('informe o nome');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('informe um e-mail válido');
+  if (senha.length < 6) throw new Error('a senha precisa de pelo menos 6 caracteres');
+  if (await env.DB.prepare('SELECT id FROM usuarios WHERE email = ?').bind(email).first()) throw new Error('já existe uma conta com esse e-mail');
+  const id = novoId('u');
+  await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin,leitor_de) VALUES (?,?,?,?,0,?)')
+    .bind(id, email, await hashSenha(senha), nome, me.id).run();
+  return { ok: true, id, email, nome };
+}
+export async function apagarLeitor(env, me, id) {
+  const u = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ? AND leitor_de = ?').bind(String(id || ''), me.id).first();
+  if (!u) throw new Error('acesso não encontrado');
+  await garantirSocial(env);
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM tl_curtida WHERE usuario_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM tl_comentario WHERE usuario_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM tl_notif WHERE para_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM usuarios WHERE id = ? AND leitor_de = ?').bind(u.id, me.id)
+  ]);
+  return { ok: true };
+}
+export async function trocarSenhaLeitor(env, me, id, senha) {
+  if (String(senha || '').length < 6) throw new Error('a senha precisa de pelo menos 6 caracteres');
+  const u = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ? AND leitor_de = ?').bind(String(id || ''), me.id).first();
+  if (!u) throw new Error('acesso não encontrado');
+  await env.DB.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').bind(await hashSenha(String(senha)), u.id).run();
+  return { ok: true };
+}
+
 /* ---------- quem vê e quem corrige ---------- */
 async function contasVisiveis(env, me, adm) {
+  if (me.lt) { const dono = await leitorDe(env, me.id); return dono ? (await equipeDe(env, dono)).ids : []; }   // leitor: a equipe de quem o criou
   if (adm) return await contasDoAdmin(env, me);   // administrador geral: a dele e as liberadas
   return (await equipeDe(env, me.id)).ids;
 }
@@ -123,6 +177,7 @@ const marcas = (ids) => ids.map(() => '?').join(',');
 /* ---------- timeline: um post por relatório, com as fotos e vídeos e as legendas ---------- */
 export async function timeline(env, me, adm, antes) {
   const ids = await contasVisiveis(env, me, adm);
+  if (!ids.length) return { ok: true, posts: [], mais: null };
   const filtro = ' AND r.usuario_id IN (' + marcas(ids) + ')';
   const corte = /^\d{4}-\d{2}-\d{2}/.test(String(antes || '')) ? String(antes) : '9999';
   const { results: rels } = await env.DB.prepare(`SELECT r.id, r.usuario_id, r.fazenda, r.produtor, r.servico, r.responsavel, r.status, r.data_inicio, r.observacoes,
