@@ -381,6 +381,36 @@ export default {
         return new Response(paginaAdmin('AMVS'), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
       }
 
+      // PowerPoint gerado na página do relatório: o navegador envia o arquivo e recebe um link de download de verdade
+      // (iPhone, app na tela inicial e navegador do WhatsApp não salvam o arquivo gerado na própria página).
+      // Só para relatórios publicados; guarda um arquivo por relatório (o anterior é apagado).
+      if (rota.startsWith('/ppt/')) {
+        const partes = rota.slice(5).split('/');
+        const chaveRel = String(partes[0] || '').replace(/[^A-Za-z0-9_+-]/g, '').slice(0, 400);
+        if (!chaveRel) return json({ erro: 'relatório inválido' }, 400);
+        if (req.method === 'POST') {
+          const ids = [...new Set(chaveRel.split('+').filter(Boolean))].slice(0, 20);
+          const { results: pub } = await env.DB.prepare(`SELECT id FROM relatorios WHERE status = 'publicado' AND id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
+          if (!pub || pub.length !== ids.length) return json({ erro: 'relatório não encontrado' }, 404);
+          const dados = await req.arrayBuffer();
+          const b = new Uint8Array(dados.slice(0, 2));
+          if (dados.byteLength < 100 || dados.byteLength > 80 * 1024 * 1024 || b[0] !== 0x50 || b[1] !== 0x4b) return json({ erro: 'arquivo inválido' }, 400);
+          const antigos = await env.MIDIA.list({ prefix: 'ppt/' + chaveRel + '/' }).catch(() => ({ objects: [] }));
+          if (antigos.objects && antigos.objects.length) await env.MIDIA.delete(antigos.objects.map((o) => o.key)).catch(() => {});
+          const rnd = novoId('p');
+          const nomeArq = (String(url.searchParams.get('n') || 'relatorio.pptx').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 120) || 'relatorio.pptx').replace(/(\.pptx)?$/i, '.pptx');
+          await env.MIDIA.put('ppt/' + chaveRel + '/' + rnd + '.pptx', dados, { httpMetadata: { contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' } });
+          return json({ ok: true, url: '/ppt/' + chaveRel + '/' + rnd + '/' + nomeArq });
+        }
+        const rnd = String(partes[1] || '').replace(/[^A-Za-z0-9]/g, '');
+        const nomeArq = String(partes[2] || 'relatorio.pptx').replace(/[^A-Za-z0-9._-]/g, '') || 'relatorio.pptx';
+        const obj = rnd ? await env.MIDIA.get('ppt/' + chaveRel + '/' + rnd + '.pptx') : null;
+        if (!obj) return new Response('Arquivo expirado: gere o PowerPoint de novo na página do relatório.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+        return new Response(obj.body, { headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'Content-Disposition': 'attachment; filename="' + nomeArq + '"', 'Cache-Control': 'private, no-store' } });
+      }
+
       if (rota.startsWith('/r/')) {
         await padronizarSafras(env);   // relatório aberto antes de alguém usar o app já sai com a safra no padrão
         await padronizarVariedades(env);   // e com as variedades no nome do catálogo ("Olimpo" → "BMX Olimpo IPRO")
