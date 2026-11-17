@@ -337,6 +337,21 @@ export default {
           const { results: pl } = await env.DB.prepare('SELECT safra, talhao, cultura, variedade, data_plantio, usuario_id FROM plantio WHERE fazenda_id = ?').bind(f.id).all();
           saida.push({ id: f.id, fazenda: f.nome, conta: f.conta, area_ha: f.area_ha, talhoes: (rs[f.id] && rs[f.id].areas) || {}, plantio: pl || [] });
         }
+        // uma vez: Rancho de Couro (Vinicius), safra 2026/2027 — só os 9 talhões de soja da lista do campo entram no plantio;
+        // os demais ficam como pastagem (fora da área de plantio). Não mexe em talhão que já tem lançamento.
+        if (url.searchParams.get('acao') === 'pastagem-rancho') {
+          const FID = 'fmw6px3b0iz84nr', SAFRA = '2026/2027';
+          const SOJA = new Set(['T76', 'T74', 'T82', 'T78', 'T02A', 'T03', 'T07', 'T06', 'T05']);
+          const f = (fz || []).filter((x) => x.id === FID)[0];
+          const dono = await env.DB.prepare('SELECT usuario_id FROM fazendas WHERE id = ?').bind(FID).first();
+          if (!f || !dono) return json({ erro: 'fazenda não encontrada' }, 404);
+          const outros = Object.keys((rs[FID] && rs[FID].areas) || {}).filter((t) => !SOJA.has(t));
+          const cmds = outros.map((t) => env.DB.prepare(`INSERT INTO plantio (fazenda_id, safra, talhao, usuario_id, cultura, atualizado_em)
+              VALUES (?,?,?,?, 'pastagem', datetime('now')) ON CONFLICT(fazenda_id, safra, talhao) DO NOTHING`).bind(FID, SAFRA, t, dono.usuario_id));
+          for (let i = 0; i < cmds.length; i += 50) await env.DB.batch(cmds.slice(i, i + 50));
+          await mudouDados(env).catch(() => {});
+          return json({ ok: true, pastagem: outros.length, soja: [...SOJA] });
+        }
         return json({ ok: true, fazendas: saida });
       }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
