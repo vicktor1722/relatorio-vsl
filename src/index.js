@@ -322,38 +322,6 @@ export default {
       if (rota === '/api/status/alta') { if (env.ADMIN_KEY && url.searchParams.get('key') === env.ADMIN_KEY && url.searchParams.get('forcar')) return json(await alertaAltaSoja(env, true, url.searchParams.get('modo') || '')); return json(await statusAlta(env)); }
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
-      // consulta temporária (protegida por chave): talhões (nome e área) de uma fazenda, para conferir uma lista do campo
-      if (rota === '/api/status/talhoes') {
-        const k = String(url.searchParams.get('k') || '');
-        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
-        if (hx !== '86d7cce577f3cc7792224ff3b7ebb287957a5beb7d4406f2f17d1a2d9423132a') return json({ erro: 'não encontrado' }, 404);
-        const q = '%' + String(url.searchParams.get('faz') || '').trim().replace(/\s+/g, '%') + '%';
-        const { results: fz } = await env.DB.prepare(`SELECT f.id, f.nome, f.resumo, length(f.talhoes) AS kml_len, f.area_ha, u.nome AS conta
-            FROM fazendas f LEFT JOIN usuarios u ON u.id = f.usuario_id WHERE f.nome LIKE ? LIMIT 10`).bind(q).all();
-        const { resumosDe } = await import('./resumokml.js');
-        const rs = await resumosDe(env, fz || []);
-        const saida = [];
-        for (const f of fz || []) {
-          const { results: pl } = await env.DB.prepare('SELECT safra, talhao, cultura, variedade, data_plantio, usuario_id FROM plantio WHERE fazenda_id = ?').bind(f.id).all();
-          saida.push({ id: f.id, fazenda: f.nome, conta: f.conta, area_ha: f.area_ha, talhoes: (rs[f.id] && rs[f.id].areas) || {}, plantio: pl || [] });
-        }
-        // uma vez: Rancho de Couro (Vinicius), safra 2026/2027 — só os 9 talhões de soja da lista do campo entram no plantio;
-        // os demais ficam como pastagem (fora da área de plantio). Não mexe em talhão que já tem lançamento.
-        if (url.searchParams.get('acao') === 'pastagem-rancho') {
-          const FID = 'fmw6px3b0iz84nr', SAFRA = '2026/2027';
-          const SOJA = new Set(['T76', 'T74', 'T82', 'T78', 'T02A', 'T03', 'T07', 'T06', 'T05']);
-          const f = (fz || []).filter((x) => x.id === FID)[0];
-          const dono = await env.DB.prepare('SELECT usuario_id FROM fazendas WHERE id = ?').bind(FID).first();
-          if (!f || !dono) return json({ erro: 'fazenda não encontrada' }, 404);
-          const outros = Object.keys((rs[FID] && rs[FID].areas) || {}).filter((t) => !SOJA.has(t));
-          const cmds = outros.map((t) => env.DB.prepare(`INSERT INTO plantio (fazenda_id, safra, talhao, usuario_id, cultura, atualizado_em)
-              VALUES (?,?,?,?, 'pastagem', datetime('now')) ON CONFLICT(fazenda_id, safra, talhao) DO NOTHING`).bind(FID, SAFRA, t, dono.usuario_id));
-          for (let i = 0; i < cmds.length; i += 50) await env.DB.batch(cmds.slice(i, i + 50));
-          await mudouDados(env).catch(() => {});
-          return json({ ok: true, pastagem: outros.length, soja: [...SOJA] });
-        }
-        return json({ ok: true, fazendas: saida });
-      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
