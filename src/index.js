@@ -334,7 +334,7 @@ export default {
         const rs = await resumosDe(env, fz || []);
         const saida = [];
         for (const f of fz || []) {
-          const { results: pl } = await env.DB.prepare('SELECT id, safra, talhao, cultura, variedade, data_plantio FROM plantio WHERE fazenda_id = ?').bind(f.id).all();
+          const { results: pl } = await env.DB.prepare('SELECT safra, talhao, cultura, variedade, data_plantio, usuario_id FROM plantio WHERE fazenda_id = ?').bind(f.id).all();
           saida.push({ id: f.id, fazenda: f.nome, conta: f.conta, area_ha: f.area_ha, talhoes: (rs[f.id] && rs[f.id].areas) || {}, plantio: pl || [] });
         }
         return json({ ok: true, fazendas: saida });
