@@ -9,6 +9,7 @@
    ============================================================ */
 import { hashSenha, novoId } from './auth.js';
 import { acessosDe } from './acessos.js';
+import { excluirConta } from './admin.js';   // import circular só de função: usado em tempo de execução
 
 let pronto = false;
 export async function garantirEquipe(env) {
@@ -89,6 +90,40 @@ export async function criarComum(env, me, b) {
   await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin,equipe_id) VALUES (?,?,?,?,0,?)')
     .bind(id, email, await hashSenha(senha), nome, me.id).run();
   return { ok: true, id, email, nome };
+}
+
+// usuário comum que pertence à equipe deste Adm (nunca o próprio Adm, nem conta de outra equipe)
+async function membroDaEquipe(env, me, id) {
+  const eq = await equipeDe(env, me.id);
+  if (eq.papel !== 'adm') throw new Error('só o Adm da equipe gerencia os usuários');
+  const u = await env.DB.prepare('SELECT id, nome, email FROM usuarios WHERE id = ? AND equipe_id = ?').bind(String(id || '').slice(0, 60), me.id).first();
+  if (!u) throw new Error('usuário não encontrado na sua equipe');
+  return u;
+}
+
+// Adm corrige nome e e-mail (o e-mail é o login) de um usuário comum da equipe dele
+export async function editarComum(env, me, b) {
+  const u = await membroDaEquipe(env, me, b.id);
+  const nome = String(b.nome || '').trim().slice(0, 80), email = String(b.email || '').trim().toLowerCase();
+  if (!nome) throw new Error('informe o nome');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('informe um e-mail válido');
+  if (await env.DB.prepare('SELECT id FROM usuarios WHERE email = ? AND id <> ?').bind(email, u.id).first()) throw new Error('já existe uma conta com esse e-mail');
+  await env.DB.prepare('UPDATE usuarios SET nome = ?, email = ? WHERE id = ? AND equipe_id = ?').bind(nome, email, u.id, me.id).run();
+  return { ok: true, id: u.id, nome, email, email_mudou: email !== String(u.email).toLowerCase() };
+}
+
+// Adm exclui um usuário comum da equipe dele (libera a vaga na cota). Os relatórios dele também são apagados,
+// por isso o e-mail digitado precisa conferir; a mesma limpeza da exclusão feita pelo administrador geral.
+export async function excluirComum(env, me, b) {
+  const u = await membroDaEquipe(env, me, b.id);
+  if (String(b.email || '').trim().toLowerCase() !== String(u.email).toLowerCase()) throw new Error('o e-mail digitado não confere com o do usuário');
+  await garantirSocial(env);
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM tl_curtida WHERE usuario_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM tl_comentario WHERE usuario_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM tl_notif WHERE para_id = ? OR de_id = ?').bind(u.id, u.id)
+  ]);
+  return await excluirConta(env, me, u.id, u.email);
 }
 
 /* ---------- privacidade do administrador geral ----------

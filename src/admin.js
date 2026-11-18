@@ -872,7 +872,7 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 .feedvz{background:#fff;border:1px dashed var(--linha);border-radius:12px;padding:22px;text-align:center;color:var(--fraco)}
 .eq-cota{display:flex;align-items:center;gap:10px;margin:2px 0 12px;font-size:13px;color:var(--fraco)}
 .eq-cota .bar{flex:1;height:8px;border-radius:5px;background:#E3EAE5;overflow:hidden}.eq-cota .bar i{display:block;height:100%;background:var(--verde)}
-.eq-u{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #EEF2EF}.eq-u:first-child{border-top:0}
+.eq-u{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #EEF2EF}.eq-ac{display:flex;gap:6px;flex:none}.btn-mini.ruim{color:#8A1C12;border-color:#E9B8B2}.btn-mini.ruim:hover{background:#FDECEA}.eq-form{flex-basis:100%;padding:6px 0 4px 46px}.eq-u:first-child{border-top:0}
 .eq-u .av{width:36px;height:36px;border-radius:50%;background:#DDEFE3;color:#146034;display:grid;place-items:center;font-weight:800;flex:none;font-size:13px}
 .eq-u .t{flex:1;min-width:0}.eq-u .t b{display:block;font-size:14px}.eq-u .t small{color:var(--fraco);font-size:12px}
 .modal.corr{max-width:620px;max-height:92vh;overflow-y:auto}
@@ -1973,7 +1973,9 @@ ${AGRO_CSS}
       E.membros.map(function (u) {
         return '<div class="eq-u"><div class="av">' + esc(iniciais(u.nome || u.email)) + '</div><div class="t"><b>' + esc(u.nome || u.email) + '</b><small>' +
           (u.eu ? 'você · ' : '') + esc(u.email) + ' · ' + (u.relatorios || 0) + ' relatório' + (u.relatorios === 1 ? '' : 's') + '</small></div>' +
-          '<span class="selo' + (u.papel === 'adm' ? ' pub' : '') + '">' + (u.papel === 'adm' ? 'Adm' : 'comum') + '</span></div>';
+          '<span class="selo' + (u.papel === 'adm' ? ' pub' : '') + '">' + (u.papel === 'adm' ? 'Adm' : 'comum') + '</span>' +
+          (u.papel === 'adm' ? '' : '<div class="eq-ac"><button class="btn-mini" data-eqed="' + esc(u.id) + '">✏️ Editar</button><button class="btn-mini ruim" data-eqex="' + esc(u.id) + '">🗑 Excluir</button></div>') +
+          '<div class="eq-form" id="eqf-' + esc(u.id) + '" style="display:none"></div></div>';
       }).join('') +
       (sobra ? '<h2 style="margin:18px 0 8px;font-size:15px">Novo usuário (comum)</h2>' +
         '<div class="campo"><label>Nome</label><input id="eqNome" autocomplete="off"></div>' +
@@ -1982,6 +1984,39 @@ ${AGRO_CSS}
         '<div id="eqMsg"></div><button class="btn" id="eqOk">Criar usuário</button>' +
         '<p class="peq" style="margin-top:8px">Você pode criar mais ' + sobra + '. O limite é definido pelo administrador do AMVS. O usuário entra no app com esse e-mail e senha e vê os relatórios dele e da equipe.</p>'
         : '<p class="peq" style="margin-top:12px">A equipe chegou ao limite de ' + (E.cota || 0) + ' usuários. Para mais, fale com o administrador do AMVS.</p>');
+    var porId = {}; E.membros.forEach(function (m) { porId[m.id] = m; });
+    function formEq(id, html) { var f = document.getElementById('eqf-' + id); f.innerHTML = html; f.style.display = html ? '' : 'none'; return f; }
+    box.querySelectorAll('[data-eqed]').forEach(function (b) { b.onclick = function () {
+      var u = porId[b.dataset.eqed];
+      var f = formEq(u.id, '<div class="campo"><label>Nome</label><input data-n value="' + esc(u.nome || '') + '" autocomplete="off"></div>' +
+        '<div class="campo"><label>E-mail (é o login no app)</label><input data-e type="email" value="' + esc(u.email) + '" autocomplete="off"></div>' +
+        '<div data-m></div><button class="btn-mini" data-salvar>Salvar</button> <button class="btn-mini" data-cancelar>Cancelar</button>');
+      f.querySelector('[data-cancelar]').onclick = function () { formEq(u.id, ''); };
+      f.querySelector('[data-salvar]').onclick = async function (ev) {
+        var bt = ev.target; bt.disabled = true;
+        try {
+          var r = await api('/api/admin/equipe/usuario/editar', { id: u.id, nome: f.querySelector('[data-n]').value, email: f.querySelector('[data-e]').value });
+          await carregarEquipe();
+          aviso($('#eqMsg') || $('#eqCorpo'), r.email_mudou ? 'Dados salvos. O novo e-mail já é o login do usuário (a senha continua a mesma).' : 'Dados salvos.', false);
+        } catch (e) { aviso(f.querySelector('[data-m]'), e.message, true); bt.disabled = false; }
+      };
+    }; });
+    box.querySelectorAll('[data-eqex]').forEach(function (b) { b.onclick = function () {
+      var u = porId[b.dataset.eqex], n = u.relatorios || 0;
+      var f = formEq(u.id, '<div class="aviso ruim">Excluir <b>' + esc(u.nome || u.email) + '</b>? ' +
+        (n ? 'Os <b>' + n + ' relatório' + (n === 1 ? '' : 's') + '</b> e as fotos dele serão apagados e não dá para desfazer. ' : 'Ele não tem relatórios. ') +
+        'A vaga volta para a cota da equipe.</div>' +
+        '<div class="campo"><label>Digite o e-mail dele para confirmar</label><input data-c type="email" autocomplete="off" placeholder="' + esc(u.email) + '"></div>' +
+        '<div data-m></div><button class="btn-mini ruim" data-confirma>Excluir definitivamente</button> <button class="btn-mini" data-cancelar>Cancelar</button>');
+      f.querySelector('[data-cancelar]').onclick = function () { formEq(u.id, ''); };
+      f.querySelector('[data-confirma]').onclick = async function (ev) {
+        var bt = ev.target; bt.disabled = true;
+        try {
+          await api('/api/admin/equipe/usuario/excluir', { id: u.id, email: f.querySelector('[data-c]').value });
+          await carregarEquipe(); aviso($('#eqMsg') || $('#eqCorpo'), 'Usuário excluído. A vaga foi liberada.', false);
+        } catch (e) { aviso(f.querySelector('[data-m]'), e.message, true); bt.disabled = false; }
+      };
+    }; });
     var ok = $('#eqOk');
     if (ok) ok.onclick = async function () {
       ok.disabled = true;

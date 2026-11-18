@@ -5,7 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
-import { apagarComentario, apagarLeitor, comentar, compartilhou, contaTitular, contarNaoLidas, criarComum, criarLeitor, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
+import { apagarComentario, apagarLeitor, comentar, compartilhou, contaTitular, contarNaoLidas, criarComum, criarLeitor, editarComum, excluirComum, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
 import { alertaAltaSoja, statusAlta } from './altasoja.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
@@ -598,6 +598,8 @@ export default {
           if (rota === '/api/admin/leitores/senha' && req.method === 'POST') { const b = await req.json(); return json(await trocarSenhaLeitor(env, me, b.id, b.senha)); }
           if (rota === '/api/admin/equipe' && req.method === 'GET') return json(await listarEquipe(env, me));
           if (rota === '/api/admin/equipe/usuario' && req.method === 'POST') return json(await criarComum(env, me, await req.json()));
+          if (rota === '/api/admin/equipe/usuario/editar' && req.method === 'POST') return json(await editarComum(env, me, await req.json()));
+          if (rota === '/api/admin/equipe/usuario/excluir' && req.method === 'POST') return json(await excluirComum(env, me, await req.json()));
           if (rota === '/api/admin/timeline') return json(await timeline(env, me, adm, url.searchParams.get('antes')));
           if (rota === '/api/admin/curtir' && req.method === 'POST') return json(await curtir(env, me, adm, (await req.json()).id));
           if (rota === '/api/admin/comentar' && req.method === 'POST') { const b = await req.json(); return json(await comentar(env, me, adm, b.id, b.texto)); }
