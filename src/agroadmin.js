@@ -182,6 +182,9 @@ export const AGRO_CSS = `
 .ag-tp div{display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0}
 .ag-feito{margin-top:8px;font-size:13.5px;color:var(--verde-escuro);font-weight:600}
 .ag-link{color:var(--texto-fraco);text-decoration:underline;font-size:12.5px;margin-left:6px;font-weight:400}
+.ag-parte{background:#fff;border:1px solid #DCE5DF;border-radius:10px;padding:8px 10px 6px;margin:8px 0}
+.ag-parte .ag-link{margin:2px 0 4px;background:none;border:0;cursor:pointer;padding:0}
+.ag-tela .btn.secundario[data-a="pextra"]{margin:6px 0 10px}
 .ag-sw{display:flex;gap:10px;align-items:flex-start;font-size:14px;margin:14px 0 4px;line-height:1.35}
 .ag-sw input{width:22px;height:22px;flex:none;accent-color:var(--verde)}
 .ag-alerta{display:flex;gap:10px;align-items:center;background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;border-left:4px solid #2E8B8B;box-shadow:0 1px 2px rgba(0,0,0,.06)}
@@ -1076,7 +1079,8 @@ ${MAPA_CHUVA_JS}
     var cards = tl.map(function (t) {
       var r = linhaPlantio(P.faz, P.safra, t.nome); if (r && (r.cultura || r.variedade || r.data_plantio)) feitos++;
       var d = r ? daeDe(r.data_emerg) : null;
-      var l2 = r ? [r.variedade, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
+      var ptsC = r ? partesPl(r) : [], vtx = ptsC.length ? ptsC.map(function (x) { return x.variedade + ' ' + fmt(x.ha) + ' ha'; }).join(' + ') : (r ? r.variedade : '');
+      var l2 = r ? [vtx, r.data_plantio ? 'plantio ' + curta(r.data_plantio) : '', d !== null ? 'DAE ' + d : (r.data_emerg ? 'ainda não emergiu' : ''), semTxt(r)].filter(Boolean).join(' · ') : '';
       return '<div class="lista-item ag-tal" data-a="edtal" data-v="' + esc(t.nome) + '"><div class="ic">' + (r && r.cultura ? '🌱' : '＋') + '</div><div class="txt"><b>' + esc(t.nome) + '</b><span>' +
         (t.ha ? fmt(t.ha) + ' ha' : '') + (r && r.cultura ? ' · ' + esc(NOME_CULT[r.cultura] || r.cultura) : '') + '</span>' +
         '<span>' + esc(l2 || 'toque para informar o plantio') + '</span></div></div>';
@@ -1109,14 +1113,48 @@ ${MAPA_CHUVA_JS}
       '<div class="linha2"><div class="campo"><label>Sementes por metro</label><input inputmode="decimal" data-k="sem_m" value="' + (e.sem_m ? String(e.sem_m).replace('.', ',') : '') + '"></div>' +
       '<div class="campo"><label>Sementes por hectare</label><input inputmode="numeric" data-k="sem_ha" value="' + (e.sem_ha ? fmt(e.sem_ha, 0) : '') + '"></div></div>' +
       '<div class="ag-dica" id="agSem">' + semDica(e) + '</div>' +
-      (outros ? '<h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div>' : '') +
+      partesHtml(e, t) +
+      (outros && !(e.extras || []).length ? '<h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div>' : '') +
       '<button class="btn" data-a="salvarplantio">Salvar</button><button class="btn perigo" data-a="limparplantio">Limpar plantio deste talhão</button>');
   }
+  // plantio parcial (igual ao app): o talhão dividido em mais de uma variedade, cada uma com a área e a data dela.
+  // r.partes = [{variedade, ha, data_plantio}]; a 1ª é a variedade principal do talhão
+  function partesPl(r) {
+    var l = r && r.partes; if (typeof l === 'string') { try { l = JSON.parse(l || '[]'); } catch (e) { l = []; } }
+    return Array.isArray(l) ? l.filter(function (x) { return x && Number(x.ha) > 0; }) : [];
+  }
+  function nomesVariedade() {
+    var v = {}; ST.plantio.forEach(function (r) { if (r.variedade) v[r.variedade] = 1; partesPl(r).forEach(function (x) { if (x.variedade) v[x.variedade] = 1; }); });
+    return Object.keys(v).sort(function (a, b) { return a.localeCompare(b, 'pt-BR', { numeric: true }); });
+  }
+  function resumoPartes(e, t) {
+    var ex = e.extras || [], usa = (Number(e.haMain) || 0) + ex.reduce(function (s, x) { return s + (Number(x.ha) || 0); }, 0);
+    var sobra = (t.ha || 0) - usa;
+    return 'Total: <b>' + fmt(usa) + ' de ' + fmt(t.ha || 0) + ' ha</b>' + (sobra > 0.05 ? ' · ' + fmt(sobra) + ' ha sem variedade' : sobra < -0.05 ? ' · <b style="color:#C0392B">passa ' + fmt(-sobra) + ' ha da área do talhão</b>' : ' ✔');
+  }
+  function partesHtml(e, t) {
+    var ex = e.extras || [];
+    if (!ex.length) return '<button class="btn secundario" data-a="pextra">＋ Outra variedade neste talhão (plantio parcial)</button>';
+    var nomes = nomesVariedade();
+    return '<h2>Plantio parcial · mais de uma variedade</h2>' +
+      '<div class="campo"><label>Área de ' + esc(e.variedade || 'variedade acima') + ' (ha)</label><input inputmode="decimal" data-k="haMain" value="' + (e.haMain ? String(e.haMain).replace('.', ',') : '') + '" placeholder="ex.: 60"></div>' +
+      ex.map(function (x, i) {
+        return '<div class="ag-parte"><div class="campo"><label>Outra variedade ' + (i + 1) + '</label><input data-x="variedade" data-i="' + i + '" list="agVarsCat" value="' + esc(x.variedade) + '" placeholder="digite ou escolha (ex.: NEO 790 IPRO)" autocomplete="off"></div>' +
+          '<div class="linha2"><div class="campo"><label>Área (ha)</label><input inputmode="decimal" data-x="ha" data-i="' + i + '" value="' + (x.ha ? String(x.ha).replace('.', ',') : '') + '"></div>' +
+          '<div class="campo"><label>Data de plantio</label><input type="date" data-x="data_plantio" data-i="' + i + '" value="' + esc(x.data_plantio || e.data_plantio) + '"></div></div>' +
+          '<button class="ag-link" data-a="pextradel" data-v="' + i + '">remover esta variedade</button></div>';
+      }).join('') +
+      '<datalist id="agVarsCat">' + nomes.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+      '<div class="ag-dica" id="agPartes">' + resumoPartes(e, t) + '</div>' +
+      '<button class="btn secundario" data-a="pextra">＋ Mais uma variedade</button>';
+  }
+  function talhaoEd() { return talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 }; }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }
   function semDica(e) { var esp = espDe(e.cultura, e.espac_cm); return e.sem_ha ? '= ' + fmt(e.sem_m, 1) + ' sementes/m a ' + esp + ' cm = ' + fmt(e.sem_ha, 0) + ' sementes/ha' : 'Informe sementes/m ou sementes/ha: a outra é calculada pelo espaçamento (' + (esp ? esp + ' cm' : 'informe o espaçamento') + ').'; }
 
   function entradaPlantio(inp) {
     var e = P.ed, k = inp.dataset.k; if (!e) return;
+    if (k === 'haMain') { e.haMain = numBR(inp.value); var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(e, talhaoEd()); return; }
     if (k === 'cultura' || k === 'variedade') { e[k] = inp.value; if (k === 'cultura') pintarPlantio(); return; }
     if (k === 'data_plantio' || k === 'data_emerg') { e[k] = inp.value; var d = $('#agDae', tP); if (d) d.textContent = daeTxt(e); return; }
     var esp = espDe(e.cultura, e.espac_cm);
@@ -1131,11 +1169,29 @@ ${MAPA_CHUVA_JS}
 
   function vazioPlantio(e) { return !e.cultura && !e.variedade && !e.data_plantio && !e.data_emerg && !e.sem_m && !e.sem_ha; }
   function gravarPlantio(limpar) {
-    var e = P.ed, alvo = [P.nome].concat(P.outros), enviar = [];
+    var e = P.ed, enviar = [], ex = limpar ? [] : (e.extras || []);
+    var alvo = ex.length ? [P.nome] : [P.nome].concat(P.outros);   // plantio parcial vale só para este talhão
+    var partes = [];
+    if (ex.length) {
+      var tt = talhaoEd();
+      if (!e.cultura) { toast('Escolha a cultura (Soja, Milho…) antes de salvar o plantio'); return; }
+      if (!e.variedade) { toast('Escolha a variedade principal'); return; }
+      if (!(Number(e.haMain) > 0)) { toast('Informe a área (ha) de ' + e.variedade); return; }
+      for (var i = 0; i < ex.length; i++) {
+        if (!String(ex[i].variedade || '').trim() || !(Number(ex[i].ha) > 0)) { toast('Preencha variedade e área da outra variedade ' + (i + 1)); return; }
+      }
+      var soma = Number(e.haMain) + ex.reduce(function (s, x) { return s + Number(x.ha); }, 0);
+      if (tt.ha && soma > tt.ha + 0.05) { toast('As áreas somam ' + fmt(soma) + ' ha: passa dos ' + fmt(tt.ha) + ' ha do talhão'); return; }
+      partes = [{ variedade: e.variedade, ha: Number(e.haMain), data_plantio: e.data_plantio }].concat(ex.map(function (x) {
+        return { variedade: String(x.variedade).trim(), ha: Number(x.ha), data_plantio: x.data_plantio || e.data_plantio };
+      }));
+    }
     alvo.forEach(function (nome) {
       var row = { fazenda_id: P.faz, safra: P.safra, talhao: nome, cultura: limpar ? '' : e.cultura, variedade: limpar ? '' : e.variedade,
         data_plantio: limpar ? '' : e.data_plantio, data_emerg: limpar ? '' : e.data_emerg,
         espac_cm: limpar ? 0 : (e.sem_m ? espDe(e.cultura, e.espac_cm) : (e.espac_cm || 0)), sem_m: limpar ? 0 : e.sem_m, sem_ha: limpar ? 0 : e.sem_ha };
+      var antP = linhaPlantio(P.faz, P.safra, nome); if (antP && antP.lanc && !limpar) row.lanc = antP.lanc;
+      row.partes = nome === P.nome ? partes : [];
       ST.plantio = ST.plantio.filter(function (r) { return !(r.fazenda_id === P.faz && (r.safra || '') === (P.safra || '') && r.talhao === nome); });
       if (!vazioPlantio(row)) ST.plantio.push(row);
       enviar.push(row);
@@ -1162,10 +1218,19 @@ ${MAPA_CHUVA_JS}
     if (a === 'edtal') {
       var r = linhaPlantio(P.faz, P.safra, v);
       P.nome = v; P.outros = [];
-      P.ed = r ? { cultura: r.cultura || '', variedade: r.variedade || '', data_plantio: r.data_plantio || '', data_emerg: r.data_emerg || '', espac_cm: r.espac_cm || 0, sem_m: r.sem_m || 0, sem_ha: r.sem_ha || 0 }
+      var pts0 = r ? partesPl(r) : [];
+      P.ed = r ? { cultura: r.cultura || '', variedade: r.variedade || '', data_plantio: r.data_plantio || '', data_emerg: r.data_emerg || '', espac_cm: r.espac_cm || 0, sem_m: r.sem_m || 0, sem_ha: r.sem_ha || 0,
+          haMain: pts0.length ? Number(pts0[0].ha) : 0, extras: pts0.slice(1).map(function (x) { return { variedade: x.variedade || '', ha: Number(x.ha) || 0, data_plantio: x.data_plantio || '' }; }) }
         : { cultura: '', variedade: '', data_plantio: '', data_emerg: '', espac_cm: 0, sem_m: 0, sem_ha: 0 };
       pintarPlantio(); topoRolagem(); return;
     }
+    if (a === 'pextra') {
+      var e0 = P.ed; e0.extras = e0.extras || [];
+      if (!e0.extras.length && !e0.haMain) e0.haMain = 0;
+      e0.extras.push({ variedade: '', ha: 0, data_plantio: e0.data_plantio || '' });
+      pintarPlantio(); return;
+    }
+    if (a === 'pextradel') { P.ed.extras.splice(Number(v), 1); if (!P.ed.extras.length) P.ed.haMain = 0; pintarPlantio(); return; }
     if (a === 'emerg') {
       if (!P.ed.data_plantio) { toast('Informe primeiro a data de plantio'); return; }
       P.ed.data_emerg = addDias(P.ed.data_plantio, Number(v)); pintarPlantio(); return;
@@ -2368,7 +2433,15 @@ ${MAPA_CHUVA_JS}
       iniciado = true;
       tP = document.getElementById('agPlantio'); tR = document.getElementById('agRecs');
       ligarTela(tP, cliquePlantio, mudancaPlantio); ligarTela(tR, cliqueRecs, mudancaRecs);
-      tP.addEventListener('input', function (ev) { var n = ev.target; if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n); });
+      tP.addEventListener('input', function (ev) {
+        var n = ev.target;
+        if (n.dataset && n.dataset.k && n.tagName === 'INPUT') entradaPlantio(n);
+        if (n.dataset && n.dataset.x && P.ed && P.ed.extras) {   // plantio parcial: outra variedade do talhão
+          var px = P.ed.extras[Number(n.dataset.i)]; if (!px) return;
+          px[n.dataset.x] = n.dataset.x === 'ha' ? numBR(n.value) : n.value;
+          var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(P.ed, talhaoEd());
+        }
+      });
       tR.addEventListener('input', function (ev) { var n = ev.target; if (R.W && n.dataset && n.dataset.w === 'obs') R.W.obs = n.value; if (R.W && n.dataset && n.dataset.w === 'oplivre') R.W.op = n.value; });
       var ap = document.getElementById('abaPlantio'), ar = document.getElementById('abaRecs');
       if (ap) ap.addEventListener('click', function () { marcaNvA('plantio'); abrirPlantio(); });
