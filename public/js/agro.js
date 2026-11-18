@@ -624,7 +624,7 @@
       '<div class="campo"><label>Sementes por hectare</label><input inputmode="numeric" data-k="sem_ha" value="' + (e.sem_ha ? fmt(e.sem_ha, 0) : '') + '"></div></div>' +
       '<div class="ag-dica" id="agSem">' + semDica(e) + '</div>' +
       partesHtml(e, t) +
-      (outros && !(e.extras || []).length ? '<h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div>' : '') +
+      (outros && !(e.extras || []).length ? '<div id="agOutros"' + (Number(e.haMain) > 0 ? ' hidden' : '') + '><h2>Aplicar também aos talhões</h2><div class="ag-chips">' + outros + '</div></div>' : '') +
       '<button class="btn" data-a="salvarplantio">Salvar</button><button class="btn perigo" data-a="limparplantio">Limpar plantio deste talhão</button>');
   }
   // plantio parcial: o talhão dividido em mais de uma variedade (cada uma com a área e a data dela)
@@ -633,6 +633,13 @@
     var E = empresasCat(); E.ordem.forEach(function (emp) { E.m[emp].forEach(function (x) { v[x.nome] = 1; }); });
     return Object.keys(v).sort(function (a, b) { return a.localeCompare(b, 'pt-BR', { numeric: true }); });
   }
+  // plantio parcial com uma variedade só: parte do talhão plantada (o resto fica para plantar)
+  function resumoParcial(e, t) {
+    var h = Number(e.haMain) || 0;
+    if (!h) return 'Sem área: vale o talhão inteiro.';
+    if (t.ha && h > t.ha + 0.05) return '<b style="color:#C0392B">passa ' + fmt(h - t.ha) + ' ha da área do talhão (' + fmt(t.ha) + ' ha)</b>';
+    return t.ha && h < t.ha - 0.05 ? '🌱 Plantio parcial: ' + fmt(h) + ' de ' + fmt(t.ha) + ' ha · faltam ' + fmt(t.ha - h) + ' ha' : 'Talhão inteiro ✔';
+  }
   function resumoPartes(e, t) {
     var ex = e.extras || [], usa = (Number(e.haMain) || 0) + ex.reduce(function (s, x) { return s + (Number(x.ha) || 0); }, 0);
     var sobra = (t.ha || 0) - usa;
@@ -640,7 +647,9 @@
   }
   function partesHtml(e, t) {
     var ex = e.extras || [];
-    if (!ex.length) return '<button class="btn secundario" data-a="pextra">＋ Outra variedade neste talhão (plantio parcial)</button>';
+    if (!ex.length) return '<div class="campo"><label>Área plantada (ha) · vazio = talhão inteiro' + (t.ha ? ' (' + fmt(t.ha) + ' ha)' : '') + '</label><input inputmode="decimal" data-k="haMain" value="' + (e.haMain ? String(e.haMain).replace('.', ',') : '') + '" placeholder="' + (t.ha ? fmt(t.ha) + ' (talhão inteiro)' : 'talhão inteiro') + '"></div>' +
+      '<div class="ag-dica" id="agPartes">' + resumoParcial(e, t) + '</div>' +
+      '<button class="btn secundario" data-a="pextra">＋ Outra variedade neste talhão</button>';
     var nomes = nomesVariedade();
     return '<h2>Plantio parcial · mais de uma variedade</h2>' +
       '<div class="campo"><label>Área de ' + esc(e.variedade || 'variedade acima') + ' (ha)</label><input inputmode="decimal" data-k="haMain" value="' + (e.haMain ? String(e.haMain).replace('.', ',') : '') + '" placeholder="ex.: 60"></div>' +
@@ -692,7 +701,7 @@
 
   function entradaPlantio(inp) {
     var e = P.ed, k = inp.dataset.k; if (!e) return;
-    if (k === 'haMain') { e.haMain = numBR(inp.value); var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(e, talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 }); return; }
+    if (k === 'haMain') { e.haMain = numBR(inp.value); var tt0 = talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 }, rp = $('#agPartes', tP); if (rp) rp.innerHTML = (e.extras || []).length ? resumoPartes(e, tt0) : resumoParcial(e, tt0); var ao = $('#agOutros', tP); if (ao) ao.hidden = Number(e.haMain) > 0; return; }
     if (k === 'empresa') {
       e.empresa = inp.value; var c = acharCult(e.variedade);
       if (e.empresa !== '*' && !(c && c.empresa === e.empresa)) e.variedade = '';
@@ -722,9 +731,15 @@
   function vazioPlantio(e) { return !e.cultura && !e.variedade && !e.data_plantio && !e.data_emerg && !e.sem_m && !e.sem_ha; }
   function gravarPlantio(limpar) {
     var e = P.ed, enviar = [], ex = limpar ? [] : (e.extras || []);
-    var alvo = ex.length ? [P.nome] : [P.nome].concat(P.outros);   // plantio parcial vale só para este talhão
+    var parc = !limpar && !ex.length && Number(e.haMain) > 0;   // uma variedade só em parte do talhão
+    var alvo = ex.length || parc ? [P.nome] : [P.nome].concat(P.outros);   // plantio parcial vale só para este talhão
     if (!limpar && !e.cultura) { toast('Escolha a cultura (Soja, Milho…) antes de salvar o plantio'); return; }
     var partes = [];
+    if (parc) {
+      var tp = talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 };
+      if (tp.ha && Number(e.haMain) > tp.ha + 0.05) { toast('A área plantada (' + fmt(e.haMain) + ' ha) passa dos ' + fmt(tp.ha) + ' ha do talhão'); return; }
+      if (!tp.ha || Number(e.haMain) < tp.ha - 0.05) partes = [{ variedade: e.variedade, ha: Number(e.haMain), data_plantio: e.data_plantio }];
+    }
     if (ex.length) {
       var tt = talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 };
       if (!e.variedade) { toast('Escolha a variedade principal'); return; }
