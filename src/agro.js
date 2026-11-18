@@ -664,7 +664,7 @@ export async function rotasAgro(env, req, me, rota, url) {
       if (Array.isArray(t.partes)) {
         const l = t.partes.slice(0, 20).map((x) => ({ variedade: variedadePadrao(txt(x && x.variedade, 80), txt(t.cultura, 20)), ha: Math.round(num(x && x.ha) * 100) / 100, data_plantio: dia(x && x.data_plantio) }))
           .filter((x) => x.ha > 0);
-        partes = l.length > 1 ? JSON.stringify(l) : '';
+        partes = l.length ? JSON.stringify(l) : '';   // 1 parte = plantio parcial com uma variedade só (parte do talhão)
       }
       cmds.push(env.DB.prepare(`INSERT INTO plantio
           (fazenda_id, safra, talhao, usuario_id, cultura, variedade, data_plantio, data_emerg, espac_cm, sem_m, sem_ha, partes, atualizado_em)
