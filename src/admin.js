@@ -757,6 +757,7 @@ export function paginaAdmin(empresa) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="ADM Relatório">
 <link rel="apple-touch-icon" href="/api/icone/adm.png">
+<link rel="manifest" href="/admin.webmanifest">
 <title>Painel · ${esc(empresa || 'AMVS Relatório')}</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
@@ -902,7 +903,11 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 .post .ncm input{flex:1;font:inherit;font-size:14px;border:1px solid #D5DED9;border-radius:999px;padding:8px 12px;min-width:0}
 .post .ncm button{border:0;background:none;color:var(--verde);font-weight:700;font-size:14px;cursor:pointer}
 .nts{margin:-6px -6px 0}.nt{display:flex;gap:10px;padding:10px 8px;border-bottom:1px solid #EEF2EF;align-items:center;cursor:pointer;border-radius:10px}
-.nt.nova{background:#F1F8F3}.nt .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px;flex:none}
+.nt.nova{background:#F1F8F3}.nt .t p{margin:3px 0 0;font-size:13px;color:#3E4F45;line-height:1.45;white-space:pre-line}
+.nt-fil{display:flex;gap:6px;margin:0 0 10px;overflow:auto}.nt-fil button{background:#fff;border:1px solid #D5DED9;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;white-space:nowrap;color:#33443A;cursor:pointer}
+.nt-fil button.on{background:#1B7A43;color:#fff;border-color:#1B7A43}
+.nt-push{display:flex;gap:10px;align-items:center;background:#E8F4EC;border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:13px}.nt-push button{flex:none}
+.nt-dia{font-size:12px;font-weight:700;color:var(--fraco);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 4px}.nt .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px;flex:none}
 .nt .t{flex:1;font-size:13.5px;min-width:0}.nt .t small{display:block;color:var(--fraco);font-size:12px;margin-top:2px}
 .nt img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;background:#eee}
 .marcar{display:flex;align-items:center;gap:9px;font-size:13.5px;margin:2px 0 12px}
@@ -1257,6 +1262,7 @@ ${AGRO_CSS}
     FEED.carregado = false;
     if ($('#pTimeline').classList.contains('on')) carregarFeed(true);
     contarSino();
+    if (/[?&]avisos=1/.test(location.search)) { try { history.replaceState(null, '', '/admin'); } catch (e) {} setTimeout(abrirSino, 300); }   // tocou na notificação do celular
     $('#hRels').textContent = adm ? 'Todos os relatórios' : temEquipe ? 'Relatórios da equipe' : 'Meus relatórios';
     if (!adm && $('#pContas').classList.contains('on')) document.querySelector('.abas button[data-aba="dash"]').click();
     pg = null;
@@ -2190,31 +2196,84 @@ ${AGRO_CSS}
   function sinoN(n) { var b = $('#sinoN'); b.textContent = n > 99 ? '99+' : String(n || ''); b.style.display = n ? '' : 'none'; }
   async function contarSino() { try { var r = await api('/api/admin/notificacoes?so=n'); sinoN(r.nao_lidas); } catch (e) {} }
   setInterval(function () { if (token && $('#telaPainel').style.display !== 'none' && !document.hidden) contarSino(); }, 60000);
-  $('#btnSino').onclick = async function () {
+  // avisos no celular (app do painel instalado): service worker do painel + assinatura
+  var PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if (PUSH_OK) {
+    navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin' }).catch(function () {});
+    navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'avisos' && token) abrirSino(); });
+  }
+  function chaveBytes(b) { var x = String(b).split('-').join('+').split('_').join('/'), bin = atob(x + '==='.slice((x.length + 3) % 4)), o = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return o; }
+  async function pushAtivo() {
+    if (!PUSH_OK || Notification.permission !== 'granted') return false;
+    try { var reg = await navigator.serviceWorker.getRegistration('/admin'); var sub = reg && await reg.pushManager.getSubscription(); return !!sub; } catch (e) { return false; }
+  }
+  async function ativarPush() {
+    if (!PUSH_OK) throw new Error('Este navegador não recebe avisos. No iPhone, adicione o painel à Tela de Início (Compartilhar → Adicionar à Tela de Início), abra por ele e toque aqui de novo.');
+    var perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('Os avisos ficaram bloqueados. Libere nas configurações do celular (Notificações) e tente de novo.');
+    await navigator.serviceWorker.register('/admin-sw.js', { scope: '/admin' });
+    var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (!sub) { var k = await api('/api/admin/push/chave'); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveBytes(k.chave) }); }
+    await api('/api/admin/push/assinar', { assinatura: sub.toJSON() });
+  }
+  var NTF = 'todas';
+  var NT_IC = { curtiu: ['❤️', '#FDE7E7'], comentou: ['💬', '#E7F0FD'], compartilhou: ['↗️', '#E8F4EC'], soja: ['📊', '#E8F4EC'], aplicacao: ['✔️', '#E7F0FD'], alerta: ['⚠️', '#FDECEA'], chuva: ['🌧️', '#E6F3FB'] };
+  function diaNt(iso) {
+    var k = function (x) { return x.toLocaleDateString('pt-BR', { timeZone: 'America/Cuiaba' }); }, d = new Date(iso);
+    return k(d) === k(new Date()) ? 'Hoje' : k(d) === k(new Date(Date.now() - 86400e3)) ? 'Ontem' : d.toLocaleDateString('pt-BR', { timeZone: 'America/Cuiaba', weekday: 'short', day: '2-digit', month: '2-digit' });
+  }
+  async function abrirSino() {
     var m = modalBase(true);
     m.cx.innerHTML = '<h2 style="margin:0 0 10px">🔔 Notificações</h2><p class="peq">Carregando…</p>';
     var N;
     try { N = await api('/api/admin/notificacoes'); } catch (e) { m.cx.innerHTML = '<p>' + esc(e.message) + '</p>'; return; }
-    var ic = { curtiu: ['❤️', '#FDE7E7'], comentou: ['💬', '#E7F0FD'], compartilhou: ['↗️', '#E8F4EC'] };
+    var temAv = !!N.pode_avisos, ativo = temAv ? await pushAtivo() : true;
     var txt = function (x) {
       return '<b>' + esc(x.de_nome || 'Alguém') + '</b> ' + (x.tipo === 'curtiu' ? 'curtiu o relatório da <b>' + esc(x.fazenda) + '</b>'
         : x.tipo === 'comentou' ? 'comentou: “' + esc(x.texto || '') + '”' : 'compartilhou o relatório da <b>' + esc(x.fazenda) + '</b>');
     };
-    m.cx.innerHTML = '<h2 style="margin:0 0 10px">🔔 Notificações</h2>' + (N.lista.length ? '<div class="nts">' + N.lista.map(function (x) {
-      var i = ic[x.tipo] || ['🔔', '#eee'];
-      return '<div class="nt' + (x.lida ? '' : ' nova') + '" data-nt="' + esc(x.relatorio_id || '') + '"><div class="ic" style="background:' + i[1] + '">' + i[0] + '</div>' +
-        '<div class="t">' + txt(x) + '<small>' + quandoTxt(x.criado_em) + (x.tipo === 'comentou' ? ' · ' + esc(x.fazenda) : '') + '</small></div>' + (x.foto ? '<img src="' + esc(x.foto) + '?capa=1" alt="">' : '') + '</div>';
-    }).join('') + '</div>' : '<p class="peq">Nenhuma notificação ainda. Quando alguém da equipe curtir, comentar ou compartilhar um relatório seu, aparece aqui.</p>') +
-      '<button class="btn sec" id="ntFecha" style="margin-top:12px">Fechar</button>';
-    m.cx.querySelector('#ntFecha').onclick = m.sair;
-    m.cx.querySelectorAll('[data-nt]').forEach(function (el) { el.onclick = function () {
-      m.sair(); var id = el.dataset.nt, bt = document.querySelector('#subabas button[data-aba="timeline"]');
-      if (bt) bt.click();
-      var achar = function (n) { var post = document.querySelector('#feed [data-post="' + id + '"]'); if (post) post.scrollIntoView({ behavior: 'smooth', block: 'start' }); else if (n > 0) setTimeout(function () { achar(n - 1); }, 500); };
-      achar(8);
-    }; });
+    function pintarNt() {
+      var fil = temAv ? [['todas', 'Todas'], ['soja', '📈 Soja e mercado'], ['timeline', '❤️ Timeline'], ['aplicacao', '🚜 Aplicações'], ['chuva', '🌧️ Chuva']] : [];
+      var l = N.lista.filter(function (x) { return NTF === 'todas' || x.cat === NTF; }), ult = '';
+      var h = '<h2 style="margin:0 0 10px">🔔 Notificações</h2>' +
+        (temAv && !ativo ? '<div class="nt-push"><span style="flex:1">📲 Receba o fechamento da soja e os alertas de alta no celular.</span><button class="btn-mini" id="ntAtivar">Ativar avisos</button></div><div id="ntMsg"></div>' : '') +
+        (fil.length ? '<div class="nt-fil">' + fil.map(function (f) { return '<button data-ntf="' + f[0] + '"' + (NTF === f[0] ? ' class="on"' : '') + '>' + f[1] + '</button>'; }).join('') + '</div>' : '');
+      if (!l.length) h += '<p class="peq">' + (N.lista.length ? 'Nenhuma notificação deste tipo.' : 'Nenhuma notificação ainda. Curtidas, comentários e compartilhamentos dos relatórios' + (temAv ? ', o fechamento da soja, as aplicações e as chuvas lançadas' : '') + ' aparecem aqui.') + '</p>';
+      else h += '<div class="nts">' + l.map(function (x) {
+        var d = diaNt(x.criado_em), cab = ''; if (d !== ult) { cab = '<div class="nt-dia">' + esc(d) + '</div>'; ult = d; }
+        if (x.tipo === 'aviso') {
+          var ic = NT_IC[x.cat] || ['🔔', '#eee'], tit = String(x.titulo || '');
+          if (x.cat === 'soja' && tit.indexOf('alta') >= 0) ic = ['📈', '#E8F4EC'];
+          if (x.cat === 'aplicacao' && tit.indexOf('parcial') >= 0) ic = ['◐', '#E7F0FD'];
+          tit = tit.replace(/^[^A-Za-zÀ-ÿ0-9]+/, '');
+          return cab + '<div class="nt' + (x.lida ? '' : ' nova') + '" style="align-items:flex-start;cursor:default"><div class="ic" style="background:' + ic[1] + '">' + ic[0] + '</div>' +
+            '<div class="t"><b>' + esc(tit) + '</b>' + (x.corpo ? '<p>' + esc(x.corpo) + '</p>' : '') + '<small>' + quandoTxt(x.criado_em) + '</small></div></div>';
+        }
+        var i = NT_IC[x.tipo] || ['🔔', '#eee'];
+        return cab + '<div class="nt' + (x.lida ? '' : ' nova') + '" data-nt="' + esc(x.relatorio_id || '') + '"><div class="ic" style="background:' + i[1] + '">' + i[0] + '</div>' +
+          '<div class="t">' + txt(x) + '<small>' + quandoTxt(x.criado_em) + (x.tipo === 'comentou' ? ' · ' + esc(x.fazenda) : '') + '</small></div>' + (x.foto ? '<img src="' + esc(x.foto) + '?capa=1" alt="">' : '') + '</div>';
+      }).join('') + '</div>';
+      h += '<button class="btn sec" id="ntFecha" style="margin-top:12px">Fechar</button>';
+      m.cx.innerHTML = h;
+      m.cx.querySelector('#ntFecha').onclick = m.sair;
+      m.cx.querySelectorAll('[data-ntf]').forEach(function (b) { b.onclick = function () { NTF = b.dataset.ntf; pintarNt(); }; });
+      var at = m.cx.querySelector('#ntAtivar');
+      if (at) at.onclick = async function () {
+        at.disabled = true;
+        try { await ativarPush(); ativo = true; pintarNt(); aviso(m.cx.querySelector('#ntMsg') || m.cx, 'Avisos ligados neste celular.', false); }
+        catch (e) { at.disabled = false; aviso(m.cx.querySelector('#ntMsg'), e.message, true); }
+      };
+      m.cx.querySelectorAll('[data-nt]').forEach(function (el) { el.onclick = function () {
+        m.sair(); var id = el.dataset.nt, bt = document.querySelector('#subabas button[data-aba="timeline"]');
+        if (bt) bt.click();
+        var achar = function (n) { var post = document.querySelector('#feed [data-post="' + id + '"]'); if (post) post.scrollIntoView({ behavior: 'smooth', block: 'start' }); else if (n > 0) setTimeout(function () { achar(n - 1); }, 500); };
+        achar(8);
+      }; });
+    }
+    pintarNt();
     if (N.nao_lidas) { api('/api/admin/notificacoes/lidas', {}).catch(function () {}); sinoN(0); }
-  };
+  }
+  $('#btnSino').onclick = function () { abrirSino(); };
   $('#feedMais').onclick = function () { carregarFeed(false); };
 
   /* ---------- Corrigir legendas e observações gerais (autor, Adm da equipe e administrador) ---------- */

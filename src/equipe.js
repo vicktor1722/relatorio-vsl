@@ -9,6 +9,7 @@
    ============================================================ */
 import { hashSenha, novoId } from './auth.js';
 import { acessosDe } from './acessos.js';
+import { contarAvisos, ehPainelAvisos, lerAvisos, listarAvisos } from './avisos.js';
 import { excluirConta } from './admin.js';   // import circular só de função: usado em tempo de execução
 
 let pronto = false;
@@ -378,15 +379,25 @@ export async function notificacoes(env, me) {
     const { results: fs } = await env.DB.prepare(`SELECT relatorio_id, midia FROM itens WHERE tipo = 'foto' AND midia IS NOT NULL AND relatorio_id IN (${ids.map(() => '?').join(',')}) ORDER BY capturado_em`).bind(...ids).all();
     (fs || []).forEach((f) => { if (!fotos[f.relatorio_id]) fotos[f.relatorio_id] = '/img/' + encodeURIComponent(f.midia); });
   }
-  return { ok: true, nao_lidas: n, lista: (results || []).map((x) => Object.assign(x, { foto: fotos[x.relatorio_id] || '' })) };
+  const lista = (results || []).map((x) => Object.assign(x, { foto: fotos[x.relatorio_id] || '', cat: 'timeline' }));
+  // avisos do painel (soja, aplicações, chuva) do administrador e do Adm de equipe, junto da timeline
+  let av = [], nAv = 0;
+  try {
+    av = (await listarAvisos(env, 'painel:' + me.id, 80)).map((x) => ({ id: x.id, tipo: 'aviso', cat: x.cat, titulo: x.titulo, corpo: x.corpo, url: x.url, criado_em: x.criado_em, lida: x.lida }));
+    nAv = await contarAvisos(env, 'painel:' + me.id);
+  } catch (e) { /* sem avisos */ }
+  const todas = lista.concat(av).sort((a, b) => (a.criado_em < b.criado_em ? 1 : a.criado_em > b.criado_em ? -1 : 0)).slice(0, 120);
+  return { ok: true, nao_lidas: n + nAv, lista: todas, pode_avisos: await ehPainelAvisos(env, me.id) };
 }
 export async function contarNaoLidas(env, me) {
   await garantirSocial(env);
-  return { ok: true, nao_lidas: (await env.DB.prepare('SELECT COUNT(*) AS n FROM tl_notif WHERE para_id = ? AND lida = 0').bind(me.id).first()).n };
+  const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM tl_notif WHERE para_id = ? AND lida = 0').bind(me.id).first()).n;
+  return { ok: true, nao_lidas: n + (await contarAvisos(env, 'painel:' + me.id).catch(() => 0)) };
 }
 export async function marcarLidas(env, me) {
   await garantirSocial(env);
   await env.DB.prepare('UPDATE tl_notif SET lida = 1 WHERE para_id = ? AND lida = 0').bind(me.id).run();
+  await lerAvisos(env, 'painel:' + me.id).catch(() => {});
   return { ok: true };
 }
 

@@ -37,6 +37,22 @@ header.topo{background:var(--verde);color:#fff;padding:calc(12px + env(safe-area
 header.topo .info{flex:1;min-width:0}header.topo h1{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header.topo p{margin:2px 0 0;font-size:12.5px;opacity:.85}
 header.topo button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600}
+header.topo .sino-p{position:relative;font-size:17px;line-height:1;padding:7px 10px}
+header.topo .sino-p b{position:absolute;top:-5px;right:-6px;background:#E53935;color:#fff;font-size:11px;border-radius:10px;padding:1px 6px;font-weight:800}
+.av-veu{position:fixed;inset:0;background:rgba(10,30,18,.45);z-index:5000;display:flex;align-items:flex-end;justify-content:center}
+.av-cx{background:#F4F7F5;width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+.av-cab{position:sticky;top:0;z-index:1;background:#fff;padding:16px 16px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #E5ECE7}
+.av-cab b{font-size:18px;color:#146034;flex:1}.av-cab button{border:0;background:none;font:inherit;cursor:pointer}
+.av-cab .lid{font-size:12.5px;color:#1B7A43;font-weight:600}.av-cab .fx{font-size:20px;color:#6B7B72;margin-left:6px}
+.av-fil{display:flex;gap:6px;padding:10px 14px 4px;overflow:auto}.av-fil button{background:#fff;border:1px solid #D5DED9;border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;white-space:nowrap;color:#33443A;cursor:pointer}
+.av-fil button.on{background:#1B7A43;color:#fff;border-color:#1B7A43}
+.av-dia{font-size:12px;font-weight:700;color:#6B7B72;text-transform:uppercase;letter-spacing:.04em;padding:14px 16px 6px}
+.av{display:flex;gap:11px;background:#fff;margin:0 12px 8px;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.av.nova{box-shadow:inset 3px 0 0 #1B7A43,0 1px 3px rgba(0,0,0,.06)}
+.av .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:19px;flex:none}
+.av .t{flex:1;min-width:0}.av .t b{display:block;font-size:14.5px;color:#1B2B22}.av .t p{margin:3px 0 0;font-size:13px;color:#3E4F45;line-height:1.45;white-space:pre-line}.av .t small{display:block;margin-top:4px;font-size:11.5px;color:#7A8A80}
+.av .ponto{width:9px;height:9px;border-radius:50%;background:#1B7A43;flex:none;margin-top:6px}
+.av-vazio{margin:30px 20px;text-align:center;color:#6B7B72;font-size:14px}.av-nota{margin:14px 12px 22px;font-size:12px;color:#6B7B72;text-align:center}
 .corpo{max-width:900px;margin:0 auto;padding:12px 14px 60px}
 .sel{display:flex;gap:10px;flex-wrap:wrap}.sel .campo{flex:1;min-width:150px;margin-bottom:8px}
 .abas{display:flex;gap:4px;background:#E4EAE6;border-radius:12px;padding:3px;margin:4px 0 14px;overflow-x:auto}
@@ -245,7 +261,7 @@ body.sem-rolar{overflow:hidden}
 </div>
 
 <div id="telaApp" class="oculto">
-  <header class="topo"><div class="info"><h1 id="hNome">—</h1><p id="hSub">—</p></div><button id="btnSair">Sair</button></header>
+  <header class="topo"><div class="info"><h1 id="hNome">—</h1><p id="hSub">—</p></div><button id="btnSino" class="sino-p" hidden aria-label="Avisos">🔔<b id="sinoN" hidden></b></button><button id="btnSair">Sair</button></header>
   <div class="corpo">
     <div class="sel"><div class="campo" id="boxFaz"><label>Fazenda</label><select id="selFaz"></select></div>
       <div class="campo" id="boxSafra"><label>Safra</label><select id="selSafra"></select></div></div>
@@ -310,10 +326,65 @@ body.sem-rolar{overflow:hidden}
     sair();
   };
 
+  /* ---------- sininho: histórico de avisos do dono/gerente (soja, aplicações, atrasos, chuva) ---------- */
+  var AVI = { filtro: 'todos', ligado: false };
+  var AV_IC = { soja: ['📊', '#E8F4EC'], aplicacao: ['✔️', '#E7F0FD'], alerta: ['⚠️', '#FDECEA'], chuva: ['🌧️', '#E6F3FB'] };
+  function sinoAv(n) { var b = $('#sinoN'); b.textContent = n > 99 ? '99+' : String(n || ''); b.hidden = !n; }
+  function contarAvisos() { if (!eu || eu.papel === 'operador') return; api('/api/portal/avisos?so=n').then(function (r) { sinoAv(r.nao_lidas); }).catch(function () {}); }
+  function iniciarAvisos() {
+    var op = !eu || eu.papel === 'operador';
+    $('#btnSino').hidden = op;
+    if (op) return;
+    contarAvisos();
+    if (!AVI.ligado) { AVI.ligado = true; setInterval(function () { if (!document.hidden) contarAvisos(); }, 120000); }
+    if (/[?&]avisos=1/.test(location.search)) { try { history.replaceState(null, '', '/portal'); } catch (e) {} abrirAvisos(); }
+  }
+  $('#btnSino').onclick = function () { abrirAvisos(); };
+  function diaAv(iso) {
+    var d = new Date(iso), h = new Date(), on = new Date(Date.now() - 86400e3);
+    var k = function (x) { return x.toLocaleDateString('pt-BR', { timeZone: 'America/Cuiaba' }); };
+    return k(d) === k(h) ? 'Hoje' : k(d) === k(on) ? 'Ontem' : d.toLocaleDateString('pt-BR', { timeZone: 'America/Cuiaba', weekday: 'short', day: '2-digit', month: '2-digit' });
+  }
+  function horaAv(iso) { try { return new Date(iso).toLocaleTimeString('pt-BR', { timeZone: 'America/Cuiaba', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+  async function abrirAvisos() {
+    var v = document.getElementById('avVeu'); if (v) v.remove();
+    v = document.createElement('div'); v.id = 'avVeu'; v.className = 'av-veu';
+    v.innerHTML = '<div class="av-cx"><div class="av-cab"><b>🔔 Avisos</b><button class="lid" id="avLid">marcar todos como lidos</button><button class="fx" id="avFx" aria-label="Fechar">✕</button></div><div id="avCorpo"><div class="av-vazio">Carregando…</div></div></div>';
+    document.body.appendChild(v);
+    v.addEventListener('click', function (e) { if (e.target === v) v.remove(); });
+    $('#avFx').onclick = function () { v.remove(); };
+    var R;
+    try { R = await api('/api/portal/avisos'); } catch (e) { $('#avCorpo').innerHTML = '<div class="av-vazio">' + esc(e.rede ? 'Sem internet agora. Abra de novo com sinal.' : e.message) + '</div>'; return; }
+    var lista = R.avisos || [];
+    function pintarAv() {
+      var fil = [['todos', 'Todos'], ['soja', '📈 Soja e mercado'], ['aplicacao', '🚜 Aplicações'], ['alerta', '⚠️ Alertas'], ['chuva', '🌧️ Chuva']];
+      var l = lista.filter(function (x) { return AVI.filtro === 'todos' || x.cat === AVI.filtro; }), ult = '';
+      var h = '<div class="av-fil">' + fil.map(function (f) { return '<button data-avf="' + f[0] + '"' + (AVI.filtro === f[0] ? ' class="on"' : '') + '>' + f[1] + '</button>'; }).join('') + '</div>';
+      if (!l.length) h += '<div class="av-vazio">' + (lista.length ? 'Nenhum aviso deste tipo.' : 'Nenhum aviso ainda. O fechamento da soja, as aplicações lançadas, os atrasos e as chuvas aparecem aqui.') + '</div>';
+      l.forEach(function (x) {
+        var d = diaAv(x.criado_em); if (d !== ult) { h += '<div class="av-dia">' + esc(d) + '</div>'; ult = d; }
+        var ic = AV_IC[x.cat] || ['🔔', '#EEF2EF'], tit = String(x.titulo || '');
+        if (x.cat === 'soja' && tit.indexOf('alta') >= 0) ic = ['📈', '#E8F4EC'];
+        if (x.cat === 'aplicacao' && tit.indexOf('parcial') >= 0) ic = ['◐', '#E7F0FD'];
+        tit = tit.replace(/^[^A-Za-zÀ-ÿ0-9]+/, '');
+        h += '<div class="av' + (x.lida ? '' : ' nova') + '"><div class="ic" style="background:' + ic[1] + '">' + ic[0] + '</div><div class="t"><b>' + esc(tit) + '</b>' +
+          (x.corpo ? '<p>' + esc(x.corpo) + '</p>' : '') + '<small>' + esc(horaAv(x.criado_em)) + '</small></div>' + (x.lida ? '' : '<div class="ponto"></div>') + '</div>';
+      });
+      if (lista.length) h += '<div class="av-nota">Os avisos ficam guardados por 60 dias.</div>';
+      $('#avCorpo').innerHTML = h;
+      document.querySelectorAll('[data-avf]').forEach(function (b) { b.onclick = function () { AVI.filtro = b.dataset.avf; pintarAv(); }; });
+    }
+    pintarAv();
+    $('#avLid').onclick = function () { lista.forEach(function (x) { x.lida = 1; }); pintarAv(); api('/api/portal/avisos/lidas', {}).catch(function () {}); sinoAv(0); };
+    // abriu a lista: os avisos contam como vistos (a marca de novo continua até fechar)
+    if (R.nao_lidas) { api('/api/portal/avisos/lidas', {}).catch(function () {}); sinoAv(0); }
+  }
+
   async function iniciar() {
     eu = await api('/api/portal/eu');
     $('#telaLogin').classList.add('oculto'); $('#telaApp').classList.remove('oculto');
     $('#hSub').textContent = eu.papel_nome + ' · ' + eu.nome;
+    iniciarAvisos();
     var sf = $('#selFaz'), ult = ''; try { ult = localStorage.getItem(CH + ':faz') || ''; } catch (e) {}
     // produtor com mais de uma fazenda pode ver todas juntas
     var todas = eu.fazendas.length > 1;
@@ -1631,7 +1702,7 @@ body.sem-rolar{overflow:hidden}
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/portal-sw.js', { scope: '/portal' }).catch(function () {});
-    navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'fazer') { filtro = 'fazer'; if (D) pintar(); } });
+    navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.abrir === 'avisos') { if (eu && eu.papel !== 'operador') abrirAvisos(); return; } if (ev.data && ev.data.abrir === 'fazer') { filtro = 'fazer'; if (D) pintar(); } });
   }
   if (/[?&]aba=fazer/.test(location.search)) { filtro = 'fazer'; try { history.replaceState(null, '', '/portal'); } catch (e) {} }
   // sessão guardada: abre mesmo sem internet (dados do aparelho); só sai se o servidor recusar o login

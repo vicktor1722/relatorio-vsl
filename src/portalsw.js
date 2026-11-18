@@ -21,7 +21,7 @@ export const PORTAL_MANIFEST = JSON.stringify({
 });
 
 export const PORTAL_SW = `
-const CACHE = 'amvs-portal-v1';
+const CACHE = 'amvs-portal-v1';   // service worker v2: abre o sininho ao tocar no aviso
 const ESPERA = 6000;   // sinal fraco: depois disso usa o que está guardado
 
 self.addEventListener('install', function () { self.skipWaiting(); });
@@ -88,7 +88,7 @@ self.addEventListener('notificationclick', function (e) {
   var url = (e.notification.data && e.notification.data.url) || '/portal';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (abertas) {
     for (var i = 0; i < abertas.length; i++) {
-      if (new URL(abertas[i].url).pathname.indexOf('/portal') === 0) { abertas[i].postMessage({ abrir: 'fazer' }); return abertas[i].focus(); }
+      if (new URL(abertas[i].url).pathname.indexOf('/portal') === 0) { abertas[i].postMessage({ abrir: url.indexOf('avisos=1') >= 0 ? 'avisos' : 'fazer' }); return abertas[i].focus(); }
     }
     return self.clients.openWindow(url);
   }));
