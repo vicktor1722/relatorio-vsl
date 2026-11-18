@@ -5,7 +5,7 @@
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
-import { apagarComentario, apagarLeitor, comentar, compartilhou, contaTitular, contarNaoLidas, criarComum, criarLeitor, editarComum, excluirComum, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
+import { apagarComentario, apagarLeitor, comentar, compartilhou, contaTitular, contarNaoLidas, donosDe, criarComum, criarLeitor, editarComum, excluirComum, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
 import { alertaAltaSoja, statusAlta } from './altasoja.js';
 import { mudaQuadros, mudouDados, quadroPronto } from './quadros.js';
 import { preencherResumos } from './resumokml.js';
@@ -573,7 +573,7 @@ export default {
 
       // plantio dos talhões e recomendações (módulos novos; liberados por conta)
       if (req.method === 'GET' && QUADROS[rota]) {
-        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|p3|' + url.search;   // p3: admin vê totais de todas as contas, detalhe só das liberadas
+        const chave = rota + '|' + me.id + '|' + (me.cf ? 1 : 0) + '|p4|' + url.search;   // p4: fazendas da equipe compartilhadas
         return await quadroPronto(env, ctx, req, chave, QUADROS[rota], async () => {
           const r = rota.startsWith('/api/painel/') ? await rotasPainelFaz(env, req, me, rota, url) : await rotasAgro(env, req, me, rota, url);
           return r.status === 200 ? await r.json() : r;
@@ -739,18 +739,20 @@ export default {
       /* ---------- cadastro ---------- */
 
       if (rota === '/api/cadastro' && req.method === 'GET') {
+        // fazendas e produtores da conta e, na equipe, os do Adm (usuário comum) ou dos usuários comuns (Adm)
+        const donos = await donosDe(env, me.id), inD = donos.map(() => '?').join(',');
         const prod = await env.DB.prepare(
-          'SELECT * FROM produtores WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
+          'SELECT * FROM produtores WHERE usuario_id IN (' + inD + ') ORDER BY nome').bind(...donos).all();
         // app novo manda kml_tenho=id~atualizado_em dos mapas que já guarda: só vai o KML das fazendas que mudaram.
         // Sem o parâmetro (app antigo, painel), vai tudo como antes.
         const tenho = url.searchParams.get('kml_tenho');
         let faz;
-        if (tenho === null) faz = await env.DB.prepare('SELECT * FROM fazendas WHERE usuario_id = ? ORDER BY nome').bind(me.id).all();
+        if (tenho === null) faz = await env.DB.prepare('SELECT * FROM fazendas WHERE usuario_id IN (' + inD + ') ORDER BY nome').bind(...donos).all();
         else {
           const conhecidos = {};
           String(tenho).split(',').forEach((x) => { const i = x.lastIndexOf('~'); if (i > 0) conhecidos[x.slice(0, i)] = x.slice(i + 1); });
           faz = await env.DB.prepare(`SELECT id, usuario_id, produtor_id, nome, municipio, uf, area_ha, n_talhoes, criado_em, atualizado_em,
-              (talhoes IS NOT NULL AND talhoes != '') AS tem_kml FROM fazendas WHERE usuario_id = ? ORDER BY nome`).bind(me.id).all();
+              (talhoes IS NOT NULL AND talhoes != '') AS tem_kml FROM fazendas WHERE usuario_id IN (${inD}) ORDER BY nome`).bind(...donos).all();
           const lista = faz.results || [], precisa = lista.filter((f) => Number(f.tem_kml) && conhecidos[f.id] !== String(f.atualizado_em || '')).map((f) => f.id);
           const kml = {};
           for (let i = 0; i < precisa.length; i += 50) {
@@ -763,6 +765,12 @@ export default {
             else f.talhoes = kml[f.id] || '';
             delete f.tem_kml;
           });
+        }
+        // cadastro de outra conta da equipe: o app mostra "da equipe" e não deixa editar nem apagar
+        if (donos.length > 1) {
+          const nomes = {};
+          (await env.DB.prepare('SELECT id, nome, email FROM usuarios WHERE id IN (' + inD + ')').bind(...donos).all()).results.forEach((u) => { nomes[u.id] = u.nome || u.email; });
+          [prod.results || [], faz.results || []].forEach((l) => l.forEach((x) => { if (x.usuario_id && x.usuario_id !== me.id) { x.equipe = 1; x.dono_nome = nomes[x.usuario_id] || ''; } }));
         }
         const saf = await env.DB.prepare(
           'SELECT * FROM safras WHERE usuario_id = ? ORDER BY nome DESC').bind(me.id).all();
@@ -828,9 +836,14 @@ export default {
         if (!p.id || p.novo) {
           // (comparação em JS: o lower() do SQLite não entende acentos, ex.: JOÃO x João)
           const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
-          const { results: todos } = await env.DB.prepare('SELECT id, nome FROM produtores WHERE usuario_id = ?').bind(me.id).all();
+          const donosP = await donosDe(env, me.id);
+          const { results: todos } = await env.DB.prepare('SELECT id, nome FROM produtores WHERE usuario_id IN (' + donosP.map(() => '?').join(',') + ')').bind(...donosP).all();
           const ja = (todos || []).find((x) => norm(x.nome) === norm(p.nome));
           if (ja) return json({ ok: true, id: ja.id, repetido: true });
+        } else {
+          // produtor de outra conta da equipe: só o dono altera (não dá erro para o app não travar a fila)
+          const de = await env.DB.prepare('SELECT usuario_id FROM produtores WHERE id = ?').bind(String(p.id)).first();
+          if (de && de.usuario_id !== me.id) return json({ ok: true, id: p.id, ignorado: 'cadastro da equipe: só quem cadastrou altera' });
         }
         const id = p.id || novoId('p');
         await env.DB.prepare(`
@@ -849,8 +862,10 @@ export default {
         // sem id (ou novo: feito sem internet) = cadastro novo: mesma fazenda (nome + produtor) já cadastrada? devolve a existente
         if (!f.id || f.novo) {
           const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
-          const { results: todas } = await env.DB.prepare('SELECT id, nome, produtor_id, talhoes FROM fazendas WHERE usuario_id = ?').bind(me.id).all();
+          const donosF = await donosDe(env, me.id);
+          const { results: todas } = await env.DB.prepare('SELECT id, nome, produtor_id, talhoes, usuario_id FROM fazendas WHERE usuario_id IN (' + donosF.map(() => '?').join(',') + ')').bind(...donosF).all();
           const ja = (todas || []).find((x) => norm(x.nome) === norm(f.nome) && (x.produtor_id || '') === (f.produtor_id || ''));
+          if (ja && ja.usuario_id !== me.id) return json({ ok: true, id: ja.id, repetido: true });   // fazenda da equipe: usa a que já existe
           if (ja) {
             // se a existente está sem talhões e esta veio com KML, aproveita o KML
             const novo = f.talhoes ? (typeof f.talhoes === 'string' ? f.talhoes : JSON.stringify(f.talhoes)) : '';
@@ -863,6 +878,11 @@ export default {
             }
             return json({ ok: true, id: ja.id, repetido: true });
           }
+        }
+        if (f.id && !f.novo) {
+          // fazenda de outra conta da equipe: só o dono altera (KML, nome); não dá erro para o app não travar a fila
+          const de = await env.DB.prepare('SELECT usuario_id FROM fazendas WHERE id = ?').bind(String(f.id)).first();
+          if (de && de.usuario_id !== me.id) return json({ ok: true, id: f.id, ignorado: 'fazenda da equipe: só quem cadastrou altera' });
         }
         const id = f.id || novoId('f');
         const gj = f.talhoes ? (typeof f.talhoes === 'string' ? f.talhoes : JSON.stringify(f.talhoes)) : '';
