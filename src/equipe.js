@@ -8,6 +8,7 @@
      (e o administrador geral).
    ============================================================ */
 import { hashSenha, novoId } from './auth.js';
+import { acessosDe } from './acessos.js';
 
 let pronto = false;
 export async function garantirEquipe(env) {
@@ -208,6 +209,9 @@ export async function timeline(env, me, adm, antes) {
   });
   const soc = await socialDosPosts(env, me, posts.map((p) => p.id)).catch(() => ({}));
   posts.forEach((p) => Object.assign(p, soc[p.id] || { curtidas: 0, eu_curti: false, curtiu: [], comentarios: [] }));
+  // visualizações do link do relatório (quantas vezes foi aberto, por quantas pessoas e quando por último)
+  const vis = await acessosDe(env, posts.map((p) => p.id)).catch(() => ({}));
+  posts.forEach((p) => { const a = vis[p.id] || {}; p.vis = { total: Number(a.total || 0), pessoas: Number(a.visitantes || 0), ultimo: a.ultimo || null }; });
   return { ok: true, posts, mais: lista.length === 8 ? lista[lista.length - 1].quando : null };
 }
 

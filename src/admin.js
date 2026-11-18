@@ -882,6 +882,10 @@ td.acoes button{cursor:pointer;border:1px solid var(--linha);margin-bottom:3px}
 .corr-it small{display:block;color:var(--fraco);font-size:11.5px;margin-bottom:3px}
 .sino{position:relative;font-size:19px;line-height:1;padding:6px 10px !important}
 .sino b{position:absolute;top:-4px;right:-4px;background:#E53935;color:#fff;font-size:11px;border-radius:10px;padding:1px 6px;font-weight:800;line-height:16px}
+.post .vis{padding:9px 12px 8px;font-size:13.5px;color:#1B7A43;border-top:1px solid #EEF2EF}.post .vis b{font-weight:700}
+.post .vis button{border:0;background:none;padding:0;font:inherit;font-weight:600;color:#1B7A43;cursor:pointer}
+.post .visd{margin-top:6px;font-size:12.5px;color:#56655C;line-height:1.5}
+.post .vis + .acs{border-top:0}
 .post .acs{display:flex;gap:4px;padding:6px 6px 0;border-top:1px solid #EEF2EF}
 .post .acs button{flex:1;border:0;background:none;padding:9px 2px;border-radius:9px;font:inherit;font-size:13.5px;font-weight:600;color:#33443A;cursor:pointer;white-space:nowrap}
 .post .acs button:active{background:#F1F4F2}.post .acs button.on{color:#E53935}.post .acs button[disabled]{opacity:.45}
@@ -2020,6 +2024,7 @@ ${AGRO_CSS}
       '<div class="ph"><div class="av">' + esc(iniciais(p.responsavel || p.autor || p.fazenda)) + '</div><div><b>' + esc(p.responsavel || p.autor || p.fazenda) + '</b><small>' + esc(p.fazenda) + ' · ' + dataBR(p.data) + (p.servico ? ' · ' + esc(p.servico) : '') + '</small></div>' +
         '<div class="ac">' + (p.pode_corrigir ? '<button class="selo" data-corr="' + esc(p.id) + '" style="cursor:pointer">✏️ corrigir</button>' : '') + '</div></div>' +
       '<div class="car">' + slides + '</div>' +
+      visHtml(p) +
       '<div class="acs"><button data-curtir="' + esc(p.id) + '" class="' + (p.eu_curti ? 'on' : '') + '">' + (p.eu_curti ? '❤️' : '🤍') + ' Curtir</button>' +
         '<button data-comentar="' + esc(p.id) + '">💬 Comentar</button>' +
         '<button data-compart="' + esc(p.id) + '"' + (p.link ? '' : ' disabled title="O relatório ainda não foi publicado"') + '>↗️ Compartilhar</button></div>' +
@@ -2030,6 +2035,26 @@ ${AGRO_CSS}
       '<div class="coms" data-coms="' + esc(p.id) + '">' + (p.comentarios || []).map(comentarioHtml).join('') + '</div>' +
       '<div class="ncm"><input data-ncm="' + esc(p.id) + '" placeholder="Escreva um comentário…" maxlength="1000"><button data-enviar="' + esc(p.id) + '">Enviar</button></div>' +
       '<script type="application/json" class="pdados">' + JSON.stringify(p.midias.map(function (m) { return { l: m.legenda, t: m.talhao }; })).split('<').join('&lt;') + '<' + '/script></article>';
+  }
+  // visualizações do link do relatório, como no Instagram ("88,1 mil · Ver insights")
+  function numCurto(n) {
+    if (n >= 1000000) return (Math.round(n / 100000) / 10).toLocaleString('pt-BR') + ' mi';
+    if (n >= 10000) return (Math.round(n / 100) / 10).toLocaleString('pt-BR') + ' mil';
+    return Number(n || 0).toLocaleString('pt-BR');
+  }
+  function quandoMT(s) {
+    try { return new Date(String(s).replace(' ', 'T') + 'Z').toLocaleString('pt-BR', { timeZone: 'America/Cuiaba', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às'); }
+    catch (e) { return ''; }
+  }
+  function visHtml(p) {
+    if (!p.link) return '';
+    var v = p.vis || { total: 0, pessoas: 0 };
+    var det = v.total
+      ? '<b>' + v.total.toLocaleString('pt-BR') + '</b> ' + (v.total === 1 ? 'visualização' : 'visualizações') + ' de <b>' + v.pessoas.toLocaleString('pt-BR') + '</b> ' + (v.pessoas === 1 ? 'pessoa' : 'pessoas diferentes') +
+        (v.ultimo ? '<br>Última visualização: ' + esc(quandoMT(v.ultimo)) : '')
+      : 'Ninguém abriu o link do relatório ainda.';
+    return '<div class="vis"><span>👁 <b>' + numCurto(v.total) + '</b> ' + (v.total === 1 ? 'visualização' : 'visualizações') + '</span> · <button data-vis="' + esc(p.id) + '">Ver detalhes</button>' +
+      '<div class="visd" hidden>' + det + '<br><span style="font-size:11.5px">Conta cada vez que alguém abre o link. Quando você abre pelo painel, não conta.</span></div></div>';
   }
   function curtidasTxt(p) {
     var n = p.curtidas || 0; if (!n) return '';
@@ -2047,6 +2072,8 @@ ${AGRO_CSS}
   function ligarPosts() {
     document.querySelectorAll('#feed .post').forEach(function (el) {
       if (el.dataset.ligado) return; el.dataset.ligado = '1';
+      var bv = el.querySelector('[data-vis]');
+      if (bv) bv.onclick = function () { var d = el.querySelector('.visd'); d.hidden = !d.hidden; bv.textContent = d.hidden ? 'Ver detalhes' : 'Fechar'; };
       var car = el.querySelector('.car'), leg = el.querySelector('.lgtxt'), dd = [];
       try { dd = JSON.parse(el.querySelector('.pdados').textContent.split('&lt;').join('<')); } catch (e) { dd = []; }
       car.addEventListener('scroll', function () {
