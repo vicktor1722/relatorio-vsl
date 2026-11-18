@@ -1103,8 +1103,7 @@ ${MAPA_CHUVA_JS}
     pintar(tP, P.nome, (t.ha ? fmt(t.ha) + ' ha · ' : '') + P.safra, '',
       '<div class="campo"><label>Cultura</label><select data-k="cultura"><option value="">— escolher —</option>' + CULTURAS.map(function (c) {
         return '<option value="' + c[0] + '"' + (c[0] === e.cultura ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('') + '</select></div>' +
-      '<div class="campo"><label>Variedade / híbrido</label><input data-k="variedade" list="agVars" value="' + esc(e.variedade) + '" placeholder="Ex.: Cultivar A-7210" autocomplete="off">' +
-      '<datalist id="agVars">' + Object.keys(vars).map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist></div>' +
+      campoVariedade(e, vars) +
       '<div class="linha2"><div class="campo"><label>Data de plantio</label><input type="date" data-k="data_plantio" value="' + esc(e.data_plantio) + '"></div>' +
       '<div class="campo"><label>Data de emergência</label><input type="date" data-k="data_emerg" value="' + esc(e.data_emerg) + '"></div></div>' +
       '<div class="ag-chips"><span>Emergência:</span><button class="ag-chip" data-a="emerg" data-v="4">plantio + 4 dias</button><button class="ag-chip" data-a="emerg" data-v="5">plantio + 5 dias</button></div>' +
@@ -1139,7 +1138,7 @@ ${MAPA_CHUVA_JS}
     return '<h2>Plantio parcial · mais de uma variedade</h2>' +
       '<div class="campo"><label>Área de ' + esc(e.variedade || 'variedade acima') + ' (ha)</label><input inputmode="decimal" data-k="haMain" value="' + (e.haMain ? String(e.haMain).replace('.', ',') : '') + '" placeholder="ex.: 60"></div>' +
       ex.map(function (x, i) {
-        return '<div class="ag-parte"><div class="campo"><label>Outra variedade ' + (i + 1) + '</label><input data-x="variedade" data-i="' + i + '" list="agVarsCat" value="' + esc(x.variedade) + '" placeholder="digite ou escolha (ex.: NEO 790 IPRO)" autocomplete="off"></div>' +
+        return '<div class="ag-parte">' + campoVarExtra(e, x, i) +
           '<div class="linha2"><div class="campo"><label>Área (ha)</label><input inputmode="decimal" data-x="ha" data-i="' + i + '" value="' + (x.ha ? String(x.ha).replace('.', ',') : '') + '"></div>' +
           '<div class="campo"><label>Data de plantio</label><input type="date" data-x="data_plantio" data-i="' + i + '" value="' + esc(x.data_plantio || e.data_plantio) + '"></div></div>' +
           '<button class="ag-link" data-a="pextradel" data-v="' + i + '">remover esta variedade</button></div>';
@@ -1148,6 +1147,88 @@ ${MAPA_CHUVA_JS}
       '<div class="ag-dica" id="agPartes">' + resumoPartes(e, t) + '</div>' +
       '<button class="btn secundario" data-a="pextra">＋ Mais uma variedade</button>';
   }
+  /* ----- catálogo de cultivares de soja (empresa → material com GMR), o mesmo do app -----
+     Baixado de /api/agro/cultivares (guardado no navegador) + materiais cadastrados pela conta (ciclos com empresa). */
+  var LS_CAT = 'agro_cat_painel', CAT = null, IDX = null, CICLOS = [], catPedido = false;
+  var FAIXA_TXT = { I: '< 7,9', II: '7,9 a 8,5', III: '> 8,5' }, TEC_FIM = /(ipro|i2x|rr|ce3|ce|e|xtd|tf|rsf)+$/;
+  function lerCat() {
+    if (!CAT) { try { CAT = JSON.parse(localStorage.getItem(LS_CAT) || 'null'); } catch (e) { CAT = null; } }
+    return CAT && CAT.catalogo ? CAT : null;
+  }
+  function baixarCat() {
+    if (catPedido) return Promise.resolve(); catPedido = true;
+    return Promise.all([api('/api/agro/cultivares').catch(function () { return null; }), api('/api/agro/ciclos').catch(function () { return null; })]).then(function (r) {
+      if (r[0] && r[0].catalogo) { CAT = { versao: r[0].versao, faixa: r[0].faixa || {}, catalogo: r[0].catalogo }; try { localStorage.setItem(LS_CAT, JSON.stringify(CAT)); } catch (e) { /* sem espaço */ } }
+      if (r[1] && r[1].ciclos) CICLOS = r[1].ciclos;
+      IDX = null;
+    });
+  }
+  function chaveCult(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function empresasCat() {
+    var c = lerCat(), m = {}, ordem = [];
+    (c ? c.catalogo : []).forEach(function (e) {
+      ordem.push(e[0]);
+      m[e[0]] = e[2].map(function (it) { return { nome: it[0], gmr: it[1] || 0, faixa: it[1] ? '' : it[2] }; });
+    });
+    CICLOS.filter(function (p) { return p.empresa; }).forEach(function (p) {
+      if (!m[p.empresa]) { m[p.empresa] = []; ordem.push(p.empresa); }
+      var k = chaveCult(p.variedade);
+      m[p.empresa] = m[p.empresa].filter(function (x) { return chaveCult(x.nome) !== k; });
+      m[p.empresa].push({ nome: p.variedade, gmr: Number(p.gmr) || 0, faixa: '' });
+    });
+    return { ordem: ordem, m: m };
+  }
+  function acharCult(nome) {
+    if (!IDX) {
+      IDX = {}; var E = empresasCat();
+      var por = function (k, x) { if (k && !IDX[k]) IDX[k] = x; };
+      E.ordem.forEach(function (emp) {
+        E.m[emp].forEach(function (x) {
+          var o = { empresa: emp, nome: x.nome }, k = chaveCult(x.nome), sm = k.replace(/^bmx/, '');
+          por(k, o); por(sm, o); por(k.replace(TEC_FIM, ''), o); por(sm.replace(TEC_FIM, ''), o);
+        });
+      });
+    }
+    var k = chaveCult(nome).replace(/^brasmax/, 'bmx');
+    return k ? (IDX[k] || IDX[k.replace(/^bmx/, '')] || IDX[k.replace(TEC_FIM, '')] || null) : null;
+  }
+  function gTxt(g) { return Number(g).toFixed(1).replace('.', ','); }
+  function opcoesMaterial(emp, E, atual) {
+    var at = acharCult(atual), selNome = at && at.empresa === emp ? at.nome : '';
+    return E.m[emp].slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true }); }).map(function (x) {
+      return '<option value="' + esc(x.nome) + '"' + (x.nome === selNome ? ' selected' : '') + '>' + esc(x.nome) + ' · ' + (x.gmr ? 'GMR ' + gTxt(x.gmr) : 'GMR ' + (FAIXA_TXT[x.faixa] || '—')) + '</option>';
+    }).join('');
+  }
+  function opcoesEmpresa(E, emp) {
+    return '<option value="">— escolher a empresa —</option>' + E.ordem.map(function (x) {
+      return '<option value="' + esc(x) + '"' + (x === emp ? ' selected' : '') + '>' + esc(x) + ' (' + E.m[x].length + ')</option>'; }).join('') +
+      '<option value="*"' + (emp === '*' ? ' selected' : '') + '>Outra / digitar o nome</option>';
+  }
+  // variedade principal: soja escolhe a empresa e depois o material (com GMR); outras culturas ou "Outra": digita
+  function campoVariedade(e, vars) {
+    var livre = '<input data-k="variedade" list="agVars" value="' + esc(e.variedade) + '" placeholder="Ex.: Cultivar A-7210" autocomplete="off">' +
+      '<datalist id="agVars">' + Object.keys(vars).map(function (v) { return '<option value="' + esc(v) + '">'; }).join('') + '</datalist>';
+    var E = !e.cultura || e.cultura === 'soja' ? empresasCat() : { ordem: [] };
+    if (!E.ordem.length) return '<div class="campo"><label>Variedade / híbrido</label>' + livre + '</div>';
+    if (e.empresa == null) { var c0 = acharCult(e.variedade); e.empresa = c0 ? c0.empresa : (e.variedade ? '*' : ''); }
+    var h = '<div class="linha2"><div class="campo"><label>Variedade' + (e.cultura ? '' : ' (soja)') + ': empresa</label><select data-k="empresa">' + opcoesEmpresa(E, e.empresa) + '</select></div>';
+    if (e.empresa === '*') h += '<div class="campo"><label>Variedade / híbrido</label>' + livre + '</div>';
+    else if (e.empresa && E.m[e.empresa]) h += '<div class="campo"><label>Material</label><select data-k="variedade"><option value="">— escolher o material —</option>' + opcoesMaterial(e.empresa, E, e.variedade) + '</select></div>';
+    else h += '<div></div>';
+    return h + '</div>';
+  }
+  // outra variedade do talhão (plantio parcial): a mesma escolha empresa → material
+  function campoVarExtra(e, x, i) {
+    var livre = '<input data-x="variedade" data-i="' + i + '" list="agVarsCat" value="' + esc(x.variedade) + '" placeholder="digite o nome (ex.: NEO 790 IPRO)" autocomplete="off">';
+    var E = !e.cultura || e.cultura === 'soja' ? empresasCat() : { ordem: [] };
+    if (!E.ordem.length) return '<div class="campo"><label>Outra variedade ' + (i + 1) + '</label>' + livre + '</div>';
+    if (x.empresa == null) { var c0 = acharCult(x.variedade); x.empresa = c0 ? c0.empresa : (x.variedade ? '*' : ''); }
+    var h = '<div class="linha2"><div class="campo"><label>Outra variedade ' + (i + 1) + ': empresa</label><select data-xemp="' + i + '">' + opcoesEmpresa(E, x.empresa) + '</select></div>';
+    if (x.empresa === '*') h += '<div class="campo"><label>Variedade / híbrido</label>' + livre + '</div>';
+    else if (x.empresa && E.m[x.empresa]) h += '<div class="campo"><label>Material</label><select data-x="variedade" data-i="' + i + '"><option value="">— escolher o material —</option>' + opcoesMaterial(x.empresa, E, x.variedade) + '</select></div>';
+    else h += '<div></div>';
+    return h + '</div>';
+  }
   function talhaoEd() { return talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === P.nome; })[0] || { ha: 0 }; }
   function daeTxt(e) { var d = daeDe(e.data_emerg); return d === null ? (e.data_emerg ? 'ainda não emergiu' : 'Informe a data de emergência para contar os dias (DAE).') : 'DAE ' + d + ' · emergiu em ' + curta(e.data_emerg); }
   function semDica(e) { var esp = espDe(e.cultura, e.espac_cm); return e.sem_ha ? '= ' + fmt(e.sem_m, 1) + ' sementes/m a ' + esp + ' cm = ' + fmt(e.sem_ha, 0) + ' sementes/ha' : 'Informe sementes/m ou sementes/ha: a outra é calculada pelo espaçamento (' + (esp ? esp + ' cm' : 'informe o espaçamento') + ').'; }
@@ -1155,7 +1236,19 @@ ${MAPA_CHUVA_JS}
   function entradaPlantio(inp) {
     var e = P.ed, k = inp.dataset.k; if (!e) return;
     if (k === 'haMain') { e.haMain = numBR(inp.value); var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(e, talhaoEd()); return; }
-    if (k === 'cultura' || k === 'variedade') { e[k] = inp.value; if (k === 'cultura') pintarPlantio(); return; }
+    if (k === 'empresa') {
+      e.empresa = inp.value; var c = acharCult(e.variedade);
+      if (e.empresa !== '*' && !(c && c.empresa === e.empresa)) e.variedade = '';
+      if (e.empresa && e.empresa !== '*' && !e.cultura) e.cultura = 'soja';
+      pintarPlantio(); return;
+    }
+    if (k === 'cultura' || k === 'variedade') {
+      e[k] = inp.value;
+      if (k === 'variedade' && inp.tagName === 'SELECT' && inp.value && !e.cultura) { e.cultura = 'soja'; pintarPlantio(); return; }
+      if (k === 'variedade' && inp.tagName === 'SELECT') { pintarPlantio(); return; }   // o rótulo "Área de <variedade>" acompanha
+      if (k === 'cultura') { e.empresa = null; (e.extras || []).forEach(function (x) { x.empresa = null; }); pintarPlantio(); }
+      return;
+    }
     if (k === 'data_plantio' || k === 'data_emerg') { e[k] = inp.value; var d = $('#agDae', tP); if (d) d.textContent = daeTxt(e); return; }
     var esp = espDe(e.cultura, e.espac_cm);
     if (k === 'espac_cm') { e.espac_cm = numBR(inp.value); esp = espDe(e.cultura, e.espac_cm); if (e.sem_m && esp) e.sem_ha = Math.round(e.sem_m * 10000 / (esp / 100)); }
@@ -1207,6 +1300,7 @@ ${MAPA_CHUVA_JS}
     P.faz = fazPadrao(); P.prod = produtorDe(fazDe(P.faz)); P.safra = safraPadrao(); P.ed = null; P.outros = []; P.sel = [];
     pintarPlantio();
     baixar().then(function (ok) { if (ok && !P.ed) pintarPlantio(); });
+    baixarCat().then(function () { if (P.ed) pintarPlantio(); });   // catálogo empresa → material para escolher a variedade
   }
 
   function cliquePlantio(a, v, alvo) {
@@ -1240,6 +1334,15 @@ ${MAPA_CHUVA_JS}
     if (a === 'limparplantio') { if (confirm('Limpar o plantio de ' + P.nome + '?')) gravarPlantio(true); }
   }
   function mudancaPlantio(sel) {
+    if (sel.dataset.xemp != null && P.ed && P.ed.extras) {   // outra variedade: troca a empresa
+      var xe = P.ed.extras[Number(sel.dataset.xemp)]; if (!xe) return;
+      xe.empresa = sel.value; var cx = acharCult(xe.variedade);
+      if (xe.empresa !== '*' && !(cx && cx.empresa === xe.empresa)) xe.variedade = '';
+      pintarPlantio(); return;
+    }
+    if (sel.dataset.x === 'variedade' && sel.tagName === 'SELECT' && P.ed && P.ed.extras) {
+      var xv = P.ed.extras[Number(sel.dataset.i)]; if (xv) xv.variedade = sel.value; return;
+    }
     if (sel.dataset.c === 'prod') { trocaProd(P, sel.value); pintarPlantio(); }
     else if (sel.dataset.c === 'faz') { P.sel = []; P.faz = sel.value; ST.ult.faz = P.faz; gravar(); pintarPlantio(); }
     else if (sel.dataset.c === 'safra') { P.safra = sel.value; ST.ult.safra = P.safra; gravar(); pintarPlantio(); }
