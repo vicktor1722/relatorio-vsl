@@ -1,6 +1,6 @@
 /* ============================================================
    avisos.js — histórico de avisos (sininho) do portal da fazenda e do painel
-   - para = 'portal:<id do acesso>' (dono/gerente; nunca o operador) ou 'painel:<id da conta>' (administrador e Adm de equipe)
+   - para = 'portal:<id do acesso>' (dono/gerente; nunca o operador) ou 'painel:<id da conta>' (todas as contas do painel)
    - cat: 'soja' (fechamento e alta), 'aplicacao' (lançada pelo operador), 'alerta' (aplicação atrasada), 'chuva' (chuva lançada)
    - O aviso fica guardado mesmo sem a notificação ligada no celular; some depois de 60 dias.
    ============================================================ */
@@ -68,12 +68,14 @@ export async function gerentesDaFazenda(env, fid) {
     return (results || []).filter((a) => { try { return JSON.parse(a.fazendas || '[]').includes(fid); } catch (e) { return false; } }).map((a) => a.id);
   } catch (e) { return []; }
 }
-// a conta usa o painel com avisos: administrador geral ou Adm de equipe
+// a conta recebe avisos no painel: todas as contas (administrador, Adm de equipe e usuário comum); o acesso só à Timeline não
 export async function ehPainelAvisos(env, uid) {
   try {
-    const u = await env.DB.prepare("SELECT COALESCE(admin,0) AS admin, papel FROM usuarios WHERE id = ?").bind(uid).first();
-    return !!(u && (Number(u.admin) === 1 || u.papel === 'adm'));
-  } catch (e) { return false; }
+    const u = await env.DB.prepare('SELECT id, leitor_de FROM usuarios WHERE id = ?').bind(uid).first();
+    return !!(u && !u.leitor_de);
+  } catch (e) {
+    try { return !!(await env.DB.prepare('SELECT id FROM usuarios WHERE id = ?').bind(uid).first()); } catch (e2) { return false; }
+  }
 }
 
 // aviso de uma fazenda para os donos/gerentes dela (portal) e para o painel do consultor dono (se for Adm)
