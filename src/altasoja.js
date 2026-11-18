@@ -15,6 +15,8 @@
    ============================================================ */
 import { calibracao, calibrado, futuroAgora, geocodificar, km, mercadoGeral } from './mercado.js';
 import { enviarParaConta } from './push.js';
+import { avisar } from './avisos.js';
+import { donosDe } from './equipe.js';
 import { resumosDe, lerResumo } from './resumokml.js';
 
 const CHAVE = 'alta:soja';
@@ -74,7 +76,7 @@ async function alertaFuturo(env, forcar) {
     const msg = { title: '📈 Soja futuro ' + dataBR(fut.venc) + ' em alta: ' + preco,
       body: 'Maior valor dos últimos 30 dias (antes: ' + (fut.moeda === 'R$' ? brl(max) : 'US$ ' + num(max, 2)) + ')' +
         '\nChicago ' + num(fut.cbot, 2) + (fut.dolar ? ' · dólar ' + brl(fut.dolar) : ''), tag: 'alta-soja' };
-    r.enviados = { portal: 0, consultor: 0 };
+    r.enviados = { portal: 0, consultor: 0, painel: 0 };
     const pontos = ((await calibracao(env)).pontos || []).map((p) => ({ municipio: p.municipio, lat: p.lat, lon: p.lon }));
     await enviar(env, pontos, () => msg, r, forcar);
     est.alerta_fut = { d: hoje, p: r2(fut.preco), em: r.em, enviados: r.enviados };
@@ -92,7 +94,7 @@ async function resumoDoDia(env, forcar) {
   const cal = await calibracao(env);
   const fut = await futuroAgora(env).catch(() => null);
   if (!fut || !fut.preco) return { sem_futuro: true };                          // tenta no próximo ciclo
-  const res = { em: agora.toISOString(), dia: hoje, enviados: { portal: 0, consultor: 0 } };
+  const res = { em: agora.toISOString(), dia: hoje, enviados: { portal: 0, consultor: 0, painel: 0 } };
   if (fut.em !== hoje && !forcar) {                                            // feriado em Chicago: sem resumo
     est.dia = hoje; est.resultado = Object.assign(res, { sem_pregao: true, futuro_em: fut.em }); await gravar(env, est); return res;
   }
@@ -153,29 +155,47 @@ async function enviar(env, pontos, montar, res, forcar) {
     if (melhor && dmin <= 400) regiaoDe[f.id] = melhor;
   }
   const { results: subs } = await env.DB.prepare('SELECT DISTINCT usuario_id FROM push_assinaturas').all();
-  for (const { usuario_id: uid } of subs || []) {
+  const temCelular = new Set((subs || []).map((x) => x.usuario_id));
+  const conta = (tipo) => { res.enviados[tipo] = (res.enviados[tipo] || 0) + 1; };
+  // regiões das fazendas de umas contas, com os nomes das fazendas de cada região
+  const regioesDe = (donos) => {
+    const porReg = new Map();
+    (fzs || []).filter((f) => donos.includes(f.usuario_id) && regiaoDe[f.id]).forEach((f) => { const g = regiaoDe[f.id]; if (!porReg.has(g)) porReg.set(g, []); porReg.get(g).push(f.nome); });
+    return porReg;
+  };
+  // 1) gerente/dono da fazenda (portal; operador não recebe): sempre no histórico (sininho); no celular se ligou o aviso
+  const { results: acs } = await env.DB.prepare("SELECT * FROM acessos_fazenda WHERE COALESCE(ativo, 1) != 0 AND papel != 'operador'").all().catch(() => ({ results: [] }));
+  for (const a of acs || []) {
     try {
-      let msg = null, tipo = '';
-      if (String(uid).startsWith('portal:')) {
-        // gerente/dono no portal (com aviso ligado); operador não recebe
-        const a = await env.DB.prepare('SELECT * FROM acessos_fazenda WHERE id = ?').bind(uid.slice(7)).first();
-        if (!a || Number(a.ativo) === 0 || a.papel === 'operador') continue;
-        let ids = []; try { ids = JSON.parse(a.fazendas || '[]'); } catch (e) { ids = []; }
-        const regs = []; ids.forEach((id) => { const g = regiaoDe[id]; if (g && regs.indexOf(g) < 0) regs.push(g); });
-        if (!regs.length) continue;
-        msg = Object.assign({}, montar(regs, null), { url: '/portal' }); tipo = 'portal';
-      } else {
-        // consultor: as regiões onde ele tem fazendas, com as fazendas de cada uma
-        const minhas = (fzs || []).filter((f) => f.usuario_id === uid && regiaoDe[f.id]);
-        if (!minhas.length) continue;
-        const porReg = new Map();
-        minhas.forEach((f) => { const g = regiaoDe[f.id]; if (!porReg.has(g)) porReg.set(g, []); porReg.get(g).push(f.nome); });
-        const regs = [...porReg.keys()];
-        msg = Object.assign({}, montar(regs, porReg), { url: '/' }); tipo = 'consultor';
-      }
-      if (forcar) (res.previa = res.previa || []).push(Object.assign({ para: tipo }, msg));
-      if (await enviarParaConta(env, uid, msg)) res.enviados[tipo]++;
-    } catch (e) { /* uma conta com problema não segura as outras */ }
+      let ids = []; try { ids = JSON.parse(a.fazendas || '[]'); } catch (e) { ids = []; }
+      const regs = []; ids.forEach((id) => { const g = regiaoDe[id]; if (g && regs.indexOf(g) < 0) regs.push(g); });
+      if (!regs.length) continue;
+      const para = 'portal:' + a.id, msg = Object.assign({}, montar(regs, null), { url: '/portal?avisos=1' });
+      if (forcar) (res.previa = res.previa || []).push(Object.assign({ para: 'portal' }, msg));
+      if (await avisar(env, para, 'soja', msg, temCelular.has(para))) conta('portal');
+    } catch (e) { /* um acesso com problema não segura os outros */ }
+  }
+  // 2) consultor (app de campo, com o aviso ligado): as regiões onde ele tem fazendas
+  for (const { usuario_id: uid } of subs || []) {
+    if (String(uid).indexOf(':') >= 0) continue;
+    try {
+      const porReg = regioesDe([uid]);
+      if (!porReg.size) continue;
+      const msg = Object.assign({}, montar([...porReg.keys()], porReg), { url: '/' });
+      if (forcar) (res.previa = res.previa || []).push(Object.assign({ para: 'consultor' }, msg));
+      if (await enviarParaConta(env, uid, msg)) conta('consultor');
+    } catch (e) { /* segue */ }
+  }
+  // 3) painel (administrador geral e Adm de equipe): regiões das fazendas da conta e da equipe; histórico + celular (app do painel)
+  const { results: adms } = await env.DB.prepare("SELECT id FROM usuarios WHERE COALESCE(admin,0) = 1 OR papel = 'adm'").all().catch(() => ({ results: [] }));
+  for (const { id: uid } of adms || []) {
+    try {
+      const porReg = regioesDe(await donosDe(env, uid));
+      if (!porReg.size) continue;
+      const para = 'painel:' + uid, msg = Object.assign({}, montar([...porReg.keys()], porReg), { url: '/admin?avisos=1' });
+      if (forcar) (res.previa = res.previa || []).push(Object.assign({ para: 'painel' }, msg));
+      if (await avisar(env, para, 'soja', msg, temCelular.has(para))) conta('painel');
+    } catch (e) { /* segue */ }
   }
 }
 

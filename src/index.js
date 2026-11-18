@@ -3,6 +3,8 @@
    API (login, cadastro, relatórios) + página pública do relatório
    ============================================================ */
 import { conferirCodigoAdmin, conferirSenha, criarToken, hashSenha, novoId, usuarioDaRequisicao } from './auth.js';
+import { ADMIN_MANIFEST, ADMIN_SW } from './adminsw.js';
+import { avisosDeAtraso, ehPainelAvisos } from './avisos.js';
 import { listaRenomeios, renomearTalhoesPindaituba } from './renomeio.js';
 import { apagarObservacaoAntiga, calibrarPontes1311 } from './limpeza.js';
 import { apagarComentario, apagarLeitor, comentar, compartilhou, contaTitular, contarNaoLidas, donosDe, criarComum, criarLeitor, editarComum, excluirComum, curtir, definirAdm, leitorDe, lerCorrecao, listarEquipe, listarLeitores, marcarLidas, notificacoes, salvarCorrecao, timeline, trocarSenhaLeitor } from './equipe.js';
@@ -23,7 +25,7 @@ import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safr
 const chaveCapa = (chave) => (!chave || String(chave).startsWith('drive:')) ? '' : String(chave).replace(/\.[a-z0-9]+$/i, '') + '.capa.jpg';
 import { dadosParaRelatorio, garantir as garantirAgro, modulosAdmin, padronizarVariedades, rotasAgro, salvarModulos } from './agro.js';
 import { cargaEstoqueSantaPaula, trocarGlifosatoSantaPaula, voltarLastingSantaPaula, trocarZappSantaPaula, tiposSantaPaula, cargaComprasGerais } from './cargaestoque.js';
-import { NOVIDADE_CLIMA, avisarAplicacoes, avisarNovidade, avisarPertoDaHora, rotasPush } from './push.js';
+import { NOVIDADE_CLIMA, avisarAplicacoes, avisarNovidade, avisarPertoDaHora, chavePublica, garantirPush, rotasPush } from './push.js';
 import { TERMOS_HTML, TERMOS_VERSAO, paginaTermos, rotasTermos } from './termos.js';
 import { rotasAcessos, rotasPortal } from './portal.js';
 import { paginaPortal } from './portalpagina.js';
@@ -297,6 +299,8 @@ export default {
       // divisas dos estados para o mapa da chuva (arquivo fixo, cache longo)
       if (rota === '/portal/ufs.json') return new Response(UFS_LINHAS, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=2592000' } });
       if (rota === '/portal' || rota === '/portal/') return html(paginaPortal());
+      if (rota === '/admin-sw.js') return new Response(ADMIN_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
+      if (rota === '/admin.webmanifest') return new Response(ADMIN_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
       if (rota === '/portal-sw.js') return new Response(PORTAL_SW, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' } });
       if (rota === '/portal.webmanifest') return new Response(PORTAL_MANIFEST, { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'public, max-age=3600' } });
       if (rota.startsWith('/api/portal/')) return await rotasPortal(env, req, rota, url, ctx);
@@ -599,6 +603,19 @@ export default {
           if (rota === '/api/admin/leitores' && req.method === 'POST') return json(await criarLeitor(env, me, adm, await req.json()));
           if (rota === '/api/admin/leitores/apagar' && req.method === 'POST') return json(await apagarLeitor(env, me, (await req.json()).id));
           if (rota === '/api/admin/leitores/senha' && req.method === 'POST') { const b = await req.json(); return json(await trocarSenhaLeitor(env, me, b.id, b.senha)); }
+          // avisos no celular (app do painel): administrador geral e Adm de equipe
+          if (rota === '/api/admin/push/chave') return json({ ok: true, chave: await chavePublica(env) });
+          if (rota === '/api/admin/push/assinar' && req.method === 'POST') {
+            if (!(await ehPainelAvisos(env, me.id))) return json({ erro: 'os avisos do painel são para o administrador e o Adm de equipe' }, 403);
+            await garantirPush(env);
+            const b = await req.json().catch(() => ({}));
+            const s = b.assinatura || {}, k = s.keys || {}, endpoint = String(s.endpoint || '');
+            if (!/^https:\/\//.test(endpoint) || !k.p256dh || !k.auth) return json({ erro: 'assinatura inválida' }, 400);
+            await env.DB.prepare(`INSERT INTO push_assinaturas (endpoint, usuario_id, p256dh, auth) VALUES (?,?,?,?)
+                ON CONFLICT(endpoint) DO UPDATE SET usuario_id = excluded.usuario_id, p256dh = excluded.p256dh, auth = excluded.auth`)
+              .bind(endpoint.slice(0, 1000), 'painel:' + me.id, String(k.p256dh).slice(0, 200), String(k.auth).slice(0, 100)).run();
+            return json({ ok: true });
+          }
           if (rota === '/api/admin/equipe' && req.method === 'GET') return json(await listarEquipe(env, me));
           if (rota === '/api/admin/equipe/usuario' && req.method === 'POST') return json(await criarComum(env, me, await req.json()));
           if (rota === '/api/admin/equipe/usuario/editar' && req.method === 'POST') return json(await editarComum(env, me, await req.json()));
@@ -1074,6 +1091,7 @@ export default {
     if (evento.cron === '30 8 * * *') { ctx.waitUntil(atualizarChuva(env).then(() => limparPdfs(env)).catch(() => {})); return; }
     if (evento.cron === '*/15 * * * *') { ctx.waitUntil(avisarPertoDaHora(env).then(() => preencherResumos(env, 400000)).catch(() => {})); ctx.waitUntil(calibrarPontes1311(env).catch(() => {})); ctx.waitUntil(alertaAltaSoja(env).catch((e) => console.log('alerta de alta:', e.message))); return; }   // visitas e lembretes: aviso 2 h antes da hora marcada   // todo dia 4h30 de MT: chuva dos próximos 15 dias
     ctx.waitUntil(avisarAplicacoes(env, evento.cron === '0 9 * * *' ? 'operador' : 'consultor'));
+    if (evento.cron === '0 9 * * *') ctx.waitUntil(avisosDeAtraso(env));   // 5h00 MT: atrasadas no sininho do dono/gerente
   }
 };
 

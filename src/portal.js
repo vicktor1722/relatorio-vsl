@@ -24,6 +24,7 @@ import { grupoDaFazenda, mapaGrupos } from './estoquegrupo.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
 import { apagarChuva, lancarChuva, listarChuva } from './chuvatalhao.js';
+import { avisarFazenda, contarAvisos, lerAvisos, listarAvisos } from './avisos.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200,
@@ -207,12 +208,15 @@ async function avisarConsultor(env, dono, r, d, talhoes, parcial, quem, data, re
     : talhoes.join(', ') + ' · ' + n1(talhoes.reduce((s, t) => s + haTal(t), 0)) + ' ha';
   const op = Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao;
   const dm = String(data).split('-');
-  return enviarParaConta(env, dono, {
+  const msg = {
     title: (parcial ? '◐ Aplicação parcial lançada · ' : '✔ Aplicação lançada · ') + ((f && f.nome) || 'fazenda'),
     body: op + ' · ' + tal + '\npor ' + quem + ' · ' + dm[2] + '/' + dm[1],
     url: '/?abrir=recs',
     tag: 'aplic-' + (regId || r.id + '-' + Date.now().toString(36))   // um aviso por lançamento (não substitui o anterior)
-  });
+  };
+  // histórico (sininho) do dono/gerente da fazenda e do painel do consultor
+  await avisarFazenda(env, r.fazenda_id, dono, 'aplicacao', msg).catch(() => {});
+  return enviarParaConta(env, dono, msg);
 }
 
 // todas as fazendas do acesso juntas: talhões com o nome da fazenda na frente ("SANTA PAULA · TH-05"),
@@ -495,6 +499,14 @@ export async function rotasPortal(env, req, rota, url, ctx) {
   const a = await acessoDaRequisicao(req, env);
   if (!a) return json({ erro: 'sessão expirada, entre de novo' }, 401);
 
+  /* ----- sininho: histórico de avisos do dono/gerente ----- */
+  if (rota === '/api/portal/avisos' && req.method === 'GET') {
+    if (a.papel === 'operador') return json({ ok: true, avisos: [], nao_lidas: 0 });
+    if (url.searchParams.get('so') === 'n') return json({ ok: true, nao_lidas: await contarAvisos(env, 'portal:' + a.id) });
+    return json({ ok: true, avisos: await listarAvisos(env, 'portal:' + a.id, 100), nao_lidas: await contarAvisos(env, 'portal:' + a.id) });
+  }
+  if (rota === '/api/portal/avisos/lidas' && req.method === 'POST') return json(await lerAvisos(env, 'portal:' + a.id));
+
   /* ----- aviso no celular do operador (5h00) ----- */
   if (rota === '/api/portal/push/chave') return json({ ok: true, chave: await chavePublica(env) });
   if (rota === '/api/portal/push/assinar' && req.method === 'POST') {
@@ -600,7 +612,12 @@ export async function rotasPortal(env, req, rota, url, ctx) {
       if (!(mm > 0 && mm <= 500)) return json({ erro: 'informe os milímetros (de 0,1 a 500)' }, 400);
       const tal = [...new Set((Array.isArray(b.talhoes) ? b.talhoes : []).map((t) => txt(t, 80)))].filter((t) => t in f.areas);
       if (!tal.length) return json({ erro: 'escolha os talhões' }, 400);
-      return json(Object.assign({ ok: true, mm, data }, await lancarChuva(env, a.dono_id, fid, data, mm, tal, (a.nome || a.login) + ' (fazenda)')));
+      const lc = await lancarChuva(env, a.dono_id, fid, data, mm, tal, (a.nome || a.login) + ' (fazenda)');
+      // histórico (sininho) dos outros donos/gerentes da fazenda e do painel do consultor
+      const dm = data.split('-');
+      await avisarFazenda(env, fid, a.dono_id, 'chuva', { title: '🌧️ Chuva lançada · ' + String(mm).replace('.', ',') + ' mm · ' + (f.nome || 'fazenda'),
+        body: tal.slice(0, 8).join(', ') + (tal.length > 8 ? ' + ' + (tal.length - 8) : '') + ' · ' + dm[2] + '/' + dm[1] + '\npor ' + (a.nome || a.login) }, a.id).catch(() => {});
+      return json(Object.assign({ ok: true, mm, data }, lc));
     }
     if (rota === '/api/portal/pluvio/apagar' && req.method === 'POST') return json(Object.assign({ ok: true }, await apagarChuva(env, a.dono_id, fid, txt(b.lote, 60))));
     return json({ erro: 'rota não encontrada' }, 404);
