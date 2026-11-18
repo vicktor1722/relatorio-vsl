@@ -546,6 +546,7 @@ export default {
         const dono = await leitorDe(env, me.id).catch(() => null);
         if (!dono) return json({ erro: 'este acesso foi removido' }, 401);
         if (rota === '/api/admin/resumo') return json(await resumoLeitor(env, me, dono));
+        if (rota === '/api/admin/logo') { const pf = await perfilDoRelatorio(env, dono).catch(() => ({})); return json({ ok: true, logo: pf.logo || '', empresa: pf.empresa || '' }); }
         const livres = ['/api/eu', '/api/admin/timeline', '/api/admin/curtir', '/api/admin/comentar', '/api/admin/comentario/apagar',
           '/api/admin/compartilhou', '/api/admin/notificacoes', '/api/admin/notificacoes/lidas'];
         if (livres.indexOf(rota) < 0) return json({ erro: 'este acesso é só para ver a Timeline' }, 403);
@@ -588,6 +589,8 @@ export default {
         if (!adm && await ehAdminSemCodigo(env, me.id)) return json({ erro: 'Conta administradora: entre com o código de confirmação', precisaCodigo: true }, 401);
         // qualquer conta vê o próprio painel; admin vê o de todos
         if (rota === '/api/admin/resumo') return json(await resumoAdmin(env, me, adm));
+        // logo da empresa de quem entrou (usuário comum sem logo usa o do Adm da equipe), para o cabeçalho do painel
+        if (rota === '/api/admin/logo') { const pf = await perfilDoRelatorio(env, me.id).catch(() => ({})); return json({ ok: true, logo: pf.logo || '', empresa: pf.empresa || '' }); }
         // mapa das fazendas da Visão geral (desenho de todos os KMLs): quadro pronto; muda quando um KML muda (versão dos dados)
         if (rota === '/api/admin/areas') return await quadroPronto(env, ctx, req, 'areas2|' + me.id + '|' + (adm ? 1 : 0), 21600, () => areasAdmin(env, me, adm));
         // equipe (Adm e usuários comuns), timeline e correção de textos: qualquer conta, cada uma com o que pode

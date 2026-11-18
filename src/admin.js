@@ -766,7 +766,13 @@ export function paginaAdmin(empresa) {
 body{margin:0;background:#F2F4F2;color:var(--texto);font-size:15px;line-height:1.5;
  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 header.topo{background:var(--verde);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
-header.topo h1{margin:0;font-size:17px;flex:1}
+header.topo h1{margin:0;font-size:17px;flex:1;min-width:0}
+header.topo .topo-id{flex:1;display:flex;align-items:center;gap:12px;min-width:0}
+header.topo .topo-logo{flex:none;background:#fff;border-radius:10px;height:46px;max-width:120px;padding:4px 7px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+header.topo .topo-logo[hidden]{display:none}
+header.topo .topo-logo img{max-height:38px;max-width:106px;object-fit:contain;display:block}
+@media (max-width:420px){header.topo{gap:8px;padding:12px 14px}header.topo .topo-id{gap:10px}header.topo .topo-logo{height:40px;max-width:84px;padding:3px 5px}header.topo .topo-logo img{max-height:33px;max-width:74px}
+  header.topo #btnAtualizar{font-size:0;padding:7px 10px}header.topo #btnAtualizar::before{content:'↻';font-size:18px;line-height:1}}
 header.topo small{opacity:.85;font-size:12px;display:block;font-weight:400}
 header.topo button{background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:13px}
 .abas{display:flex;gap:8px;overflow-x:auto;padding:12px 16px 0;max-width:1100px;margin:0 auto;scrollbar-width:none}
@@ -952,9 +958,9 @@ ${AGRO_CSS}
 
 <div id="telaPainel" style="display:none">
   <header class="topo">
-    <div style="flex:1"><h1 id="titulo">Administração<small id="quem"></small></h1></div>
+    <div class="topo-id"><span id="topoLogo" class="topo-logo" hidden><img alt=""></span><h1 id="titulo">Administração<small id="quem"></small></h1></div>
     <button id="btnSino" class="sino" aria-label="Notificações" title="Notificações">🔔<b id="sinoN" style="display:none"></b></button>
-    <button id="btnAtualizar">Atualizar</button>
+    <button id="btnAtualizar" aria-label="Atualizar" title="Atualizar">Atualizar</button>
     <button id="btnSair">Sair</button>
   </header>
   <nav class="lado" id="lado" aria-label="Áreas do painel"></nav>
@@ -1198,6 +1204,20 @@ ${AGRO_CSS}
   });
 
   /* ---------- painel ---------- */
+  // logo da empresa de quem entrou, no canto do cabeçalho (guardado no aparelho para aparecer na hora)
+  function mostrarLogo(src) {
+    var bx = $('#topoLogo'); if (!bx) return;
+    if (!src) { bx.hidden = true; return; }
+    bx.querySelector('img').src = src; bx.hidden = false;
+  }
+  function carregarLogo() {
+    var chave = 'vsl-logo-' + ((dados && dados.eu && dados.eu.id) || '');
+    try { var c = localStorage.getItem(chave); if (c) mostrarLogo(c); } catch (e) {}
+    api('/api/admin/logo').then(function (r) {
+      mostrarLogo(r.logo || '');
+      try { if (r.logo) localStorage.setItem(chave, r.logo); else localStorage.removeItem(chave); } catch (e) {}
+    }).catch(function () {});
+  }
   async function abrirPainel() {
     try {
       dados = await api('/api/admin/resumo');
@@ -1211,6 +1231,7 @@ ${AGRO_CSS}
     }
     $('#telaEntrar').style.display = 'none';
     $('#telaPainel').style.display = '';
+    carregarLogo();
     // acesso só à Timeline: esconde todo o resto do painel (nada mais é carregado)
     if (dados.eu && dados.eu.leitor) {
       document.body.classList.add('so-timeline');
