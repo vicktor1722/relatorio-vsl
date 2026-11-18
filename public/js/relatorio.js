@@ -46,9 +46,10 @@
         const d = rings.map(r => 'M' + r.map(p => px(p[0]).toFixed(1) + ',' + py(p[1]).toFixed(1)).join('L') + 'Z').join(' ');
         s += `<path d="${d}" fill="rgba(27,122,67,.13)" stroke="#1B7A43" stroke-width="2.5"/>`;
       });
-      let sx = 0, sy = 0, n = 0;
-      each(f, rings => rings[0].forEach(p => { sx += p[0]; sy += p[1]; n++; }));
-      s += `<text x="${px(sx / n).toFixed(1)}" y="${py(sy / n).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${esc((f.properties || {}).nome || '')}</text>`;
+      // o nome em cada parte do talhão
+      (window.Geo && Geo.rotulosParte ? Geo.rotulosParte(f.geometry) : []).forEach(pt => {
+        s += `<text x="${px(pt.x).toFixed(1)}" y="${py(pt.y).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${esc((f.properties || {}).nome || '')}</text>`;
+      });
     });
     itens.filter(i => i.lat != null).forEach(i => {
       s += `<circle cx="${px(i.lon).toFixed(1)}" cy="${py(i.lat).toFixed(1)}" r="7" fill="${i.tipo === 'video' ? '#D93025' : '#1B7A43'}" stroke="#fff" stroke-width="2.5"/>`;

@@ -1682,6 +1682,22 @@ ${MAPA_CHUVA_JS}
     document.addEventListener('mouseup', function () { if (mouse && mouse.mov) zSupr = Date.now(); mouse = null; });
   }
 
+  // pontos para escrever o nome do talhão: um em cada parte (talhão em várias partes leva o nome em todas,
+  // menos nas partes bem pequenas, abaixo de 25% da maior). Centro da área de cada parte.
+  function rotulosParte(g) {
+    var polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : (g.coordinates || []), l = [];
+    polys.forEach(function (rings) {
+      var r = rings && rings[0]; if (!r || !r.length) return;
+      var a = 0, cx = 0, cy = 0;
+      for (var i = 0, j = r.length - 1; i < r.length; j = i++) { var f = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += f; cx += (r[j][0] + r[i][0]) * f; cy += (r[j][1] + r[i][1]) * f; }
+      if (Math.abs(a) < 1e-14) { cx = 0; cy = 0; r.forEach(function (p) { cx += p[0]; cy += p[1]; }); l.push({ x: cx / r.length, y: cy / r.length, a: 0 }); }
+      else l.push({ x: cx / (3 * a), y: cy / (3 * a), a: Math.abs(a / 2) });
+    });
+    var max = l.reduce(function (m, p) { return Math.max(m, p.a); }, 0);
+    var out = l.filter(function (p) { return p.a >= max * 0.25; });
+    out.sort(function (p, q) { return q.a - p.a; });   // a maior primeiro
+    return out;
+  }
   function mapaSVG(f, sel, act, feitos) {
     var feats = (f && f.talhoes && f.talhoes.features) || [], minX = 180, minY = 90, maxX = -180, maxY = -90;
     var each = function (ft, cb) { var g = ft.geometry; if (!g) return; (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).forEach(cb); };
@@ -1699,7 +1715,9 @@ ${MAPA_CHUVA_JS}
         d += rings.map(function (rg, ri) { if (ri === 0) rg.forEach(function (q) { cx += px(q[0]); cy += py(q[1]); n++; }); return 'M' + rg.map(function (q) { return px(q[0]).toFixed(1) + ',' + py(q[1]).toFixed(1); }).join('L') + 'Z'; }).join(' ');
       });
       s += '<path class="ag-poly' + (on ? ' on' : '') + (feitos && feitos.indexOf(nome) >= 0 ? ' feito' : '') + '" data-a="' + (act || 'wtog') + '" data-v="' + esc(nome) + '" d="' + d + '"/>';
-      if (n) txt += '<text x="' + (cx / n).toFixed(0) + '" y="' + (cy / n).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
+      rotulosParte(ft.geometry).forEach(function (pt) {   // o nome em cada parte do talhão
+        txt += '<text x="' + px(pt.x).toFixed(0) + '" y="' + py(pt.y).toFixed(0) + '" text-anchor="middle">' + (on ? '✔ ' : '') + esc(nome) + '</text>';
+      });
     });
     return s + txt + '</svg><div class="ag-zb"><button type="button" data-z="in" title="Ampliar">+</button><button type="button" data-z="out" title="Reduzir">−</button><button type="button" data-z="reset" title="Mapa inteiro">⤢</button></div></div>';
   }

@@ -89,6 +89,7 @@ th:first-child,td:first-child{text-align:left}tr:last-child td{border-bottom:0}
 .plv-tal button.on{background:#1F6FB5;border-color:#1F6FB5;color:#fff}.plv-tal button.todos{border-style:dashed}
 .rot{background:none;border:0;box-shadow:none;color:#fff;font-weight:700;font-size:12px;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap;text-align:center;line-height:1.15}
 .rot small{display:block;font-size:11px;font-weight:600}
+.rot-ic{background:none;border:0}.rot-ic .rot{pointer-events:auto;cursor:pointer}
 .fz-tit{margin-top:18px}
 /* operador */
 .chips{display:flex;gap:6px;margin-bottom:10px}.chips button{border:1px solid var(--linha);background:#fff;border-radius:16px;padding:7px 14px;font-size:14px}
@@ -412,6 +413,23 @@ body.sem-rolar{overflow:hidden}
   }
 
   /* ---------- mapa (satélite + talhões) ---------- */
+  // pontos para escrever o nome do talhão: um em cada parte (talhão em várias partes leva o nome em todas,
+  // menos nas partes bem pequenas, abaixo de 25% da maior). Centro da área de cada parte.
+  function rotulosParte(g) {
+    var polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : (g.coordinates || []), l = [];
+    polys.forEach(function (rings) {
+      var r = rings && rings[0]; if (!r || !r.length) return;
+      var a = 0, cx = 0, cy = 0;
+      for (var i = 0, j = r.length - 1; i < r.length; j = i++) { var f = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += f; cx += (r[j][0] + r[i][0]) * f; cy += (r[j][1] + r[i][1]) * f; }
+      if (Math.abs(a) < 1e-14) { cx = 0; cy = 0; r.forEach(function (p) { cx += p[0]; cy += p[1]; }); l.push({ x: cx / r.length, y: cy / r.length, a: 0 }); }
+      else l.push({ x: cx / (3 * a), y: cy / (3 * a), a: Math.abs(a / 2) });
+    });
+    var max = l.reduce(function (m, p) { return Math.max(m, p.a); }, 0);
+    var out = l.filter(function (p) { return p.a >= max * 0.25; });
+    out.sort(function (p, q) { return q.a - p.a; });   // a maior primeiro
+    return out;
+  }
+
   var CORES = ['#2E7D32', '#F9A825', '#1565C0', '#C62828', '#6A1B9A', '#00838F', '#EF6C00', '#558B2F', '#AD1457', '#4E342E'];
   // etiqueta (opcional): o que vai escrito dentro do talhão; sem ela, só o nome
   function desenharMapa(el, estilo, rotulo, etiqueta, clicar) {
@@ -421,6 +439,7 @@ body.sem-rolar{overflow:hidden}
     L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagens © Esri' }).addTo(m);
     var g = L.geoJSON(D.mapa);
     m.fitBounds(g.getBounds(), { padding: [16, 16], maxZoom: 17 });   // enquadra antes de desenhar
+    var extras = [];
     m.camada = L.geoJSON(D.mapa, {
       style: function (f) { return estilo((f.properties || {}).nome || ''); },
       onEachFeature: function (f, c) {
@@ -428,9 +447,17 @@ body.sem-rolar{overflow:hidden}
         if (clicar) c.on('click', function () { clicar(nm); });
         else c.bindPopup(rotulo(nm, f.properties || {}));
         var curto = D.todas ? nm.split(' · ').slice(1).join(' · ') || nm : nm;
-        c.bindTooltip(etiqueta ? etiqueta(curto, f.properties || {}) : esc(curto), { permanent: true, direction: 'center', className: 'rot' });
+        var txtR = etiqueta ? etiqueta(curto, f.properties || {}) : esc(curto), pts = rotulosParte(f.geometry);
+        if (pts.length <= 1) { c.bindTooltip(txtR, { permanent: true, direction: 'center', className: 'rot' }); return; }
+        // talhão em várias partes: o nome em cada parte (tocar no nome também seleciona o talhão)
+        pts.forEach(function (pt) {
+          var mk = L.marker([pt.y, pt.x], { icon: L.divIcon({ className: 'rot-ic', html: '<div class="rot" style="transform:translate(-50%,-50%);display:inline-block">' + txtR + '</div>', iconSize: [0, 0] }), keyboard: false });
+          if (clicar) mk.on('click', function () { clicar(nm); });
+          extras.push(mk);
+        });
       }
     }).addTo(m);
+    extras.forEach(function (mk) { m.camada.addLayer(mk); });
     mapas.push(m);
     return m;
   }

@@ -7,6 +7,20 @@ import { AGRO_REL_CSS, AGRO_REL_JS, blocosAgro } from './agrorel.js';
 import { safraPadrao } from './safras.js';
 import { ZAP_JS, semZap, zap } from './zap.js';
 
+// pontos para escrever o nome do talhão: um em cada parte (menos nas partes abaixo de 25% da maior); a maior primeiro
+function rotulosParte(g) {
+  const polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : (g.coordinates || []), l = [];
+  polys.forEach((rings) => {
+    const r = rings && rings[0]; if (!r || !r.length) return;
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const f = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += f; cx += (r[j][0] + r[i][0]) * f; cy += (r[j][1] + r[i][1]) * f; }
+    if (Math.abs(a) < 1e-14) { cx = 0; cy = 0; r.forEach((p) => { cx += p[0]; cy += p[1]; }); l.push({ x: cx / r.length, y: cy / r.length, a: 0 }); }
+    else l.push({ x: cx / (3 * a), y: cy / (3 * a), a: Math.abs(a / 2) });
+  });
+  const max = l.reduce((m, p) => Math.max(m, p.a), 0);
+  return l.filter((p) => p.a >= max * 0.25).sort((p, q) => q.a - p.a);
+}
+
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // texto traduzível com *negrito*, _itálico_ e ~riscado~ (o original fica em data-raw para a tradução)
 const trz = (t, cls) => `<span${cls ? ` class="${cls}"` : ''} data-tr data-raw="${esc(t)}">${zap(esc(t))}</span>`;
@@ -167,11 +181,12 @@ function mapaSVG(talhoes, itens) {
       const d = rings.map(r => 'M' + r.map(p => px(p[0]).toFixed(1) + ',' + py(p[1]).toFixed(1)).join('L') + 'Z').join(' ');
       s += `<path d="${d}" fill="rgba(27,122,67,.13)" stroke="#1B7A43" stroke-width="2.5"/>`;
     });
-    let sx = 0, sy = 0, n = 0;
-    each(f, rings => rings[0].forEach(p => { sx += p[0]; sy += p[1]; n++; }));
-    s += `<text x="${px(sx / n).toFixed(1)}" y="${py(sy / n).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${esc(f.properties && f.properties.nome || '')}</text>`;
+    // o nome em cada parte do talhão; a área só na maior parte
     const haT = Number(f.properties && f.properties.area_ha) || 0;
-    if (haT) s += `<text x="${px(sx / n).toFixed(1)}" y="${(py(sy / n) + 21).toFixed(1)}" font-size="16" fill="#146034" text-anchor="middle" font-family="sans-serif">${haT.toFixed(1).replace('.', ',')} ha</text>`;
+    rotulosParte(f.geometry).forEach((pt, ip) => {
+      s += `<text x="${px(pt.x).toFixed(1)}" y="${py(pt.y).toFixed(1)}" font-size="19" font-weight="600" fill="#146034" text-anchor="middle" font-family="sans-serif">${esc(f.properties && f.properties.nome || '')}</text>`;
+      if (haT && ip === 0) s += `<text x="${px(pt.x).toFixed(1)}" y="${(py(pt.y) + 21).toFixed(1)}" font-size="16" fill="#146034" text-anchor="middle" font-family="sans-serif">${haT.toFixed(1).replace('.', ',')} ha</text>`;
+    });
   });
   itens.filter(i => i.lat != null).forEach(i => {
     s += `<circle cx="${px(i.lon).toFixed(1)}" cy="${py(i.lat).toFixed(1)}" r="7" fill="${i.tipo === 'video' ? '#D93025' : '#1B7A43'}" stroke="#fff" stroke-width="2.5"/>`;
