@@ -326,6 +326,32 @@ export default {
       if (rota === '/api/status/alta') { if (env.ADMIN_KEY && url.searchParams.get('key') === env.ADMIN_KEY && url.searchParams.get('forcar')) return json(await alertaAltaSoja(env, true, url.searchParams.get('modo') || '')); return json(await statusAlta(env)); }
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
+      // consulta temporária (protegida por chave): fazendas do Júnior Redivo (equipe) e os talhões, para trocar pelo KML unificado
+      if (rota === '/api/status/lagloria') {
+        const k = String(url.searchParams.get('k') || '');
+        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
+        if (hx !== 'f3fe39dd383aaa9527c8d38d305f3d7629dfdb825a0c8f5878e30e464d9ed28a') return json({ erro: 'não encontrado' }, 404);
+        const u = await env.DB.prepare("SELECT id, nome, equipe_id FROM usuarios WHERE lower(email) = 'redivojunior@hotmail.com'").first();
+        if (!u) return json({ erro: 'conta não encontrada' }, 404);
+        const { results: eq } = await env.DB.prepare('SELECT id, nome FROM usuarios WHERE id = ? OR equipe_id = ?').bind(u.id, u.id).all();
+        const ids = (eq || []).map((x) => x.id);
+        const { results: fz } = await env.DB.prepare('SELECT id, nome, usuario_id, n_talhoes, area_ha, atualizado_em, talhoes FROM fazendas WHERE usuario_id IN (' + ids.map(() => '?').join(',') + ')').bind(...ids).all();
+        const saida = [];
+        for (const f of fz || []) {
+          let gj = null; try { gj = JSON.parse(f.talhoes || 'null'); } catch (e) { gj = null; }
+          const tal = ((gj && gj.features) || []).map((x) => ({ nome: x.properties && x.properties.nome, ha: x.properties && x.properties.area_ha, tipo: x.geometry && x.geometry.type }));
+          const cont = async (q) => ((await env.DB.prepare(q).bind(f.id).all().catch(() => ({ results: [] }))).results || []);
+          const r = { id: f.id, nome: f.nome, dono: f.usuario_id, n_talhoes: f.n_talhoes, area_ha: f.area_ha, atualizado_em: f.atualizado_em, talhoes: tal,
+            plantio: await cont('SELECT safra, talhao, cultura, variedade, data_plantio, partes FROM plantio WHERE fazenda_id = ?'),
+            colheita: await cont('SELECT safra, talhao FROM colheita WHERE fazenda_id = ?'),
+            recs: (await cont('SELECT id, operacao, dados FROM recomendacoes WHERE fazenda_id = ?')).map((x) => { let d = {}; try { d = JSON.parse(x.dados || '{}'); } catch (e) {} return { id: x.id, op: x.operacao, tal: d.tal || [] }; }),
+            itens: await cont('SELECT i.talhao, COUNT(*) AS n FROM itens i JOIN relatorios r ON r.id = i.relatorio_id WHERE r.fazenda_id = ? GROUP BY i.talhao'),
+            chuva: await cont('SELECT talhao, COUNT(*) AS n FROM chuva_talhao WHERE fazenda_id = ? GROUP BY talhao') };
+          if (/gl[oó]ria/i.test(f.nome) && url.searchParams.get('geo') === '1') r.geo = gj;
+          saida.push(r);
+        }
+        return json({ ok: true, conta: u.nome, equipe: eq, fazendas: saida });
+      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
