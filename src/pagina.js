@@ -629,12 +629,30 @@ const SCRIPT_PPT = String.raw`
       var AREA_H = 5.65, AREA_W = 12.2;
       // linhas de cada observação; entre uma observação e outra, um espaço
       var pars = [];
-      D.obs.forEach(function(o, k){ String(o).split('\n').forEach(function(l, j){ pars.push({ t: l.replace(/\s+$/, ''), novo: k > 0 && j === 0 }); }); });
+      // t: texto puro (para medir); m: com os marcadores (para o negrito/itálico/riscado no slide)
+      var zp = window.ZAP || { puro: function(x){ return x; }, partes: function(x){ return [{ t: x }]; } };
+      D.obs.forEach(function(o, k){ String(o).split('\n').forEach(function(l, j){ var lm = l.replace(/\s+$/, ''); pars.push({ t: zp.puro(lm), m: lm, novo: k > 0 && j === 0 }); }); });
       var altura = function(lista, f, w){
         var cpl = Math.max(10, Math.floor(w / (f * 0.55 / 72)));   // letras por linha nessa largura
         return lista.reduce(function(s, p){ return s + Math.max(1, Math.ceil((p.t.length || 1) / cpl)) * (f * 1.22 / 72) + (p.novo ? f * 0.7 / 72 : 0); }, 0);
       };
-      var runs = function(lista, f){ return lista.map(function(p){ return { text: p.t || ' ', options: { breakLine: true, paraSpaceBefore: p.novo ? Math.round(f * 0.7) : 0 } }; }); };
+      var runs = function(lista, f){
+        var out = [];
+        lista.forEach(function(p){
+          var pd = p.m != null && p.t ? zp.partes(p.m) : [];
+          if (!pd.length) pd = [{ t: p.t || ' ' }];
+          pd.forEach(function(x, n){
+            var o = {};
+            if (n === 0) o.paraSpaceBefore = p.novo ? Math.round(f * 0.7) : 0;
+            if (n === pd.length - 1) o.breakLine = true;
+            if (x.b) o.bold = true;
+            if (x.i) o.italic = true;
+            if (x.s) o.strike = 'sngStrike';
+            out.push({ text: x.t, options: o });
+          });
+        });
+        return out;
+      };
       var caixa = function(sl, lista, f, x, w){ sl.addText(runs(lista, f), { x: x, y: 1.2, w: w, h: AREA_H, fontSize: f, color: TEXTO, fontFace: 'Arial', valign: 'top', margin: 0.05 }); };
       var f1 = 0, f2 = 0, corte = 0;
       for (var ff = 18; ff >= 10; ff--) { if (altura(pars, ff, AREA_W) <= AREA_H) { f1 = ff; break; } }
@@ -646,10 +664,10 @@ const SCRIPT_PPT = String.raw`
           var tot = altura(pars, f3, meioCol), ac = 0, melhor = -1;
           for (var i = 0; i < pars.length; i++) { ac = altura(pars.slice(0, i + 1), f3, meioCol); if (ac >= tot / 2) { melhor = i + 1; break; } }
           if (melhor < 0) melhor = pars.length;
-          var a1 = pars.slice(0, melhor), a2 = pars.slice(melhor).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; });
+          var a1 = pars.slice(0, melhor), a2 = pars.slice(melhor).map(function(p, j){ return j === 0 ? { t: p.t, m: p.m, novo: false } : p; });
           // começa a 2ª coluna numa linha em branco ou no começo de uma observação, quando dá
           for (var dj = 0; dj < 6 && melhor + dj < pars.length; dj++) { if (!pars[melhor + dj].t.trim() || pars[melhor + dj].novo) { melhor = melhor + dj + (pars[melhor + dj].t.trim() ? 0 : 1); break; } }
-          a1 = pars.slice(0, melhor); a2 = pars.slice(melhor).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; });
+          a1 = pars.slice(0, melhor); a2 = pars.slice(melhor).map(function(p, j){ return j === 0 ? { t: p.t, m: p.m, novo: false } : p; });
           if (altura(a1, f3, meioCol) <= AREA_H && altura(a2, f3, meioCol) <= AREA_H) { f2 = f3; corte = melhor; }
         }
       }
@@ -660,11 +678,11 @@ const SCRIPT_PPT = String.raw`
         var mc = (AREA_W - 0.4) / 2;
         caixa(s2, pars.slice(0, corte), f2, 0.55, mc);
         s2.addShape('rect', { x: 0.55 + mc + 0.194, y: 1.3, w: 0.012, h: AREA_H - 0.2, fill: { color: 'D5DED9' }, line: { color: 'D5DED9', width: 0 } });
-        caixa(s2, pars.slice(corte).map(function(p, j){ return j === 0 ? { t: p.t, novo: false } : p; }), f2, 0.55 + mc + 0.4, mc);
+        caixa(s2, pars.slice(corte).map(function(p, j){ return j === 0 ? { t: p.t, m: p.m, novo: false } : p; }), f2, 0.55 + mc + 0.4, mc);
       } else {
         // texto muito grande: vários slides em duas colunas, letra 10
         var blocos = [], at = [];
-        pars.forEach(function(p){ at.push(p); if (altura(at, 10, AREA_W) > AREA_H) { at.pop(); blocos.push(at); at = [{ t: p.t, novo: false }]; } });
+        pars.forEach(function(p){ at.push(p); if (altura(at, 10, AREA_W) > AREA_H) { at.pop(); blocos.push(at); at = [{ t: p.t, m: p.m, novo: false }]; } });
         if (at.length) blocos.push(at);
         blocos.forEach(function(b, i){ var sb = P.addSlide(); faixa(sb, 'Observações gerais', (i + 1) + ' de ' + blocos.length); caixa(sb, b, 10, 0.55, AREA_W); });
       }
@@ -981,7 +999,8 @@ export function paginaRelatorio(rel, itens, env, origem, perfil, agro) {
     ntalhoes: ((talhoes && talhoes.features) || []).length,
     periodo: rel.data_inicio ? fmtData(rel.data_inicio) + (rel.data_fim && rel.data_fim !== rel.data_inicio ? ' a ' + fmtData(rel.data_fim) : '') : '',
     publicado: rel.publicado_em ? fmtData(noFuso(rel.publicado_em)) : '',
-    obs: [rel.observacoes].concat(gNotas ? gNotas.itens.map(i => i.legenda) : []).map(t => semZap(String(t || '').trim())).filter(Boolean),
+    // com os marcadores *negrito*, _itálico_, ~riscado~: o PowerPoint aplica o estilo (ZAP.partes)
+    obs: [rel.observacoes].concat(gNotas ? gNotas.itens.map(i => i.legenda) : []).map(t => String(t || '').trim()).filter((t) => semZap(t)),
     grupos: grupos.filter(g => g.chave !== '\u0000notas').map(g => ({
       titulo: g.titulo,
       area: g.area ? g.area.toFixed(1).replace('.', ',') + ' ha' : '',
