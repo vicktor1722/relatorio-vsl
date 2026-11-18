@@ -322,20 +322,6 @@ export default {
       if (rota === '/api/status/alta') { if (env.ADMIN_KEY && url.searchParams.get('key') === env.ADMIN_KEY && url.searchParams.get('forcar')) return json(await alertaAltaSoja(env, true, url.searchParams.get('modo') || '')); return json(await statusAlta(env)); }
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
-      // uma vez (protegido por chave): exclui o usuário comum cadastrado com o e-mail digitado errado (sem relatórios)
-      if (rota === '/api/status/excluir-kawa') {
-        const k = String(url.searchParams.get('k') || '');
-        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
-        if (hx !== '2dadeeec90f77ddfc7c3882918e01d455c3d8ea99737c0acb5cb675f769e02df') return json({ erro: 'não encontrado' }, 404);
-        const u = await env.DB.prepare("SELECT u.id, u.email, u.equipe_id, a.email AS adm FROM usuarios u LEFT JOIN usuarios a ON a.id = u.equipe_id WHERE lower(trim(u.email)) = 'kawasantana92@gamail.com'").first();
-        if (!u) return json({ ok: true, feito: false, motivo: 'não existe (já excluído?)' });
-        if (String(u.adm || '').toLowerCase() !== 'redivojunior@hotmail.com') return json({ ok: false, motivo: 'não é da equipe esperada' });
-        const n = (await env.DB.prepare('SELECT COUNT(*) AS n FROM relatorios WHERE usuario_id = ?').bind(u.id).first()).n;
-        if (n) return json({ ok: false, motivo: 'tem ' + n + ' relatório(s); não excluído' });
-        const { excluirComum } = await import('./equipe.js');
-        const r = await excluirComum(env, { id: u.equipe_id }, { id: u.id, email: u.email });
-        return json({ ok: true, feito: true, email_salvo: JSON.stringify(u.email), r });
-      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
