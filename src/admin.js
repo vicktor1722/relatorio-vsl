@@ -2027,13 +2027,15 @@ ${AGRO_CSS}
       var f = formEq(u.id, '<div class="aviso ruim">Excluir <b>' + esc(u.nome || u.email) + '</b>? ' +
         (n ? 'Os <b>' + n + ' relatório' + (n === 1 ? '' : 's') + '</b> e as fotos dele serão apagados e não dá para desfazer. ' : 'Ele não tem relatórios. ') +
         'A vaga volta para a cota da equipe.</div>' +
-        '<div class="campo"><label>Digite o e-mail dele para confirmar</label><input data-c type="email" autocomplete="off" placeholder="' + esc(u.email) + '"></div>' +
+        '<div class="campo"><label>Para confirmar, digite o e-mail dele: <b>' + esc(u.email) + '</b></label><input data-c type="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="digite o e-mail aqui"></div>' +
         '<div data-m></div><button class="btn-mini ruim" data-confirma>Excluir definitivamente</button> <button class="btn-mini" data-cancelar>Cancelar</button>');
       f.querySelector('[data-cancelar]').onclick = function () { formEq(u.id, ''); };
       f.querySelector('[data-confirma]').onclick = async function (ev) {
         var bt = ev.target; bt.disabled = true;
         try {
-          await api('/api/admin/equipe/usuario/excluir', { id: u.id, email: f.querySelector('[data-c]').value });
+          var dig = f.querySelector('[data-c]').value.trim();
+          if (!dig) { aviso(f.querySelector('[data-m]'), 'Digite o e-mail do usuário no campo acima para confirmar.', true); bt.disabled = false; return; }
+          await api('/api/admin/equipe/usuario/excluir', { id: u.id, email: dig });
           await carregarEquipe(); aviso($('#eqMsg') || $('#eqCorpo'), 'Usuário excluído. A vaga foi liberada.', false);
         } catch (e) { aviso(f.querySelector('[data-m]'), e.message, true); bt.disabled = false; }
       };
