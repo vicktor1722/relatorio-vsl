@@ -170,7 +170,14 @@
   function safras() { return (cad().safras || []).map(function (s) { return s.nome; }); }
   function talhoesDe(f) {
     if (!f || !f.talhoes || !f.talhoes.features) return [];
-    return f.talhoes.features.map(function (ft) { var p = ft.properties || {}; return { nome: String(p.nome || ''), ha: Number(p.area_ha) || 0, f: ft }; }).filter(function (t) { return t.nome; });
+    // polígonos com o mesmo nome são um talhão só: uma linha, área somada (o mapa seleciona todos pelo nome)
+    var por = {}, out = [];
+    f.talhoes.features.forEach(function (ft) {
+      var p = ft.properties || {}, nome = String(p.nome || ''); if (!nome) return;
+      if (por[nome]) { por[nome].ha = Math.round((por[nome].ha + (Number(p.area_ha) || 0)) * 100) / 100; por[nome].partes++; return; }
+      por[nome] = { nome: nome, ha: Number(p.area_ha) || 0, f: ft, partes: 1 }; out.push(por[nome]);
+    });
+    return out;
   }
   // área usada de um talhão: o talhão inteiro ou, se a recomendação pegar só uma parte, os ha informados
   function haUsada(total, p) { p = Number(p); return p > 0 && p < total ? p : total; }

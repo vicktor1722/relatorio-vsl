@@ -47,7 +47,7 @@ function areasDoMapa(mapa) {
   const a = {};
   ((mapa && mapa.features) || []).forEach((f) => {
     const p = f.properties || {};
-    if (p.nome) a[p.nome] = Number(p.area_ha) || 0;
+    if (p.nome) a[p.nome] = Math.round(((a[p.nome] || 0) + (Number(p.area_ha) || 0)) * 100) / 100;   // mesmo nome = um talhão só (partes)
   });
   return a;
 }

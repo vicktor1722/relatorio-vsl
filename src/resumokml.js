@@ -22,7 +22,7 @@ export async function comResumo(env, fn) {
 
 export function calcularResumo(talhoes) {
   const s = typeof talhoes === 'string' ? talhoes : (talhoes ? JSON.stringify(talhoes) : '');
-  const out = { v: 1, len: s.length, n: 0, total: 0, areas: {}, centro: null };
+  const out = { v: 2, len: s.length, n: 0, total: 0, areas: {}, centro: null };   // v2: talhões de mesmo nome somam (um talhão só)
   if (!s) return out;
   let gj = null;
   try { gj = typeof talhoes === 'string' ? JSON.parse(talhoes) : talhoes; } catch (e) { return out; }
@@ -34,7 +34,7 @@ export function calcularResumo(talhoes) {
   };
   ((gj && gj.features) || []).forEach((ft) => {
     const p = (ft && ft.properties) || {};
-    if (p.nome) { const ha = Number(p.area_ha) || 0; out.areas[String(p.nome)] = ha; out.total += ha; out.n++; }
+    if (p.nome) { const ha = Number(p.area_ha) || 0, k = String(p.nome); if (!(k in out.areas)) { out.areas[k] = 0; out.n++; } out.areas[k] = Math.round((out.areas[k] + ha) * 100) / 100; out.total += ha; }
     if (ft && ft.geometry && ft.geometry.coordinates) passa(ft.geometry.coordinates);
   });
   out.total = Math.round(out.total * 100) / 100;
@@ -47,7 +47,7 @@ export function lerResumo(resumo, kmlLen) {
   if (!resumo) return null;
   try {
     const r = typeof resumo === 'string' ? JSON.parse(resumo) : resumo;
-    if (!r || r.v !== 1 || !r.areas) return null;
+    if (!r || r.v !== 2 || !r.areas) return null;
     if (kmlLen != null && Number(kmlLen || 0) !== Number(r.len || 0)) return null;
     return r;
   } catch (e) { return null; }
@@ -59,7 +59,7 @@ export async function resumosDe(env, rows) {
   const out = {}, faltam = [];
   (rows || []).forEach((r) => {
     if (!r || !r.id) return;
-    if (!Number(r.kml_len || 0)) { out[r.id] = { v: 1, len: 0, n: 0, total: 0, areas: {}, centro: null }; return; }
+    if (!Number(r.kml_len || 0)) { out[r.id] = { v: 2, len: 0, n: 0, total: 0, areas: {}, centro: null }; return; }
     const ok = lerResumo(r.resumo, r.kml_len);
     if (ok) out[r.id] = ok; else faltam.push(r.id);
   });
