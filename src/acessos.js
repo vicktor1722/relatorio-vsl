@@ -57,3 +57,17 @@ export async function contagemAcessos(env) {
     return {};
   }
 }
+
+// só dos relatórios pedidos (timeline): { id: { total, visitantes, ultimo } }
+export async function acessosDe(env, ids) {
+  const lista = [...new Set((ids || []).filter(Boolean))].slice(0, 100);
+  if (!lista.length) return {};
+  try {
+    await garantirTabela(env);
+    const { results } = await env.DB.prepare(`SELECT relatorio_id AS id, COUNT(*) AS total, COUNT(DISTINCT visitante) AS visitantes, MAX(em) AS ultimo
+        FROM acessos WHERE relatorio_id IN (${lista.map(() => '?').join(',')}) GROUP BY relatorio_id`).bind(...lista).all();
+    const mapa = {};
+    (results || []).forEach((r) => { mapa[r.id] = r; });
+    return mapa;
+  } catch (e) { return {}; }
+}
