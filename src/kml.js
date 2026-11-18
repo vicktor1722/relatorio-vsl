@@ -52,5 +52,33 @@ export function kmlParaGeo(kml) {
       geometry: polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys }
     });
   });
-  return { type: 'FeatureCollection', features: feats };
+  return juntarMesmoNome({ type: 'FeatureCollection', features: feats }).gj;
+}
+
+/* talhões com o mesmo nome são um talhão só: os polígonos viram partes de um MultiPolygon e a área é a soma.
+   Tocar em qualquer parte seleciona o talhão inteiro (app, painel e portal trabalham por nome).
+   Nome comparado sem diferença de maiúsculas e espaços repetidos; fica o nome e os atributos do 1º. */
+const chaveNome = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+export function juntarMesmoNome(gj) {
+  const feats = (gj && Array.isArray(gj.features)) ? gj.features : [];
+  const por = new Map(), out = [];
+  let juntou = 0;
+  feats.forEach((ft) => {
+    const g = ft && ft.geometry, k = chaveNome(ft && ft.properties && ft.properties.nome);
+    if (!k || !g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) { out.push(ft); return; }
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+    const ja = por.get(k);
+    if (!ja) { const c = { type: 'Feature', properties: Object.assign({}, ft.properties), geometry: g, _polys: polys.slice() }; por.set(k, c); out.push(c); return; }
+    ja._polys = ja._polys.concat(polys); ja._junto = true; juntou++;
+  });
+  out.forEach((c) => {
+    if (!c._polys) return;
+    if (c._junto) {
+      c.geometry = { type: 'MultiPolygon', coordinates: c._polys };
+      c.properties.area_ha = areaHa(c._polys);
+      c.properties.n_partes = c._polys.length;
+    }
+    delete c._polys; delete c._junto;
+  });
+  return { gj: Object.assign({}, gj || { type: 'FeatureCollection' }, { features: out }), juntou };
 }

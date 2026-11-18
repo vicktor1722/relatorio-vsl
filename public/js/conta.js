@@ -364,7 +364,8 @@
   }
 
   function statusKmlFazenda(gj, n, area) {
-    const qtd = gj && gj.features ? gj.features.length : (n || 0);
+    // polígonos com o mesmo nome contam como um talhão só
+    const qtd = gj && gj.features ? new Set(gj.features.map((x) => String((x.properties && x.properties.nome) || '').trim().toLowerCase())).size : (n || 0);
     const ha = gj && gj.features
       ? gj.features.reduce((s, x) => s + ((x.properties && x.properties.area_ha) || 0), 0)
       : (area || 0);

@@ -235,7 +235,7 @@ function agruparPorTalhao(itens, talhoes) {
   const ordem = {}, areas = {};
   ((talhoes && talhoes.features) || []).forEach((f, i) => {
     const p = f.properties || {};
-    if (p.nome) { ordem[p.nome] = i; areas[p.nome] = p.area_ha || 0; }
+    if (p.nome) { if (!(p.nome in ordem)) ordem[p.nome] = i; areas[p.nome] = (areas[p.nome] || 0) + (p.area_ha || 0); }   // mesmo nome = um talhão só
   });
 
   const mapa = {};

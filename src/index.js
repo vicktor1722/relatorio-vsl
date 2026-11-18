@@ -18,7 +18,7 @@ import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
-import { kmlParaGeo } from './kml.js';
+import { juntarMesmoNome, kmlParaGeo } from './kml.js';
 import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safras.js';
 
 // onde fica a capa leve de uma foto: "rel/item.jpg" → "rel/item.capa.jpg" (no Google Drive não há)
@@ -224,6 +224,12 @@ async function perfilDoRelatorio(env, uid) {
   if (!p.logo && t.logo) p.logo = t.logo;
   if (!String(p.empresa || '').trim() && t.empresa) { p.empresa = t.empresa; if (!String(p.cidade || '').trim()) p.cidade = t.cidade || ''; }
   return p;
+}
+
+// mapa da fazenda vindo do app: talhões com o mesmo nome viram um talhão só (MultiPolygon, área somada)
+function kmlJunto(t) {
+  try { const o = typeof t === 'string' ? JSON.parse(t) : t; return JSON.stringify(juntarMesmoNome(o).gj); }
+  catch (e) { return typeof t === 'string' ? t : JSON.stringify(t); }
 }
 
 export default {
@@ -885,7 +891,7 @@ export default {
           if (ja && ja.usuario_id !== me.id) return json({ ok: true, id: ja.id, repetido: true });   // fazenda da equipe: usa a que já existe
           if (ja) {
             // se a existente está sem talhões e esta veio com KML, aproveita o KML
-            const novo = f.talhoes ? (typeof f.talhoes === 'string' ? f.talhoes : JSON.stringify(f.talhoes)) : '';
+            const novo = f.talhoes ? kmlJunto(f.talhoes) : '';
             if (novo && !ja.talhoes) {
               let n2 = 0, a2 = 0;
               try { const o2 = JSON.parse(novo); n2 = (o2.features || []).length;
@@ -902,7 +908,7 @@ export default {
           if (de && de.usuario_id !== me.id) return json({ ok: true, id: f.id, ignorado: 'fazenda da equipe: só quem cadastrou altera' });
         }
         const id = f.id || novoId('f');
-        const gj = f.talhoes ? (typeof f.talhoes === 'string' ? f.talhoes : JSON.stringify(f.talhoes)) : '';
+        const gj = f.talhoes ? kmlJunto(f.talhoes) : '';   // talhões de mesmo nome viram um só (partes)
         let n = 0, area = 0;
         try {
           const o = gj ? JSON.parse(gj) : null;
