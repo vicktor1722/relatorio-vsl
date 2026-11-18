@@ -34,6 +34,18 @@ export async function equipeDe(env, uid) {
   return { papel: u.papel === 'adm' ? 'adm' : 'comum', adm_id: admId, ids, cota: u.papel === 'adm' ? Number(u.cota) || 0 : 0 };
 }
 
+// contas cujas fazendas (e o que foi lançado nelas: plantio, colheita, recomendações, estoque) esta conta usa:
+// o Adm de equipe vê as dele e as dos usuários comuns; o usuário comum vê as dele e as do Adm; os demais, só as próprias.
+// O que é lançado numa fazenda fica gravado em nome do dono da fazenda (assim o portal e o painel do dono veem tudo).
+export async function donosDe(env, uid) {
+  try {
+    const eq = await equipeDe(env, uid);
+    if (eq.papel === 'adm') return eq.ids;
+    if (eq.papel === 'comum' && eq.adm_id) return [...new Set([uid, eq.adm_id])];
+  } catch (e) { /* sem equipe */ }
+  return [uid];
+}
+
 // conta cujo prazo e módulos valem para esta (o Adm da equipe, para o usuário comum)
 export async function contaTitular(env, uid) {
   try {

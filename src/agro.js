@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { listarChuva } from './chuvatalhao.js';
-import { contaTitular, contasDoAdmin } from './equipe.js';
+import { contaTitular, contasDoAdmin, donosDe } from './equipe.js';
 import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
 import { safraPadrao } from './safras.js';
@@ -263,10 +263,15 @@ const txt = (v, max) => String(v == null ? '' : v).trim().slice(0, max || 200);
 const num = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
 const dia = (v) => { const s = String(v || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
 
+// fazenda que esta conta pode usar: a própria ou da equipe (donosDe). Devolve também o dono (usuario_id):
+// o que for lançado nela fica gravado em nome do dono.
 async function fazendaDoUsuario(env, usuarioId, fazendaId) {
-  return env.DB.prepare('SELECT id, nome, talhoes FROM fazendas WHERE id = ? AND usuario_id = ?')
-    .bind(fazendaId, usuarioId).first();
+  const f = await env.DB.prepare('SELECT id, nome, talhoes, usuario_id FROM fazendas WHERE id = ?').bind(fazendaId).first();
+  if (!f) return null;
+  if (f.usuario_id === usuarioId) return f;
+  return (await donosDe(env, usuarioId)).includes(f.usuario_id) ? f : null;
 }
+const marcasDe = (l) => l.map(() => '?').join(',');
 
 function lerDados(s) {
   try { const o = JSON.parse(s || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
@@ -314,18 +319,20 @@ export async function dadosParaRelatorio(env, rel) {
     const mod = await modulosDe(env, rel.usuario_id);
     if (!mod.plantio && !mod.recomendacoes) return null;
     const out = { plantio: [], recs: [], mapa: null };
+    // fazenda da equipe (ex.: do Adm): os lançamentos estão em nome do dono da fazenda
+    const f = await fazendaDoUsuario(env, rel.usuario_id, rel.fazenda_id);
+    const dono = (f && f.usuario_id) || rel.usuario_id;
     if (mod.plantio) {
       const { results } = await env.DB.prepare(
         'SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ? AND safra IN (?, ?)')
-        .bind(rel.usuario_id, rel.fazenda_id, safraPadrao(rel.safra), rel.safra || '').all();   // padrão ou como foi gravado
+        .bind(dono, rel.fazenda_id, safraPadrao(rel.safra), rel.safra || '').all();   // padrão ou como foi gravado
       out.plantio = results || [];
-      const f = await fazendaDoUsuario(env, rel.usuario_id, rel.fazenda_id);
       if (f && f.talhoes) { try { out.mapa = JSON.parse(f.talhoes); } catch (e) { /* sem mapa */ } }
     }
     if (mod.recomendacoes) {
       const { results } = await env.DB.prepare(
         'SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? AND mostrar = 1 ORDER BY data_prevista')
-        .bind(rel.usuario_id, rel.fazenda_id).all();
+        .bind(dono, rel.fazenda_id).all();
       out.recs = (results || []).filter((r) => !rel.safra || !r.safra || safraPadrao(r.safra) === safraPadrao(rel.safra)).map(linhaRec);
     }
     if (!out.plantio.length && !out.recs.length) return null;
@@ -371,10 +378,10 @@ function ocultarDemais(S, faz, ver, r1) {
 // uid: só as fazendas daquela conta (painel da conta comum). Também pode ser uma lista de contas (administrador geral: a dele e as liberadas com "visualizar dados")
 // uid '*' + visiveis (administrador geral): soma todas as contas, mas as fazendas fora de "visiveis" vão juntas,
 // sem nome, numa linha só ("Demais usuários") — só as áreas e datas, nunca o nome da fazenda ou do produtor
-export async function plantioGeral(env, uid, visiveis) {
+export async function plantioGeral(env, uid, visiveis, propriaLista) {
   await garantir(env);
   const todas = uid === '*';
-  const propria = typeof uid === 'string' && !todas;
+  const propria = (typeof uid === 'string' && !todas) || !!propriaLista;   // propriaLista: lista das contas da equipe (painel da conta)
   const uids = todas ? [] : uid ? [].concat(uid) : [];
   const inq = uids.map(() => '?').join(',') || "''";
   const so = (campo) => (todas ? '' : ' AND ' + campo + ' IN (' + inq + ')');
@@ -523,7 +530,7 @@ export async function comparativo(env, me, adm, safraPedida) {
   await garantir(env);
   let safra = safraPadrao(safraPedida || '');
   // administrador geral: a conta dele e as liberadas com "visualizar dados"; conta comum: só a dela
-  const ids = adm ? await contasDoAdmin(env, me) : [me.id];
+  const ids = adm ? await contasDoAdmin(env, me) : await donosDe(env, me.id);   // conta comum: a dela e as fazendas da equipe
   const onde = ' WHERE usuario_id IN (' + ids.map(() => '?').join(',') + ')';
   const arg = ids;
   const [faz, recs, ent, col, pla, contas] = await Promise.all([
@@ -599,6 +606,9 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (!me.cf) mod.admin = false;   // visão de todas as contas só no painel que entrou com o código
 
   if (rota === '/api/modulos') return json({ ok: true, plantio: mod.plantio, recomendacoes: mod.recomendacoes, admin: mod.admin });
+  // contas cujas fazendas esta conta usa (a própria e, na equipe, as do Adm / dos usuários comuns)
+  const donos = await donosDe(env, me.id);
+  const inD = marcasDe(donos);
 
   const precisaPlantio = rota.startsWith('/api/agro/plantio');
   const precisaRec = rota.startsWith('/api/agro/rec') || rota.startsWith('/api/agro/produto') || rota.startsWith('/api/agro/estoque');
@@ -610,30 +620,33 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (rota === '/api/agro/admin/plantio' && req.method === 'GET') {
     // administrador vê todas as contas; conta com o módulo de plantio vê a evolução das fazendas dela
     if (mod.admin) return json(await plantioGeral(env, '*', await contasDoAdmin(env, me)));   // totais de todas as contas; detalhe só das liberadas
-    if (mod.plantio) return json(Object.assign(await plantioGeral(env, me.id), { propria: true }));
+    if (mod.plantio) return json(Object.assign(await plantioGeral(env, donos, null, true), { propria: true }));
     return json({ erro: 'módulo de plantio não liberado para esta conta' }, 403);
   }
 
   /* ----- chuva lançada por talhão pela fazenda (o consultor só vê) ----- */
   if (rota === '/api/agro/chuva' && req.method === 'GET') {
     const fid = txt(url.searchParams.get('fazenda_id'), 80);
-    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
-    return json(Object.assign({ ok: true }, await listarChuva(env, me.id, fid, safraPadrao(txt(url.searchParams.get('safra'), 40)))));
+    const fc = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
+    if (!fc) return json({ erro: 'fazenda não encontrada' }, 404);
+    return json(Object.assign({ ok: true }, await listarChuva(env, fc.usuario_id, fid, safraPadrao(txt(url.searchParams.get('safra'), 40)))));
   }
 
   /* ----- plantio ----- */
   if (rota === '/api/agro/plantio' && req.method === 'GET') {
     const fid = txt(url.searchParams.get('fazenda_id'), 80);
     const { results } = fid
-      ? await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? AND fazenda_id = ?').bind(me.id, fid).all()
-      : await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ?').bind(me.id).all();
+      ? await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inD + ') AND fazenda_id = ?').bind(...donos, fid).all()
+      : await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inD + ')').bind(...donos).all();
     return json({ ok: true, plantio: results || [] });
   }
 
   if (rota === '/api/agro/plantio' && req.method === 'POST') {
     const b = await req.json();
     const fid = txt(b.fazenda_id, 80);
-    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    const fp = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
+    if (!fp) return json({ erro: 'fazenda não encontrada' }, 404);
+    const dono = fp.usuario_id;   // fazenda da equipe: grava em nome do dono
     const safra = safraPadrao(txt(b.safra, 40));
     const lista = Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [];
     const cmds = [];
@@ -643,7 +656,7 @@ export async function rotasAgro(env, req, me, rota, url) {
       const vazio = !t.cultura && !t.variedade && !t.data_plantio && !t.data_emerg && !num(t.sem_m) && !num(t.sem_ha);
       if (vazio) {
         cmds.push(env.DB.prepare('DELETE FROM plantio WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?')
-          .bind(fid, safra, talhao, me.id));
+          .bind(fid, safra, talhao, dono));
         continue;
       }
       // talhão em partes (mais de uma variedade): [{variedade, ha, data_plantio}]; sem a lista (app antigo) mantém o que estava
@@ -661,7 +674,7 @@ export async function rotasAgro(env, req, me, rota, url) {
             data_emerg = excluded.data_emerg, espac_cm = excluded.espac_cm, sem_m = excluded.sem_m,
             sem_ha = excluded.sem_ha, partes = COALESCE(excluded.partes, plantio.partes), atualizado_em = datetime('now')
           WHERE plantio.usuario_id = excluded.usuario_id`)
-        .bind(fid, safra, talhao, me.id, txt(t.cultura, 20), variedadePadrao(txt(t.variedade, 80), txt(t.cultura, 20)), dia(t.data_plantio),
+        .bind(fid, safra, talhao, dono, txt(t.cultura, 20), variedadePadrao(txt(t.variedade, 80), txt(t.cultura, 20)), dia(t.data_plantio),
               dia(t.data_emerg), num(t.espac_cm), num(t.sem_m), Math.round(num(t.sem_ha)), partes));
     }
     if (cmds.length) await env.DB.batch(cmds);
@@ -710,13 +723,15 @@ export async function rotasAgro(env, req, me, rota, url) {
 
   /* ----- colheita (produtividade por talhão) ----- */
   if (rota === '/api/agro/colheita' && req.method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT fazenda_id, safra, talhao, sc_ha, data FROM colheita WHERE usuario_id = ?').bind(me.id).all();
+    const { results } = await env.DB.prepare('SELECT fazenda_id, safra, talhao, sc_ha, data FROM colheita WHERE usuario_id IN (' + inD + ')').bind(...donos).all();
     return json({ ok: true, colheita: results || [] });
   }
   if (rota === '/api/agro/colheita' && req.method === 'POST') {
     const b = await req.json();
     const fid = txt(b.fazenda_id, 80);
-    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    const fcl = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
+    if (!fcl) return json({ erro: 'fazenda não encontrada' }, 404);
+    const dono = fcl.usuario_id;
     const safra = safraPadrao(txt(b.safra, 40));
     const cmds = [];
     for (const t of (Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [])) {
@@ -725,8 +740,8 @@ export async function rotasAgro(env, req, me, rota, url) {
       cmds.push(sc
         ? env.DB.prepare(`INSERT INTO colheita (fazenda_id, safra, talhao, usuario_id, sc_ha, data, atualizado_em) VALUES (?,?,?,?,?,?,datetime('now'))
             ON CONFLICT(fazenda_id, safra, talhao) DO UPDATE SET sc_ha = excluded.sc_ha, data = excluded.data, atualizado_em = datetime('now')
-            WHERE colheita.usuario_id = excluded.usuario_id`).bind(fid, safra, talhao, me.id, sc, dia(t.data))
-        : env.DB.prepare('DELETE FROM colheita WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?').bind(fid, safra, talhao, me.id));
+            WHERE colheita.usuario_id = excluded.usuario_id`).bind(fid, safra, talhao, dono, sc, dia(t.data))
+        : env.DB.prepare('DELETE FROM colheita WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?').bind(fid, safra, talhao, dono));
     }
     if (cmds.length) await env.DB.batch(cmds);
     return json({ ok: true, salvos: cmds.length });
@@ -742,21 +757,25 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (rota === '/api/agro/colheita-prevista' && req.method === 'GET') {
     if (!mod.plantio) return json({ ok: true, colheita: [] });
     const [pl, fz, cic, reg, colh] = await Promise.all([
-      env.DB.prepare('SELECT * FROM plantio WHERE usuario_id = ? LIMIT 20000').bind(me.id).all(),
-      comResumo(env, () => env.DB.prepare("SELECT id, resumo, length(talhoes) AS kml_len FROM fazendas WHERE usuario_id = ? AND talhoes IS NOT NULL AND talhoes != ''").bind(me.id).all()),
-      env.DB.prepare('SELECT variedade, dias, gmr FROM ciclos WHERE usuario_id = ?').bind(me.id).all().catch(() => ({ results: [] })),
-      env.DB.prepare('SELECT gmr, dias, ponto FROM ciclo_regra WHERE usuario_id = ?').bind(me.id).first().catch(() => null),
-      env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0 AND usuario_id = ?').bind(me.id).all().catch(() => ({ results: [] }))
+      env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inD + ') LIMIT 20000').bind(...donos).all(),
+      comResumo(env, () => env.DB.prepare("SELECT id, resumo, length(talhoes) AS kml_len FROM fazendas WHERE usuario_id IN (" + inD + ") AND talhoes IS NOT NULL AND talhoes != ''").bind(...donos).all()),
+      env.DB.prepare('SELECT usuario_id, variedade, dias, gmr FROM ciclos WHERE usuario_id IN (' + inD + ')').bind(...donos).all().catch(() => ({ results: [] })),
+      env.DB.prepare('SELECT usuario_id, gmr, dias, ponto FROM ciclo_regra WHERE usuario_id IN (' + inD + ')').bind(...donos).all().catch(() => ({ results: [] })),
+      env.DB.prepare('SELECT fazenda_id, safra, talhao FROM colheita WHERE sc_ha > 0 AND usuario_id IN (' + inD + ')').bind(...donos).all().catch(() => ({ results: [] }))
     ]);
     const areas = {}, colhidos = {}, rsm = await resumosDe(env, (fz && fz.results) || []);
     Object.keys(rsm).forEach((id) => { areas[id] = rsm[id].areas || {}; });
     ((colh && colh.results) || []).forEach((c) => { colhidos[c.fazenda_id + '|' + safraPadrao(c.safra || '') + '|' + c.talhao] = 1; });
-    const cicloDe = cicloDaConta((cic && cic.results) || [], regraValida(reg || REGRA_PADRAO));
+    // ciclo dos materiais de cada dono (a fazenda do Adm usa o ciclo cadastrado pelo Adm, igual ao portal)
+    const cicPor = {}, regPor = {}, cicloPor = {};
+    ((cic && cic.results) || []).forEach((c) => { (cicPor[c.usuario_id] = cicPor[c.usuario_id] || []).push(c); });
+    ((reg && reg.results) || []).forEach((x) => { regPor[x.usuario_id] = x; });
+    const cicloDeDono = (u) => cicloPor[u] || (cicloPor[u] = cicloDaConta(cicPor[u] || [], regraValida(regPor[u] || REGRA_PADRAO)));
     const g = {};
     ((pl && pl.results) || []).forEach((r) => {
       const a = areas[r.fazenda_id]; if (!a || SEM_PLANTIO[r.cultura]) return;
       if (colhidos[r.fazenda_id + '|' + safraPadrao(r.safra || '') + '|' + r.talhao]) return;   // já colhido: sai do calendário
-      previsaoTalhao(r, a[r.talhao] || 0, cicloDe, false).forEach((x) => {
+      previsaoTalhao(r, a[r.talhao] || 0, cicloDeDono(r.usuario_id), false).forEach((x) => {
         const k = x.d + '|' + r.fazenda_id + '|' + (x.mat || x.cultura);
         const o = g[k] || (g[k] = { d: x.d, fazenda_id: r.fazenda_id, mat: x.mat || '', cultura: x.cultura, tal: [], ha: 0, est: false });
         if (o.tal.indexOf(r.talhao) < 0) o.tal.push(r.talhao);
@@ -806,8 +825,8 @@ export async function rotasAgro(env, req, me, rota, url) {
   /* ----- estoque de produtos por fazenda ----- */
   if (rota === '/api/agro/estoque' && req.method === 'GET') {
     const [{ results }, fz, G] = await Promise.all([
-      env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id = ? ORDER BY data, criado_em').bind(me.id).all(),
-      env.DB.prepare('SELECT id FROM fazendas WHERE usuario_id = ?').bind(me.id).all(),
+      env.DB.prepare('SELECT * FROM estoque_agro WHERE usuario_id IN (' + inD + ') ORDER BY data, criado_em').bind(...donos).all(),
+      env.DB.prepare('SELECT id FROM fazendas WHERE usuario_id IN (' + inD + ')').bind(...donos).all(),
       mapaGrupos(env)
     ]);
     const minhas = new Set((fz.results || []).map((x) => x.id)), grupos = {};
@@ -817,7 +836,8 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (rota === '/api/agro/estoque' && req.method === 'POST') {
     const b = await req.json();
     const fid = txt(b.fazenda_id, 80), produto = txt(b.produto, 120);
-    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    const fe = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
+    if (!fe) return json({ erro: 'fazenda não encontrada' }, 404);
     if (!produto) return json({ erro: 'informe o produto' }, 400);
     const id = b.id ? txt(b.id, 60) : novoId('es');
     await env.DB.prepare(`INSERT INTO estoque_agro (id, usuario_id, fazenda_id, produto, unidade, qtd, valor, data, obs)
@@ -825,19 +845,19 @@ export async function rotasAgro(env, req, me, rota, url) {
         ON CONFLICT(id) DO UPDATE SET produto = excluded.produto, unidade = excluded.unidade, qtd = excluded.qtd,
           valor = excluded.valor, data = excluded.data, obs = excluded.obs
         WHERE estoque_agro.usuario_id = excluded.usuario_id`)
-      .bind(id, me.id, fid, produto, txt(b.unidade, 4) === 'kg' ? 'kg' : 'L', num(b.qtd), Math.max(0, num(b.valor)), dia(b.data), txt(b.obs, 200)).run();
+      .bind(id, fe.usuario_id, fid, produto, txt(b.unidade, 4) === 'kg' ? 'kg' : 'L', num(b.qtd), Math.max(0, num(b.valor)), dia(b.data), txt(b.obs, 200)).run();
     return json({ ok: true, id: id });
   }
   if (rota === '/api/agro/estoque/apagar' && req.method === 'POST') {
     const b = await req.json();
-    await env.DB.prepare('DELETE FROM estoque_agro WHERE id = ? AND usuario_id = ?').bind(txt(b.id, 60), me.id).run();
+    await env.DB.prepare('DELETE FROM estoque_agro WHERE id = ? AND usuario_id IN (' + inD + ')').bind(txt(b.id, 60), ...donos).run();
     return json({ ok: true });
   }
 
   /* ----- produtos (catálogo) ----- */
   if (rota === '/api/agro/produtos' && req.method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT * FROM produtos_agro WHERE usuario_id = ? ORDER BY tipo, nome')
-      .bind(me.id).all();
+    const { results } = await env.DB.prepare('SELECT * FROM produtos_agro WHERE usuario_id IN (' + inD + ') ORDER BY tipo, nome')
+      .bind(...donos).all();
     return json({ ok: true, produtos: results || [] });
   }
   if (rota === '/api/agro/produto' && req.method === 'POST') {
@@ -864,20 +884,22 @@ export async function rotasAgro(env, req, me, rota, url) {
   if (rota === '/api/agro/recs' && req.method === 'GET') {
     const fid = txt(url.searchParams.get('fazenda_id'), 80);
     const { results } = fid
-      ? await env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id = ? AND fazenda_id = ? ORDER BY data_prevista, criado_em').bind(me.id, fid).all()
-      : await env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id = ? ORDER BY data_prevista, criado_em').bind(me.id).all();
+      ? await env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id IN (' + inD + ') AND fazenda_id = ? ORDER BY data_prevista, criado_em').bind(...donos, fid).all()
+      : await env.DB.prepare('SELECT * FROM recomendacoes WHERE usuario_id IN (' + inD + ') ORDER BY data_prevista, criado_em').bind(...donos).all();
     return json({ ok: true, recs: (results || []).map(linhaRec) });
   }
   if (rota === '/api/agro/rec' && req.method === 'POST') {
     const b = await req.json();
     const fid = txt(b.fazenda_id, 80);
-    if (!fid || !(await fazendaDoUsuario(env, me.id, fid))) return json({ erro: 'fazenda não encontrada' }, 404);
+    const fr = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
+    if (!fr) return json({ erro: 'fazenda não encontrada' }, 404);
+    const dono = fr.usuario_id;   // fazenda da equipe: a recomendação fica em nome do dono (o portal da fazenda lê por ele)
     const id = b.id ? txt(b.id, 60) : novoId('rc');
     const novo = b.dados && typeof b.dados === 'object' ? b.dados : {};
     // aplicação marcada pelo operador no portal não se perde quando o consultor salva com dados antigos;
     // só sai se o consultor desfez de propósito (lista "desfeitos")
     if (b.id) {
-      const ant = await env.DB.prepare('SELECT dados FROM recomendacoes WHERE id = ? AND usuario_id = ?').bind(id, me.id).first();
+      const ant = await env.DB.prepare('SELECT dados FROM recomendacoes WHERE id = ? AND usuario_id = ?').bind(id, dono).first();
       if (ant) mesclarOperador(lerDados(ant.dados), novo);
     }
     const dados = JSON.stringify(novo);
@@ -888,12 +910,12 @@ export async function rotasAgro(env, req, me, rota, url) {
           operacao = excluded.operacao, data_prevista = excluded.data_prevista, mostrar = excluded.mostrar,
           dados = excluded.dados, atualizado_em = datetime('now')
         WHERE recomendacoes.usuario_id = excluded.usuario_id`)
-      .bind(id, me.id, fid, safraPadrao(txt(b.safra, 40)), txt(b.operacao, 80), dia(b.data_prevista), b.mostrar === false ? 0 : 1, dados).run();
+      .bind(id, dono, fid, safraPadrao(txt(b.safra, 40)), txt(b.operacao, 80), dia(b.data_prevista), b.mostrar === false ? 0 : 1, dados).run();
     return json({ ok: true, id: id });
   }
   if (rota === '/api/agro/rec/apagar' && req.method === 'POST') {
     const b = await req.json();
-    await env.DB.prepare('DELETE FROM recomendacoes WHERE id = ? AND usuario_id = ?').bind(txt(b.id, 60), me.id).run();
+    await env.DB.prepare('DELETE FROM recomendacoes WHERE id = ? AND usuario_id IN (' + inD + ')').bind(txt(b.id, 60), ...donos).run();
     return json({ ok: true });
   }
 

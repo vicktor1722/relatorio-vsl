@@ -6,7 +6,7 @@ import { dadosPainelLote, dadosParaPainel } from './portal.js';
 import { calibracao, climaVarios, climaDe, localDaFazenda, mercadoDaFazenda, mercadoGeral, salvarCalibracao } from './mercado.js';
 import { chuvaDaFazenda, mapaGuardado } from './chuva.js';
 import { comCentro, comResumo, resumosDe } from './resumokml.js';
-import { contasDoAdmin } from './equipe.js';
+import { contasDoAdmin, donosDe } from './equipe.js';
 
 const json = (o, status) => new Response(JSON.stringify(o), {
   status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
@@ -64,7 +64,7 @@ function mediaUF(tab, uf) {
 export async function rotasPainelFaz(env, req, me, rota, url) {
   const mod = await modulosDe(env, me.id);
   const admin = mod.admin && !!me.cf;   // admin: a conta dele e as liberadas com "visualizar dados"; as demais contas, só as delas
-  const contas = admin ? await contasDoAdmin(env, me) : [me.id];
+  const contas = admin ? await contasDoAdmin(env, me) : await donosDe(env, me.id);   // conta comum: as dela e as da equipe
   const inq = contas.map(() => '?').join(',');
 
   if (rota === '/api/painel/fazendas') {

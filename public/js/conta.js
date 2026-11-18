@@ -180,15 +180,17 @@
         (prod ? esc(prod.nome) + ' · ' : '') +
         (x.n_talhoes ? x.n_talhoes + ' talhões · ' + Math.round(x.area_ha || 0) + ' ha' : 'sem KML') +
         (x.pendente ? ' · <em class="pend">⏳ aguardando internet</em>' : '') +
-        '</span></div><span class="badge">editar</span></div>';
+        (x.equipe ? ' · de ' + esc(x.dono_nome || 'outra conta da equipe') : '') +
+        '</span></div><span class="badge">' + (x.equipe ? 'da equipe' : 'editar') + '</span></div>';
     }).join('') : '<div class="aviso">Nenhuma fazenda cadastrada.</div>';
 
     $('#listaProdutores').innerHTML = p.length ? p.map(function (x) {
       const n = f.filter(y => y.produtor_id === x.id).length;
       return '<div class="lista-item" data-produtor="' + esc(x.id) + '">' +
         '<div class="ic">👤</div><div class="txt"><b>' + esc(x.nome) + '</b><span>' +
-        (x.telefone ? esc(x.telefone) + ' · ' : '') + n + ' fazenda(s)' + (x.pendente ? ' · <em class="pend">⏳ aguardando internet</em>' : '') + '</span></div>' +
-        '<span class="badge">editar</span></div>';
+        (x.telefone ? esc(x.telefone) + ' · ' : '') + n + ' fazenda(s)' + (x.pendente ? ' · <em class="pend">⏳ aguardando internet</em>' : '') +
+        (x.equipe ? ' · de ' + esc(x.dono_nome || 'outra conta da equipe') : '') + '</span></div>' +
+        '<span class="badge">' + (x.equipe ? 'da equipe' : 'editar') + '</span></div>';
     }).join('') : '<div class="aviso">Nenhum produtor cadastrado.</div>';
 
     document.querySelectorAll('[data-safra]').forEach(el => el.onclick = async function () {
@@ -203,8 +205,15 @@
       try { await Sync.apagarCadastro('responsavel', r.id); await atualizarCadastro(false); }
       catch (e) { alert('Não removeu: ' + e.message); }
     });
-    document.querySelectorAll('[data-fazenda]').forEach(el => el.onclick = () => abrirFazenda(el.dataset.fazenda));
-    document.querySelectorAll('[data-produtor]').forEach(el => el.onclick = () => abrirProdutor(el.dataset.produtor));
+    // cadastro de outra conta da equipe (ex.: do Adm): usa nos relatórios, plantio e recomendações, mas só quem cadastrou altera
+    const daEquipe = (x, tipo) => {
+      if (!x || !x.equipe) return false;
+      alert(tipo + ' "' + x.nome + '" foi cadastrad' + (tipo === 'Fazenda' ? 'a' : 'o') + ' por ' + (x.dono_nome || 'outra conta da equipe') +
+        '. Você pode usar nos relatórios, no plantio e nas recomendações; só quem cadastrou altera ou apaga.');
+      return true;
+    };
+    document.querySelectorAll('[data-fazenda]').forEach(el => el.onclick = () => { if (!daEquipe(fazendaPorId(el.dataset.fazenda), 'Fazenda')) abrirFazenda(el.dataset.fazenda); });
+    document.querySelectorAll('[data-produtor]').forEach(el => el.onclick = () => { if (!daEquipe(produtorPorId(el.dataset.produtor), 'Produtor')) abrirProdutor(el.dataset.produtor); });
   }
 
   // "2026/27" → "2026/2027" (o mesmo padrão do servidor)
