@@ -603,10 +603,10 @@ export default {
           if (rota === '/api/admin/leitores' && req.method === 'POST') return json(await criarLeitor(env, me, adm, await req.json()));
           if (rota === '/api/admin/leitores/apagar' && req.method === 'POST') return json(await apagarLeitor(env, me, (await req.json()).id));
           if (rota === '/api/admin/leitores/senha' && req.method === 'POST') { const b = await req.json(); return json(await trocarSenhaLeitor(env, me, b.id, b.senha)); }
-          // avisos no celular (app do painel): administrador geral e Adm de equipe
+          // avisos no celular (app do painel): todas as contas (menos o acesso só à Timeline)
           if (rota === '/api/admin/push/chave') return json({ ok: true, chave: await chavePublica(env) });
           if (rota === '/api/admin/push/assinar' && req.method === 'POST') {
-            if (!(await ehPainelAvisos(env, me.id))) return json({ erro: 'os avisos do painel são para o administrador e o Adm de equipe' }, 403);
+            if (!(await ehPainelAvisos(env, me.id))) return json({ erro: 'este acesso não recebe avisos no celular' }, 403);
             await garantirPush(env);
             const b = await req.json().catch(() => ({}));
             const s = b.assinatura || {}, k = s.keys || {}, endpoint = String(s.endpoint || '');

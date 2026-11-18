@@ -186,8 +186,10 @@ async function enviar(env, pontos, montar, res, forcar) {
       if (await enviarParaConta(env, uid, msg)) conta('consultor');
     } catch (e) { /* segue */ }
   }
-  // 3) painel (administrador geral e Adm de equipe): regiões das fazendas da conta e da equipe; histórico + celular (app do painel)
-  const { results: adms } = await env.DB.prepare("SELECT id FROM usuarios WHERE COALESCE(admin,0) = 1 OR papel = 'adm'").all().catch(() => ({ results: [] }));
+  // 3) painel (todas as contas: administrador, Adm de equipe e usuário comum; não o acesso só à Timeline):
+  //    regiões das fazendas da conta e da equipe; histórico + celular (app do painel)
+  const { results: adms } = await env.DB.prepare('SELECT id FROM usuarios WHERE leitor_de IS NULL').all()
+    .catch(() => env.DB.prepare('SELECT id FROM usuarios').all()).catch(() => ({ results: [] }));
   for (const { id: uid } of adms || []) {
     try {
       const porReg = regioesDe(await donosDe(env, uid));
