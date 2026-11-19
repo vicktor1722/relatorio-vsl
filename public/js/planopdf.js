@@ -395,8 +395,8 @@
     var ent = o.entradas || [];
     if (ent.length) {
       cabe(60); txt(M, y - 4, 12, true, 'Entradas lançadas', VERDE); y -= 14;
-      var E = [{ t: 'Data', w: 62 }, { t: 'Produto', w: 170 }, { t: 'Quantidade', w: 80 }, { t: 'Valor', w: 80 }, { t: 'Observação', w: 131 }];
-      function cabE() { rect(M, y - 16, W - 2 * M, 16, VERDE); var x = M; E.forEach(function (c, i) { if (i === 2 || i === 3) dir(x + c.w - 4, y - 11, 8, true, c.t, BRANCO); else txt(x + 5, y - 11, 8, true, c.t, BRANCO); x += c.w; }); y -= 16; }
+      var E = [{ t: 'Data', w: 56 }, { t: 'Produto', w: 118 }, { t: 'Quantidade', w: 64 }, { t: 'Valor lançado', w: 78 }, { t: 'Dólar', w: 40 }, { t: 'Valor em R$', w: 74 }, { t: 'Observação', w: 93 }];
+      function cabE() { rect(M, y - 16, W - 2 * M, 16, VERDE); var x = M; E.forEach(function (c, i) { if (i >= 2 && i <= 5) dir(x + c.w - 4, y - 11, 8, true, c.t, BRANCO); else txt(x + 5, y - 11, 8, true, c.t, BRANCO); x += c.w; }); y -= 16; }
       cabE();
       ent.forEach(function (e, k) {
         if (cabe(15)) cabE();
@@ -405,8 +405,11 @@
         txt(x + 5, y - 10.5, 8, false, dataBR(e.data), [0.15, 0.15, 0.15]); x += E[0].w;
         txt(x + 5, y - 10.5, 8, true, corta(e.produto, E[1].w - 8, 8, true)); x += E[1].w;
         dir(x + E[2].w - 4, y - 10.5, 8, false, (q < 0 ? '' : '+') + qBR(q, e.unidade || 'L'), q < 0 ? VERM : [0.15, 0.15, 0.15]); x += E[2].w;
-        dir(x + E[3].w - 4, y - 10.5, 8, false, Number(e.valor) ? rBR(e.valor) : '-', [0.15, 0.15, 0.15]); x += E[3].w;
-        txt(x + 5, y - 10.5, 7.5, false, corta(e.obs || '', E[4].w - 8, 7.5, false), CINZA);
+        var usd = e.moeda === 'USD', AZUL = [0.118, 0.353, 0.659];
+        dir(x + E[3].w - 4, y - 10.5, 8, usd, Number(e.valor) ? (usd ? 'US$ ' + nBR(e.valor_moeda, 2) : rBR(e.valor)) : '-', usd ? AZUL : [0.15, 0.15, 0.15]); x += E[3].w;
+        dir(x + E[4].w - 4, y - 10.5, 8, false, usd && Number(e.cambio) ? nBR(e.cambio, 2) : '-', CINZA); x += E[4].w;
+        dir(x + E[5].w - 4, y - 10.5, 8, false, Number(e.valor) ? rBR(e.valor) : '-', [0.15, 0.15, 0.15]); x += E[5].w;
+        txt(x + 5, y - 10.5, 7.5, false, corta(e.obs || '', E[6].w - 8, 7.5, false), CINZA);
         y -= 15;
       });
     }
@@ -426,8 +429,11 @@
         it.sobra < -0.0001 ? 'Faltam ' + n(-it.sobra) + ' ' + it.un : 'OK']);
     });
     if ((o.entradas || []).length) {
-      L.push([], ['Entradas lançadas'], ['Data', 'Produto', 'Quantidade', 'Unidade', 'Valor (R$)', 'Observação']);
-      o.entradas.forEach(function (e) { L.push([dataBR(e.data), e.produto, n(e.qtd), e.unidade || 'L', Number(e.valor) ? n(e.valor) : '', e.obs || '']); });
+      L.push([], ['Entradas lançadas'], ['Data', 'Produto', 'Quantidade', 'Unidade', 'Moeda', 'Valor lançado', 'Dólar (R$)', 'Valor em R$', 'Observação']);
+      o.entradas.forEach(function (e) {
+        var usd = e.moeda === 'USD';
+        L.push([dataBR(e.data), e.produto, n(e.qtd), e.unidade || 'L', usd ? 'US$' : 'R$', Number(e.valor) ? n(usd ? e.valor_moeda : e.valor) : '', usd && Number(e.cambio) ? n(e.cambio, 4) : '', Number(e.valor) ? n(e.valor) : '', e.obs || '']);
+      });
     }
     return '﻿' + L.map(function (r) { return r.map(c).join(';'); }).join('\r\n');
   }
