@@ -558,7 +558,7 @@ body.sem-rolar{overflow:hidden}
     var Bs = m.dolar_bob;
     h += cx('💵', 'Dólar → boliviano', Bs, 'Bs ', '', B && Bs ? 'soja: Bs ' + n(B.preco * Bs.preco) + '/t' : '');
     if (B) h += cx('🌱', 'Soja disponível', B, 'US$ ', '/t', '📍 ' + esc(B.regiao) + ' · Bolívia') + cx('🌱', 'Soja · sc 60 kg', { preco: B.sc }, 'US$ ', '/sc', '= ' + n(B.preco, 2) + ' ÷ 16,67 sc/t');
-    h += cx('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', m.cbot_soja ? '= US$ ' + n(m.cbot_soja.preco * 36.7437, 2) + '/t' : '') + cx('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu') + '</div>';
+    h += cx('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', m.cbot_soja ? 'Chicago em tonelada: US$ ' + n(m.cbot_soja.preco * 36.7437, 2) + '/t (não é o disponível)' : '') + cx('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu') + '</div>';
     if (!B) h += '<div class="ini-pe">A cotação da soja em San Ignacio aparece quando o consultor informar o preço do dia.</div>';
     return h + '<div class="ini-pe">' + esc(m.fonte) + '.</div></div>';
   }
