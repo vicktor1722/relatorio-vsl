@@ -346,6 +346,7 @@ ${MAPA_CHUVA_CSS}
 .ca-ps{font-size:12.5px;color:var(--fraco);max-width:55%;text-align:right}
 .ca-mapa{position:relative;height:380px;border-radius:12px;overflow:hidden}.ca-mapa #caMapa{position:absolute;inset:0}
 .ca-mapa .t,.ca-mapa .d{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none;font-size:11px;padding:3px 8px}.ca-mapa .t{left:52px}.ca-mapa .d{right:8px;font-weight:800;font-size:15px}
+.ca-marca{position:absolute;z-index:500;right:56px;bottom:8px;display:flex;align-items:center;gap:7px;pointer-events:none;background:rgba(255,255,255,.95);border-radius:11px;padding:5px 12px 5px 5px;box-shadow:0 1px 5px rgba(0,0,0,.3)}.ca-marca img{width:32px;height:32px;border-radius:8px;display:block}.ca-marca b{font-size:16px;font-weight:800;color:#17703D;letter-spacing:1px;line-height:1}.ca-bloco.cheia .ca-marca{right:8px}
 .ca-fs{position:absolute;z-index:600;right:8px;bottom:8px;width:40px;height:38px;border:0;border-radius:9px;background:#fff;font-size:19px;box-shadow:0 1px 5px rgba(0,0,0,.35);cursor:pointer}
 .ca-pe{font-size:11.5px;color:var(--fraco);margin-top:8px}.ca-pe b{color:var(--texto,#1C2B23)}.pf-pe{font-size:11.5px;color:var(--fraco)}
 .ca-cheia-cab{display:none}
@@ -460,7 +461,7 @@ ${EXPORTA_CHUVA_JS}
       '<div class="ca-bloco" id="caBloco"><div class="ca-cheia-cab"><b>🌧️ Mapa da chuva</b><span class="ca-cab-bt"><button id="caExp" class="ca-exp" aria-label="Exportar vídeo ou GIF" title="Exportar vídeo ou GIF">' + (typeof ExportaChuva !== 'undefined' ? ExportaChuva.icone : '⤓') + '</button><button id="caSai" aria-label="Fechar tela cheia">✕</button></span></div>' +
       '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-cam="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
       '<button id="caPlay" class="oculto">▶</button></div>' +
-      '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button></div>' +
+      '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button><span class="ca-marca"><img src="/icon-192.png" alt=""><b>AMVS</b></span></div>' +
       '<div class="mc-esc"></div><div class="mc-escx">' + (typeof MapaChuva !== 'undefined' ? MapaChuva.rotulos('a7') : '') + '</div></div>' +
       '<div class="ca-pe">🌍 <b>Modelo europeu (ECMWF)</b> · atualizado ' + em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) +
       ' · atualiza todo dia de manhã cedo · escolha uma fazenda na lista ou no gráfico de plantio para ver o ponto dela</div>';
