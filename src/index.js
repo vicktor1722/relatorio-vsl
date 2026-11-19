@@ -232,6 +232,18 @@ function kmlJunto(t) {
   catch (e) { return typeof t === 'string' ? t : JSON.stringify(t); }
 }
 
+// relatório mostra o nome atual da fazenda e do produtor (o cadastro pode ter sido renomeado depois da visita);
+// só na página: o que ficou gravado no relatório não muda
+async function nomesAtuais(env, rels) {
+  try {
+    const fids = [...new Set(rels.map((r) => r.fazenda_id).filter(Boolean))], pids = [...new Set(rels.map((r) => r.produtor_id).filter(Boolean))];
+    const nf = {}, np = {};
+    if (fids.length) ((await env.DB.prepare('SELECT id, nome FROM fazendas WHERE id IN (' + fids.map(() => '?').join(',') + ')').bind(...fids).all()).results || []).forEach((x) => { if (String(x.nome || '').trim()) nf[x.id] = String(x.nome).trim(); });
+    if (pids.length) ((await env.DB.prepare('SELECT id, nome FROM produtores WHERE id IN (' + pids.map(() => '?').join(',') + ')').bind(...pids).all()).results || []).forEach((x) => { if (String(x.nome || '').trim()) np[x.id] = String(x.nome).trim(); });
+    rels.forEach((r) => { if (nf[r.fazenda_id]) r.fazenda = nf[r.fazenda_id]; if (np[r.produtor_id]) r.produtor = np[r.produtor_id]; });
+  } catch (e) { /* fica o nome gravado */ }
+}
+
 export default {
   async fetch(req, env, ctx) {
     const res = await this.responder(req, env, ctx);
@@ -457,6 +469,7 @@ export default {
             return html(paginaSimples('Relatório não disponível',
               'Este link não existe ou alguma das visitas ainda não foi finalizada pelo técnico.'), 404);
           }
+          await nomesAtuais(env, rels);   // nome da fazenda e do produtor como estão hoje no cadastro
           const { results: todos } = await env.DB.prepare(
             `SELECT * FROM itens WHERE relatorio_id IN (${marcas}) ORDER BY capturado_em ASC`).bind(...ids).all();
           if (querTraduzir) {
@@ -475,6 +488,7 @@ export default {
           .bind(id, 'publicado').first();
         if (!rel) return html(paginaSimples('Relatório não disponível',
           'Este link não existe ou o relatório ainda não foi finalizado pelo técnico.'), 404);
+        await nomesAtuais(env, [rel]);   // nome da fazenda e do produtor como estão hoje no cadastro
         const { results } = await env.DB.prepare(
           'SELECT * FROM itens WHERE relatorio_id = ? ORDER BY capturado_em ASC').bind(id).all();
         if (querTraduzir) return json(await traduzirRelatorio(env, [rel], results || [], url.searchParams.get('lang')));
