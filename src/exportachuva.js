@@ -31,7 +31,7 @@ var ExportaChuva = (function () {
       '.ex-p{font-size:12.5px;color:#6B7B72;margin:4px 0 6px}.ex-lab{font-size:12px;color:#6B7B72;font-weight:700;margin:12px 0 6px}' +
       '.ex-op{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ex-op button{text-align:left;border:1px solid #D5DDD9;background:#fff;border-radius:10px;padding:9px 10px;font-size:12.5px;color:#4A5A51;cursor:pointer}' +
       '.ex-op button b{display:block;font-size:14px;color:#1B2B22}.ex-op button.on{border:2px solid #1B7A43;background:#EEF7F1}' +
-      '.ex-go{display:block;width:100%;margin-top:14px;border:0;background:#1B7A43;color:#fff;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer}.ex-go[disabled]{opacity:.6}' +
+      '.ex-go{display:block;width:100%;margin-top:14px;border:0;background:#1B7A43;color:#fff;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer}.ex-go[disabled]{opacity:.6}.ex-go[hidden]{display:none}' +
       '.ex-sec{display:block;width:100%;margin-top:8px;border:1px solid #1B7A43;background:#fff;color:#1B7A43;border-radius:10px;padding:10px;font-size:14px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer}' +
       '.ex-pr{margin-top:14px;font-size:13px}.ex-pb{height:8px;background:#E6EBE8;border-radius:5px;margin-top:6px;overflow:hidden}.ex-pb i{display:block;height:100%;width:0;background:#1B7A43;transition:width .2s}' +
       '.ex-prev{margin-top:12px;border-radius:10px;overflow:hidden;background:#0B1F14;text-align:center}.ex-prev video,.ex-prev img{max-width:100%;max-height:46vh;display:block;margin:0 auto}' +
@@ -180,7 +180,7 @@ var ExportaChuva = (function () {
   function abrir(o) {
     css();
     if (!o || !o.mapa || !o.canvas || !o.n) return;
-    var fmt = tipoVideo() ? 'video' : 'gif', dias = Math.min(15, o.n), ocupado = false;
+    var fmt = tipoVideo() ? 'video' : 'gif', dias = Math.min(15, o.n), ocupado = false, pronto = false;
     var f = document.createElement('div'); f.className = 'ex-fundo';
     f.innerHTML = '<div class="ex-cx" role="dialog" aria-label="Exportar animação da chuva"><div class="ex-cab"><b>🎬 Animação da chuva</b><button class="ex-x" aria-label="Fechar">✕</button></div>' +
       '<div class="ex-p">Um quadro por dia, com a data, a escala de cores e o logo AMVS. O enquadramento é o do mapa na tela.</div>' +
@@ -196,7 +196,10 @@ var ExportaChuva = (function () {
       f.querySelectorAll('[data-g="dias"] button').forEach(function (x) { x.classList.toggle('on', Number(x.dataset.v) === dias); });
     }
     marcar();
-    f.querySelectorAll('[data-g] button').forEach(function (x) { x.onclick = function () { if (ocupado) return; if (x.parentNode.dataset.g === 'fmt') fmt = x.dataset.v; else dias = Number(x.dataset.v); marcar(); }; });
+    f.querySelectorAll('[data-g] button').forEach(function (x) { x.onclick = function () {
+      if (ocupado) return; if (x.parentNode.dataset.g === 'fmt') fmt = x.dataset.v; else dias = Number(x.dataset.v); marcar();
+      if (pronto) { pronto = false; res.innerHTML = ''; go.hidden = false; go.textContent = 'Gerar animação'; }   // trocou a escolha: gera de novo
+    }; });
     var url = null;
     function fechar() { if (ocupado) return; if (url) URL.revokeObjectURL(url); f.remove(); }
     f.querySelector('.ex-x').onclick = fechar;
@@ -219,11 +222,11 @@ var ExportaChuva = (function () {
         var instalado = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
         var viaMenu = podeComp && (ios || instalado);
         var tam = (blob.size / 1048576).toFixed(1).replace('.', ',') + ' MB';
-        res.innerHTML = '<div class="ex-prev">' + (fmt === 'gif' ? '<img alt="Animação da chuva" src="' + url + '">' : '<video src="' + url + '" autoplay loop muted playsinline controls></video>') + '</div>' +
-          '<button class="ex-go ex-salva">' + (viaMenu ? '💾 Salvar ' + (fmt === 'gif' ? 'GIF' : 'vídeo') + ' / compartilhar' : '⬇ Baixar ' + (fmt === 'gif' ? 'GIF' : 'vídeo')) + ' (' + tam + ')</button>' +
+        pronto = true; go.hidden = true;   // pronto: só o botão de salvar (sem prévia)
+        res.innerHTML = '<button class="ex-go ex-salva">' + (viaMenu ? '💾 Salvar ' + (fmt === 'gif' ? 'GIF' : 'vídeo') + ' / compartilhar' : '⬇ Baixar ' + (fmt === 'gif' ? 'GIF' : 'vídeo')) + ' (' + tam + ')</button>' +
           (podeComp && !viaMenu ? '<button class="ex-sec ex-comp">Compartilhar</button>' : '') +
           '<div class="ex-nota">' + (viaMenu ? 'No menu que abrir, toque em <b>Salvar ' + (fmt === 'gif' ? 'imagem' : 'vídeo') + '</b> (vai para as Fotos) ou escolha o WhatsApp.' :
-            'Se não baixar, toque e segure na prévia para salvar.') + (ext === 'webm' ? ' Este aparelho grava em WebM; se o WhatsApp não aceitar, gere em GIF.' : '') + '</div>';
+            'Pronto! Toque para baixar o arquivo.') + (ext === 'webm' ? ' Este aparelho grava em WebM; se o WhatsApp não aceitar, gere em GIF.' : '') + '</div>';
         function compartilhar() { return navigator.share({ files: [arq], title: 'Chuva prevista' }); }
         function baixar() {
           var a = document.createElement('a'); a.href = url; a.download = nome; a.rel = 'noopener'; a.style.display = 'none';
@@ -238,7 +241,7 @@ var ExportaChuva = (function () {
       }).catch(function (e) {
         res.innerHTML = '<div class="ex-err">Não deu para gerar: ' + String((e && e.message) || e) + '</div>';
       }).then(function () {
-        ocupado = false; go.disabled = false; go.textContent = 'Gerar de novo';
+        ocupado = false; go.disabled = false; if (!pronto) go.textContent = 'Gerar animação';
         try { if (o.restaurar) o.restaurar(); } catch (e) {}
       });
     };
