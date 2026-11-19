@@ -1718,7 +1718,7 @@
     });
     h += '<h2>Compartilhar</h2><div class="ag-sec"><small>Envie para o gerente ou o operador, sem depender do relatório do cliente.</small><div style="display:flex;gap:8px;margin-top:8px">' +
       '<button class="btn" style="flex:1" data-a="zap">📲 WhatsApp</button><button class="btn secundario" style="flex:1" data-a="pdf">📄 PDF</button></div></div>';
-    h += '<label class="ag-sw"><input type="checkbox" data-a="mostrar"' + (r.mostrar ? ' checked' : '') + '> Mostrar no relatório do cliente</label>' +
+    h += '<label class="ag-sw"><input type="checkbox" data-a="mostrar"' + (r.mostrar ? ' checked' : '') + '> Mostrar no relatório do cliente <small style="color:#6B7B72;font-weight:400">(no app da fazenda e do operador aparece sempre)</small></label>' +
       '<button class="btn secundario" data-a="editarrec">Editar recomendação</button><button class="btn perigo" data-a="excluirrec">Excluir recomendação</button>';
     pintar(tR, 'Ordem de campo', f ? f.nome : '', '', h);
   }
@@ -1985,7 +1985,7 @@
         (W.rep > 0 ? '<div class="ag-g3"><div class="campo"><label>Próxima em (dias)</label><input inputmode="numeric" data-w="rep" value="' + W.rep + '"></div><div class="campo"><label>Nº de aplicações</label><input inputmode="numeric" data-w="total" value="' + W.total + '"></div><div class="campo"><label>Avisar (dias antes)</label><input inputmode="numeric" data-w="aviso" value="' + W.aviso + '"></div></div>' +
           '<div class="ag-dica">⏱ A contagem começa quando você marcar “aplicada”. Ex.: aplicou em ' + curta(W.data) + ' → a próxima (podem ser outros produtos) vence em <b>' + curta(addDias(W.data, W.rep)) + '</b>, e o alerta aparece aqui e no relatório do cliente ' + W.aviso + ' dia(s) antes.</div>' : '') + '</div>' +
         '<div class="campo"><label>Observação para a aplicação</label><textarea rows="2" data-w="obs" placeholder="Ex.: aplicar com vento abaixo de 10 km/h">' + esc(W.obs) + '</textarea></div>' +
-        '<label class="ag-sw"><input type="checkbox" data-w="mostrar"' + (W.mostrar ? ' checked' : '') + '> Mostrar no relatório do cliente</label>' +
+        '<label class="ag-sw"><input type="checkbox" data-w="mostrar"' + (W.mostrar ? ' checked' : '') + '> Mostrar no relatório do cliente <small style="color:#6B7B72;font-weight:400">(no app da fazenda e do operador aparece sempre)</small></label>' +
         '<div class="ag-sec"><b>Resumo</b><small>' + esc(op) + ' · ' + esc(f ? f.nome : '') + '</small>' +
         (W.rep > 0 ? '<small>🔁 ' + esc(ordTxt(op, W.num)) + ' de ' + W.total + ' · próxima ' + W.rep + ' dias depois · avisa ' + W.aviso + ' dia(s) antes</small>' : '') +
         '<small>' + esc(W.tal.join(', ')) + ' · <b>' + fmt(ha) + ' ha</b></small>' +

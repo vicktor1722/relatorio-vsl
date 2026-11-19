@@ -358,7 +358,8 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
 
   // aplicações em formato de lista (as duas visões usam)
   const hoje = hojeMT();
-  const aplicacoes = recs.filter(daSafra).filter((r) => acesso.papel === 'operador' || op.todas || r.mostrar).map((r) => {
+  // todas as aplicações aparecem para a fazenda e o operador; "mostrar" vale só para o relatório do cliente
+  const aplicacoes = recs.filter(daSafra).map((r) => {
     const d = r.dados, num = Number(d.num) || 1, datas = datasTal(r, porTal), feito = d.feito || {};
     const tal = (d.tal || []).map((t) => {
       const tot = areas[t] || 0, p = Number((d.parte || {})[t]), ha = p > 0 && p < tot ? p : tot;
