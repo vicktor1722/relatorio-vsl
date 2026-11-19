@@ -102,3 +102,80 @@ export async function renomearTalhoesPindaituba(env) {
 export async function listaRenomeios(env) {
   try { const a = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_LISTA).first(); return a ? JSON.parse(a.valor) : []; } catch (e) { return []; }
 }
+
+/* ---------------- troca de nome pelo painel (lápis ao lado do nome do talhão) ----------------
+   Um talhão de uma fazenda: de → para. Muda no mapa (todas as partes com esse nome), nos relatórios
+   (mapa copiado e registros), plantio, colheita, chuva por talhão e recomendações. Não troca se o nome
+   novo já existir na fazenda (no mapa ou em algum lançamento). */
+// recomendação: chaves iguais ao nome (feito, datas, parcial…), listas de talhões e campos "talhao"
+function trocarRec(v, de, para, chave) {
+  if (Array.isArray(v)) {
+    const lista = chave === 'tal' || chave === 'talhoes' || chave === 'sel';
+    return v.map((x) => (lista && x === de ? para : trocarRec(x, de, para, '')));
+  }
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v).forEach((k) => {
+      const x = v[k];
+      o[k === de ? para : k] = (k === 'talhao' || k === 't') && x === de ? para : trocarRec(x, de, para, k);
+    });
+    return o;
+  }
+  return v;
+}
+const PROPS_NOME = ['nome', 'name', 'Name', 'NOME'];
+const nomeFt = (ft) => { const p = (ft && ft.properties) || {}; for (const k of PROPS_NOME) if (typeof p[k] === 'string' && p[k].trim()) return p[k].trim(); return ''; };
+function trocarGeoNome(gj, de, para) {
+  let n = 0;
+  ((gj && gj.features) || []).forEach((ft) => {
+    const p = ft && ft.properties; if (!p || nomeFt(ft) !== de) return;
+    PROPS_NOME.forEach((k) => { if (typeof p[k] === 'string' && p[k].trim() === de) { p[k] = para; n++; } });
+  });
+  return n;
+}
+
+export async function renomearTalhao(env, fid, de, para) {
+  de = String(de || '').trim(); para = String(para || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!de || !para) return { erro: 'Informe o nome novo do talhão' };
+  if (de === para) return { ok: true, igual: true };
+  const f = await env.DB.prepare('SELECT id, talhoes FROM fazendas WHERE id = ?').bind(fid).first();
+  if (!f) return { erro: 'fazenda não encontrada' };
+  let gj = null; try { gj = JSON.parse(f.talhoes || 'null'); } catch (e) { gj = null; }
+  const feats = (gj && gj.features) || [];
+  if (!feats.some((ft) => nomeFt(ft) === de)) return { erro: 'Talhão "' + de + '" não encontrado no mapa da fazenda' };
+  const ja = 'Já existe um talhão "' + para + '" nesta fazenda: escolha outro nome';
+  if (feats.some((ft) => nomeFt(ft).toLowerCase() === para.toLowerCase())) return { erro: ja };
+  for (const t of ['plantio', 'colheita', 'chuva_talhao']) {
+    const r = await env.DB.prepare('SELECT 1 AS x FROM ' + t + ' WHERE fazenda_id = ? AND talhao = ? LIMIT 1').bind(fid, para).first().catch(() => null);
+    if (r) return { erro: ja + ' (há lançamentos com esse nome)' };
+  }
+  trocarGeoNome(gj, de, para);
+  const cmds = [env.DB.prepare("UPDATE fazendas SET talhoes = ?, resumo = NULL, atualizado_em = datetime('now') WHERE id = ?").bind(JSON.stringify(gj), fid)];
+  const rels = (await env.DB.prepare('SELECT id, talhoes FROM relatorios WHERE fazenda_id = ?').bind(fid).all()).results || [];
+  rels.forEach((x) => {
+    let g = null; try { g = JSON.parse(x.talhoes || 'null'); } catch (e) { g = null; }
+    if (g && trocarGeoNome(g, de, para)) cmds.push(env.DB.prepare('UPDATE relatorios SET talhoes = ? WHERE id = ?').bind(JSON.stringify(g), x.id));
+  });
+  cmds.push(env.DB.prepare('UPDATE itens SET talhao = ? WHERE talhao = ? AND relatorio_id IN (SELECT id FROM relatorios WHERE fazenda_id = ?)').bind(para, de, fid));
+  for (const t of ['plantio', 'colheita', 'chuva_talhao']) {
+    const existe = await env.DB.prepare('SELECT 1 AS x FROM ' + t + ' LIMIT 1').first().then(() => true).catch(() => false);
+    if (existe) cmds.push(env.DB.prepare('UPDATE ' + t + ' SET talhao = ? WHERE fazenda_id = ? AND talhao = ?').bind(para, fid, de));
+  }
+  const recs = (await env.DB.prepare('SELECT id, dados FROM recomendacoes WHERE fazenda_id = ?').bind(fid).all().catch(() => ({ results: [] }))).results || [];
+  let nRec = 0;
+  recs.forEach((x) => {
+    let d; try { d = JSON.parse(x.dados || '{}'); } catch (e) { return; }
+    const novo = JSON.stringify(trocarRec(d, de, para, ''));
+    if (novo !== JSON.stringify(d)) { nRec++; cmds.push(env.DB.prepare("UPDATE recomendacoes SET dados = ?, atualizado_em = datetime('now') WHERE id = ?").bind(novo, x.id)); }
+  });
+  await env.DB.batch(cmds);
+  // o app ajusta as cópias guardadas no aparelho (mapa dos relatórios e talhão dos registros)
+  try {
+    const a = await env.DB.prepare('SELECT valor FROM config WHERE chave = ?').bind(CHAVE_LISTA).first();
+    const ant = a ? JSON.parse(a.valor) : [];
+    ant.push({ fazenda_id: fid, mapa: { [de]: para }, chave: 'ren:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
+    await env.DB.prepare('INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').bind(CHAVE_LISTA, JSON.stringify(ant)).run();
+  } catch (e) { /* o servidor já trocou; só as cópias antigas do aparelho ficam com o nome velho */ }
+  await mudouDados(env).catch(() => {});
+  return { ok: true, de, para, relatorios: rels.length, recomendacoes: nRec };
+}

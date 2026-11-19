@@ -16,6 +16,7 @@ import { safraAtual, safraPadrao } from './safras.js';
 import { haAplicada, lancComAjuste, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { areasDaFazenda, comResumo, resumosDe } from './resumokml.js';
+import { renomearTalhao } from './renomeio.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
 
 let pronta = null;
@@ -658,6 +659,16 @@ export async function rotasAgro(env, req, me, rota, url) {
       ? await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inD + ') AND fazenda_id = ?').bind(...donos, fid).all()
       : await env.DB.prepare('SELECT * FROM plantio WHERE usuario_id IN (' + inD + ')').bind(...donos).all();
     return json({ ok: true, plantio: results || [] });
+  }
+
+  // lápis ao lado do nome do talhão: troca o nome em tudo da fazenda (mapa, relatórios, plantio, colheita, chuva, recomendações)
+  if (rota === '/api/agro/talhao/renomear' && req.method === 'POST') {
+    const b = await req.json();
+    const fid = txt(b.fazenda_id, 80);
+    const fp = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
+    if (!fp) return json({ erro: 'fazenda não encontrada' }, 404);
+    const r = await renomearTalhao(env, fid, txt(b.de, 80), txt(b.para, 80));
+    return json(r, r.erro ? 400 : 200);
   }
 
   if (rota === '/api/agro/plantio' && req.method === 'POST') {

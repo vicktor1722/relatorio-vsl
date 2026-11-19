@@ -152,6 +152,9 @@ export const AGRO_CSS = `
 .ag-novo-card .btn{width:100%;margin:6px 0 0}
 .ag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;align-items:center}
 .ag-chips>span{font-size:12.5px;color:var(--texto-fraco)}
+.ag-lapis{border:1px solid #cfe3d6;background:#E8F4EC;border-radius:8px;padding:2px 7px;font-size:14px;margin-left:6px;cursor:pointer;vertical-align:middle}
+.ag-ren{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.ag-ren input{font-size:16px;padding:7px 10px;border:2px solid var(--verde,#1B7A43);border-radius:8px;width:170px;max-width:100%}
+.ag-ren .btn{padding:8px 12px;width:auto;margin:0}.ag-ren-err{color:#C0392B}
 .ag-chip{padding:7px 12px;border-radius:16px;background:#fff;border:1px solid var(--linha);font-size:13px}
 .ag-chip.on{background:var(--verde);color:#fff;border-color:var(--verde)}
 .ag-dica{font-size:12.5px;color:var(--texto-fraco);margin:2px 0 12px;line-height:1.4}
@@ -1027,7 +1030,40 @@ ${MAPA_CHUVA_JS}
     var y = window.pageYOffset;
     el.innerHTML = '<div class="ag-hd">' + (topo ? '' : '<button class="ag-volta" data-a="voltar">←</button>') + '<div class="info"><h1>' + esc(titulo) + '</h1><p>' + esc(sub || '') +
       '</p></div>' + (acoes ? '<div class="acoes">' + acoes + '</div>' : '') + '</div><div class="conteudo">' + corpo + '</div>';
+    if (el === tP && P.ed) lapisNome();
     window.scrollTo(0, y);
+  }
+  // lápis ao lado do nome do talhão: troca o nome em tudo da fazenda (mapa, relatórios, plantio, colheita, recomendações e app)
+  function lapisNome() {
+    var h = tP.querySelector('.ag-hd h1'), sub = tP.querySelector('.ag-hd .info p'); if (!h) return;
+    if (!P.ren) { h.innerHTML = esc(P.nome) + ' <button class="ag-lapis" data-a="renome" title="Editar o nome do talhão">✏️</button>'; return; }
+    h.innerHTML = '<span class="ag-ren"><input id="agRenome" maxlength="80" value="' + esc(P.ren.v) + '" aria-label="Nome do talhão">' +
+      '<button class="btn" data-a="rensalvar"' + (P.ren.ind ? ' disabled' : '') + '>' + (P.ren.ind ? 'Salvando…' : 'Salvar') + '</button><button class="btn secundario" data-a="rencancel">Cancelar</button></span>';
+    if (sub) sub.innerHTML = P.ren.erro ? '<span class="ag-ren-err">⚠ ' + esc(P.ren.erro) + '</span>' :
+      'Troca o nome em todo lugar: mapa da fazenda, plantio, colheita, recomendações, relatórios e no app de campo.';
+    var inp = h.querySelector('#agRenome');
+    inp.oninput = function () { P.ren.v = inp.value; };
+    inp.onkeydown = function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); renomearTal(); } if (ev.key === 'Escape') { P.ren = null; pintarPlantio(); } };
+    if (!P.ren.ind) { inp.focus(); try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {} }
+  }
+  async function renomearTal() {
+    if (!P.ren || P.ren.ind) return;
+    var de = P.nome, para = String(P.ren.v || '').trim().replace(/ +/g, ' ');
+    if (!para) { P.ren.erro = 'Informe o nome novo do talhão'; pintarPlantio(); return; }
+    if (para === de) { P.ren = null; pintarPlantio(); return; }
+    if (talhoesDe(fazDe(P.faz)).some(function (t) { return t.nome.toLowerCase() === para.toLowerCase(); })) { P.ren.erro = 'Já existe um talhão "' + para + '" nesta fazenda: escolha outro nome'; pintarPlantio(); return; }
+    P.ren.ind = true; P.ren.erro = ''; pintarPlantio();
+    try {
+      await api('/api/agro/talhao/renomear', { fazenda_id: P.faz, de: de, para: para });
+    } catch (e) { if (P.ren) { P.ren.ind = false; P.ren.erro = e.message || 'Não foi possível trocar o nome'; pintarPlantio(); } return; }
+    // já troca na tela; depois baixa tudo de novo da nuvem
+    var f = fazDe(P.faz);
+    if (f && f.talhoes && f.talhoes.features) f.talhoes.features.forEach(function (ft) { var pp = ft.properties || {}; if (String(pp.nome || '') === de) pp.nome = para; });
+    ST.plantio.forEach(function (r) { if (r.fazenda_id === P.faz && r.talhao === de) r.talhao = para; });
+    P.outros = P.outros.map(function (x) { return x === de ? para : x; });
+    P.nome = para; P.ren = null; gravar(); pintarPlantio();
+    toast('✔ Talhão renomeado: ' + de + ' → ' + para);
+    baixar().then(function (ok) { if (ok) pintarPlantio(); });
   }
   function topoRolagem() { window.scrollTo(0, 0); }
 
@@ -1343,14 +1379,17 @@ ${MAPA_CHUVA_JS}
   }
 
   function cliquePlantio(a, v, alvo) {
-    if (a === 'voltar') { if (P.ed) { P.ed = null; P.outros = []; pintarPlantio(); } return; }
+    if (a === 'voltar') { if (P.ed) { P.ed = null; P.outros = []; P.ren = null; pintarPlantio(); } return; }
+    if (a === 'renome') { P.ren = { v: P.nome, erro: '' }; pintarPlantio(); return; }
+    if (a === 'rencancel') { P.ren = null; pintarPlantio(); return; }
+    if (a === 'rensalvar') { renomearTal(); return; }
     if (a === 'ptog') { var kp = P.sel.indexOf(v); if (kp >= 0) P.sel.splice(kp, 1); else P.sel.push(v); pintarPlantio(); return; }
     if (a === 'ptodos') { P.sel = talhoesDe(fazDe(P.faz)).map(function (t) { return t.nome; }); pintarPlantio(); return; }
     if (a === 'plimpar') { P.sel = []; pintarPlantio(); return; }
     if (a === 'plancar') { if (!P.sel.length) return; var p0 = P.sel[0], resto = P.sel.slice(1); cliquePlantio('edtal', p0); P.outros = resto; pintarPlantio(); topoRolagem(tP); return; }
     if (a === 'edtal') {
       var r = linhaPlantio(P.faz, P.safra, v);
-      P.nome = v; P.outros = [];
+      P.nome = v; P.outros = []; P.ren = null;
       var pts0 = r ? partesPl(r) : [];
       P.ed = r ? { cultura: r.cultura || '', variedade: r.variedade || '', data_plantio: r.data_plantio || '', data_emerg: r.data_emerg || '', espac_cm: r.espac_cm || 0, sem_m: r.sem_m || 0, sem_ha: r.sem_ha || 0,
           haMain: pts0.length ? Number(pts0[0].ha) : 0, extras: pts0.slice(1).map(function (x) { return { variedade: x.variedade || '', ha: Number(x.ha) || 0, data_plantio: x.data_plantio || '' }; }) }
