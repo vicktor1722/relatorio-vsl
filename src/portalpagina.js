@@ -555,12 +555,14 @@ body.sem-rolar{overflow:hidden}
       return '<div class="ini-m"><small>' + ic + ' ' + tit + '</small><b>' + pre + n(x.preco, 2) + '<span>' + suf + '</span></b>' + (x.var != null ? varTxt(x.var) : '') +
         (sub ? '<small class="ini-pr">' + sub + '</small>' : '') + (x.serie ? linhaMini(x.serie, cor) : '') + '</div>';
     }
+    var Bs = m.dolar_bob;
+    h += cx('💵', 'Dólar → boliviano', Bs, 'Bs ', '', B && Bs ? 'soja: Bs ' + n(B.preco * Bs.preco) + '/t' : '');
     if (B) h += cx('🌱', 'Soja disponível', B, 'US$ ', '/t', '📍 ' + esc(B.regiao) + ' · Bolívia') + cx('🌱', 'Soja · sc 60 kg', { preco: B.sc }, 'US$ ', '/sc', '= ' + n(B.preco, 2) + ' ÷ 16,67 sc/t');
     h += cx('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', m.cbot_soja ? '= US$ ' + n(m.cbot_soja.preco * 36.7437, 2) + '/t' : '') + cx('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu') + '</div>';
     if (!B) h += '<div class="ini-pe">A cotação da soja em San Ignacio aparece quando o consultor informar o preço do dia.</div>';
     return h + '<div class="ini-pe">' + esc(m.fonte) + '.</div></div>';
   }
-  function cartaoFormacaoBO(B) {
+  function cartaoFormacaoBO(B, Bs) {
     var cab = '<button class="fp-cab" id="fpAbre" aria-expanded="' + FORM_AB + '"><span>💰 Soja disponível na fazenda</span><b>US$ ' + n(B.preco, 2) + '/t</b><i>▾</i></button>';
     if (!FORM_AB) return '<div class="ini-card fp-card">' + cab + '</div>';
     var sinal = function (v) { return (v >= 0 ? '+ ' : '− ') + 'US$ ' + n(Math.abs(v), 2); };
@@ -570,7 +572,8 @@ body.sem-rolar{overflow:hidden}
       '<div><span>📏 Base da região (diferença para Chicago)</span><b>' + sinal(B.base_t) + '/t</b></div>' +
       '<div><span>🏛️ Chicago hoje (US$ ' + n(B.cbot_hoje, 2) + '/bu)</span><b>US$ ' + n(B.cbot_t, 2) + '/t</b></div>' +
       '<div class="tot fz"><span>= Disponível hoje</span><b>US$ ' + n(B.preco, 2) + '/t</b></div></div>' +
-      '<div class="ini-fpc">Nos próximos dias o preço acompanha Chicago mantendo essa base, até o consultor informar uma cotação nova. Em saca: <b>US$ ' + n(B.sc, 2) + '/sc</b>.</div>' +
+      '<div class="ini-fpc">Nos próximos dias o preço acompanha Chicago mantendo essa base, até o consultor informar uma cotação nova. Em saca: <b>US$ ' + n(B.sc, 2) + '/sc</b>.' +
+        (Bs ? '<br>Em bolivianos (dólar Bs ' + n(Bs.preco, 2) + '): <b>Bs ' + n(B.preco * Bs.preco) + '/t</b> · Bs ' + n(B.sc * Bs.preco, 2) + '/sc' : '') + '</div>' +
       '<div class="ini-pe">1 t = 36,74 bushels = 16,67 sacas de 60 kg.</div></div>';
   }
   function cartaoMercado() {
@@ -609,7 +612,7 @@ body.sem-rolar{overflow:hidden}
   var FRETE_ED = false, FORM_AB = false;
   function cartaoFormacao() {
     var m = INI.dados && INI.dados.mercado, F = m && m.formacao;
-    if (m && m.pais === 'BO') return m.bolivia ? cartaoFormacaoBO(m.bolivia) : '';
+    if (m && m.pais === 'BO') return m.bolivia ? cartaoFormacaoBO(m.bolivia, m.dolar_bob) : '';
     if (!F) return '';
     var sinal = function (v, c) { return (v >= 0 ? '+ ' : '− ') + n(Math.abs(v), c); };
     var venda = F.venda != null ? F.venda : F.fazenda;

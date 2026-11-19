@@ -636,7 +636,8 @@ ${MAPA_CHUVA_JS}
     var h = '<div class="pf-dh"><div><h3>' + esc(X.fazenda.nome) + '</h3><small>' + esc([X.fazenda.produtor, X.fazenda.municipio ? X.fazenda.municipio + (X.fazenda.uf ? '/' + X.fazenda.uf : '') : ''].filter(Boolean).join(' · ')) + '</small></div><button class="pf-x" id="pfFecha">✕</button></div>';
     var BO = X.mercado && X.mercado.pais === 'BO' ? (X.mercado.bolivia || {}) : null;
     h += '<div class="pf-heroi"><div><small>' + (BO ? 'Soja disponível (San Ignacio · Bolívia)' : 'Soja na fazenda (venda estimada)') + '</small><b>' +
-      (BO ? (BO.preco != null ? 'US$ ' + pfN(BO.preco, 2) + '<span>/t</span>' : '—') : venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b></div>' +
+      (BO ? (BO.preco != null ? 'US$ ' + pfN(BO.preco, 2) + '<span>/t</span>' : '—') : venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b>' +
+      (BO && X.mercado.dolar_bob ? '<small>dólar Bs ' + pfN(X.mercado.dolar_bob.preco, 2) + (BO.preco != null ? ' · Bs ' + pfN(BO.preco * X.mercado.dolar_bob.preco) + '/t' : '') + '</small>' : '') + '</div>' +
       (c && c.agora ? '<div class="tp"><small>agora</small><b>' + c.agora.ic + ' ' + c.agora.temp + '°</b></div>' : '') + '</div>';
     h += '<div class="pf-k4"><div><b>' + pfN(X.plantio.pct) + '%</b><span>plantado</span></div><div><b' + (X.alertas.atrasadas ? ' class="dn"' : '') + '>' + X.alertas.atrasadas + '</b><span>atrasadas</span></div>' +
       '<div><b>' + (P ? pfN(P.acc[1]) + ' mm' : '—') + '</b><span>chuva 15 dias</span></div><div><b>' + pfBr(X.colheita) + '</b><span>1ª colheita</span></div></div>';
