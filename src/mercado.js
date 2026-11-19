@@ -513,7 +513,11 @@ function formacao(m, local, praca, frete, cal) {
 const BU_T = 36.7437;   // bushels de soja por tonelada
 export function precoBolivia(m, cal) {
   const b = cal && cal.bolivia, cb = m && m.cbot_soja;
-  if (!b || !cb || !cb.preco) return null;
+  if (!cb || !cb.preco) return null;
+  if (!b) {   // sem cotação informada: soja disponível na Bolívia = Chicago em tonelada
+    const t = r2(cb.preco * BU_T);
+    return { auto: true, regiao: 'Bolívia', preco: t, sc: r2(t / SC_T), em: cb.em, var: cb.var, serie: (cb.serie || []).map((c) => r2(c * BU_T)), cbot_hoje: cb.preco, cbot_t: t };
+  }
   const base = b.usd_t / BU_T - b.ref.cbot, conv = (c) => r2((c + base) * BU_T);
   const serie = (cb.serie || []).map(conv), hoje = conv(cb.preco);
   return { regiao: b.regiao || 'San Ignacio', preco: hoje, sc: r2(hoje / SC_T), em: cb.em, var: cb.var, serie,
@@ -524,9 +528,10 @@ export async function mercadoDaFazenda(env, local, frete) {
   const m = await mercadoGeral(env);
   if (naBolivia(local)) {   // fazenda na Bolívia: soja em US$/t (San Ignacio); sem praça, porto e real do Brasil
     const bob = await yahoo('BOB=X', 1).catch(() => null);   // dólar → boliviano
-    return { pais: 'BO', cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho, bolivia: precoBolivia(m, await calibracao(env)),
+    const bo = precoBolivia(m, await calibracao(env));
+    return { pais: 'BO', cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho, bolivia: bo,
       dolar_bob: bob ? { preco: r2(bob.preco), var: bob.var, serie: bob.serie, em: bob.em } : null,
-      fonte: 'Soja disponível: cotação de San Ignacio (Bolívia) em dólar por tonelada · Dólar em bolivianos e Chicago: Yahoo Finance' };
+      fonte: (bo && !bo.auto ? 'Soja disponível: cotação de San Ignacio (Bolívia) em dólar por tonelada' : 'Soja disponível: Chicago em dólar por tonelada') + ' · Dólar em bolivianos e Chicago: Yahoo Finance' };
   }
   const soja = await pracaPerto(m.pracas.soja, local);
   return {
