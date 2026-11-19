@@ -12,7 +12,14 @@ var ExportaChuva = (function () {
   var GIFENC = 'https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js';
   var ESC = [[0, '#BDBDBD'], [8, '#9BE29B'], [16, '#2EAA3C'], [24, '#0B6B2B'], [32, '#1E3FD8'], [40, '#2E7BFF'], [48, '#8FD6FF'], [56, '#F7F3C2'], [64, '#FFB000'], [72, '#FF6A00'], [80, '#E31A1C'], [88, '#FFB3D9'], [100, '#8E5CFF']];
   var ROT = [['<1', 0], ['10', 16], ['17', 32], ['30', 48], ['50', 64], ['120', 80], ['270+ mm', 100]];
-  var SEG_DIA = 550;   // milissegundos por dia no vídeo
+  // tempo de cada dia: fica parado mostrando o dia e depois passa devagar para o próximo
+  var PARADO = 800, TRANS = 700, SEG_DIA = PARADO + TRANS, FIM = 1800;
+  function suave(x) { return x * x * (3 - 2 * x); }
+  function tempoDia(e, dias) {   // milissegundos desde o começo → dia (com fração na passagem)
+    var k = Math.floor(e / SEG_DIA), r = e - k * SEG_DIA;
+    if (k >= dias - 1) return dias - 1;
+    return r < PARADO ? k : k + suave((r - PARADO) / TRANS);
+  }
   var cssPronto = false;
   function css() {
     if (cssPronto) return; cssPronto = true;
@@ -139,10 +146,10 @@ var ExportaChuva = (function () {
       rec.ondataavailable = function (e) { if (e.data && e.data.size) pd.push(e.data); };
       rec.onstop = function () { ok(new Blob(pd, { type: tp.split(';')[0] })); };
       M.quadro(0); rec.start(250);
-      var t0 = null, fim = (dias - 1) * SEG_DIA, seg = 900;
+      var t0 = null, fim = (dias - 1) * SEG_DIA, seg = FIM;
       function passo(ts) {
         if (t0 === null) t0 = ts;
-        var e = ts - t0, t = Math.min(dias - 1, e / SEG_DIA);
+        var e = ts - t0, t = tempoDia(e, dias);
         M.quadro(t); prog(Math.min(1, e / (fim + seg)), Math.min(dias, Math.floor(t) + 1), dias);
         if (e < fim + seg) requestAnimationFrame(passo); else setTimeout(function () { try { rec.stop(); } catch (x) { erro(x); } }, 120);
       }
@@ -153,14 +160,15 @@ var ExportaChuva = (function () {
     return import(GIFENC).then(function (G) {
       var M = montador(o), w = 480, h = Math.round(M.H * 480 / M.W / 2) * 2;
       var pc = document.createElement('canvas'); pc.width = w; pc.height = h; var px = pc.getContext('2d', { willReadFrequently: true });
-      var enc = G.GIFEncoder(), passos = 3, tot = (dias - 1) * passos + 1, i = 0;
+      // cada dia: um quadro parado e 4 de passagem para o próximo
+      var enc = G.GIFEncoder(), passos = 5, tot = (dias - 1) * passos + 1, i = 0;
       return new Promise(function (ok, erro) {
         function um() {
           try {
-            var t = i / passos; M.quadro(t);
+            var k = Math.floor(i / passos), j = i % passos, t = k + (j ? suave(j / passos) : 0); M.quadro(t);
             px.drawImage(M.out, 0, 0, w, h);
             var d = px.getImageData(0, 0, w, h).data, pal = G.quantize(d, 256, { format: 'rgb444' }), ix = G.applyPalette(d, pal, 'rgb444');
-            enc.writeFrame(ix, w, h, { palette: pal, delay: i === tot - 1 ? 1500 : Math.round(SEG_DIA / passos) });
+            enc.writeFrame(ix, w, h, { palette: pal, delay: i === tot - 1 ? FIM : j === 0 ? PARADO : Math.round(TRANS / (passos - 1)) });
             i++; prog(i / tot, Math.min(dias, Math.floor(t) + 1), dias);
             if (i < tot) setTimeout(um, 0); else { enc.finish(); ok(new Blob([enc.bytes()], { type: 'image/gif' })); }
           } catch (e) { erro(e); }
@@ -179,7 +187,7 @@ var ExportaChuva = (function () {
       '<div class="ex-lab">Formato</div><div class="ex-op" data-g="fmt">' +
         '<button data-v="video"><b>🎥 Vídeo</b>melhor para WhatsApp e Instagram</button><button data-v="gif"><b>🖼️ GIF</b>abre em qualquer lugar, arquivo maior</button></div>' +
       '<div class="ex-lab">Período</div><div class="ex-op" data-g="dias">' +
-        '<button data-v="7"><b>7 dias</b>~4 segundos</button><button data-v="' + Math.min(15, o.n) + '"><b>' + Math.min(15, o.n) + ' dias</b>~8 segundos</button></div>' +
+        '<button data-v="7"><b>7 dias</b>~' + Math.round((6 * SEG_DIA + FIM) / 1000) + ' segundos</button><button data-v="' + Math.min(15, o.n) + '"><b>' + Math.min(15, o.n) + ' dias</b>~' + Math.round(((Math.min(15, o.n) - 1) * SEG_DIA + FIM) / 1000) + ' segundos</button></div>' +
       '<button class="ex-go">Gerar animação</button><div class="ex-res"></div></div>';
     document.body.appendChild(f);
     var cxa = f.querySelector('.ex-cx'), res = f.querySelector('.ex-res'), go = f.querySelector('.ex-go');
