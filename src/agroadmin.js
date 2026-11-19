@@ -556,7 +556,7 @@ ${MAPA_CHUVA_JS}
         '<button class="ini-lk" id="calBoX">remover</button></div>' : '') +
       '<div class="pf-calf"><input id="calBoUsd" inputmode="decimal" placeholder="US$/t hoje (ex.: 419,44)"><input id="calBoData" type="date" value="' + new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10) + '"><button class="btn-mini" id="calSalvaBo">Salvar cotação da Bolívia</button></div>' +
       '<div class="pf-pe">Ao salvar, o painel guarda junto o preço do porto, Chicago e o dólar do dia. Daí em diante o preço de cada fazenda (até 150 km do município) acompanha o mercado mantendo essa diferença; o futuro vale para as fazendas até 250 km. ' +
-      'Bolívia: vale para as fazendas com o mapa na Bolívia; o preço acompanha Chicago mantendo a base da região até você informar uma cotação nova.</div></div>';
+      'Bolívia: vale para as fazendas com o mapa na Bolívia. Sem cotação aqui, a soja disponível é Chicago em tonelada (atualiza sozinha); com cotação, ela manda e acompanha Chicago mantendo a base.</div></div>';
   }
   function pfLigarCal() {
     var ab = document.getElementById('pfCalAbre'); if (ab) ab.onclick = function () { PF.calAb = !PF.calAb; pfPintar(); };
@@ -635,7 +635,7 @@ ${MAPA_CHUVA_JS}
     var F = X.mercado && X.mercado.formacao, c = X.clima, P = X.chuva && X.chuva.ponto, venda = F ? (F.venda != null ? F.venda : F.fazenda) : null;
     var h = '<div class="pf-dh"><div><h3>' + esc(X.fazenda.nome) + '</h3><small>' + esc([X.fazenda.produtor, X.fazenda.municipio ? X.fazenda.municipio + (X.fazenda.uf ? '/' + X.fazenda.uf : '') : ''].filter(Boolean).join(' · ')) + '</small></div><button class="pf-x" id="pfFecha">✕</button></div>';
     var BO = X.mercado && X.mercado.pais === 'BO' ? (X.mercado.bolivia || {}) : null;
-    h += '<div class="pf-heroi"><div><small>' + (BO ? 'Soja disponível (San Ignacio · Bolívia)' : 'Soja na fazenda (venda estimada)') + '</small><b>' +
+    h += '<div class="pf-heroi"><div><small>' + (BO ? (BO.auto ? 'Soja disponível (Bolívia · Chicago em tonelada)' : 'Soja disponível (San Ignacio · Bolívia)') : 'Soja na fazenda (venda estimada)') + '</small><b>' +
       (BO ? (BO.preco != null ? 'US$ ' + pfN(BO.preco, 2) + '<span>/t</span>' : '—') : venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b>' +
       (BO && X.mercado.dolar_bob ? '<small>dólar Bs ' + pfN(X.mercado.dolar_bob.preco, 2) + (BO.preco != null ? ' · Bs ' + pfN(BO.preco * X.mercado.dolar_bob.preco) + '/t' : '') + '</small>' : '') + '</div>' +
       (c && c.agora ? '<div class="tp"><small>agora</small><b>' + c.agora.ic + ' ' + c.agora.temp + '°</b></div>' : '') + '</div>';
