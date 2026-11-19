@@ -93,22 +93,48 @@ var ExportaChuva = (function () {
       im.src = '/icon-192.png';
     });
   }
-  function montador(o) {
-    var b = o.cont.getBoundingClientRect(), W = Math.max(1, b.width), H = Math.max(1, b.height), k = Math.min(2, window.devicePixelRatio || 1);
-    var base = camada(o, W, H, k, 'base'), topo = camada(o, W, H, k, 'topo');
+  // satélite com o dobro de detalhe (um nível de zoom acima) por cima das fotos da tela: o vídeo fica nítido
+  function sateliteHD(o, ctx, W, H, k) {
+    var m = o.mapa, z = Math.round(m.getZoom()), zt = Math.min(17, z + 1), n = Math.pow(2, zt);
+    var p0 = m.project(m.containerPointToLatLng([0, 0]), zt), p1 = m.project(m.containerPointToLatLng([W, H]), zt);
+    var s = W / (p1.x - p0.x), l = [];
+    for (var ty = Math.floor(p0.y / 256); ty <= Math.floor(p1.y / 256); ty++) {
+      if (ty < 0 || ty >= n) continue;
+      for (var tx = Math.floor(p0.x / 256); tx <= Math.floor(p1.x / 256); tx++) l.push([tx, ty]);
+    }
+    if (l.length > 80) return Promise.resolve();   // área grande demais: fica com as fotos da tela
+    return Promise.all(l.map(function (q) {
+      return new Promise(function (ok) {
+        var im = new Image(), fim = setTimeout(function () { ok(); }, 8000);
+        im.crossOrigin = 'anonymous';
+        im.onload = function () { clearTimeout(fim); try { ctx.drawImage(im, (q[0] * 256 - p0.x) * s * k, (q[1] * 256 - p0.y) * s * k, 256 * s * k + 0.5, 256 * s * k + 0.5); } catch (e) {} ok(); };
+        im.onerror = function () { clearTimeout(fim); ok(); };
+        im.src = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + zt + '/' + q[1] + '/' + (((q[0] % n) + n) % n);
+      });
+    }));
+  }
+  // Q: escala da saída (1 = 720 px de largura; 1,5 = 1080 px)
+  function montador(o, Q) {
+    Q = Q || 1;
+    var b = o.cont.getBoundingClientRect(), W = Math.max(1, b.width), H = Math.max(1, b.height);
     var OW = 720, HEAD = 112, FOOT = 132;
     var MH = Math.round(Math.max(520, Math.min(1000, OW * H / W)) / 2) * 2, OH = HEAD + MH + FOOT;
-    var out = document.createElement('canvas'); out.width = OW; out.height = OH;
-    var mc = document.createElement('canvas'); mc.width = base.width; mc.height = base.height;
-    var cx = out.getContext('2d'), mx = mc.getContext('2d'), filtro = 'filter' in mx;
     // recorte do mapa que cabe no quadro (preenche, cortando o que sobra do lado mais comprido)
     var esc = Math.max(OW / W, MH / H), sw = OW / esc, sh = MH / esc, sx = (W - sw) / 2, sy = (H - sh) / 2;
+    var k = Math.min(3, Math.max(window.devicePixelRatio || 1, OW * Q / sw));   // resolução do mapa = a do quadro (sem esticar)
+    var base = camada(o, W, H, k, 'base'), topo = camada(o, W, H, k, 'topo');
+    return sateliteHD(o, base.getContext('2d'), W, H, k).catch(function () {}).then(function () {
+    var out = document.createElement('canvas'); out.width = Math.round(OW * Q / 2) * 2; out.height = Math.round(OH * Q / 2) * 2;
+    var mc = document.createElement('canvas'); mc.width = base.width; mc.height = base.height;
+    var cx = out.getContext('2d'), mx = mc.getContext('2d'), filtro = 'filter' in mx;
+    cx.imageSmoothingQuality = 'high'; mx.imageSmoothingQuality = 'high';
     var fonte = 'system-ui,-apple-system,Segoe UI,Arial,sans-serif';
     function quadro(t) {
       o.desenhar(t);
+      cx.setTransform(Q, 0, 0, Q, 0, 0);
       mx.setTransform(1, 0, 0, 1, 0, 0); mx.clearRect(0, 0, mc.width, mc.height); mx.drawImage(base, 0, 0);
       var r = ret(o.canvas, b);
-      mx.save(); mx.scale(k, k); if (filtro) mx.filter = 'blur(2px) saturate(1.35) contrast(1.08)';
+      mx.save(); mx.scale(k, k); if (filtro) mx.filter = 'blur(0.8px) saturate(1.35) contrast(1.08)';   // chuva já em resolução maior: pouco desfoque
       try { mx.drawImage(o.canvas, r.x, r.y, r.w, r.h); } catch (e) {}
       mx.restore(); mx.drawImage(topo, 0, 0);
       cx.fillStyle = '#0B1F14'; cx.fillRect(0, 0, OW, OH);
@@ -130,7 +156,8 @@ var ExportaChuva = (function () {
       var tx0 = lx + 14; if (LOGO) { cx.save(); cx.beginPath(); if (cx.roundRect) cx.roundRect(lx + 7, ly + 7, 38, 38, 9); else cx.rect(lx + 7, ly + 7, 38, 38); cx.clip(); try { cx.drawImage(LOGO, lx + 7, ly + 7, 38, 38); } catch (e) {} cx.restore(); tx0 = lx + 53; }
       cx.fillStyle = '#17703D'; if ('letterSpacing' in cx) cx.letterSpacing = '1px'; cx.fillText('AMVS', tx0, ly + 35); if ('letterSpacing' in cx) cx.letterSpacing = '0px';
     }
-    return { out: out, quadro: quadro, W: OW, H: OH };
+    return { out: out, quadro: quadro, W: out.width, H: out.height };
+    });
   }
   function tipoVideo() {
     if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return null;
@@ -141,8 +168,9 @@ var ExportaChuva = (function () {
   function video(o, dias, prog) {
     return new Promise(function (ok, erro) {
       var tp = tipoVideo(); if (!tp) { erro(new Error('este aparelho não grava vídeo; escolha GIF')); return; }
-      var M = montador(o), st = M.out.captureStream(30), pd = [], rec;
-      try { rec = new MediaRecorder(st, { mimeType: tp, videoBitsPerSecond: 5000000 }); } catch (e) { erro(e); return; }
+      montador(o, 1.5).then(function (M) {
+      var st = M.out.captureStream(30), pd = [], rec;
+      try { rec = new MediaRecorder(st, { mimeType: tp, videoBitsPerSecond: 12000000 }); } catch (e) { erro(e); return; }
       rec.ondataavailable = function (e) { if (e.data && e.data.size) pd.push(e.data); };
       rec.onstop = function () { ok(new Blob(pd, { type: tp.split(';')[0] })); };
       M.quadro(0); rec.start(250);
@@ -154,12 +182,13 @@ var ExportaChuva = (function () {
         if (e < fim + seg) requestAnimationFrame(passo); else setTimeout(function () { try { rec.stop(); } catch (x) { erro(x); } }, 120);
       }
       requestAnimationFrame(passo);
+      }, erro);
     });
   }
   function gif(o, dias, prog) {
-    return import(GIFENC).then(function (G) {
-      var M = montador(o), w = 480, h = Math.round(M.H * 480 / M.W / 2) * 2;
-      var pc = document.createElement('canvas'); pc.width = w; pc.height = h; var px = pc.getContext('2d', { willReadFrequently: true });
+    return Promise.all([import(GIFENC), montador(o, 1)]).then(function (r) {
+      var G = r[0], M = r[1], w = 600, h = Math.round(M.H * w / M.W / 2) * 2;   // GIF com 600 px de largura
+      var pc = document.createElement('canvas'); pc.width = w; pc.height = h; var px = pc.getContext('2d', { willReadFrequently: true }); px.imageSmoothingQuality = 'high';
       // cada dia: um quadro parado e 4 de passagem para o próximo
       var enc = G.GIFEncoder(), passos = 5, tot = (dias - 1) * passos + 1, i = 0;
       return new Promise(function (ok, erro) {
@@ -167,7 +196,7 @@ var ExportaChuva = (function () {
           try {
             var k = Math.floor(i / passos), j = i % passos, t = k + (j ? suave(j / passos) : 0); M.quadro(t);
             px.drawImage(M.out, 0, 0, w, h);
-            var d = px.getImageData(0, 0, w, h).data, pal = G.quantize(d, 256, { format: 'rgb444' }), ix = G.applyPalette(d, pal, 'rgb444');
+            var d = px.getImageData(0, 0, w, h).data, pal = G.quantize(d, 256, { format: 'rgb565' }), ix = G.applyPalette(d, pal, 'rgb565');   // mais tons de cor
             enc.writeFrame(ix, w, h, { palette: pal, delay: i === tot - 1 ? FIM : j === 0 ? PARADO : Math.round(TRANS / (passos - 1)) });
             i++; prog(i / tot, Math.min(dias, Math.floor(t) + 1), dias);
             if (i < tot) setTimeout(um, 0); else { enc.finish(); ok(new Blob([enc.bytes()], { type: 'image/gif' })); }
@@ -210,6 +239,9 @@ var ExportaChuva = (function () {
       res.innerHTML = '<div class="ex-pr"><span>Preparando o mapa…</span><div class="ex-pb"><i></i></div></div>';
       var tx = res.querySelector('.ex-pr span'), bar = res.querySelector('.ex-pb i');
       function prog(p, d, n) { tx.textContent = 'Montando o dia ' + d + ' de ' + n + '…'; bar.style.width = Math.round(p * 100) + '%'; }
+      // chuva desenhada em resolução maior durante a exportação (fica nítida no vídeo); volta ao normal no fim
+      var cv = o.canvas, w0 = cv.width, h0 = cv.height, F = fmt === 'video' ? 1.8 : 2.2;
+      cv.width = Math.round(w0 * F); cv.height = Math.round(h0 * F);
       var trabalho = carregarLogo().then(function () { return (fmt === 'video' ? video : gif)(o, dias, prog); });
       trabalho.then(function (blob) {
         var ext = fmt === 'gif' ? 'gif' : blob.type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
@@ -242,6 +274,7 @@ var ExportaChuva = (function () {
         res.innerHTML = '<div class="ex-err">Não deu para gerar: ' + String((e && e.message) || e) + '</div>';
       }).then(function () {
         ocupado = false; go.disabled = false; if (!pronto) go.textContent = 'Gerar animação';
+        cv.width = w0; cv.height = h0;
         try { if (o.restaurar) o.restaurar(); } catch (e) {}
       });
     };
