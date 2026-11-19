@@ -6,6 +6,7 @@
 
 import { AGRO_REL_CSS, AGRO_REL_JS } from './agrorel.js';
 import { DPG_CSS, DPG_JS } from './graficodp.js';
+import { EXPORTA_CHUVA_JS } from './exportachuva.js';
 
 export function paginaPortal() {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
@@ -227,7 +228,7 @@ ${DPG_CSS}
 .chv-mapa{position:relative;height:320px;border-radius:12px;overflow:hidden}.chv-cv{filter:blur(2px) saturate(1.35) contrast(1.08)}.chv-mapa #chvMapa{position:absolute;inset:0}
 .chv-tit,.chv-dia{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none}
 .chv-tit{left:8px;font-size:11px;padding:4px 8px;line-height:1.3}
-.chv-logo{position:absolute;z-index:500;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);border-radius:9px;padding:4px 9px 4px 4px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.chv-logo{position:absolute;z-index:500;right:56px;bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);border-radius:9px;padding:4px 9px 4px 4px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .chv-logo svg{width:24px;height:24px;display:block}.chv-logo b{font-size:13px;color:#12261B;letter-spacing:.3px;line-height:1}.chv-logo small{display:block;font-size:9px;color:#4a5a51;font-weight:600;margin-top:1px}.chv-dia{right:8px;font-weight:800;font-size:19px;padding:4px 10px}
 .chv-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
 .chv-escx{position:relative;height:14px;font-size:10px;color:var(--fraco);margin-top:2px}.chv-escx span{position:absolute;top:0;white-space:nowrap}
@@ -242,6 +243,8 @@ ${DPG_CSS}
 .chv-bloco.cheia{position:fixed;inset:0;z-index:3000;background:#0B1F14;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px))}
 .chv-bloco.cheia .chv-cheia-cab{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:2px 2px 8px}
 .chv-bloco.cheia .chv-cheia-cab button{width:38px;height:38px;border-radius:50%;border:0;background:#fff;font-size:16px;cursor:pointer}
+.chv-bloco.cheia .chv-logo{right:8px}.chv-cab-bt{display:flex;align-items:center;gap:10px}
+.chv-bloco.cheia .chv-cheia-cab .chv-exp{width:34px;height:34px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);opacity:.8;display:grid;place-items:center;padding:0}
 .chv-bloco.cheia .chv-mapa{flex:1;height:auto}.chv-bloco.cheia .chv-escx{color:#DDE7E1}.chv-bloco.cheia .chv-fs{display:none}
 body.sem-rolar{overflow:hidden}
 .chv-pe b{color:var(--texto)}
@@ -278,6 +281,7 @@ body.sem-rolar{overflow:hidden}
 
 <script>${AGRO_REL_JS}</script>
 <script>${DPG_JS}</script>
+<script>${EXPORTA_CHUVA_JS}</script>
 <script>
 (function () {
   var CH = 'amvs-portal', tok = '', eu = null, D = null, aba = 'inicio', filtro = 'fazer', mapas = [], modoMapa = 'var';
@@ -735,7 +739,7 @@ body.sem-rolar{overflow:hidden}
       (prox ? '<span>1ª chuva ≥ 5 mm: <b>' + dataBR(prox.d) + '</b> (' + prox.p5 + '%)</span>' : '<span>sem chuva ≥ 5 mm provável</span>') + '</div>';
     var M = C.mapa;
     if (M && M.v && M.v.length) {
-      h += '<div class="chv-bloco" id="chvBloco"><div class="chv-cheia-cab"><b>🌧️ Mapa da chuva</b><button id="chvSai" aria-label="Fechar tela cheia">✕</button></div>' +
+      h += '<div class="chv-bloco" id="chvBloco"><div class="chv-cheia-cab"><b>🌧️ Mapa da chuva</b><span class="chv-cab-bt"><button id="chvExp" class="chv-exp" aria-label="Exportar vídeo ou GIF" title="Exportar vídeo ou GIF">' + (window.ExportaChuva ? ExportaChuva.icone : '⤓') + '</button><button id="chvSai" aria-label="Fechar tela cheia">✕</button></span></div>' +
         '<div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) {
         return '<button data-chvm="' + x[0] + '" class="' + (CHV.modo === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="chv-mapa"><div id="chvMapa"></div><div class="chv-tit" id="chvTit"></div><div class="chv-dia" id="chvDia"></div>' +
@@ -810,10 +814,10 @@ body.sem-rolar{overflow:hidden}
     var P = CHV.dados.ponto, M = CHV.dados.mapa;
     CHV.mapa = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView([P.lat || -14, P.lon || -54], 4);
     mapas.push(CHV.mapa);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10 }).addTo(CHV.mapa);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, crossOrigin: true }).addTo(CHV.mapa);
     // divisas dos estados e dos países (com os nomes) por cima da chuva
     CHV.mapa.createPane('limites'); CHV.mapa.getPane('limites').style.zIndex = 450; CHV.mapa.getPane('limites').style.pointerEvents = 'none';
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, pane: 'limites' }).addTo(CHV.mapa);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, pane: 'limites', crossOrigin: true }).addTo(CHV.mapa);
     // divisas dos estados (linhas do Brasil guardadas no próprio app)
     var mp = CHV.mapa;
     (window.UFS_GEO ? Promise.resolve(window.UFS_GEO) : fetch('/portal/ufs.json').then(function (r) { return r.json(); }).then(function (g) { window.UFS_GEO = g; return g; }))
@@ -836,6 +840,18 @@ body.sem-rolar{overflow:hidden}
     var fs = document.getElementById('chvFs'), sai = document.getElementById('chvSai');
     if (fs) fs.onclick = function () { cheia(!bloco.classList.contains('cheia')); };
     if (sai) sai.onclick = function () { cheia(false); };
+    // exportar a animação (vídeo ou GIF): ícone pequeno só na tela cheia
+    var exb = document.getElementById('chvExp');
+    if (exb) exb.onclick = function () {
+      if (!window.ExportaChuva) return;
+      chvParar();
+      var modo0 = CHV.modo, dia0 = CHV.dia, em0 = new Date(CHV.dados.ponto.gerado_em || M.gerado_em || Date.now());
+      ExportaChuva.abrir({ mapa: CHV.mapa, cont: el, canvas: CHV.canvas, n: M.v.length, datas: M.datas, local: CHV.dados.fazenda.nome,
+        atualizado: em0.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+        pontos: P.lat ? [{ lat: P.lat, lon: P.lon, nome: CHV.dados.fazenda.nome }] : [],
+        desenhar: function (t) { CHV.modo = 'dia'; chvDesenhar(t); },
+        restaurar: function () { CHV.modo = modo0; CHV.dia = dia0; chvDesenhar(CHV.dia); } });
+    };
     var sl = document.getElementById('chvSl'), pl = document.getElementById('chvPlay');
     if (sl) sl.oninput = function () { chvParar(); CHV.dia = Number(sl.value); chvDesenhar(CHV.dia); };
     // ▶: um dia vira o outro aos poucos (~1,4 s por dia), como a chuva andando

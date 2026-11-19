@@ -55,16 +55,16 @@ var MapaChuva = (function () {
     var st = { modo: op.modo || 'dia', t: 0, play: null };
     P = P || {};
     var m = L.map(el, { zoomControl: !!op.zoom, attributionControl: false, scrollWheelZoom: false }).setView([P.lat || op.lat || -14, P.lon || op.lon || -54], op.nivel || 4);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10 }).addTo(m);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, crossOrigin: true }).addTo(m);
     m.createPane('limites'); m.getPane('limites').style.zIndex = 450; m.getPane('limites').style.pointerEvents = 'none';
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, pane: 'limites' }).addTo(m);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 10, pane: 'limites', crossOrigin: true }).addTo(m);
     (UFS ? Promise.resolve(UFS) : fetch('/portal/ufs.json').then(function (r) { return r.json(); }).then(function (g) { UFS = g; return g; }))
       .then(function (g) { try { L.geoJSON(g, { pane: 'limites', interactive: false, style: { color: '#FFFFFF', weight: 1.1, opacity: 0.85 } }).addTo(m); } catch (e) {} }).catch(function () {});
     var cv = document.createElement('canvas'); cv.width = 220; cv.height = 240; cv.className = 'mc-cv';
     new Camada(cv, [[M.la0, M.lo0], [M.la1, M.lo1]], { interactive: false }).addTo(m);
-    var grupo = L.layerGroup().addTo(m);
+    var grupo = L.layerGroup().addTo(m), atuais = P && P.lat ? [P] : [];
     function pontos(l) {
-      grupo.clearLayers();
+      grupo.clearLayers(); atuais = (l || []).filter(function (p) { return p && p.lat; });
       (l || []).forEach(function (p) { if (p && p.lat) L.circleMarker([p.lat, p.lon], { radius: 6, color: '#fff', weight: 2, fillColor: '#C62828', fillOpacity: 1, pane: 'limites' })
         .addTo(grupo).bindTooltip(String(p.nome || ''), { permanent: !!op.rotulos, direction: 'top', offset: [0, -6] }); });
     }
@@ -108,7 +108,14 @@ var MapaChuva = (function () {
     function parar() { if (st.play) { cancelAnimationFrame(st.play); st.play = null; } }
     desenhar();
     return {
-      mapa: m, st: st, n: M.v.length, pontos: pontos,
+      mapa: m, st: st, n: M.v.length, pontos: pontos, canvas: cv, cont: el,
+      // exportar a animação (vídeo ou GIF) com o enquadramento da tela
+      exportar: function (local, atualizado) {
+        if (typeof ExportaChuva === 'undefined') return;
+        parar(); var modo0 = st.modo, t0 = st.t;
+        ExportaChuva.abrir({ mapa: m, cont: el, canvas: cv, n: M.v.length, datas: M.datas, local: local || (atuais.length === 1 ? atuais[0].nome : ''), atualizado: atualizado || '', pontos: atuais,
+          desenhar: function (t) { st.modo = 'dia'; st.t = t; desenhar(); }, restaurar: function () { st.modo = modo0; st.t = t0; desenhar(); } });
+      },
       modo: function (mo) { parar(); st.modo = mo; desenhar(); },
       dia: function (t) { parar(); st.t = t; desenhar(); },
       tocando: function () { return !!st.play; },

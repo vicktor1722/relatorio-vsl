@@ -1385,7 +1385,8 @@
     if (!document.body.contains(box)) return null;
     const br = function (d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) : ''; };
     const em = M.gerado_em ? new Date(M.gerado_em).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '';
-    box.innerHTML = '<div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span><button class="cl-sai" aria-label="Sair da tela cheia">✕</button></div>' +
+    box.innerHTML = '<div class="cl-chuva-cab">🌧️ <b>Mapa da chuva</b><span>próximos 15 dias</span>' +
+      '<button class="cl-exp" aria-label="Exportar vídeo ou GIF" title="Exportar vídeo ou GIF">' + (window.ExportaChuva ? ExportaChuva.icone : '⤓') + '</button><button class="cl-sai" aria-label="Sair da tela cheia">✕</button></div>' +
       '<div class="cl-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) { return '<button data-clm="' + x[0] + '" class="' + (x[0] === 'a7' ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<div class="cl-mapa"><div class="cl-mapa-in"></div><span class="t"></span><span class="d"></span>' +
         '<button class="cl-fs" aria-label="Tela cheia" title="Tela cheia">⛶</button>' +
@@ -1415,6 +1416,8 @@
     const cheia = function (on) { box.classList.toggle('cheia', on); setTimeout(function () { try { mc.mapa.invalidateSize(); } catch (e) {} }, 60); };
     box.querySelector('.cl-fs').onclick = function () { cheia(true); };
     box.querySelector('.cl-sai').onclick = function (e) { e.stopPropagation(); cheia(false); };
+    // exportar a animação (vídeo ou GIF): ícone pequeno só na tela cheia
+    box.querySelector('.cl-exp').onclick = function (e) { e.stopPropagation(); pl.textContent = '▶'; if (mc.exportar) mc.exportar('', em); };
     pl.onclick = function () { pl.textContent = mc.play() ? '⏸' : '▶'; };
     setTimeout(function () { try { mc.mapa.invalidateSize(); } catch (e) {} }, 150);
     return mc;
