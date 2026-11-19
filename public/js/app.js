@@ -1357,7 +1357,7 @@
         const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
         await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js');
       }
-      await carregarScript((await Sync.baseApi()) + '/api/mapachuva.js');
+      await carregarScript((await Sync.baseApi()) + '/api/mapachuva.js?v=81');   // ?v: pega a versão nova sem esperar o cache
     })().catch(function (e) { promMapa = null; throw e; });
     return promMapa;
   }
@@ -1390,7 +1390,7 @@
       '<div class="cl-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) { return '<button data-clm="' + x[0] + '" class="' + (x[0] === 'a7' ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<div class="cl-mapa"><div class="cl-mapa-in"></div><span class="t"></span><span class="d"></span>' +
         '<button class="cl-fs" aria-label="Tela cheia" title="Tela cheia">⛶</button>' +
-        '<span class="cl-marca"><img src="/icon-192.png" alt="" width="22" height="22"><b>AMVS</b></span></div>' +
+        '<span class="cl-marca"><img src="/logo-amvs.png" alt="" width="26" height="26"><span><b>Relatório de Campo</b><small>AMVS Tecnologia</small></span></span></div>' +
       '<div class="cl-ctrl oculto"><button class="cl-play" aria-label="Animar">▶</button><input type="range" min="0" max="' + (M.v.length - 1) + '" value="0"></div>' +
       '<div class="mc-esc"></div><div class="mc-escx"></div>' +
       '<div class="cl-chuva-pe">🌍 Modelo europeu (ECMWF) · atualizado ' + esc(em) + ' · atualiza todo dia de manhã cedo</div>';

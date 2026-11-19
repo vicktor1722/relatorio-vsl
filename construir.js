@@ -50,7 +50,7 @@ if (!/apple-mobile-web-app-capable/.test(html)) {
 /* 4. grava */
 fs.mkdirSync(saida, { recursive: true });
 fs.writeFileSync(path.join(saida, 'index.html'), html);
-['manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png'].forEach(function (f) {
+['manifest.webmanifest', 'sw.js', 'icon-192.png', 'icon-512.png', 'logo-amvs.png'].forEach(function (f) {
   fs.copyFileSync(path.join(pub, f), path.join(saida, f));
 });
 // gerador de PDF também solto, para o painel /admin usar o mesmo
