@@ -1014,7 +1014,7 @@
     var gIds = grupoIds(R.faz), comp = gIds.length > 1 ? gIds.map(function (id) { var x = fazDe(id); return x ? x.nome : ''; }).filter(Boolean) : [];
     var hist = (ST.estoque || []).filter(function (e) { return gIds.indexOf(e.fazenda_id) >= 0; }).slice().sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; }).map(function (e) {
       return '<div class="lista-item" data-a="editent" data-v="' + esc(e.id) + '"><div class="txt"><b>' + esc(e.produto) + '</b><span>' + dataBR(e.data) + (e.obs ? ' · ' + esc(e.obs) : '') + '</span></div>' +
-        '<span class="badge">' + (Number(e.qtd) < 0 ? '' : '+') + qtdTxt(Number(e.qtd) || 0, e.unidade || 'L') + (Number(e.valor) ? ' · ' + brl(e.valor) : '') + '</span></div>';
+        '<span class="badge">' + (Number(e.qtd) < 0 ? '' : '+') + qtdTxt(Number(e.qtd) || 0, e.unidade || 'L') + (Number(e.valor) ? ' · ' + (e.moeda === 'USD' ? '<span class="ag-usd">US$ ' + fmt(Number(e.valor_moeda) || 0, 2) + '</span> · ' : '') + brl(e.valor) : '') + '</span></div>';
     }).join('');
     pintar(tR, 'Estoque', f ? f.nome : '—', '',
       abasRec('estoque') + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
@@ -1060,7 +1060,7 @@
         if (novo === nome0) { ov.remove(); return; }
         var jaTem = chaveProd(novo) !== chaveProd(nome0) && (ST.estoque || []).some(function (e) { return gIds.indexOf(e.fazenda_id) >= 0 && chaveProd(e.produto) === chaveProd(novo) && (e.unidade || 'L') === un; });
         if (jaTem && !confirm('Já existe "' + novo + '" no estoque. Juntar as entradas de "' + nome0 + '" com ele?')) return;
-        ents.forEach(function (e) { e.produto = novo; enfileirar('/api/agro/estoque', { id: e.id, fazenda_id: e.fazenda_id, produto: novo, unidade: e.unidade || 'L', qtd: Number(e.qtd) || 0, valor: Number(e.valor) || 0, data: e.data || hoje(), obs: e.obs || '' }); });
+        ents.forEach(function (e) { e.produto = novo; enfileirar('/api/agro/estoque', { id: e.id, fazenda_id: e.fazenda_id, produto: novo, unidade: e.unidade || 'L', qtd: Number(e.qtd) || 0, valor: Number(e.valor) || 0, data: e.data || hoje(), obs: e.obs || '', moeda: e.moeda === 'USD' ? 'USD' : 'BRL', valor_moeda: e.moeda === 'USD' ? Number(e.valor_moeda) || 0 : Number(e.valor) || 0, cambio: Number(e.cambio) || 0 }); });
         gravar(); ov.remove(); pintarRecs();
         toast(emRec ? 'Nome trocado nas entradas. As recomendações continuam com "' + nome0 + '"' : 'Nome do produto atualizado');
         return;
@@ -1076,28 +1076,50 @@
       }
     };
   }
+  var DOLAR_HOJE = 0;   // dólar do dia (preenche a entrada em dólar)
   function modalEntrada(e, pre) {
     var novo = !e, p0 = pre ? pre.split('|') : [];
     var cat = p0[0] ? prodCat(p0[0]) : null;
     e = e || { id: novoId('es'), fazenda_id: R.faz, produto: p0[0] || '', unidade: p0[1] || (cat ? baseUnidade(cat.unidade)[0] : 'L'), qtd: 0, valor: 0, data: hoje(), obs: '' };
     var nomes = {}; ST.produtos.forEach(function (x) { nomes[x.nome] = 1; }); saldoFaz(R.faz).forEach(function (x) { nomes[x.nome] = 1; });
+    var moeda = e.moeda === 'USD' ? 'USD' : 'BRL', vIni = moeda === 'USD' ? Number(e.valor_moeda) || 0 : Number(e.valor) || 0;
     var ov = document.createElement('div'); ov.className = 'ag-ov';
     ov.innerHTML = '<div class="ag-mod"><h3>' + (novo ? 'Entrada de produto' : 'Editar entrada') + '</h3>' +
       '<div class="campo"><label>Produto</label><input id="enProd" list="enLista" value="' + esc(e.produto) + '" placeholder="Nome igual ao da recomendação" autocomplete="off">' +
       '<datalist id="enLista">' + Object.keys(nomes).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist></div>' +
       '<div class="linha2"><div class="campo"><label>Quantidade</label><input id="enQtd" inputmode="decimal" value="' + (e.qtd ? String(e.qtd).replace('.', ',') : '') + '" placeholder="ex.: 200"></div>' +
       '<div class="campo"><label>Unidade</label><select id="enUn"><option' + (e.unidade === 'L' ? ' selected' : '') + '>L</option><option' + (e.unidade === 'kg' ? ' selected' : '') + '>kg</option></select></div></div>' +
-      '<div class="linha2"><div class="campo"><label>Preço por unidade (R$)</label><input id="enPu" inputmode="decimal" value="' + (e.qtd && e.valor ? fmt(e.valor / e.qtd, 2) : '') + '"></div>' +
-      '<div class="campo"><label>Valor total (R$)</label><input id="enVal" inputmode="decimal" value="' + (e.valor ? fmt(e.valor, 2) : '') + '"></div></div>' +
+      '<div class="campo"><label>Moeda do valor</label><div class="ag-moeda"><button type="button" data-moeda="BRL">R$ Real</button><button type="button" data-moeda="USD">US$ Dólar</button></div></div>' +
+      '<div class="linha2"><div class="campo"><label id="enPuL">Preço por unidade (R$)</label><input id="enPu" inputmode="decimal" value="' + (e.qtd && vIni ? fmt(vIni / e.qtd, 2) : '') + '"></div>' +
+      '<div class="campo"><label id="enValL">Valor total (R$)</label><input id="enVal" inputmode="decimal" value="' + (vIni ? fmt(vIni, 2) : '') + '"></div></div>' +
+      '<div id="enCambBox"><div class="linha2"><div class="campo"><label>Dólar do dia (R$)</label><input id="enCam" inputmode="decimal" value="' + (Number(e.cambio) ? String(e.cambio).replace('.', ',') : DOLAR_HOJE ? String(DOLAR_HOJE).replace('.', ',') : '') + '" placeholder="ex.: 5,89"></div><div></div></div>' +
+      '<div class="ag-conv" id="enConv"></div></div>' +
       '<div class="linha2"><div class="campo"><label>Data</label><input type="date" id="enData" value="' + esc(e.data || hoje()) + '"></div>' +
       '<div class="campo"><label>Obs. (nota, fornecedor)</label><input id="enObs" value="' + esc(e.obs || '') + '"></div></div>' +
       '<div class="ag-dica">Para corrigir o estoque (perda, contagem), lance quantidade negativa.</div>' +
       '<button class="btn" data-m="ok">Salvar</button>' + (novo ? '' : '<button class="btn perigo" data-m="del">Excluir entrada</button>') + '<button class="btn secundario" data-m="no">Cancelar</button></div>';
     document.body.appendChild(ov);
-    var q = $('#enQtd', ov), pu = $('#enPu', ov), vt = $('#enVal', ov);
-    var liga = function () { var n = numBR(q.value), u = numBR(pu.value); if (n && u) vt.value = fmt(n * u, 2); };
-    q.addEventListener('input', liga); pu.addEventListener('input', liga);
-    vt.addEventListener('input', function () { var n = numBR(q.value), v = numBR(vt.value); if (n && v) pu.value = fmt(v / n, 2); });
+    var q = $('#enQtd', ov), pu = $('#enPu', ov), vt = $('#enVal', ov), cam = $('#enCam', ov);
+    // em dólar: mostra o valor convertido em reais pelo dólar informado (fica guardado na entrada)
+    var conv = function () {
+      if (moeda !== 'USD') return;
+      var v = numBR(vt.value), c = numBR(cam.value);
+      $('#enConv', ov).innerHTML = v && c ? '= <b>' + brl(v * c) + '</b> em reais (US$ ' + fmt(v, 2) + ' × ' + String(c).replace('.', ',') + ')' : 'Informe o valor em dólar e o dólar do dia';
+    };
+    var modo = function () {
+      ov.querySelectorAll('[data-moeda]').forEach(function (b) { b.classList.toggle('on', b.dataset.moeda === moeda); });
+      var sm = moeda === 'USD' ? 'US$' : 'R$';
+      $('#enPuL', ov).textContent = 'Preço por unidade (' + sm + ')'; $('#enValL', ov).textContent = 'Valor total (' + sm + ')';
+      $('#enCambBox', ov).hidden = moeda !== 'USD'; conv();
+    };
+    ov.querySelectorAll('[data-moeda]').forEach(function (b) { b.onclick = function () { moeda = b.dataset.moeda; modo(); }; });
+    var liga = function () { var n = numBR(q.value), u = numBR(pu.value); if (n && u) vt.value = fmt(n * u, 2); conv(); };
+    q.addEventListener('input', liga); pu.addEventListener('input', liga); cam.addEventListener('input', conv);
+    vt.addEventListener('input', function () { var n = numBR(q.value), v = numBR(vt.value); if (n && v) pu.value = fmt(v / n, 2); conv(); });
+    modo();
+    if (!Number(e.cambio)) chamar('/api/agro/dolar').then(function (r) {
+      if (r && r.preco) { DOLAR_HOJE = Math.round(r.preco * 10000) / 10000; if (!cam.value) { cam.value = String(DOLAR_HOJE).replace('.', ','); conv(); } }
+    }).catch(function () {});
     $('#enProd', ov).addEventListener('change', function () { var c = prodCat(this.value.trim()); if (c) $('#enUn', ov).value = baseUnidade(c.unidade)[0]; });
     ov.onclick = function (ev) {
       var m = ev.target.dataset && ev.target.dataset.m;
@@ -1110,7 +1132,10 @@
       var nome = $('#enProd', ov).value.trim(), qtd = numBR(q.value);
       if (!nome) { toast('Informe o produto'); return; }
       if (!qtd) { toast('Informe a quantidade'); return; }
-      var mov = { id: e.id, fazenda_id: e.fazenda_id || R.faz, produto: nome, unidade: $('#enUn', ov).value, qtd: qtd, valor: Math.max(0, numBR(vt.value)), data: $('#enData', ov).value || hoje(), obs: $('#enObs', ov).value.trim() };
+      var vDig = Math.max(0, numBR(vt.value)), cDig = numBR(cam.value);
+      if (moeda === 'USD' && vDig && !(cDig > 0)) { toast('Informe o dólar do dia para converter em reais'); return; }
+      var mov = { id: e.id, fazenda_id: e.fazenda_id || R.faz, produto: nome, unidade: $('#enUn', ov).value, qtd: qtd, data: $('#enData', ov).value || hoje(), obs: $('#enObs', ov).value.trim(),
+        moeda: moeda, valor_moeda: vDig, cambio: moeda === 'USD' ? cDig : 0, valor: moeda === 'USD' ? Math.round(vDig * cDig * 100) / 100 : vDig };
       ST.estoque = ST.estoque || [];
       var i = ST.estoque.findIndex(function (x) { return x.id === mov.id; });
       if (i >= 0) ST.estoque[i] = mov; else ST.estoque.push(mov);

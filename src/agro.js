@@ -18,6 +18,7 @@ import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { areasDaFazenda, comResumo, resumosDe } from './resumokml.js';
 import { renomearTalhao } from './renomeio.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
+import { mercadoGeral } from './mercado.js';
 
 let pronta = null;
 
@@ -136,7 +137,9 @@ export function garantir(env) {
 // + plantio lançado por dia pelo gerente da fazenda (plantio.lanc)
 async function colunasCiclos(env) {
   for (const c of ['ciclos ADD COLUMN gmr REAL DEFAULT 0', "ciclos ADD COLUMN empresa TEXT DEFAULT ''", "plantio ADD COLUMN lanc TEXT DEFAULT ''", "plantio ADD COLUMN partes TEXT DEFAULT ''",
-                   "lembretes_agro ADD COLUMN responsavel TEXT DEFAULT ''"]) {
+                   "lembretes_agro ADD COLUMN responsavel TEXT DEFAULT ''",
+                   // entrada do estoque em dólar: valor na moeda lançada e o dólar usado (valor continua em R$)
+                   'estoque_agro ADD COLUMN moeda TEXT', 'estoque_agro ADD COLUMN valor_moeda REAL', 'estoque_agro ADD COLUMN cambio REAL']) {
     try { await env.DB.prepare('ALTER TABLE ' + c).run(); } catch (e) { /* já existe */ }
   }
 }
@@ -872,13 +875,24 @@ export async function rotasAgro(env, req, me, rota, url) {
     if (!fe) return json({ erro: 'fazenda não encontrada' }, 404);
     if (!produto) return json({ erro: 'informe o produto' }, 400);
     const id = b.id ? txt(b.id, 60) : novoId('es');
-    await env.DB.prepare(`INSERT INTO estoque_agro (id, usuario_id, fazenda_id, produto, unidade, qtd, valor, data, obs)
-        VALUES (?,?,?,?,?,?,?,?,?)
+    // moeda: 'USD' = valor lançado em dólar (valor_moeda) convertido pelo dólar informado (cambio); sem moeda (app antigo) mantém o que estava
+    let moeda = b.moeda === 'USD' ? 'USD' : b.moeda === 'BRL' ? 'BRL' : null, vm = null, cb = null, valor = Math.max(0, num(b.valor));
+    if (moeda === 'USD') { vm = Math.max(0, num(b.valor_moeda)); cb = Math.max(0, num(b.cambio)); if (vm && cb) valor = Math.round(vm * cb * 100) / 100; }
+    else if (moeda === 'BRL') { vm = valor; cb = 0; }
+    await env.DB.prepare(`INSERT INTO estoque_agro (id, usuario_id, fazenda_id, produto, unidade, qtd, valor, data, obs, moeda, valor_moeda, cambio)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET produto = excluded.produto, unidade = excluded.unidade, qtd = excluded.qtd,
-          valor = excluded.valor, data = excluded.data, obs = excluded.obs
+          valor = excluded.valor, data = excluded.data, obs = excluded.obs,
+          moeda = COALESCE(excluded.moeda, estoque_agro.moeda), valor_moeda = COALESCE(excluded.valor_moeda, estoque_agro.valor_moeda),
+          cambio = COALESCE(excluded.cambio, estoque_agro.cambio)
         WHERE estoque_agro.usuario_id = excluded.usuario_id`)
-      .bind(id, fe.usuario_id, fid, produto, txt(b.unidade, 4) === 'kg' ? 'kg' : 'L', num(b.qtd), Math.max(0, num(b.valor)), dia(b.data), txt(b.obs, 200)).run();
+      .bind(id, fe.usuario_id, fid, produto, txt(b.unidade, 4) === 'kg' ? 'kg' : 'L', num(b.qtd), valor, dia(b.data), txt(b.obs, 200), moeda, vm, cb).run();
     return json({ ok: true, id: id });
+  }
+  // dólar de hoje (para a entrada do estoque em dólar)
+  if (rota === '/api/agro/dolar') {
+    const m = await mercadoGeral(env).catch(() => null);
+    return json({ ok: true, preco: m && m.dolar ? m.dolar.preco : null, em: m && m.dolar ? m.dolar.em : null });
   }
   if (rota === '/api/agro/estoque/apagar' && req.method === 'POST') {
     const b = await req.json();
