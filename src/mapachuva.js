@@ -79,7 +79,7 @@ var MapaChuva = (function () {
         var nd = Math.min(M.v.length, st.modo === 'a7' ? 7 : 15);
         for (i = 0; i < np; i++) { var s = 0; for (d = 0; d < nd; d++) s += M.v[d][i] || 0; G[i] = s; }
       }
-      var cw = cv.width, ch = cv.height, cx = cv.getContext('2d'), im = cx.createImageData(cw, ch);
+      var cw = cv.width, ch = cv.height, cx = cv.getContext('2d'), im = cx.createImageData(cw, ch), fz = cw / 220;   // canvas maior (exportar) = mesma textura, mais nítida
       var m1 = merc(M.la1), m0 = merc(M.la0), dx = st.modo === 'dia' ? t * 2.2 : 0, dy = st.modo === 'dia' ? -t * 1.3 : 0;
       function g(a, b) { a = a < 0 ? 0 : a > M.nlat - 1 ? M.nlat - 1 : a; b = b < 0 ? 0 : b > M.nlon - 1 ? M.nlon - 1 : b; return G[a * M.nlon + b]; }
       for (var y = 0; y < ch; y++) {
@@ -89,7 +89,7 @@ var MapaChuva = (function () {
           var fb = (x + 0.5) / cw * (M.nlon - 1), b0 = Math.floor(fb), tb = fb - b0;
           var v = g(a0, b0) * (1 - ta) * (1 - tb) + g(a0 + 1, b0) * ta * (1 - tb) + g(a0, b0 + 1) * (1 - ta) * tb + g(a0 + 1, b0 + 1) * ta * tb;
           if (v < 1) continue;
-          var nz = 0.65 * ruido(x / 9 + dx, y / 9 + dy) + 0.35 * ruido(x / 4 - dx * 1.6, y / 4 + dy * 1.4);
+          var nz = 0.65 * ruido(x / (9 * fz) + dx, y / (9 * fz) + dy) + 0.35 * ruido(x / (4 * fz) - dx * 1.6, y / (4 * fz) + dy * 1.4);
           var vv = v * (st.modo === 'dia' ? 0.7 + 0.6 * nz : 0.94 + 0.12 * nz), c = cor(vv, st.modo);
           if (!c) continue;
           var ex = Math.min(x, cw - 1 - x) / (cw * 0.12), borda = Math.min(1, ex, ey);
