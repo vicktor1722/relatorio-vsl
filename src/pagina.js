@@ -339,7 +339,14 @@ function blocoGrupos(midias) {
 export function juntarRelatorios(rels) {
   const lista = rels.slice().sort((a, b) =>
     String(a.data_inicio || a.criado_em).localeCompare(String(b.data_inicio || b.criado_em)));
-  const unicos = (campo, sep) => [...new Set(lista.map(r => String(r[campo] || '').trim()).filter(Boolean))].join(sep);
+  // sem repetir o mesmo nome escrito de outro jeito ("São Domingos" e "SÃO DOMINGOS"): fica o da visita mais recente
+  const chaveTxt = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
+  const unicos = (campo, sep) => {
+    const m = new Map();
+    lista.forEach(r => { const t = String(r[campo] || '').trim(); if (!t) return; const k = chaveTxt(t); if (m.has(k)) m.delete(k); m.set(k, t); });
+    const ordem = []; lista.forEach(r => { const t = String(r[campo] || '').trim(); const k = t && chaveTxt(t); if (k && ordem.indexOf(k) < 0) ordem.push(k); });
+    return ordem.map(k => m.get(k)).join(sep);
+  };
   const datas = lista.map(r => String(r.data_inicio || noFuso(r.criado_em)).slice(0, 10)).filter(Boolean);
   const fins = lista.map(r => String(r.data_fim || r.data_inicio || noFuso(r.criado_em)).slice(0, 10)).filter(Boolean);
 
