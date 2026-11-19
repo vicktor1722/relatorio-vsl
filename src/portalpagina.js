@@ -228,8 +228,8 @@ ${DPG_CSS}
 .chv-mapa{position:relative;height:320px;border-radius:12px;overflow:hidden}.chv-cv{filter:blur(2px) saturate(1.35) contrast(1.08)}.chv-mapa #chvMapa{position:absolute;inset:0}
 .chv-tit,.chv-dia{position:absolute;z-index:500;top:8px;background:rgba(10,40,25,.85);color:#fff;border-radius:8px;pointer-events:none}
 .chv-tit{left:8px;font-size:11px;padding:4px 8px;line-height:1.3}
-.chv-logo{position:absolute;z-index:500;right:56px;bottom:8px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);border-radius:9px;padding:4px 9px 4px 4px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
-.chv-logo img{width:26px;height:26px;display:block;border-radius:6px}.chv-logo b{font-size:12px;color:#12261B;line-height:1.05;display:block}.chv-logo small{display:block;font-size:9px;color:#3E8E4F;font-weight:600;margin-top:1px;letter-spacing:.4px}.chv-dia{right:8px;font-weight:800;font-size:19px;padding:4px 10px}
+.chv-logo{position:absolute;z-index:500;right:56px;bottom:8px;display:flex;align-items:center;gap:7px;pointer-events:none;background:rgba(255,255,255,.95);border-radius:11px;padding:5px 12px 5px 5px;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.chv-logo img{width:32px;height:32px;border-radius:8px;display:block}.chv-logo b{font-size:16px;font-weight:800;color:#17703D;letter-spacing:1px;line-height:1}
 .chv-esc{height:11px;border-radius:3px;margin-top:8px;background:linear-gradient(90deg,#BDBDBD,#9BE29B 8%,#2EAA3C 16%,#0B6B2B 24%,#1E3FD8 32%,#2E7BFF 40%,#8FD6FF 48%,#F7F3C2 56%,#FFB000 64%,#FF6A00 72%,#E31A1C 80%,#FFB3D9 88%,#8E5CFF)}
 .chv-escx{position:relative;height:14px;font-size:10px;color:var(--fraco);margin-top:2px}.chv-escx span{position:absolute;top:0;white-space:nowrap}
 .chv-ctrl{display:flex;align-items:center;gap:10px;margin-top:8px}.chv-ctrl button{width:38px;height:38px;border-radius:50%;border:0;background:#134A7C;color:#fff;font-size:14px;flex:none}.chv-ctrl input{flex:1;accent-color:#134A7C}
@@ -743,7 +743,7 @@ body.sem-rolar{overflow:hidden}
         '<div class="chv-seg">' + [['dia', 'Dia a dia'], ['a7', '7 dias'], ['a15', '15 dias']].map(function (x) {
         return '<button data-chvm="' + x[0] + '" class="' + (CHV.modo === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="chv-mapa"><div id="chvMapa"></div><div class="chv-tit" id="chvTit"></div><div class="chv-dia" id="chvDia"></div>' +
-        '<div class="chv-logo" aria-label="Relatório de Campo · AMVS Tecnologia"><img src="/logo-amvs.png" alt=""><span><b>Relatório de Campo</b><small>AMVS Tecnologia</small></span></div>' +
+        '<div class="chv-logo" aria-label="AMVS"><img src="/icon-192.png" alt=""><b>AMVS</b></div>' +
         '<button class="chv-fs" id="chvFs" aria-label="Tela cheia" title="Tela cheia">⛶</button></div>' +
         '<div class="chv-esc"></div><div class="chv-escx" id="chvEscx">' + rotulosEscala() + '</div>' +
         '<div class="chv-ctrl' + (CHV.modo === 'dia' ? '' : ' oculto') + '" id="chvCtrl"><button id="chvPlay" aria-label="Animar">▶</button><input type="range" id="chvSl" min="0" max="' + (M.v.length - 1) + '" value="' + CHV.dia + '"></div></div>';

@@ -77,13 +77,13 @@ var ExportaChuva = (function () {
     }
     return c;
   }
-  // logo oficial (ícone do Relatório de Campo · AMVS Tecnologia), mesmo endereço do site
+  // logo AMVS (ícone do app), o mesmo selo dos mapas
   var LOGO = null;
   function carregarLogo() {
     return new Promise(function (ok) {
       if (LOGO) { ok(LOGO); return; }
       var im = new Image(); im.onload = function () { LOGO = im; ok(im); }; im.onerror = function () { ok(null); };
-      im.src = '/logo-amvs.png';
+      im.src = '/icon-192.png';
     });
   }
   function montador(o) {
@@ -118,11 +118,10 @@ var ExportaChuva = (function () {
       ROT.forEach(function (e, i) { cx.textAlign = i === 0 ? 'left' : i === ROT.length - 1 ? 'right' : 'center'; cx.fillText(e[0], gx + gw * e[1] / 100, y + 40); });
       cx.textAlign = 'left'; cx.font = '500 16px ' + fonte; cx.fillStyle = 'rgba(255,255,255,.7)';
       if (o.atualizado) cx.fillText('atualizado ' + o.atualizado, 24, OH - 26);
-      cx.font = '800 18px ' + fonte; var tw = cx.measureText('Relatório de Campo').width, lw = tw + (LOGO ? 62 : 24), lx = OW - 24 - lw, ly = OH - 64;
-      cx.fillStyle = '#FFFFFF'; cx.beginPath(); if (cx.roundRect) cx.roundRect(lx, ly, lw, 50, 10); else cx.rect(lx, ly, lw, 50); cx.fill();
-      var tx0 = lx + 12; if (LOGO) { try { cx.drawImage(LOGO, lx + 6, ly + 6, 38, 38); } catch (e) {} tx0 = lx + 50; }
-      cx.fillStyle = '#12261B'; cx.fillText('Relatório de Campo', tx0, ly + 25);
-      cx.font = '600 12px ' + fonte; cx.fillStyle = '#3E8E4F'; cx.fillText('AMVS Tecnologia', tx0, ly + 41);
+      cx.font = '800 24px ' + fonte; var tw = cx.measureText('AMVS').width + 3, lw = tw + (LOGO ? 66 : 28), lx = OW - 24 - lw, ly = OH - 66;
+      cx.fillStyle = '#FFFFFF'; cx.beginPath(); if (cx.roundRect) cx.roundRect(lx, ly, lw, 52, 12); else cx.rect(lx, ly, lw, 52); cx.fill();
+      var tx0 = lx + 14; if (LOGO) { cx.save(); cx.beginPath(); if (cx.roundRect) cx.roundRect(lx + 7, ly + 7, 38, 38, 9); else cx.rect(lx + 7, ly + 7, 38, 38); cx.clip(); try { cx.drawImage(LOGO, lx + 7, ly + 7, 38, 38); } catch (e) {} cx.restore(); tx0 = lx + 53; }
+      cx.fillStyle = '#17703D'; if ('letterSpacing' in cx) cx.letterSpacing = '1px'; cx.fillText('AMVS', tx0, ly + 35); if ('letterSpacing' in cx) cx.letterSpacing = '0px';
     }
     return { out: out, quadro: quadro, W: OW, H: OH };
   }
