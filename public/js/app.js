@@ -1357,7 +1357,7 @@
         const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
         await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js');
       }
-      await carregarScript((await Sync.baseApi()) + '/api/mapachuva.js?v=86');   // ?v: pega a versão nova sem esperar o cache
+      await carregarScript((await Sync.baseApi()) + '/api/mapachuva.js?v=87');   // ?v: pega a versão nova sem esperar o cache
     })().catch(function (e) { promMapa = null; throw e; });
     return promMapa;
   }

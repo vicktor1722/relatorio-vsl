@@ -107,7 +107,7 @@ var ExportaChuva = (function () {
       return new Promise(function (ok) {
         var im = new Image(), fim = setTimeout(function () { ok(); }, 8000);
         im.crossOrigin = 'anonymous';
-        im.onload = function () { clearTimeout(fim); try { ctx.drawImage(im, (q[0] * 256 - p0.x) * s * k, (q[1] * 256 - p0.y) * s * k, 256 * s * k + 0.5, 256 * s * k + 0.5); } catch (e) {} ok(); };
+        im.onload = function () { clearTimeout(fim); try { ctx.drawImage(im, (q[0] * 256 - p0.x) * s, (q[1] * 256 - p0.y) * s, 256 * s + 0.5 / k, 256 * s + 0.5 / k); } catch (e) {} ok(); };   // o canvas já está na escala k (camada)
         im.onerror = function () { clearTimeout(fim); ok(); };
         im.src = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + zt + '/' + q[1] + '/' + (((q[0] % n) + n) % n);
       });
