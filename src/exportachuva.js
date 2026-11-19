@@ -125,8 +125,8 @@ var ExportaChuva = (function () {
       ROT.forEach(function (e, i) { cx.textAlign = i === 0 ? 'left' : i === ROT.length - 1 ? 'right' : 'center'; cx.fillText(e[0], gx + gw * e[1] / 100, y + 40); });
       cx.textAlign = 'left'; cx.font = '500 16px ' + fonte; cx.fillStyle = 'rgba(255,255,255,.7)';
       if (o.atualizado) cx.fillText('atualizado ' + o.atualizado, 24, OH - 26);
-      cx.font = '800 24px ' + fonte; var tw = cx.measureText('AMVS').width + 3, lw = tw + (LOGO ? 66 : 28), lx = OW - 24 - lw, ly = OH - 66;
-      cx.fillStyle = '#FFFFFF'; cx.beginPath(); if (cx.roundRect) cx.roundRect(lx, ly, lw, 52, 12); else cx.rect(lx, ly, lw, 52); cx.fill();
+      cx.font = '800 24px ' + fonte; var tw = cx.measureText('AMVS').width + 3, lw = tw + (LOGO ? 66 : 28), lx = OW - 18 - lw, ly = HEAD + MH - 18 - 52;   // dentro do mapa, canto de baixo à direita
+      cx.save(); cx.shadowColor = 'rgba(0,0,0,.35)'; cx.shadowBlur = 8; cx.shadowOffsetY = 1; cx.fillStyle = 'rgba(255,255,255,.96)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(lx, ly, lw, 52, 12); else cx.rect(lx, ly, lw, 52); cx.fill(); cx.restore();
       var tx0 = lx + 14; if (LOGO) { cx.save(); cx.beginPath(); if (cx.roundRect) cx.roundRect(lx + 7, ly + 7, 38, 38, 9); else cx.rect(lx + 7, ly + 7, 38, 38); cx.clip(); try { cx.drawImage(LOGO, lx + 7, ly + 7, 38, 38); } catch (e) {} cx.restore(); tx0 = lx + 53; }
       cx.fillStyle = '#17703D'; if ('letterSpacing' in cx) cx.letterSpacing = '1px'; cx.fillText('AMVS', tx0, ly + 35); if ('letterSpacing' in cx) cx.letterSpacing = '0px';
     }
