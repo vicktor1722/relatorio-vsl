@@ -9,7 +9,7 @@ export function lerLanc(p) {
   try { l = JSON.parse((p && p.lanc) || '[]'); } catch (e) { l = []; }
   return (Array.isArray(l) ? l : []).filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.d) && Number(x.ha) > 0)
     .map((x) => Object.assign({ d: x.d, ha: Number(x.ha), por: x.por || '' }, Number(x.sem) > 0 ? { sem: Number(x.sem) } : {}, Number(x.esp) > 0 ? { esp: Number(x.esp) } : {},
-      x.v && typeof x.v === 'string' ? { v: x.v } : {}))
+      x.v && typeof x.v === 'string' ? { v: x.v } : {}, x.aj ? { aj: 1 } : {}))
     .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
 }
 
@@ -28,6 +28,21 @@ export function plantioPorDia(p, area) {
 }
 
 export function haPlantada(p, area) { return plantioPorDia(p, area).reduce((s, x) => s + x.ha, 0); }
+
+/* ---------------- talhão inteiro salvo pelo consultor ----------------
+   O consultor salvou o talhão sem área parcial (talhão inteiro) mas a fazenda lançou menos por dia:
+   os lançamentos da fazenda ficam e entra um ajuste {aj: 1} na data de plantio com o que falta.
+   Salvo como parcial (ou sem data de plantio), o ajuste sai. Devolve a lista nova (ou null se não mudou). */
+export function lancComAjuste(p, area, inteiro, por) {
+  const todos = lerLanc(p), l = todos.filter((x) => !x.aj);
+  if (!todos.length) return null;
+  const soma = l.reduce((s, x) => s + x.ha, 0), falta = Math.round((area - soma) * 100) / 100;
+  const dp = /^\d{4}-\d{2}-\d{2}$/.test((p && p.data_plantio) || '') ? p.data_plantio : '';
+  const novo = l.slice();
+  if (inteiro && l.length && dp && area > 0 && falta > 0.05) novo.push({ d: dp, ha: falta, por: por || 'Consultor (talhão inteiro)', aj: 1 });
+  novo.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  return JSON.stringify(novo) === JSON.stringify(todos) ? null : novo;
+}
 
 /* ---------------- aplicação parcial do talhão ----------------
    O operador pode lançar só parte do talhão (não deu tempo de terminar): d.parcial[t] = [{id, d, ha, por, porId}].

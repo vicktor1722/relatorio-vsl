@@ -649,7 +649,7 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     if (!(esp >= 10 && esp <= 150)) esp = (ant && Number(ant.espac_cm)) || 0;
     if (!(sem > 0 && sem < 80)) sem = (ant && Number(ant.sem_m)) || 0;
     // um lançamento por dia: lançar de novo no mesmo dia corrige o valor
-    let l = lerLanc(ant).filter((x) => x.d !== dataOk);
+    let l = lerLanc(ant).filter((x) => x.d !== dataOk || x.aj);   // o ajuste do consultor (talhão inteiro) fica
     if (!b.apagar) {
       const outros = l.reduce((s, x) => s + x.ha, 0);
       const falta = Math.round(Math.max(0, area - outros) * 100) / 100;

@@ -354,10 +354,20 @@ export default {
         if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
         const { resumosDe } = await import('./resumokml.js');
         const rs = (await resumosDe(env, [f]))[FID] || {};
+        let feitos = null;
+        if (req.method === 'POST' && url.searchParams.get('fazer') === '1') {
+          // correção só desta fazenda: talhões salvos inteiros pelo consultor contam inteiros (ajuste do que falta)
+          const { ajustarInteiro } = await import('./agro.js');
+          const { results: p0 } = await env.DB.prepare("SELECT safra, talhao, partes FROM plantio WHERE fazenda_id = ? AND usuario_id = ? AND COALESCE(lanc, '') NOT IN ('', '[]')").bind(FID, f.usuario_id).all();
+          const porSafra = {};
+          (p0 || []).forEach((p) => { let pt = []; try { pt = JSON.parse(p.partes || '[]'); } catch (e) { pt = []; } (porSafra[p.safra] = porSafra[p.safra] || {})[p.talhao] = !(Array.isArray(pt) && pt.some((x) => x && Number(x.ha) > 0)); });
+          feitos = 0;
+          for (const sf of Object.keys(porSafra)) feitos += await ajustarInteiro(env, FID, f.usuario_id, sf, porSafra[sf]);
+        }
         const { results: pl } = await env.DB.prepare('SELECT safra, talhao, cultura, variedade, data_plantio, data_emerg, partes, lanc, usuario_id, atualizado_em FROM plantio WHERE fazenda_id = ?').bind(FID).all();
         const { plantioPorDia } = await import('./plantiodia.js');
         const linhas = (pl || []).map((p) => Object.assign({}, p, { area: rs.areas && rs.areas[p.talhao], ha_calc: Math.round(plantioPorDia(p, (rs.areas && rs.areas[p.talhao]) || 0).reduce((s2, x) => s2 + x.ha, 0) * 10) / 10 }));
-        return json({ ok: true, total: rs.total, n: rs.n, linhas });
+        return json({ ok: true, feitos, total: rs.total, n: rs.n, linhas });
       }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento

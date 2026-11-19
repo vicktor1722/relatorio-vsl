@@ -13,9 +13,9 @@ import { contaTitular, contasDoAdmin, donosDe } from './equipe.js';
 import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
 import { safraAtual, safraPadrao } from './safras.js';
-import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
+import { haAplicada, lancComAjuste, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
-import { comResumo, resumosDe } from './resumokml.js';
+import { areasDaFazenda, comResumo, resumosDe } from './resumokml.js';
 import { CATALOGO, FONTES_CULT, GMR_FAIXA, REGRA_PADRAO, nomeOficial, regraValida } from './cultivares.js';
 
 let pronta = null;
@@ -262,6 +262,25 @@ export async function salvarModulos(env, b) {
 const txt = (v, max) => String(v == null ? '' : v).trim().slice(0, max || 200);
 const num = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
 const dia = (v) => { const s = String(v || '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+
+// talhões salvos pelo consultor (nome → true = inteiro, false = parcial) que têm plantio por dia da fazenda:
+// inteiro completa o que falta com um ajuste na data de plantio; parcial tira o ajuste. Talhão sem lançamento da fazenda não muda.
+export async function ajustarInteiro(env, fid, dono, safra, inteiro) {
+  const nomes = Object.keys(inteiro || {});
+  if (!nomes.length) return 0;
+  const { results } = await env.DB.prepare("SELECT talhao, data_plantio, lanc FROM plantio WHERE fazenda_id = ? AND safra = ? AND usuario_id = ? AND COALESCE(lanc, '') NOT IN ('', '[]')")
+    .bind(fid, safra, dono).all();
+  const linhas = (results || []).filter((r) => Object.prototype.hasOwnProperty.call(inteiro, r.talhao));
+  if (!linhas.length) return 0;
+  const areas = ((await areasDaFazenda(env, fid)) || {}).areas || {};
+  const cmds = [];
+  for (const r of linhas) {
+    const novo = lancComAjuste(r, Number(areas[r.talhao]) || 0, inteiro[r.talhao]);
+    if (novo) cmds.push(env.DB.prepare('UPDATE plantio SET lanc = ? WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?').bind(JSON.stringify(novo), fid, safra, r.talhao, dono));
+  }
+  if (cmds.length) await env.DB.batch(cmds);
+  return cmds.length;
+}
 
 // fazenda que esta conta pode usar: a própria ou da equipe (donosDe). Devolve também o dono (usuario_id):
 // o que for lançado nela fica gravado em nome do dono.
@@ -649,11 +668,12 @@ export async function rotasAgro(env, req, me, rota, url) {
     const dono = fp.usuario_id;   // fazenda da equipe: grava em nome do dono
     const safra = safraPadrao(txt(b.safra, 40)) || safraAtual();   // sem safra escolhida → a safra em andamento
     const lista = Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [];
-    const cmds = [];
+    const cmds = [], inteiro = {};
     for (const t of lista) {
       const talhao = txt(t.talhao, 80);
       if (!talhao) continue;
       const vazio = !t.cultura && !t.variedade && !t.data_plantio && !t.data_emerg && !num(t.sem_m) && !num(t.sem_ha);
+      if (!vazio && Array.isArray(t.partes)) inteiro[talhao] = !t.partes.some((x) => x && num(x.ha) > 0);   // app novo: sem partes = talhão inteiro
       if (vazio) {
         cmds.push(env.DB.prepare('DELETE FROM plantio WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?')
           .bind(fid, safra, talhao, dono));
@@ -678,6 +698,7 @@ export async function rotasAgro(env, req, me, rota, url) {
               dia(t.data_emerg), num(t.espac_cm), num(t.sem_m), Math.round(num(t.sem_ha)), partes));
     }
     if (cmds.length) await env.DB.batch(cmds);
+    try { await ajustarInteiro(env, fid, dono, safra, inteiro); } catch (e) { /* o plantio já está salvo */ }
     return json({ ok: true, salvos: cmds.length });
   }
 
