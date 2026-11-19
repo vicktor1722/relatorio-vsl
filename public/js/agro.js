@@ -993,6 +993,13 @@
       .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
   }
   function qtdTxt(q, un) { return fmt(q, Math.abs(q) < 100 ? 1 : 0) + ' ' + un; }
+  // dados do estoque para o PDF/planilha (mesma conta da tela)
+  function dadosEstoque(fid) {
+    var f = fazDe(fid), l = saldoFaz(fid), valor = 0, gasto = 0, gIds = grupoIds(fid);
+    l.forEach(function (x) { valor += Math.max(0, x.saldo) * x.custo; gasto += x.apl * x.custo; });
+    var ents = (ST.estoque || []).filter(function (e) { return gIds.indexOf(e.fazenda_id) >= 0; }).slice().sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; });
+    return { fazenda: f ? f.nome : '', compartilhado: gIds.map(function (id) { var x = fazDe(id); return x ? x.nome : ''; }).filter(Boolean), itens: l, valor: valor, gasto: gasto, entradas: ents };
+  }
   function pintarEstoque() {
     var f = fazDe(R.faz), l = saldoFaz(R.faz), valor = 0, gasto = 0;
     var cards = l.map(function (x) {
@@ -1013,7 +1020,7 @@
       abasRec('estoque') + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz) + '</select></div>' +
       (comp.length ? '<div class="ag-dica">Estoque compartilhado: ' + esc(comp.join(', ')) + '. A compra é geral e as recomendações de todas dão baixa nele.</div>' : '') +
       '<button class="btn" data-a="entrada">+ Entrada de produto</button>' +
-      (l.length ? '<div class="ag-resumo-ha">Valor em estoque: <b>' + brl(valor) + '</b><br>Gasto em produtos aplicados: <b>' + brl(gasto) + '</b></div>' + cards
+      (l.length ? '<div class="ag-resumo-ha ag-res-exp"><button class="ag-exp" data-a="expest" title="Exportar em PDF ou planilha" aria-label="Exportar estoque">⤓<small>Exportar</small></button>Valor em estoque: <b>' + brl(valor) + '</b><br>Gasto em produtos aplicados: <b>' + brl(gasto) + '</b></div>' + cards
         : '<div class="aviso" style="margin-top:10px">Nenhum produto ainda. Lance as entradas (compras) desta fazenda; as recomendações aplicadas dão baixa sozinhas.</div>') +
       (hist ? '<h2>Entradas lançadas</h2>' + hist : '') +
       '<div class="ag-nota">A baixa é automática: ao marcar uma recomendação como aplicada, dose × área sai do estoque. Desmarcar devolve. O preço médio das entradas vira o custo usado no comparativo do painel.</div>');
@@ -2152,6 +2159,11 @@
     }
     if (a === 'aba') { R.view = v; R.inicio = false; pintarRecs(); topoRolagem(tR); return; }
     if (a === 'entrada') { modalEntrada(null, v); return; }
+    if (a === 'expest') {   // exportar o estoque (PDF ou planilha)
+      if (!global.PlanoPDF || !global.PlanoPDF.exportarEstoque) { toast('Atualize o app para exportar'); return; }
+      prepararLogoPdf(); var de = dadosEstoque(R.faz); de.logo = LOGO_PDF; de.empresa = typeof EMP_PDF !== 'undefined' && EMP_PDF ? EMP_PDF.empresa : '';
+      global.PlanoPDF.exportarEstoque(de, toast, function (b, n) { return global.Sync.subirPdf(b, n); }); return;
+    }
     if (a === 'prodest') { modalProdEstoque(v); return; }
     if (a === 'push') { ativarAvisos(); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
