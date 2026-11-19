@@ -15,6 +15,7 @@ import { cfgSet, pastaRaiz, trocarCodigo, urlAutorizacao } from './google.js';
 import { espaco, ler as lerMidia, salvar as salvarMidia } from './midia.js';
 import { raioX } from './armazenamento.js';
 import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
+import { EXPORTA_CHUVA_JS } from './exportachuva.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
 import { registrarAcesso } from './acessos.js';
@@ -326,7 +327,7 @@ export default {
       // mapa da chuva para o app de campo (o mesmo do portal e do painel); o app carrega quando abre a previsão
       if (rota === '/api/mapachuva.js') {
         const js = '(function(){var s=document.createElement("style");s.textContent=' + JSON.stringify(MAPA_CHUVA_CSS) + ';document.head.appendChild(s);})();\n' +
-          MAPA_CHUVA_JS + '\nwindow.MapaChuva = MapaChuva;';
+          MAPA_CHUVA_JS + '\nwindow.MapaChuva = MapaChuva;\n' + EXPORTA_CHUVA_JS + '\nwindow.ExportaChuva = ExportaChuva;';
         return new Response(js, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' } });
       }
 

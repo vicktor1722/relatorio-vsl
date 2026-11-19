@@ -603,6 +603,8 @@ u.c-prev{background:#3B78C3}u.c-apl{background:#2F9E5B}u.c-perto{background:#E0A
 .cl-chuva.cheia{position:fixed;inset:0;z-index:9995;margin:0;border:0;border-radius:0;background:#0F1F16;display:flex;flex-direction:column;
   padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px))}
 .cl-chuva.cheia .cl-chuva-cab{color:#fff;align-items:center}.cl-chuva.cheia .cl-chuva-cab span{color:#B9CCC1}
+.cl-exp{display:none;margin-left:auto;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:50%;width:32px;height:32px;padding:0;opacity:.8;place-items:center}
+.cl-chuva.cheia .cl-exp{display:grid}.cl-chuva.cheia .cl-exp+.cl-sai{margin-left:10px}
 .cl-chuva.cheia .cl-sai{display:block}.cl-chuva.cheia .cl-fs{display:none}
 .cl-chuva.cheia .cl-mapa{flex:1;height:auto}
 .cl-chuva.cheia .mc-escx,.cl-chuva.cheia .cl-chuva-pe{color:#DDE7E1}

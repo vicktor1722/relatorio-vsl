@@ -1,5 +1,6 @@
 import { DPG_CSS, DPG_JS } from './graficodp.js';
 import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
+import { EXPORTA_CHUVA_JS } from './exportachuva.js';
 /* ============================================================
    agroadmin.js — pedaços do painel /admin ligados a Plantio e Recomendações.
    O admin.js só encaixa estes textos em lugares marcados; aqui ficam
@@ -350,6 +351,7 @@ ${MAPA_CHUVA_CSS}
 .ca-cheia-cab{display:none}
 .ca-bloco.cheia{position:fixed;inset:0;z-index:3000;background:#0B1F14;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px))}
 .ca-bloco.cheia .ca-cheia-cab{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:2px 2px 8px}.ca-bloco.cheia .ca-cheia-cab button{width:38px;height:38px;border-radius:50%;border:0;background:#fff;font-size:16px;cursor:pointer}
+.ca-cab-bt{display:flex;align-items:center;gap:10px}.ca-bloco.cheia .ca-cheia-cab .ca-exp{width:34px;height:34px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);opacity:.8;display:grid;place-items:center;padding:0}
 .ca-bloco.cheia .ca-mapa{flex:1;height:auto}.ca-bloco.cheia .mc-escx{color:#DDE7E1}.ca-bloco.cheia .ca-fs{display:none}
 
 .pf-bloco{margin:0 0 16px}.pf-bloco>.cab-caixa{margin:4px 2px 10px}.pf-bloco>.cab-caixa h2{margin:0}
@@ -407,6 +409,7 @@ ${MAPA_CHUVA_CSS}
 export const AGRO_JS = String.raw`
 ${DPG_JS}
 ${MAPA_CHUVA_JS}
+${EXPORTA_CHUVA_JS}
   /* ---------- aba Fazendas: uma linha por fazenda + resumo ao lado (Opção A) ---------- */
   var PF = { d: null, sel: null, filtro: 'todas', busca: '', det: {}, mc: null, carregando: false };
   function pfN(v, c) { return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: c || 0, maximumFractionDigits: c || 0 }); }
@@ -454,7 +457,7 @@ ${MAPA_CHUVA_JS}
     if (CA.mc) { CA.mc.destruir(); CA.mc = null; }
     var em = new Date(M.gerado_em);
     cx.innerHTML = '<div class="cab-caixa"><h2>🌧️ Mapa da chuva</h2><span class="ca-ps" id="caPs"></span></div>' +
-      '<div class="ca-bloco" id="caBloco"><div class="ca-cheia-cab"><b>🌧️ Mapa da chuva</b><button id="caSai" aria-label="Fechar tela cheia">✕</button></div>' +
+      '<div class="ca-bloco" id="caBloco"><div class="ca-cheia-cab"><b>🌧️ Mapa da chuva</b><span class="ca-cab-bt"><button id="caExp" class="ca-exp" aria-label="Exportar vídeo ou GIF" title="Exportar vídeo ou GIF">' + (typeof ExportaChuva !== 'undefined' ? ExportaChuva.icone : '⤓') + '</button><button id="caSai" aria-label="Fechar tela cheia">✕</button></span></div>' +
       '<div class="pf-seg">' + [['a7', '7 dias'], ['a15', '15 dias'], ['dia', 'Dia a dia']].map(function (x, i) { return '<button data-cam="' + x[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') +
       '<button id="caPlay" class="oculto">▶</button></div>' +
       '<div class="ca-mapa"><div id="caMapa"></div><span class="t" id="caT"></span><span class="d" id="caD"></span><button class="ca-fs" id="caFs" title="Tela cheia">⛶</button></div>' +
@@ -475,6 +478,9 @@ ${MAPA_CHUVA_JS}
     function cheia(sim) { bl.classList.toggle('cheia', sim); document.body.style.overflow = sim ? 'hidden' : ''; setTimeout(function () { try { CA.mc.mapa.invalidateSize(); } catch (e) {} }, 60); }
     document.getElementById('caFs').onclick = function () { cheia(!bl.classList.contains('cheia')); };
     document.getElementById('caSai').onclick = function () { cheia(false); };
+    document.getElementById('caExp').onclick = function () {   // exportar a animação (vídeo ou GIF)
+      pl.textContent = '▶'; CA.mc.exportar('', em.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }));
+    };
     chvPontos();
   }
   // pontos: fazendas escolhidas no gráfico de plantio + a fazenda aberta na lista
