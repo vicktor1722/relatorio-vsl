@@ -332,6 +332,138 @@
     rodape(pgs, W, M);
     return bytes(pgs, logo, W, H);
   }
-  global.PlanoPDF = { ch: pdfCh, rodape: rodape, bytes: bytes, entregar: entregar, nomeArq: nomeArq, icone: icone, plano: plano,
+  /* ---------------- estoque: PDF e planilha ----------------
+     o = { fazenda, compartilhado: [nomes], itens: [{nome, un, ent, apl, prev, saldo, sobra, custo}], valor, gasto, entradas: [{data, produto, qtd, unidade, valor, obs}], logo, empresa } */
+  function nBR(v, c) { return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: c || 0, maximumFractionDigits: c || 0 }); }
+  function qBR(q, un) { return nBR(q, Math.abs(q) < 100 ? 1 : 0) + ' ' + (un || ''); }
+  function rBR(v) { return 'R$ ' + nBR(v, 2); }
+  function estoquePdf(o) {
+    var W = 595, H = 842, M = 36, pgs = [[]], y = 0, logo = o.logo || null, ch = pdfCh;
+    function op(s) { pgs[pgs.length - 1].push(s); }
+    function txt(x, yy, size, bold, s, cor) { op('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf ' + (cor || [0.1, 0.1, 0.1]).join(' ') + ' rg ' + x.toFixed(2) + ' ' + yy.toFixed(2) + ' Td (' + ch(s) + ') Tj ET'); }
+    function larg(s, size, bold) { return ch(s).length * size * (bold ? 0.56 : 0.5); }
+    function dir(xr, yy, size, bold, s, cor) { txt(xr - larg(s, size, bold), yy, size, bold, s, cor); }
+    function rect(x, yy, w, h, c) { op(c.join(' ') + ' rg ' + x.toFixed(2) + ' ' + yy.toFixed(2) + ' ' + w.toFixed(2) + ' ' + h.toFixed(2) + ' re f'); }
+    function corta(s, largura, size, bold) { var t = String(s || ''); while (t.length > 3 && larg(t, size, bold) > largura) t = t.slice(0, -1); return t.length < String(s || '').length ? t.slice(0, -2) + '...' : t; }
+    var VERDE = [0.106, 0.478, 0.263], BRANCO = [1, 1, 1], CINZA = [0.4, 0.4, 0.4], VERM = [0.75, 0.16, 0.16], CLARO = [0.94, 0.97, 0.95];
+    function novaPag() { pgs.push([]); y = H - M; }
+    function cabe(h) { if (y - h < M + 30) { novaPag(); return true; } return false; }
+    // cabeçalho verde
+    rect(0, H - 96, W, 96, VERDE);
+    var lx = W - M;
+    if (logo) {
+      var lh = Math.min(54, logo.h), lw = logo.w * lh / logo.h;
+      if (lw > 140) { lw = 140; lh = logo.h * lw / logo.w; }
+      lx = W - M - lw; var ly = H - 48 - lh / 2;
+      rect(lx - 6, ly - 6, lw + 12, lh + 12, BRANCO);
+      op('q ' + lw.toFixed(2) + ' 0 0 ' + lh.toFixed(2) + ' ' + lx.toFixed(2) + ' ' + ly.toFixed(2) + ' cm /Im1 Do Q');
+    }
+    txt(M, H - 32, 10, false, 'ESTOQUE DE PRODUTOS', BRANCO);
+    txt(M, H - 58, 20, true, corta(o.fazenda || '', lx - 16 - M, 20, true), BRANCO);
+    txt(M, H - 78, 9.5, false, 'Posição em ' + dataBR(hoje()) + (o.empresa ? '  ·  ' + o.empresa : ''), BRANCO);
+    y = H - 96 - 18;
+    if (o.compartilhado && o.compartilhado.length > 1) { txt(M, y, 8.5, false, corta('Estoque compartilhado: ' + o.compartilhado.join(', '), W - 2 * M, 8.5, false), CINZA); y -= 16; }
+    // resumo
+    var falt = (o.itens || []).filter(function (x) { return x.sobra < -0.0001; }).length, bw = (W - 2 * M - 18) / 4;
+    [['Valor em estoque', rBR(o.valor)], ['Gasto em aplicados', rBR(o.gasto)], ['Produtos', String((o.itens || []).length)], ['Faltando p/ recomendações', String(falt)]].forEach(function (b, i) {
+      var x = M + i * (bw + 6);
+      rect(x, y - 40, bw, 40, i === 3 && falt ? [0.99, 0.93, 0.93] : CLARO);
+      txt(x + 8, y - 15, 7.5, false, b[0], CINZA); txt(x + 8, y - 32, 12, true, b[1], i === 3 && falt ? VERM : [0.1, 0.1, 0.1]);
+    });
+    y -= 58;
+    // tabela de produtos
+    var C = [{ t: 'Produto', w: 128 }, { t: 'Entradas', w: 54 }, { t: 'Aplicado', w: 54 }, { t: 'A aplicar', w: 54 }, { t: 'Saldo', w: 54 }, { t: 'Sobra', w: 54 }, { t: 'Preço médio', w: 66 }, { t: 'Valor', w: 59 }];
+    function cab() {
+      rect(M, y - 18, W - 2 * M, 18, VERDE); var x = M;
+      C.forEach(function (c, i) { if (i === 0) txt(x + 5, y - 12.5, 8, true, c.t, BRANCO); else dir(x + c.w - 4, y - 12.5, 8, true, c.t, BRANCO); x += c.w; });
+      y -= 18;
+    }
+    cab();
+    (o.itens || []).forEach(function (it, k) {
+      if (cabe(17)) cab();
+      if (k % 2) rect(M, y - 17, W - 2 * M, 17, [0.97, 0.98, 0.975]);
+      var falta = it.sobra < -0.0001, vals = [qBR(it.ent, it.un), qBR(it.apl, it.un), qBR(it.prev, it.un), qBR(it.saldo, it.un), qBR(it.sobra, it.un),
+        it.custo ? rBR(it.custo) + '/' + it.un : 'sem preço', it.custo ? rBR(Math.max(0, it.saldo) * it.custo) : '-'];
+      var x = M; txt(x + 5, y - 11.5, 8.5, true, corta(it.nome, C[0].w - 8, 8.5, true), falta ? VERM : [0.1, 0.1, 0.1]); x += C[0].w;
+      vals.forEach(function (v, i) { var c = C[i + 1]; dir(x + c.w - 4, y - 11.5, 8, i === 3 || i === 4, v, (i === 3 && it.saldo < 0) || (i === 4 && falta) ? VERM : i === 5 && !it.custo ? CINZA : [0.15, 0.15, 0.15]); x += c.w; });
+      y -= 17;
+    });
+    y -= 6;
+    txt(M, y - 8, 7.5, false, 'Saldo = entradas - aplicado.  Sobra = saldo - o que ainda está recomendado (a aplicar).  Em vermelho: falta produto para as recomendações.', CINZA);
+    y -= 26;
+    // entradas lançadas
+    var ent = o.entradas || [];
+    if (ent.length) {
+      cabe(60); txt(M, y - 4, 12, true, 'Entradas lançadas', VERDE); y -= 14;
+      var E = [{ t: 'Data', w: 62 }, { t: 'Produto', w: 170 }, { t: 'Quantidade', w: 80 }, { t: 'Valor', w: 80 }, { t: 'Observação', w: 131 }];
+      function cabE() { rect(M, y - 16, W - 2 * M, 16, VERDE); var x = M; E.forEach(function (c, i) { if (i === 2 || i === 3) dir(x + c.w - 4, y - 11, 8, true, c.t, BRANCO); else txt(x + 5, y - 11, 8, true, c.t, BRANCO); x += c.w; }); y -= 16; }
+      cabE();
+      ent.forEach(function (e, k) {
+        if (cabe(15)) cabE();
+        if (k % 2) rect(M, y - 15, W - 2 * M, 15, [0.97, 0.98, 0.975]);
+        var x = M, q = Number(e.qtd) || 0;
+        txt(x + 5, y - 10.5, 8, false, dataBR(e.data), [0.15, 0.15, 0.15]); x += E[0].w;
+        txt(x + 5, y - 10.5, 8, true, corta(e.produto, E[1].w - 8, 8, true)); x += E[1].w;
+        dir(x + E[2].w - 4, y - 10.5, 8, false, (q < 0 ? '' : '+') + qBR(q, e.unidade || 'L'), q < 0 ? VERM : [0.15, 0.15, 0.15]); x += E[2].w;
+        dir(x + E[3].w - 4, y - 10.5, 8, false, Number(e.valor) ? rBR(e.valor) : '-', [0.15, 0.15, 0.15]); x += E[3].w;
+        txt(x + 5, y - 10.5, 7.5, false, corta(e.obs || '', E[4].w - 8, 7.5, false), CINZA);
+        y -= 15;
+      });
+    }
+    rodape(pgs, W, M);
+    return bytes(pgs, logo, W, H);
+  }
+  // planilha (CSV com ; e vírgula decimal: abre direto no Excel em português, no Google Planilhas e no Numbers)
+  function estoqueCsv(o) {
+    function c(v) { var s = String(v == null ? '' : v); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+    function n(v, d) { return Number(v || 0).toFixed(d == null ? 2 : d).replace('.', ','); }
+    var L = [['Estoque de produtos', o.fazenda || ''], ['Posição em', dataBR(hoje())]];
+    if (o.compartilhado && o.compartilhado.length > 1) L.push(['Estoque compartilhado', o.compartilhado.join(', ')]);
+    L.push(['Valor em estoque (R$)', n(o.valor)], ['Gasto em produtos aplicados (R$)', n(o.gasto)], []);
+    L.push(['Produto', 'Unidade', 'Entradas', 'Aplicado', 'A aplicar', 'Saldo', 'Sobra depois das recomendações', 'Preço médio (R$/un)', 'Valor em estoque (R$)', 'Situação']);
+    (o.itens || []).forEach(function (it) {
+      L.push([it.nome, it.un, n(it.ent), n(it.apl), n(it.prev), n(it.saldo), n(it.sobra), it.custo ? n(it.custo) : '', it.custo ? n(Math.max(0, it.saldo) * it.custo) : '',
+        it.sobra < -0.0001 ? 'Faltam ' + n(-it.sobra) + ' ' + it.un : 'OK']);
+    });
+    if ((o.entradas || []).length) {
+      L.push([], ['Entradas lançadas'], ['Data', 'Produto', 'Quantidade', 'Unidade', 'Valor (R$)', 'Observação']);
+      o.entradas.forEach(function (e) { L.push([dataBR(e.data), e.produto, n(e.qtd), e.unidade || 'L', Number(e.valor) ? n(e.valor) : '', e.obs || '']); });
+    }
+    return '﻿' + L.map(function (r) { return r.map(c).join(';'); }).join('\r\n');
+  }
+  // entrega um arquivo qualquer: compartilhar do celular (iPhone salva em Arquivos/WhatsApp) ou baixar
+  function entregarArquivo(dados, nome, tipo, titulo, aviso) {
+    var blob = new Blob([dados], { type: tipo }), arq = null, pode = false;
+    try { arq = new File([blob], nome, { type: tipo }); pode = !!(navigator.canShare && navigator.canShare({ files: [arq] })); } catch (e) { pode = false; }
+    var ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var instalado = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    if (pode && (ios || instalado || /Android/.test(navigator.userAgent))) {
+      navigator.share({ files: [arq], title: titulo }).catch(function (e) { if (!e || e.name !== 'AbortError') baixar(blob, nome, null); });
+      return;
+    }
+    baixar(blob, nome, null); if (aviso) aviso('Arquivo salvo em Downloads');
+  }
+  // folha "Exportar estoque": PDF ou planilha
+  function exportarEstoque(o, aviso, subir) {
+    var ov = document.createElement('div');
+    ov.setAttribute('style', 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center');
+    var bt = 'display:flex;align-items:center;gap:12px;width:100%;padding:14px;margin:0 0 8px;border-radius:12px;font:inherit;font-size:15.5px;text-align:left;cursor:pointer;border:1.5px solid #D5DED8;background:#fff;color:#1B2B22';
+    ov.innerHTML = '<div style="background:#fff;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font-family:inherit">' +
+      '<div style="font-weight:700;font-size:17px;margin:0 0 4px;color:#1B2B22">⤓ Exportar estoque</div>' +
+      '<div style="font-size:13px;color:#5F6F66;margin:0 0 12px">' + String(o.fazenda || '').replace(/[<>&]/g, '') + ' · ' + (o.itens || []).length + ' produto(s)</div>' +
+      '<button type="button" data-x="pdf" style="' + bt + '"><span style="font-size:22px">📄</span><span><b>PDF</b><br><small style="color:#5F6F66">para enviar ou imprimir</small></span></button>' +
+      '<button type="button" data-x="csv" style="' + bt + '"><span style="font-size:22px">📊</span><span><b>Planilha</b><br><small style="color:#5F6F66">abre no Excel e no Google Planilhas</small></span></button>' +
+      '<button type="button" data-x="fechar" style="' + bt + ';justify-content:center;border:0;color:#5F6F66">Fechar</button></div>';
+    document.body.appendChild(ov);
+    var base = String(nomeArq('estoque-' + (o.fazenda || 'fazenda') + '-' + hoje())).replace(/\.pdf$/, '');
+    ov.onclick = function (ev) {
+      if (ev.target === ov) { ov.remove(); return; }
+      var b = ev.target.closest('[data-x]'); if (!b) return;
+      var x = b.getAttribute('data-x'); ov.remove();
+      if (x === 'pdf') entregar(estoquePdf(o), base + '.pdf', 'Estoque · ' + (o.fazenda || ''), aviso, subir);
+      if (x === 'csv') entregarArquivo(estoqueCsv(o), base + '.csv', 'text/csv', 'Estoque · ' + (o.fazenda || ''), aviso);
+    };
+  }
+  global.PlanoPDF = { estoquePdf: estoquePdf, estoqueCsv: estoqueCsv, exportarEstoque: exportarEstoque, entregarArquivo: entregarArquivo, ch: pdfCh, rodape: rodape, bytes: bytes, entregar: entregar, nomeArq: nomeArq, icone: icone, plano: plano,
     segundaDe: segundaDe, periodoTxt: periodoTxt, COR: COR_PDF, NOME_COR: NOME_COR };
 })(typeof window !== 'undefined' ? window : this);

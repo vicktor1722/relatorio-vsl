@@ -211,6 +211,7 @@ export const AGRO_CSS = `
 .ag-poly.on{fill:var(--verde-acento);stroke:var(--verde-escuro);stroke-width:4}
 .ag-mapa text{font-size:24px;font-weight:700;fill:#10331f;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:4px}
 .ag-resumo-ha{background:#fff;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:6px}
+.ag-res-exp{position:relative;padding-right:84px}.ag-exp{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:1.5px solid #CFE3D6;background:#F1F8F3;color:#1B7A43;border-radius:10px;padding:5px 9px;font-size:17px;line-height:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}.ag-exp small{font-size:10px;font-weight:700}
 .ag-est{background:#fff;border-radius:12px;padding:10px 12px;margin:8px 0;border-left:4px solid var(--verde);cursor:pointer}
 .ag-est.falta{border-left-color:var(--erro)}
 .ag-est-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -1570,6 +1571,13 @@ ${EXPORTA_CHUVA_JS}
       .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
   }
   function qtdTxt(q, un) { return fmt(q, Math.abs(q) < 100 ? 1 : 0) + ' ' + un; }
+  // dados do estoque para o PDF/planilha (mesma conta da tela)
+  function dadosEstoque(fid) {
+    var f = fazDe(fid), l = saldoFaz(fid), valor = 0, gasto = 0, gIds = grupoIds(fid);
+    l.forEach(function (x) { valor += Math.max(0, x.saldo) * x.custo; gasto += x.apl * x.custo; });
+    var ents = (ST.estoque || []).filter(function (e) { return gIds.indexOf(e.fazenda_id) >= 0; }).slice().sort(function (a, b) { return (b.data || '') < (a.data || '') ? -1 : 1; });
+    return { fazenda: f ? f.nome : '', compartilhado: gIds.map(function (id) { var x = fazDe(id); return x ? x.nome : ''; }).filter(Boolean), itens: l, valor: valor, gasto: gasto, entradas: ents };
+  }
   function pintarEstoque() {
     var f = fazDe(R.faz), l = saldoFaz(R.faz), valor = 0, gasto = 0;
     var cards = l.map(function (x) {
@@ -1590,7 +1598,7 @@ ${EXPORTA_CHUVA_JS}
       abasRec('estoque') + campoProd(R) + '<div class="campo"><label>Fazenda</label><select data-c="faz">' + opcoesFaz(R.faz, R.prod) + '</select></div>' +
       (comp.length ? '<div class="ag-dica">Estoque compartilhado: ' + esc(comp.join(', ')) + '. A compra é geral e as recomendações de todas dão baixa nele.</div>' : '') +
       '<button class="btn" data-a="entrada">+ Entrada de produto</button>' +
-      (l.length ? '<div class="ag-resumo-ha">Valor em estoque: <b>' + brl(valor) + '</b><br>Gasto em produtos aplicados: <b>' + brl(gasto) + '</b></div>' + cards
+      (l.length ? '<div class="ag-resumo-ha ag-res-exp"><button class="ag-exp" data-a="expest" title="Exportar em PDF ou planilha" aria-label="Exportar estoque">⤓<small>Exportar</small></button>Valor em estoque: <b>' + brl(valor) + '</b><br>Gasto em produtos aplicados: <b>' + brl(gasto) + '</b></div>' + cards
         : '<div class="aviso" style="margin-top:10px">Nenhum produto ainda. Lance as entradas (compras) desta fazenda; as recomendações aplicadas dão baixa sozinhas.</div>') +
       (hist ? '<h2>Entradas lançadas</h2>' + hist : '') +
       '<div class="ag-nota">A baixa é automática: ao marcar uma recomendação como aplicada, dose × área sai do estoque. Desmarcar devolve. O preço médio das entradas vira o custo usado no comparativo do painel.</div>');
@@ -2224,6 +2232,12 @@ ${EXPORTA_CHUVA_JS}
     if (a === 'aba') { R.view = v; pintarRecs(); topoRolagem(); return; }
     // estoque: entrada de produto, produto (nome, excluir, entradas) e editar uma entrada
     if (a === 'entrada') { modalEntrada(null, null); return; }
+    if (a === 'expest') {   // exportar o estoque (PDF ou planilha)
+      if (!window.PlanoPDF || !window.PlanoPDF.exportarEstoque) { toast('Gerador de PDF ainda carregando, tente de novo'); return; }
+      var de = dadosEstoque(R.faz);
+      (AG.logo ? Promise.resolve() : agPerfil().catch(function () {})).then(function () { de.logo = AG.logo; de.empresa = AG.emp && AG.emp.empresa; PlanoPDF.exportarEstoque(de, toast); });
+      return;
+    }
     if (a === 'prodest') { modalProdEstoque(v); return; }
     if (a === 'editent') { modalEntrada((ST.estoque || []).filter(function (x) { return x.id === v; })[0], null); return; }
     if (a === 'calsel') { R.sel = v; pintarCalendario(); return; }
