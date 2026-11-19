@@ -523,8 +523,10 @@ export function precoBolivia(m, cal) {
 export async function mercadoDaFazenda(env, local, frete) {
   const m = await mercadoGeral(env);
   if (naBolivia(local)) {   // fazenda na Bolívia: soja em US$/t (San Ignacio); sem praça, porto e real do Brasil
+    const bob = await yahoo('BOB=X', 1).catch(() => null);   // dólar → boliviano
     return { pais: 'BO', cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho, bolivia: precoBolivia(m, await calibracao(env)),
-      fonte: 'Soja disponível: cotação de San Ignacio (Bolívia) em dólar por tonelada · Chicago: Yahoo Finance' };
+      dolar_bob: bob ? { preco: r2(bob.preco), var: bob.var, serie: bob.serie, em: bob.em } : null,
+      fonte: 'Soja disponível: cotação de San Ignacio (Bolívia) em dólar por tonelada · Dólar em bolivianos e Chicago: Yahoo Finance' };
   }
   const soja = await pracaPerto(m.pracas.soja, local);
   return {
