@@ -2,6 +2,8 @@
    soja/milho no físico da praça mais próxima da fazenda (tabela pública do Notícias Agrícolas).
    As respostas ficam no cache da Cloudflare; o mercado também fica guardado no banco para quando a fonte cair. */
 
+import { naBolivia } from './bolivia.js';
+
 const UA = 'Mozilla/5.0 (compatible; AMVS-Relatorio/1.0)';
 
 async function buscar(url, ttl, texto) {
@@ -361,6 +363,16 @@ export async function salvarCalibracao(env, b) {
     atual.pontos = atual.pontos.filter((p) => p.municipio.toLowerCase() !== String(b.municipio).trim().toLowerCase());
     atual.pontos.push({ municipio: String(b.municipio).trim(), uf: (b.uf || 'MT').toUpperCase(), lat: g.lat, lon: g.lon, disp, data: hoje, ref });
   }
+  if (b.bolivia) {   // Bolívia (San Ignacio): soja disponível em US$ por tonelada
+    const usdT = nb(b.bolivia.usd_t), dia = /^\d{4}-\d{2}-\d{2}$/.test(String(b.bolivia.data || '')) && b.bolivia.data <= hoje ? b.bolivia.data : hoje;
+    if (!(usdT > 150 && usdT < 1000)) throw new Error('preço da Bolívia inválido (US$ por tonelada)');
+    const cb = m.cbot_soja;
+    if (!cb || !cb.preco) throw new Error('sem a cotação de Chicago agora; tente mais tarde');
+    let ref = cb.preco;   // Chicago do dia informado (fechamento daquele dia ou o último antes dele)
+    if (dia < hoje && cb.dias) { const ant = cb.dias.filter((x) => x[0] <= dia).pop(); if (ant) ref = ant[1]; }
+    atual.bolivia = { regiao: 'San Ignacio', usd_t: usdT, data: dia, ref: { cbot: ref } };
+  }
+  if (b.apagar_bolivia) delete atual.bolivia;
   if (b.futuro) {
     const f = b.futuro, usd = nb(f.usd_sc), brl = nb(f.brl_sc), venc = String(f.venc || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || !(usd > 3 && usd < 80)) throw new Error('futuro: informe a data de entrega e o preço em US$/sc');
@@ -497,8 +509,23 @@ function formacao(m, local, praca, frete, cal) {
   };
 }
 
+// Bolívia: preço informado (US$/t) acompanha Chicago mantendo a base da região
+const BU_T = 36.7437;   // bushels de soja por tonelada
+export function precoBolivia(m, cal) {
+  const b = cal && cal.bolivia, cb = m && m.cbot_soja;
+  if (!b || !cb || !cb.preco) return null;
+  const base = b.usd_t / BU_T - b.ref.cbot, conv = (c) => r2((c + base) * BU_T);
+  const serie = (cb.serie || []).map(conv), hoje = conv(cb.preco);
+  return { regiao: b.regiao || 'San Ignacio', preco: hoje, sc: r2(hoje / SC_T), em: cb.em, var: cb.var, serie,
+    ref_preco: b.usd_t, ref_data: b.data, ref_cbot: b.ref.cbot, ref_cbot_t: r2(b.ref.cbot * BU_T), cbot_hoje: cb.preco, cbot_t: r2(cb.preco * BU_T), base_t: r2(base * BU_T) };
+}
+
 export async function mercadoDaFazenda(env, local, frete) {
   const m = await mercadoGeral(env);
+  if (naBolivia(local)) {   // fazenda na Bolívia: soja em US$/t (San Ignacio); sem praça, porto e real do Brasil
+    return { pais: 'BO', cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho, bolivia: precoBolivia(m, await calibracao(env)),
+      fonte: 'Soja disponível: cotação de San Ignacio (Bolívia) em dólar por tonelada · Chicago: Yahoo Finance' };
+  }
   const soja = await pracaPerto(m.pracas.soja, local);
   return {
     dolar: m.dolar, cbot_soja: m.cbot_soja, cbot_milho: m.cbot_milho, premio: m.premio,

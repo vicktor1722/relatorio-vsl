@@ -14,6 +14,7 @@
    Dia sem pregão em Chicago (feriado) não manda. Histórico em config 'alta:soja'; resumo em /api/status/alta.
    ============================================================ */
 import { calibracao, calibrado, futuroAgora, geocodificar, km, mercadoGeral } from './mercado.js';
+import { naBolivia } from './bolivia.js';
 import { enviarParaConta } from './push.js';
 import { avisar } from './avisos.js';
 import { donosDe } from './equipe.js';
@@ -150,6 +151,7 @@ async function enviar(env, pontos, montar, res, forcar) {
     let c = (rs[f.id] && rs[f.id].centro) || (lerResumo(f.resumo, f.kml_len) || {}).centro;
     if ((!c || typeof c.lat !== 'number') && f.municipio) c = await geocodificar(f.municipio, f.uf || 'MT').catch(() => null);   // sem mapa: município
     if (!c || typeof c.lat !== 'number') continue;
+    if (naBolivia(c)) continue;   // fazenda na Bolívia: preço em US$/t (San Ignacio), não entra no aviso em R$/sc
     let melhor = null, dmin = Infinity;
     pontos.forEach((x) => { const d = km([c.lat, c.lon], [x.lat, x.lon]); if (d < dmin) { dmin = d; melhor = x; } });
     if (melhor && dmin <= 400) regiaoDe[f.id] = melhor;
