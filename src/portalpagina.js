@@ -1215,7 +1215,7 @@ body.sem-rolar{overflow:hidden}
 
   function vistaPlantio() {
     var areas = areasMapa(), pl = {}, lanc = [];
-    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; var mv = (p.lanc || []).some(function (x) { return x.v; }); (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por, sem: x.sem, esp: x.esp, vv: mv ? (x.v || p.variedade || '') : '' }); }); });
+    (D.plantio || []).forEach(function (p) { pl[p.talhao] = p; var mv = (p.lanc || []).some(function (x) { return x.v; }); (p.lanc || []).forEach(function (x) { lanc.push({ t: p.talhao, d: x.d, ha: x.ha, por: x.por, sem: x.sem, esp: x.esp, aj: x.aj, vv: mv ? (x.v || p.variedade || '') : '' }); }); });
     lanc.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : porNome(a.t, b.t); });
     var nomes = Object.keys(areas).concat(Object.keys(pl).filter(function (t) { return !(t in areas); })).sort(porNome);
     var lin = nomes.map(function (t) {
@@ -1233,7 +1233,7 @@ body.sem-rolar{overflow:hidden}
     if (lanc.length) h += '<h2 class="talhao">Lançamentos por dia</h2>' + lanc.slice(0, 40).map(function (x) {
       return '<div class="lanc"><div class="t"><b>' + dataBR(x.d) + ' · ' + esc(x.t) + ' · ' + n(x.ha, 1) + ' ha</b><small>' + (x.vv ? '🌾 ' + esc(x.vv) + ' · ' : '') +
         (x.sem ? '🌱 ' + n(x.sem, 1) + ' sem/m · ' + n(x.esp) + ' cm · ' + n(x.sem * 1000000 / x.esp) + ' sem/ha · ' : '') + esc(x.por || 'lançado') + '</small></div>' +
-        (gerente && !D.todas ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
+        (gerente && !D.todas && !x.aj ? '<button data-apl="' + esc(x.t) + '|' + esc(x.d) + '">apagar</button>' : '') + '</div>';
     }).join('');
     $('#conteudo').innerHTML = h;
     DPG.ligar($('#conteudo'), GR.plantio, pintar);

@@ -1285,6 +1285,13 @@ ${MAPA_CHUVA_JS}
     var dc = $('#agSem', tP); if (dc) dc.textContent = semDica(e);
   }
 
+  // talhão salvo inteiro com plantio por dia da fazenda a menos: entra o ajuste do que falta na data de plantio (igual ao servidor)
+  function lancInteiro(antP, row, inteiro, nome) {
+    var l = lancDe(antP).filter(function (x) { return !x.aj; }), soma = l.reduce(function (s, x) { return s + Number(x.ha); }, 0);
+    var tt = talhoesDe(fazDe(P.faz)).filter(function (x) { return x.nome === nome; })[0] || { ha: 0 }, falta = Math.round((tt.ha - soma) * 100) / 100;
+    if (inteiro && l.length && row.data_plantio && tt.ha > 0 && falta > 0.05) l = l.concat([{ d: row.data_plantio, ha: falta, por: 'Consultor (talhão inteiro)', aj: 1 }]);
+    return l;
+  }
   function vazioPlantio(e) { return !e.cultura && !e.variedade && !e.data_plantio && !e.data_emerg && !e.sem_m && !e.sem_ha; }
   function gravarPlantio(limpar) {
     var e = P.ed, enviar = [], ex = limpar ? [] : (e.extras || []);
@@ -1315,8 +1322,8 @@ ${MAPA_CHUVA_JS}
       var row = { fazenda_id: P.faz, safra: P.safra, talhao: nome, cultura: limpar ? '' : e.cultura, variedade: limpar ? '' : e.variedade,
         data_plantio: limpar ? '' : e.data_plantio, data_emerg: limpar ? '' : e.data_emerg,
         espac_cm: limpar ? 0 : (e.sem_m ? espDe(e.cultura, e.espac_cm) : (e.espac_cm || 0)), sem_m: limpar ? 0 : e.sem_m, sem_ha: limpar ? 0 : e.sem_ha };
-      var antP = linhaPlantio(P.faz, P.safra, nome); if (antP && antP.lanc && !limpar) row.lanc = antP.lanc;
       row.partes = nome === P.nome ? partes : [];
+      var antP = linhaPlantio(P.faz, P.safra, nome); if (antP && antP.lanc && !limpar) row.lanc = lancInteiro(antP, row, !row.partes.length, nome);
       ST.plantio = ST.plantio.filter(function (r) { return !(r.fazenda_id === P.faz && (r.safra || '') === (P.safra || '') && r.talhao === nome); });
       if (!vazioPlantio(row)) ST.plantio.push(row);
       enviar.push(row);
