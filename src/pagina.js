@@ -7,7 +7,7 @@ import { AGRO_REL_CSS, AGRO_REL_JS, blocosAgro } from './agrorel.js';
 import { safraPadrao } from './safras.js';
 import { ZAP_JS, semZap, zap } from './zap.js';
 
-// pontos para escrever o nome do talhão: um em cada parte (menos nas partes abaixo de 25% da maior); a maior primeiro
+// ponto para escrever o nome do talhão: um só por talhão, mesmo em várias partes (no centro da maior parte)
 function rotulosParte(g) {
   const polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : (g.coordinates || []), l = [];
   polys.forEach((rings) => {
@@ -18,7 +18,7 @@ function rotulosParte(g) {
     else l.push({ x: cx / (3 * a), y: cy / (3 * a), a: Math.abs(a / 2) });
   });
   const max = l.reduce((m, p) => Math.max(m, p.a), 0);
-  return l.filter((p) => p.a >= max * 0.25).sort((p, q) => q.a - p.a);
+  return l.filter((p) => p.a === max).slice(0, 1);
 }
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

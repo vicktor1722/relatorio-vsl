@@ -413,8 +413,7 @@ body.sem-rolar{overflow:hidden}
   }
 
   /* ---------- mapa (satélite + talhões) ---------- */
-  // pontos para escrever o nome do talhão: um em cada parte (talhão em várias partes leva o nome em todas,
-  // menos nas partes bem pequenas, abaixo de 25% da maior). Centro da área de cada parte.
+  // ponto para escrever o nome do talhão: um só por talhão, mesmo em várias partes (no centro da maior parte).
   function rotulosParte(g) {
     var polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : (g.coordinates || []), l = [];
     polys.forEach(function (rings) {
@@ -425,9 +424,7 @@ body.sem-rolar{overflow:hidden}
       else l.push({ x: cx / (3 * a), y: cy / (3 * a), a: Math.abs(a / 2) });
     });
     var max = l.reduce(function (m, p) { return Math.max(m, p.a); }, 0);
-    var out = l.filter(function (p) { return p.a >= max * 0.25; });
-    out.sort(function (p, q) { return q.a - p.a; });   // a maior primeiro
-    return out;
+    return l.filter(function (p) { return p.a === max; }).slice(0, 1);
   }
 
   var CORES = ['#2E7D32', '#F9A825', '#1565C0', '#C62828', '#6A1B9A', '#00838F', '#EF6C00', '#558B2F', '#AD1457', '#4E342E'];
