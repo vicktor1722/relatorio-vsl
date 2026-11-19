@@ -19,7 +19,7 @@ import { dividirTalhao, haAplicada, haPlantada, lerLanc, parciaisDe, partesDe, p
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { climaDe, localDaFazenda, mercadoDaFazenda } from './mercado.js';
 import { chuvaDaFazenda } from './chuva.js';
-import { safraPadrao } from './safras.js';
+import { safraAtual, safraPadrao } from './safras.js';
 import { grupoDaFazenda, mapaGrupos } from './estoquegrupo.js';
 import { chavePublica, enviarParaConta, garantirPush } from './push.js';
 import { salvar as salvarMidia } from './midia.js';
@@ -635,7 +635,7 @@ export async function rotasPortal(env, req, rota, url, ctx) {
     // o que vier errado é corrigido aqui em vez de recusar (o gerente não vê aviso de erro)
     const dataOk = data && data <= somaDias(hojeMT(), 1) ? data : hojeMT();   // sem data ou no futuro → hoje
     await garantirAgro(env);
-    const safra = safraPadrao(txt(b.safra, 40));
+    const safra = safraPadrao(txt(b.safra, 40)) || safraAtual();   // fazenda ainda sem safra na tela → a safra em andamento (nunca grava sem safra)
     const ant = await env.DB.prepare('SELECT * FROM plantio WHERE fazenda_id = ? AND safra = ? AND talhao = ? AND usuario_id = ?')
       .bind(fid, safra, talhao, a.dono_id).first();
     const area = areas[talhao] || 0;

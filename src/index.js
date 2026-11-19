@@ -351,6 +351,31 @@ export default {
         if (hx !== '18fb6a3ba07c5f5bd2f11396010dc04a32eac277656c088f3c99546a811d83a4') return json({ erro: 'não encontrado' }, 404);
         const u = await env.DB.prepare("SELECT id FROM usuarios WHERE lower(email) = 'redivojunior@hotmail.com'").first();
         if (!u) return json({ erro: 'conta não encontrada' }, 404);
+        // uma vez: Fazenda Santa Rosa — plantio gravado sem safra (lançado pelo portal) passa para 2026/2027.
+        // Talhão que já tem lançamento em 2026/2027 (BV-16): junta os dois, fica o plantio por dia do gerente e a data mais antiga.
+        if (url.searchParams.get('acao') === 'corrigir-safra') {
+          const FID = 'fmwm3p2gl8ntwit', SAFRA = '2026/2027';
+          const { results: vaz } = await env.DB.prepare("SELECT * FROM plantio WHERE fazenda_id = ? AND usuario_id = ? AND safra = ''").bind(FID, u.id).all();
+          const feito = [];
+          for (const p of vaz || []) {
+            const ja = await env.DB.prepare('SELECT * FROM plantio WHERE fazenda_id = ? AND safra = ? AND talhao = ?').bind(FID, SAFRA, p.talhao).first();
+            if (!ja) {
+              await env.DB.prepare("UPDATE plantio SET safra = ? WHERE fazenda_id = ? AND safra = '' AND talhao = ?").bind(SAFRA, FID, p.talhao).run();
+              feito.push(p.talhao + ': movido');
+            } else {
+              const dp = [ja.data_plantio, p.data_plantio].filter(Boolean).sort()[0] || '';
+              await env.DB.batch([
+                env.DB.prepare("UPDATE plantio SET lanc = CASE WHEN lanc IS NULL OR lanc = '' OR lanc = '[]' THEN ? ELSE lanc END, data_plantio = ?, variedade = COALESCE(NULLIF(variedade, ''), ?), cultura = COALESCE(NULLIF(cultura, ''), ?), atualizado_em = datetime('now') WHERE fazenda_id = ? AND safra = ? AND talhao = ?")
+                  .bind(p.lanc || null, dp, p.variedade || '', p.cultura || '', FID, SAFRA, p.talhao),
+                env.DB.prepare("DELETE FROM plantio WHERE fazenda_id = ? AND safra = '' AND talhao = ?").bind(FID, p.talhao)
+              ]);
+              feito.push(p.talhao + ': juntado com o de ' + SAFRA);
+            }
+          }
+          const { mudouDados } = await import('./quadros.js');
+          await mudouDados(env).catch(() => {});
+          return json({ ok: true, corrigidos: feito });
+        }
         const { results: eq } = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ? OR equipe_id = ?').bind(u.id, u.id).all();
         const ids = (eq || []).map((x) => x.id);
         const { plantioGeral } = await import('./agro.js');

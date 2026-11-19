@@ -12,7 +12,7 @@ import { listarChuva } from './chuvatalhao.js';
 import { contaTitular, contasDoAdmin, donosDe } from './equipe.js';
 import { mapaGrupos } from './estoquegrupo.js';
 import { novoId } from './auth.js';
-import { safraPadrao } from './safras.js';
+import { safraAtual, safraPadrao } from './safras.js';
 import { haAplicada, partesDe, plantioPorDia } from './plantiodia.js';
 import { cicloDaConta, juntarPrevisao, previsaoTalhao } from './previsao.js';
 import { comResumo, resumosDe } from './resumokml.js';
@@ -647,7 +647,7 @@ export async function rotasAgro(env, req, me, rota, url) {
     const fp = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
     if (!fp) return json({ erro: 'fazenda não encontrada' }, 404);
     const dono = fp.usuario_id;   // fazenda da equipe: grava em nome do dono
-    const safra = safraPadrao(txt(b.safra, 40));
+    const safra = safraPadrao(txt(b.safra, 40)) || safraAtual();   // sem safra escolhida → a safra em andamento
     const lista = Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [];
     const cmds = [];
     for (const t of lista) {
@@ -732,7 +732,7 @@ export async function rotasAgro(env, req, me, rota, url) {
     const fcl = fid ? await fazendaDoUsuario(env, me.id, fid) : null;
     if (!fcl) return json({ erro: 'fazenda não encontrada' }, 404);
     const dono = fcl.usuario_id;
-    const safra = safraPadrao(txt(b.safra, 40));
+    const safra = safraPadrao(txt(b.safra, 40)) || safraAtual();   // sem safra escolhida → a safra em andamento
     const cmds = [];
     for (const t of (Array.isArray(b.talhoes) ? b.talhoes.slice(0, 400) : [])) {
       const talhao = txt(t.talhao, 80), sc = Math.max(0, num(t.sc_ha));
