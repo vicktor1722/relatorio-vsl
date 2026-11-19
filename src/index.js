@@ -344,6 +344,25 @@ export default {
       if (rota === '/api/status/alta') { if (env.ADMIN_KEY && url.searchParams.get('key') === env.ADMIN_KEY && url.searchParams.get('forcar')) return json(await alertaAltaSoja(env, true, url.searchParams.get('modo') || '')); return json(await statusAlta(env)); }
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
+      // consulta temporária (protegida por chave), só leitura: plantio das fazendas da Rediagro (conferir % do app x relatório/painel)
+      if (rota === '/api/status/plantio-rediagro') {
+        const k = String(url.searchParams.get('k') || '');
+        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
+        if (hx !== '18fb6a3ba07c5f5bd2f11396010dc04a32eac277656c088f3c99546a811d83a4') return json({ erro: 'não encontrado' }, 404);
+        const u = await env.DB.prepare("SELECT id FROM usuarios WHERE lower(email) = 'redivojunior@hotmail.com'").first();
+        if (!u) return json({ erro: 'conta não encontrada' }, 404);
+        const { results: eq } = await env.DB.prepare('SELECT id FROM usuarios WHERE id = ? OR equipe_id = ?').bind(u.id, u.id).all();
+        const ids = (eq || []).map((x) => x.id);
+        const { plantioGeral } = await import('./agro.js');
+        const g = await plantioGeral(env, ids, null, true);
+        const { results: fz } = await env.DB.prepare('SELECT id, nome, resumo, length(talhoes) AS kml_len FROM fazendas WHERE usuario_id IN (' + ids.map(() => '?').join(',') + ')').bind(...ids).all();
+        const { resumosDe } = await import('./resumokml.js');
+        const rs = await resumosDe(env, fz || []);
+        const { results: pl } = await env.DB.prepare('SELECT fazenda_id, safra, talhao, cultura, variedade, data_plantio, partes, lanc, usuario_id FROM plantio WHERE usuario_id IN (' + ids.map(() => '?').join(',') + ')').bind(...ids).all();
+        const fazendas = (fz || []).map((f) => ({ id: f.id, nome: f.nome, total_resumo: rs[f.id] && rs[f.id].total, n_resumo: rs[f.id] && rs[f.id].n, areas: rs[f.id] && rs[f.id].areas,
+          plantio: (pl || []).filter((x) => x.fazenda_id === f.id) }));
+        return json({ ok: true, geral: g.safras.map((sf) => ({ safra: sf.safra, total_ha: sf.total_ha, plantado_ha: sf.plantado_ha, fazendas: sf.fazendas.map((x) => ({ id: x.id, nome: x.nome, total_ha: x.total_ha, plantado_ha: x.plantado_ha })) })), fazendas });
+      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
