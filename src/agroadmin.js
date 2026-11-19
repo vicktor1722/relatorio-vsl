@@ -211,7 +211,7 @@ export const AGRO_CSS = `
 .ag-poly.on{fill:var(--verde-acento);stroke:var(--verde-escuro);stroke-width:4}
 .ag-mapa text{font-size:24px;font-weight:700;fill:#10331f;pointer-events:none;paint-order:stroke;stroke:#fff;stroke-width:4px}
 .ag-resumo-ha{background:#fff;border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:6px}
-.ag-res-exp{position:relative;padding-right:84px}.ag-exp{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:1.5px solid #CFE3D6;background:#F1F8F3;color:#1B7A43;border-radius:10px;padding:5px 9px;font-size:17px;line-height:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}.ag-exp small{font-size:10px;font-weight:700}
+.ag-est-pa{color:#3E8E4F;font-size:12px;margin:1px 0 3px}.ag-pa{color:#3E8E4F;font-size:12px;margin:2px 0 4px 30px}.ag-res-exp{position:relative;padding-right:84px}.ag-exp{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:1.5px solid #CFE3D6;background:#F1F8F3;color:#1B7A43;border-radius:10px;padding:5px 9px;font-size:17px;line-height:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}.ag-exp small{font-size:10px;font-weight:700}
 .ag-est{background:#fff;border-radius:12px;padding:10px 12px;margin:8px 0;border-left:4px solid var(--verde);cursor:pointer}
 .ag-est.falta{border-left-color:var(--erro)}
 .ag-est-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -1585,6 +1585,7 @@ ${EXPORTA_CHUVA_JS}
       var falta = x.sobra < -0.0001;
       return '<div class="ag-est' + (falta ? ' falta' : '') + '" data-a="prodest" data-v="' + esc(x.nome) + '|' + x.un + '">' +
         '<div class="ag-est-top"><b>' + esc(x.nome) + '</b><em' + (x.saldo < 0 ? ' class="neg"' : '') + '>' + qtdTxt(x.saldo, x.un) + '</em></div>' +
+        ((catDe(x.nome) || {}).ingrediente ? '<div class="ag-est-pa">🧪 ' + esc(catDe(x.nome).ingrediente) + '</div>' : '') +
         '<div class="ag-est-l"><span>Entradas ' + qtdTxt(x.ent, x.un) + '</span><span>Aplicado ' + qtdTxt(x.apl, x.un) + '</span><span>A aplicar ' + qtdTxt(x.prev, x.un) + '</span></div>' +
         '<div class="ag-est-l"><span class="' + (falta ? 'neg' : '') + '">' + (falta ? '⚠️ Faltam ' + qtdTxt(-x.sobra, x.un) + ' para as recomendações' : 'Sobra depois das recomendações: ' + qtdTxt(x.sobra, x.un)) + '</span>' +
         '<span>' + (x.custo ? brl(x.custo) + '/' + x.un : 'sem preço') + '</span></div></div>';
@@ -1613,7 +1614,11 @@ ${EXPORTA_CHUVA_JS}
     var emRec = sd.apl > 0.0001 || sd.prev > 0.0001;
     var nomes = {}; ST.produtos.forEach(function (x) { nomes[x.nome] = 1; }); saldoFaz(R.faz).forEach(function (x) { nomes[x.nome] = 1; });
     var ov = document.createElement('div'); ov.className = 'ag-ov';
+    var cat0 = catDe(nome0) || {};
     ov.innerHTML = '<div class="ag-mod"><h3>' + esc(nome0) + '</h3>' +
+      '<div class="linha2"><div class="campo"><label>Princípio ativo</label><input id="peIng" value="' + esc(cat0.ingrediente || '') + '" placeholder="ex.: Glifosato"></div>' +
+      '<div class="campo"><label>Tipo</label><select id="peTipo">' + opcoesTipo(cat0.tipo || 'Herbicida') + '</select></div></div>' +
+      '<button class="btn secundario" data-m="ing">Salvar princípio ativo e tipo</button>' +
       (ents.length
         ? '<div class="campo"><label>Nome do produto</label><input id="peNome" list="peLista" value="' + esc(nome0) + '" autocomplete="off">' +
           '<datalist id="peLista">' + Object.keys(nomes).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist></div>' +
@@ -1631,6 +1636,7 @@ ${EXPORTA_CHUVA_JS}
       var alvo = ev.target.closest ? ev.target.closest('[data-m]') : null, m = alvo && alvo.dataset.m;
       if (m === 'no' || ev.target === ov) { ov.remove(); return; }
       if (m === 'nova') { ov.remove(); modalEntrada(null, v); return; }
+      if (m === 'ing') { salvarNoCatalogo(nome0, $('#peIng', ov).value, $('#peTipo', ov).value, un); gravar(); ov.remove(); pintarRecs(); toast('Princípio ativo salvo: vale no estoque e na recomendação'); return; }
       if (m === 'ent') { var e1 = ents.filter(function (x) { return x.id === alvo.dataset.id; })[0]; ov.remove(); if (e1) modalEntrada(e1, null); return; }
       if (m === 'nome') {
         var novo = $('#peNome', ov).value.trim().replace(/\s+/g, ' ');
@@ -1654,6 +1660,23 @@ ${EXPORTA_CHUVA_JS}
       }
     };
   }
+  // catálogo de produtos (o mesmo da recomendação): acha pelo nome sem diferença de maiúsculas/espaços
+  function catDe(nome) { var k = chaveProd(nome); return ST.produtos.filter(function (p) { return chaveProd(p.nome) === k; })[0]; }
+  // estoque e recomendação usam o mesmo catálogo: produto novo do estoque entra nele; princípio ativo e tipo ficam guardados
+  function salvarNoCatalogo(nome, ing, tipo, un) {
+    var c = catDe(nome); ing = String(ing || '').trim(); tipo = tipo || '';
+    if (c) {
+      if ((ing && ing !== (c.ingrediente || '')) || (tipo && tipo !== (c.tipo || ''))) {
+        c.ingrediente = ing || c.ingrediente || ''; c.tipo = tipo || c.tipo || 'Outro';
+        enfileirar('/api/agro/produto', { id: c.id, nome: c.nome, tipo: c.tipo, ingrediente: c.ingrediente, dose: Number(c.dose) || 0, unidade: c.unidade || 'L/ha', intervalo_dias: Number(c.intervalo_dias) || 0 });
+      }
+      return c;
+    }
+    var pr = { id: novoId('pr'), nome: nome, tipo: tipo || 'Outro', ingrediente: ing, dose: 0, unidade: un === 'kg' ? 'kg/ha' : 'L/ha', intervalo_dias: 0 };
+    ST.produtos.push(pr); enfileirar('/api/agro/produto', pr);
+    return pr;
+  }
+  function opcoesTipo(t) { return TIPOS.map(function (x) { return '<option' + (x === t ? ' selected' : '') + '>' + x + '</option>'; }).join(''); }
   function modalEntrada(e, pre) {
     var novo = !e, p0 = pre ? pre.split('|') : [];
     var cat = p0[0] ? prodCat(p0[0]) : null;
@@ -1663,6 +1686,9 @@ ${EXPORTA_CHUVA_JS}
     ov.innerHTML = '<div class="ag-mod"><h3>' + (novo ? 'Entrada de produto' : 'Editar entrada') + '</h3>' +
       '<div class="campo"><label>Produto</label><input id="enProd" list="enLista" value="' + esc(e.produto) + '" placeholder="Nome igual ao da recomendação" autocomplete="off">' +
       '<datalist id="enLista">' + Object.keys(nomes).map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist></div>' +
+      '<div class="linha2"><div class="campo"><label>Princípio ativo</label><input id="enIng" value="' + esc((catDe(e.produto) || {}).ingrediente || '') + '" placeholder="ex.: Glifosato"></div>' +
+      '<div class="campo"><label>Tipo</label><select id="enTipo">' + opcoesTipo((catDe(e.produto) || {}).tipo || 'Herbicida') + '</select></div></div>' +
+      '<div class="ag-dica" style="margin-top:-4px">Fica no catálogo: aparece na recomendação com o princípio ativo.</div>' +
       '<div class="linha2"><div class="campo"><label>Quantidade</label><input id="enQtd" inputmode="decimal" value="' + (e.qtd ? String(e.qtd).replace('.', ',') : '') + '" placeholder="ex.: 200"></div>' +
       '<div class="campo"><label>Unidade</label><select id="enUn"><option' + (e.unidade === 'L' ? ' selected' : '') + '>L</option><option' + (e.unidade === 'kg' ? ' selected' : '') + '>kg</option></select></div></div>' +
       '<div class="linha2"><div class="campo"><label>Preço por unidade (R$)</label><input id="enPu" inputmode="decimal" value="' + (e.qtd && e.valor ? fmt(e.valor / e.qtd, 2) : '') + '"></div>' +
@@ -1676,7 +1702,12 @@ ${EXPORTA_CHUVA_JS}
     var liga = function () { var n = numBR(q.value), u = numBR(pu.value); if (n && u) vt.value = fmt(n * u, 2); };
     q.addEventListener('input', liga); pu.addEventListener('input', liga);
     vt.addEventListener('input', function () { var n = numBR(q.value), v = numBR(vt.value); if (n && v) pu.value = fmt(v / n, 2); });
-    $('#enProd', ov).addEventListener('change', function () { var c = prodCat(this.value.trim()); if (c) $('#enUn', ov).value = baseUnidade(c.unidade)[0]; });
+    $('#enProd', ov).addEventListener('change', function () {
+      var c = catDe(this.value.trim()); if (!c) return;
+      $('#enUn', ov).value = baseUnidade(c.unidade)[0];
+      if (c.ingrediente) $('#enIng', ov).value = c.ingrediente;
+      if (c.tipo) $('#enTipo', ov).value = c.tipo;
+    });
     ov.onclick = function (ev) {
       var m = ev.target.dataset && ev.target.dataset.m;
       if (m === 'no' || ev.target === ov) { ov.remove(); return; }
@@ -1692,6 +1723,7 @@ ${EXPORTA_CHUVA_JS}
       ST.estoque = ST.estoque || [];
       var i = ST.estoque.findIndex(function (x) { return x.id === mov.id; });
       if (i >= 0) ST.estoque[i] = mov; else ST.estoque.push(mov);
+      salvarNoCatalogo(nome, $('#enIng', ov).value, $('#enTipo', ov).value, mov.unidade);
       gravar(); enfileirar('/api/agro/estoque', mov); ov.remove(); pintarRecs();
       toast(novo ? 'Entrada lançada no estoque' : 'Entrada atualizada');
     };
@@ -1997,14 +2029,21 @@ ${EXPORTA_CHUVA_JS}
       if (!ST.produtos.length) h += '<div class="ag-sec"><b>Seu catálogo de produtos está vazio</b><small>Carregue uma lista inicial (herbicidas, fungicidas, adubos…) e ajuste depois.</small><button class="btn secundario" data-a="padrao">Carregar lista inicial</button></div>';
       h += '<label class="ag-l">Comece por um modelo pronto (você ajusta depois)</label><div class="ag-chips">' + Object.keys(MODELOS).map(function (m) {
         return '<button class="ag-chip' + (W.modelo === m ? ' on' : '') + '" data-a="wmodelo" data-v="' + esc(m) + '">' + esc(m) + '</button>'; }).join('') + '<button class="ag-chip" data-a="wbranco">Em branco</button></div>';
+      var estW = {}; saldoFaz(W.faz).forEach(function (x) { var k = chaveProd(x.nome); if (!estW[k]) estW[k] = x; });
+      var soEst = Object.keys(estW).filter(function (k) { return !catDe(estW[k].nome); }).map(function (k) { return estW[k]; });
+      function rotuloProd(x) { var e = estW[chaveProd(x.nome)]; return x.nome + (x.ingrediente ? ' — ' + x.ingrediente : '') + (e && e.saldo > 0.0001 ? ' · estoque ' + qtdTxt(e.saldo, e.un) : ''); }
       h += W.prods.map(function (p, i) {
-        var tem = ST.produtos.some(function (x) { return x.nome === p[0]; });
+        var tem = ST.produtos.some(function (x) { return x.nome === p[0]; }) || soEst.some(function (x) { return x.nome === p[0]; });
         var opts = TIPOS.map(function (tp) {
           var l = ST.produtos.filter(function (x) { return (x.tipo || 'Outro') === tp; }); if (!l.length) return '';
-          return '<optgroup label="' + tp + '">' + l.map(function (x) { return '<option value="' + esc(x.nome) + '"' + (x.nome === p[0] ? ' selected' : '') + '>' + esc(x.nome) + '</option>'; }).join('') + '</optgroup>';
-        }).join('') + (p[0] && !tem ? '<option value="' + esc(p[0]) + '" selected>' + esc(p[0]) + '</option>' : '');
+          return '<optgroup label="' + tp + '">' + l.map(function (x) { return '<option value="' + esc(x.nome) + '"' + (x.nome === p[0] ? ' selected' : '') + '>' + esc(rotuloProd(x)) + '</option>'; }).join('') + '</optgroup>';
+        }).join('') + (soEst.length ? '<optgroup label="Do estoque (sem princípio ativo cadastrado)">' + soEst.map(function (x) {
+          return '<option value="' + esc(x.nome) + '"' + (x.nome === p[0] ? ' selected' : '') + '>' + esc(rotuloProd(x)) + '</option>'; }).join('') + '</optgroup>' : '') +
+          (p[0] && !tem ? '<option value="' + esc(p[0]) + '" selected>' + esc(p[0]) + '</option>' : '');
+        var cP = p[0] ? catDe(p[0]) : null, eP = p[0] ? estW[chaveProd(p[0])] : null;
         return '<div class="ag-prod"><div class="ag-pt"><b class="ag-ord">' + (i + 1) + '</b><select data-w="prod" data-i="' + i + '"><option value="">Escolher produto…</option>' + opts + '</select>' +
           '<div class="ag-mv"><button data-a="wmover" data-v="' + i + '|-1">↑</button><button data-a="wmover" data-v="' + i + '|1">↓</button><button data-a="wdel" data-v="' + i + '">✕</button></div></div>' +
+          (p[0] && ((cP && cP.ingrediente) || eP) ? '<div class="ag-pa">' + (cP && cP.ingrediente ? '🧪 ' + esc(cP.ingrediente) : '🧪 sem princípio ativo cadastrado') + (eP ? ' · 📦 estoque ' + qtdTxt(eP.saldo, eP.un) : '') + '</div>' : '') +
           '<div class="ag-dose"><button data-a="wdose" data-v="' + i + '|-1">−</button><input inputmode="decimal" data-w="dose" data-i="' + i + '" value="' + String(p[1]).replace('.', ',') + '">' +
           '<select data-w="un" data-i="' + i + '">' + UNIDADES.map(function (u) { return '<option' + (u === p[2] ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select>' +
           '<button data-a="wdose" data-v="' + i + '|1">+</button><div class="ag-tot">' + (ha ? 'total <b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '—') + '</div></div></div>';
@@ -2102,7 +2141,7 @@ ${EXPORTA_CHUVA_JS}
     if (w === 'faz') { W.faz = el.value; W.tal = []; ST.ult.faz = W.faz; gravar(); pintarWiz(); return; }
     if (w === 'prod') {
       var c = prodCat(el.value); W.prods[i][0] = el.value;
-      if (c) { W.prods[i][1] = Number(c.dose) || 0; W.prods[i][2] = c.unidade || 'L/ha'; }
+      if (c) { if (Number(c.dose) > 0) W.prods[i][1] = Number(c.dose); W.prods[i][2] = c.unidade || 'L/ha'; }
       pintarWiz(); return;
     }
     if (w === 'parte') {
