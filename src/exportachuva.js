@@ -203,12 +203,27 @@ var ExportaChuva = (function () {
         url = URL.createObjectURL(blob);
         var arq = null; try { arq = new File([blob], nome, { type: blob.type }); } catch (e) { arq = null; }
         var podeComp = !!(arq && navigator.canShare && navigator.canShare({ files: [arq] }));
+        // iPhone/iPad e app instalado na tela inicial: o "baixar" do navegador não funciona; o menu de compartilhar tem "Salvar vídeo/imagem"
+        var ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var instalado = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+        var viaMenu = podeComp && (ios || instalado);
+        var tam = (blob.size / 1048576).toFixed(1).replace('.', ',') + ' MB';
         res.innerHTML = '<div class="ex-prev">' + (fmt === 'gif' ? '<img alt="Animação da chuva" src="' + url + '">' : '<video src="' + url + '" autoplay loop muted playsinline controls></video>') + '</div>' +
-          (podeComp ? '<button class="ex-go ex-comp">Compartilhar / salvar</button>' : '') +
-          '<a class="ex-sec" href="' + url + '" download="' + nome + '">⬇ Baixar ' + (fmt === 'gif' ? 'GIF' : 'vídeo') + ' (' + (blob.size / 1048576).toFixed(1).replace('.', ',') + ' MB)</a>' +
-          (ext === 'webm' ? '<div class="ex-nota">Este aparelho grava em WebM; se o WhatsApp não aceitar, gere em GIF.</div>' : '');
+          '<button class="ex-go ex-salva">' + (viaMenu ? '💾 Salvar ' + (fmt === 'gif' ? 'GIF' : 'vídeo') + ' / compartilhar' : '⬇ Baixar ' + (fmt === 'gif' ? 'GIF' : 'vídeo')) + ' (' + tam + ')</button>' +
+          (podeComp && !viaMenu ? '<button class="ex-sec ex-comp">Compartilhar</button>' : '') +
+          '<div class="ex-nota">' + (viaMenu ? 'No menu que abrir, toque em <b>Salvar ' + (fmt === 'gif' ? 'imagem' : 'vídeo') + '</b> (vai para as Fotos) ou escolha o WhatsApp.' :
+            'Se não baixar, toque e segure na prévia para salvar.') + (ext === 'webm' ? ' Este aparelho grava em WebM; se o WhatsApp não aceitar, gere em GIF.' : '') + '</div>';
+        function compartilhar() { return navigator.share({ files: [arq], title: 'Chuva prevista' }); }
+        function baixar() {
+          var a = document.createElement('a'); a.href = url; a.download = nome; a.rel = 'noopener'; a.style.display = 'none';
+          document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 1000);
+        }
+        res.querySelector('.ex-salva').onclick = function () {
+          if (viaMenu) compartilhar().catch(function (e) { if (!e || e.name !== 'AbortError') { try { window.open(url, '_blank'); } catch (x) { baixar(); } } });
+          else baixar();
+        };
         var cb = res.querySelector('.ex-comp');
-        if (cb) cb.onclick = function () { navigator.share({ files: [arq], title: 'Chuva prevista' }).catch(function () {}); };
+        if (cb) cb.onclick = function () { compartilhar().catch(function () {}); };
       }).catch(function (e) {
         res.innerHTML = '<div class="ex-err">Não deu para gerar: ' + String((e && e.message) || e) + '</div>';
       }).then(function () {
