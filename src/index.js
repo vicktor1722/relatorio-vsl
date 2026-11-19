@@ -344,6 +344,21 @@ export default {
       if (rota === '/api/status/alta') { if (env.ADMIN_KEY && url.searchParams.get('key') === env.ADMIN_KEY && url.searchParams.get('forcar')) return json(await alertaAltaSoja(env, true, url.searchParams.get('modo') || '')); return json(await statusAlta(env)); }
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
+      // consulta temporária (protegida por chave), só leitura: plantio da La Gloria (conferir a % plantada)
+      if (rota === '/api/status/plantio-lagloria') {
+        const k = String(url.searchParams.get('k') || '');
+        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
+        if (hx !== '0acc4429ede4f0130d91dbb8a60e23e301458e10e343918dc212337a31350aab') return json({ erro: 'não encontrado' }, 404);
+        const FID = 'fmwm4cb3wv0xvsf';
+        const f = await env.DB.prepare('SELECT id, nome, usuario_id, resumo, length(talhoes) AS kml_len FROM fazendas WHERE id = ?').bind(FID).first();
+        if (!f) return json({ erro: 'fazenda não encontrada' }, 404);
+        const { resumosDe } = await import('./resumokml.js');
+        const rs = (await resumosDe(env, [f]))[FID] || {};
+        const { results: pl } = await env.DB.prepare('SELECT safra, talhao, cultura, variedade, data_plantio, data_emerg, partes, lanc, usuario_id, atualizado_em FROM plantio WHERE fazenda_id = ?').bind(FID).all();
+        const { plantioPorDia } = await import('./plantiodia.js');
+        const linhas = (pl || []).map((p) => Object.assign({}, p, { area: rs.areas && rs.areas[p.talhao], ha_calc: Math.round(plantioPorDia(p, (rs.areas && rs.areas[p.talhao]) || 0).reduce((s2, x) => s2 + x.ha, 0) * 10) / 10 }));
+        return json({ ok: true, total: rs.total, n: rs.n, linhas });
+      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
