@@ -98,7 +98,8 @@ export async function rotasPainelFaz(env, req, me, rota, url) {
         chuva7: c && c.dias ? r1(c.dias.slice(0, 7).reduce((s, x) => s + (x.mm || 0), 0)) : null,
         janela: c && c.janela ? { melhor: c.janela.melhor, hoje: c.janela.hoje, horas: c.janela.horas.map((h) => h.st) } : null,
         tempo: c && c.agora ? { ic: c.agora.ic, temp: c.agora.temp } : null,
-        venda: F ? (F.venda != null ? F.venda : F.fazenda) : null, praca: m && m.soja ? { nome: m.soja.praca, preco: m.soja.preco } : null
+        venda: F ? (F.venda != null ? F.venda : F.fazenda) : null, praca: m && m.soja ? { nome: m.soja.praca, preco: m.soja.preco } : null,
+        bo: m && m.pais === 'BO' ? (m.bolivia ? { preco: m.bolivia.preco, sc: m.bolivia.sc } : {}) : null   // fazenda na Bolívia: US$/t
       }, r));
     }
     return json({

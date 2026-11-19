@@ -545,8 +545,37 @@ body.sem-rolar{overflow:hidden}
     if (I.local.fonte === 'municipio' && !compacto) h += '<div class="ini-pe">Local pelo município (' + esc(I.fazenda.municipio) + '). Com o mapa da fazenda fica mais preciso.</div>';
     return h + '</div>';
   }
+  // fazenda na Bolívia: soja disponível em US$ por tonelada (San Ignacio), em saca e Chicago
+  function cartaoMercadoBO(m) {
+    var B = m.bolivia;
+    var h = '<div class="ini-card"><div class="ini-ct"><h3>📈 Mercado</h3><span>' + (B ? 'hoje ' + dataBR(B.em) : '') + '</span></div><div class="ini-mk">';
+    function cx(ic, tit, x, pre, suf, sub) {
+      if (!x || x.preco == null) return '';
+      var cor = x.var > 0 ? '#2F9E5B' : x.var < 0 ? '#C62828' : '#6B7B72';
+      return '<div class="ini-m"><small>' + ic + ' ' + tit + '</small><b>' + pre + n(x.preco, 2) + '<span>' + suf + '</span></b>' + (x.var != null ? varTxt(x.var) : '') +
+        (sub ? '<small class="ini-pr">' + sub + '</small>' : '') + (x.serie ? linhaMini(x.serie, cor) : '') + '</div>';
+    }
+    if (B) h += cx('🌱', 'Soja disponível', B, 'US$ ', '/t', '📍 ' + esc(B.regiao) + ' · Bolívia') + cx('🌱', 'Soja · sc 60 kg', { preco: B.sc }, 'US$ ', '/sc', '= ' + n(B.preco, 2) + ' ÷ 16,67 sc/t');
+    h += cx('🏛️', 'Soja Chicago', m.cbot_soja, 'US$ ', '/bu', m.cbot_soja ? '= US$ ' + n(m.cbot_soja.preco * 36.7437, 2) + '/t' : '') + cx('🏛️', 'Milho Chicago', m.cbot_milho, 'US$ ', '/bu') + '</div>';
+    if (!B) h += '<div class="ini-pe">A cotação da soja em San Ignacio aparece quando o consultor informar o preço do dia.</div>';
+    return h + '<div class="ini-pe">' + esc(m.fonte) + '.</div></div>';
+  }
+  function cartaoFormacaoBO(B) {
+    var cab = '<button class="fp-cab" id="fpAbre" aria-expanded="' + FORM_AB + '"><span>💰 Soja disponível na fazenda</span><b>US$ ' + n(B.preco, 2) + '/t</b><i>▾</i></button>';
+    if (!FORM_AB) return '<div class="ini-card fp-card">' + cab + '</div>';
+    var sinal = function (v) { return (v >= 0 ? '+ ' : '− ') + 'US$ ' + n(Math.abs(v), 2); };
+    return '<div class="ini-card fp-card aberto">' + cab + '<div class="ini-ct" style="margin-top:10px"><h3>🧮 Preço da região</h3><span>' + dataBR(B.em) + '</span></div><div class="ini-fp">' +
+      '<div><span>📍 Cotação informada em ' + esc(B.regiao) + ' <em>' + dataBR(B.ref_data) + '</em></span><b>US$ ' + n(B.ref_preco, 2) + '/t</b></div>' +
+      '<div><span>🏛️ Chicago naquele dia (US$ ' + n(B.ref_cbot, 2) + '/bu)</span><b>US$ ' + n(B.ref_cbot_t, 2) + '/t</b></div>' +
+      '<div><span>📏 Base da região (diferença para Chicago)</span><b>' + sinal(B.base_t) + '/t</b></div>' +
+      '<div><span>🏛️ Chicago hoje (US$ ' + n(B.cbot_hoje, 2) + '/bu)</span><b>US$ ' + n(B.cbot_t, 2) + '/t</b></div>' +
+      '<div class="tot fz"><span>= Disponível hoje</span><b>US$ ' + n(B.preco, 2) + '/t</b></div></div>' +
+      '<div class="ini-fpc">Nos próximos dias o preço acompanha Chicago mantendo essa base, até o consultor informar uma cotação nova. Em saca: <b>US$ ' + n(B.sc, 2) + '/sc</b>.</div>' +
+      '<div class="ini-pe">1 t = 36,74 bushels = 16,67 sacas de 60 kg.</div></div>';
+  }
   function cartaoMercado() {
     var m = INI.dados && INI.dados.mercado;
+    if (m && m.pais === 'BO') return cartaoMercadoBO(m);
     var h = '<div class="ini-card"><div class="ini-ct"><h3>📈 Mercado</h3><span>' + (m && m.soja ? 'fechamento ' + dataBR(m.soja.em) : '') + '</span></div>';
     if (INI.carregando && !INI.dados) return h + '<div class="ini-vz">Carregando…</div></div>';
     if (!m) return h + '<div class="ini-vz">Cotações indisponíveis agora.</div></div>';
@@ -580,6 +609,7 @@ body.sem-rolar{overflow:hidden}
   var FRETE_ED = false, FORM_AB = false;
   function cartaoFormacao() {
     var m = INI.dados && INI.dados.mercado, F = m && m.formacao;
+    if (m && m.pais === 'BO') return m.bolivia ? cartaoFormacaoBO(m.bolivia) : '';
     if (!F) return '';
     var sinal = function (v, c) { return (v >= 0 ? '+ ' : '− ') + n(Math.abs(v), c); };
     var venda = F.venda != null ? F.venda : F.fazenda;

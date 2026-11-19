@@ -551,7 +551,12 @@ ${MAPA_CHUVA_JS}
       '<div class="pf-sec">Futuro</div>' +
       (f ? '<div class="pf-calr"><span><b>Entrega ' + pfBr(f.venc) + '/' + f.venc.slice(2, 4) + '</b><small>informado em ' + pfBr(f.data) + ' · Chicago ' + esc(f.contrato.replace('.CBT', '')) + ' US$ ' + pfN(f.ref.cbot, 3) + '/bu · dólar ' + pfN(f.ref.dolar, 4) + '</small></span><b>US$ ' + pfN(f.usd_sc, 2) + (f.brl_sc ? ' · R$ ' + pfN(f.brl_sc, 2) : '') + '</b></div>' : '') +
       '<div class="pf-calf"><input id="calVenc" type="date" value="' + (f ? f.venc : '') + '"><input id="calUsd" inputmode="decimal" placeholder="US$/sc"><input id="calBrl" inputmode="decimal" placeholder="R$/sc"><button class="btn-mini" id="calSalvaF">Salvar futuro</button></div>' +
-      '<div class="pf-pe">Ao salvar, o painel guarda junto o preço do porto, Chicago e o dólar do dia. Daí em diante o preço de cada fazenda (até 150 km do município) acompanha o mercado mantendo essa diferença; o futuro vale para as fazendas até 250 km.</div></div>';
+      '<div class="pf-sec">🇧🇴 Bolívia · San Ignacio (US$/tonelada)</div>' +
+      (C.bolivia ? '<div class="pf-calr"><span><b>Soja disponível</b><small>informado em ' + pfBr(C.bolivia.data) + ' · Chicago US$ ' + pfN(C.bolivia.ref.cbot, 3) + '/bu naquele dia</small></span><b>US$ ' + pfN(C.bolivia.usd_t, 2) + '/t</b>' +
+        '<button class="ini-lk" id="calBoX">remover</button></div>' : '') +
+      '<div class="pf-calf"><input id="calBoUsd" inputmode="decimal" placeholder="US$/t hoje (ex.: 419,44)"><input id="calBoData" type="date" value="' + new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10) + '"><button class="btn-mini" id="calSalvaBo">Salvar cotação da Bolívia</button></div>' +
+      '<div class="pf-pe">Ao salvar, o painel guarda junto o preço do porto, Chicago e o dólar do dia. Daí em diante o preço de cada fazenda (até 150 km do município) acompanha o mercado mantendo essa diferença; o futuro vale para as fazendas até 250 km. ' +
+      'Bolívia: vale para as fazendas com o mapa na Bolívia; o preço acompanha Chicago mantendo a base da região até você informar uma cotação nova.</div></div>';
   }
   function pfLigarCal() {
     var ab = document.getElementById('pfCalAbre'); if (ab) ab.onclick = function () { PF.calAb = !PF.calAb; pfPintar(); };
@@ -568,6 +573,12 @@ ${MAPA_CHUVA_JS}
       if (!vc || !us) { alert('Informe a data de entrega e o preço em US$/sc'); return; }
       salvar({ futuro: { venc: vc, usd_sc: us, brl_sc: document.getElementById('calBrl').value.trim() } }, 'Futuro salvo');
     };
+    var sb = document.getElementById('calSalvaBo'); if (sb) sb.onclick = function () {
+      var us = document.getElementById('calBoUsd').value.trim();
+      if (!us) { alert('Informe o preço da soja disponível em US$ por tonelada'); return; }
+      salvar({ bolivia: { usd_t: us, data: document.getElementById('calBoData').value } }, 'Cotação da Bolívia salva');
+    };
+    var bx = document.getElementById('calBoX'); if (bx) bx.onclick = function () { if (confirm('Remover a cotação da Bolívia?')) salvar({ apagar_bolivia: 1 }, 'Removida'); };
     document.querySelectorAll('[data-calx]').forEach(function (b) { b.onclick = function () { if (confirm('Remover a cotação de ' + b.dataset.calx + '?')) salvar({ apagar: b.dataset.calx }, 'Removida'); }; });
   }
   function pfLista() {
@@ -587,7 +598,7 @@ ${MAPA_CHUVA_JS}
         '<span class="pl"><i>Plantio</i>' + pfN(f.plantio.pct) + '%<u><b style="width:' + Math.min(100, f.plantio.pct) + '%"></b></u></span>' +
         '<span><i>Chuva 7 dias</i>' + (f.chuva7 == null ? '—' : '<span class="pf-c az">' + (f.chuva7 >= 20 ? '🌧️ ' : f.chuva7 >= 5 ? '🌦️ ' : '☀️ ') + pfN(f.chuva7) + ' mm</span>') + '</span>' +
         '<span><i>Pulverizar ' + (f.janela && f.janela.hoje ? 'hoje' : 'amanhã') + '</i>' + (f.janela ? (j ? ('0' + j.de).slice(-2) + 'h–' + ('0' + j.ate).slice(-2) + 'h' : 'sem janela') : '—') + '</span>' +
-        '<span class="vd"><i>Soja na fazenda</i>' + (f.venda != null ? '<b>R$ ' + pfN(f.venda, 2) + '</b>' : '—') + '</span>' +
+        '<span class="vd"><i>Soja na fazenda</i>' + (f.bo ? (f.bo.preco != null ? '<b>US$ ' + pfN(f.bo.preco, 2) + '/t</b>' : '—') : f.venda != null ? '<b>R$ ' + pfN(f.venda, 2) + '</b>' : '—') + '</span>' +
         '<span class="pf-mais"><button class="pf-ver" data-pfv="' + esc(f.id) + '">Ver resumo completo ›</button></span><i class="pf-seta">▾</i></div>';
     }).join('');
   }
@@ -623,7 +634,9 @@ ${MAPA_CHUVA_JS}
     if (X.erro) return '<div class="aviso ruim">' + esc(X.erro) + '</div>';
     var F = X.mercado && X.mercado.formacao, c = X.clima, P = X.chuva && X.chuva.ponto, venda = F ? (F.venda != null ? F.venda : F.fazenda) : null;
     var h = '<div class="pf-dh"><div><h3>' + esc(X.fazenda.nome) + '</h3><small>' + esc([X.fazenda.produtor, X.fazenda.municipio ? X.fazenda.municipio + (X.fazenda.uf ? '/' + X.fazenda.uf : '') : ''].filter(Boolean).join(' · ')) + '</small></div><button class="pf-x" id="pfFecha">✕</button></div>';
-    h += '<div class="pf-heroi"><div><small>Soja na fazenda (venda estimada)</small><b>' + (venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b></div>' +
+    var BO = X.mercado && X.mercado.pais === 'BO' ? (X.mercado.bolivia || {}) : null;
+    h += '<div class="pf-heroi"><div><small>' + (BO ? 'Soja disponível (San Ignacio · Bolívia)' : 'Soja na fazenda (venda estimada)') + '</small><b>' +
+      (BO ? (BO.preco != null ? 'US$ ' + pfN(BO.preco, 2) + '<span>/t</span>' : '—') : venda != null ? 'R$ ' + pfN(venda, 2) + '<span>/sc</span>' : '—') + '</b></div>' +
       (c && c.agora ? '<div class="tp"><small>agora</small><b>' + c.agora.ic + ' ' + c.agora.temp + '°</b></div>' : '') + '</div>';
     h += '<div class="pf-k4"><div><b>' + pfN(X.plantio.pct) + '%</b><span>plantado</span></div><div><b' + (X.alertas.atrasadas ? ' class="dn"' : '') + '>' + X.alertas.atrasadas + '</b><span>atrasadas</span></div>' +
       '<div><b>' + (P ? pfN(P.acc[1]) + ' mm' : '—') + '</b><span>chuva 15 dias</span></div><div><b>' + pfBr(X.colheita) + '</b><span>1ª colheita</span></div></div>';
