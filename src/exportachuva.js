@@ -17,7 +17,7 @@ var ExportaChuva = (function () {
   function css() {
     if (cssPronto) return; cssPronto = true;
     var s = document.createElement('style');
-    s.textContent = '.ex-fundo{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif}' +
+    s.textContent = '.ex-fundo{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif}' +
       '.ex-cx{background:#fff;color:#1B2B22;width:100%;max-width:440px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}' +
       '@media(min-width:700px){.ex-fundo{align-items:center}.ex-cx{border-radius:16px}}' +
       '.ex-cab{display:flex;justify-content:space-between;align-items:center}.ex-cab b{font-size:17px}.ex-x{border:0;background:#EEF1EF;width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer}' +
@@ -77,12 +77,14 @@ var ExportaChuva = (function () {
     }
     return c;
   }
-  function folha(ctx, x, y, s) {   // logo AMVS (folha), desenhado à mão para não depender de imagem
-    ctx.save(); ctx.translate(x, y); ctx.scale(s / 34, s / 34);
-    ctx.fillStyle = '#17703D'; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(0, 0, 34, 34, 9); else ctx.rect(0, 0, 34, 34); ctx.fill();
-    ctx.fillStyle = '#FFFFFF'; ctx.fill(new Path2D('M9 23c0-6 4-10 11-10h5c0 7-4 11-10 11-2 0-4 0-6-1z'));
-    ctx.strokeStyle = '#17703D'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.stroke(new Path2D('M9 25c3-5 6-8 11-10'));
-    ctx.restore();
+  // logo oficial (ícone do Relatório de Campo · AMVS Tecnologia), mesmo endereço do site
+  var LOGO = null;
+  function carregarLogo() {
+    return new Promise(function (ok) {
+      if (LOGO) { ok(LOGO); return; }
+      var im = new Image(); im.onload = function () { LOGO = im; ok(im); }; im.onerror = function () { ok(null); };
+      im.src = '/logo-amvs.png';
+    });
   }
   function montador(o) {
     var b = o.cont.getBoundingClientRect(), W = Math.max(1, b.width), H = Math.max(1, b.height), k = Math.min(2, window.devicePixelRatio || 1);
@@ -116,9 +118,11 @@ var ExportaChuva = (function () {
       ROT.forEach(function (e, i) { cx.textAlign = i === 0 ? 'left' : i === ROT.length - 1 ? 'right' : 'center'; cx.fillText(e[0], gx + gw * e[1] / 100, y + 40); });
       cx.textAlign = 'left'; cx.font = '500 16px ' + fonte; cx.fillStyle = 'rgba(255,255,255,.7)';
       if (o.atualizado) cx.fillText('atualizado ' + o.atualizado, 24, OH - 26);
-      cx.font = '800 18px ' + fonte; var tw = cx.measureText('AMVS Relatório').width, lw = tw + 58, lx = OW - 24 - lw, ly = OH - 58;
-      cx.fillStyle = '#FFFFFF'; cx.beginPath(); if (cx.roundRect) cx.roundRect(lx, ly, lw, 42, 10); else cx.rect(lx, ly, lw, 42); cx.fill();
-      folha(cx, lx + 6, ly + 6, 30); cx.fillStyle = '#12261B'; cx.fillText('AMVS Relatório', lx + 44, ly + 28);
+      cx.font = '800 18px ' + fonte; var tw = cx.measureText('Relatório de Campo').width, lw = tw + (LOGO ? 62 : 24), lx = OW - 24 - lw, ly = OH - 64;
+      cx.fillStyle = '#FFFFFF'; cx.beginPath(); if (cx.roundRect) cx.roundRect(lx, ly, lw, 50, 10); else cx.rect(lx, ly, lw, 50); cx.fill();
+      var tx0 = lx + 12; if (LOGO) { try { cx.drawImage(LOGO, lx + 6, ly + 6, 38, 38); } catch (e) {} tx0 = lx + 50; }
+      cx.fillStyle = '#12261B'; cx.fillText('Relatório de Campo', tx0, ly + 25);
+      cx.font = '600 12px ' + fonte; cx.fillStyle = '#3E8E4F'; cx.fillText('AMVS Tecnologia', tx0, ly + 41);
     }
     return { out: out, quadro: quadro, W: OW, H: OH };
   }
@@ -196,7 +200,7 @@ var ExportaChuva = (function () {
       res.innerHTML = '<div class="ex-pr"><span>Preparando o mapa…</span><div class="ex-pb"><i></i></div></div>';
       var tx = res.querySelector('.ex-pr span'), bar = res.querySelector('.ex-pb i');
       function prog(p, d, n) { tx.textContent = 'Montando o dia ' + d + ' de ' + n + '…'; bar.style.width = Math.round(p * 100) + '%'; }
-      var trabalho = (fmt === 'video' ? video : gif)(o, dias, prog);
+      var trabalho = carregarLogo().then(function () { return (fmt === 'video' ? video : gif)(o, dias, prog); });
       trabalho.then(function (blob) {
         var ext = fmt === 'gif' ? 'gif' : blob.type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
         var nome = 'chuva-' + (o.datas[0] || 'previsao') + '-' + dias + 'dias.' + ext;
