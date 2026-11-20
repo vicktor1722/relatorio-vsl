@@ -18,6 +18,7 @@ import { MAPA_CHUVA_CSS, MAPA_CHUVA_JS } from './mapachuva.js';
 import { EXPORTA_CHUVA_JS } from './exportachuva.js';
 import { juntarRelatorios, paginaRelatorio, paginaSimples } from './pagina.js';
 import { traduzirRelatorio } from './traducao.js';
+import { blocosAgro, textosAgro } from './agrorel.js';
 import { registrarAcesso } from './acessos.js';
 import { juntarMesmoNome, kmlParaGeo } from './kml.js';
 import { padronizarSafras, safraAtual, safraPadrao, safrasProntas } from './safras.js';
@@ -475,7 +476,8 @@ export default {
           const { results: todos } = await env.DB.prepare(
             `SELECT * FROM itens WHERE relatorio_id IN (${marcas}) ORDER BY capturado_em ASC`).bind(...ids).all();
           if (querTraduzir) {
-            return json(await traduzirRelatorio(env, [juntarRelatorios(rels), ...rels], todos || [], url.searchParams.get('lang')));
+            const agT = await dadosParaRelatorio(env, rels[0]).catch(() => null);
+            return json(await traduzirRelatorio(env, [juntarRelatorios(rels), ...rels], todos || [], url.searchParams.get('lang'), textosAgro(agT ? blocosAgro(agT, { semAplicadas: true }) : null)));
           }
           const perfilJ = Object.assign({}, await perfilDoRelatorio(env, rels[0].usuario_id), await lerContato(env, rels[0].usuario_id));
           if (req.method === 'GET' && url.searchParams.get('sc') !== '1') {
@@ -493,7 +495,10 @@ export default {
         await nomesAtuais(env, [rel]);   // nome da fazenda e do produtor como estão hoje no cadastro
         const { results } = await env.DB.prepare(
           'SELECT * FROM itens WHERE relatorio_id = ? ORDER BY capturado_em ASC').bind(id).all();
-        if (querTraduzir) return json(await traduzirRelatorio(env, [rel], results || [], url.searchParams.get('lang')));
+        if (querTraduzir) {
+          const agT = await dadosParaRelatorio(env, rel).catch(() => null);
+          return json(await traduzirRelatorio(env, [rel], results || [], url.searchParams.get('lang'), textosAgro(agT ? blocosAgro(agT, { semAplicadas: true }) : null)));
+        }
         const perfil = Object.assign({}, await perfilDoRelatorio(env, rel.usuario_id), await lerContato(env, rel.usuario_id));
         // conta a visualização (o admin abre com ?sc=1 para não se contar)
         if (req.method === 'GET' && url.searchParams.get('sc') !== '1') ctx.waitUntil(registrarAcesso(env, req, id));
