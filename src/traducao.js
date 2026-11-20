@@ -30,11 +30,13 @@ async function chaveDe(lang, texto) {
 }
 
 // só os textos que o próprio relatório tem: o endereço não serve de tradutor aberto
-export function textosDoRelatorio(rels, itens) {
+// extras: textos do plantio e das aplicações (títulos, situação, cabeçalhos; sem nomes de produto)
+export function textosDoRelatorio(rels, itens, extras) {
   const set = new Set();
   (rels || []).forEach((r) => { set.add(norm(r.servico)); set.add(norm(r.observacoes)); });
   (itens || []).forEach((i) => set.add(norm(i.legenda)));
-  return [...set].filter((t) => t && t.length <= 1500).slice(0, 300);
+  (extras || []).forEach((t) => set.add(norm(t)));
+  return [...set].filter((t) => t && t.length <= 1500 && /[A-Za-zÀ-ú]{2}/.test(t)).slice(0, 600);
 }
 
 async function traduzirUm(env, texto, lang) {
@@ -52,11 +54,11 @@ async function traduzirUm(env, texto, lang) {
   return saida.join('\n');
 }
 
-export async function traduzirRelatorio(env, rels, itens, lang) {
+export async function traduzirRelatorio(env, rels, itens, lang, extras) {
   if (!ALVO[lang]) return { ok: true, lang, traducoes: {} };
   if (!env.AI && !env.TRADUTOR_TESTE) return { ok: true, lang, traducoes: {}, indisponivel: true };
 
-  const textos = textosDoRelatorio(rels, itens);
+  const textos = textosDoRelatorio(rels, itens, extras);
   const chaves = await Promise.all(textos.map((t) => chaveDe(lang, t)));
   const mapa = {};
   const faltam = [];

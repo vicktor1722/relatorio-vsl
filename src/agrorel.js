@@ -12,6 +12,8 @@ import { dividirTalhao, haAplicada, partesDe, plantioPorDia } from './plantiodia
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+// texto que o relatório traduz (inglês/espanhol) no navegador do cliente; nomes de produto, talhão e variedade ficam fora
+const tr = (s) => '<span data-tr>' + esc(s) + '</span>';
 const fmt = (n, d) => Number(n || 0).toLocaleString('pt-BR', {
   minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d
 });
@@ -93,10 +95,10 @@ function proximas(recs, hoje) {
     const q = e.st.k === 'venc' ? 'prevista para ' + curta(e.d) + ' · em atraso'
       : e.st.k === 'hoje' ? 'prevista para hoje'
         : 'prevista para ' + curta(e.d) + ' · em ' + e.st.n + ' dia' + (e.st.n > 1 ? 's' : '');
-    return '<div class="px ' + (e.st.k === 'perto' ? 'perto' : 'venc') + '"><i></i><div><b>' + esc(ordTxt(e.op, e.num)) +
-      '</b> <span>' + esc(e.tal.join(', ')) + '</span><small>' + q + '</small></div></div>';
+    return '<div class="px ' + (e.st.k === 'perto' ? 'perto' : 'venc') + '"><i></i><div><b>' + tr(ordTxt(e.op, e.num)) +
+      '</b> <span>' + esc(e.tal.join(', ')) + '</span><small>' + tr(q) + '</small></div></div>';
   }).join('');
-  return '<div class="prox-cli"><h5>📅 Próximas aplicações</h5>' + linhas + '</div>';
+  return '<div class="prox-cli"><h5>📅 ' + tr('Próximas aplicações') + '</h5>' + linhas + '</div>';
 }
 
 /* ---------------- aplicações (bloco final) ---------------- */
@@ -118,12 +120,12 @@ const num1 = (v) => String(Math.round(Number(v) * 10) / 10).replace('.', ',');
 function registroCampo(regs) {
   if (!regs || !regs.length) return '';
   const l = regs.slice().sort((a, b) => (a.data + (a.em || '') < b.data + (b.em || '') ? -1 : 1));   // ordem em que foram marcadas
-  return '<div class="ap-reg"><div class="ap-reg-t">📋 Registro de campo</div>' + l.map((x) => {
+  return '<div class="ap-reg"><div class="ap-reg-t">📋 ' + tr('Registro de campo') + '</div>' + l.map((x) => {
     const clima = [x.vento != null ? 'vento ' + num1(x.vento) + ' km/h' : '', x.temp != null ? num1(x.temp) + ' °C' : '', x.umid != null ? 'umidade ' + num1(x.umid) + '%' : ''].filter(Boolean);
     return '<div class="ap-rg"><div><b>' + curta(x.data) + '</b>' + (x.inicio ? ' · ' + esc(x.inicio) + (x.fim ? '–' + esc(x.fim) : '') : '') +
       ' · ' + esc((x.talhoes || []).join(', ')) + (x.por ? ' · <span>' + esc(String(x.por).replace(/ \((operador|fazenda)\)$/, '')) + '</span>' : '') + '</div>' +
-      (clima.length ? '<div class="ap-clima">' + clima.join(' · ') + '</div>' : '') +
-      (x.obs ? '<div class="ap-obs">' + esc(x.obs) + '</div>' : '') +
+      (clima.length ? '<div class="ap-clima">' + tr(clima.join(' · ')) + '</div>' : '') +
+      (x.obs ? '<div class="ap-obs">' + tr(x.obs) + '</div>' : '') +
       ((x.fotos || []).length ? '<div class="ap-fotos">' + x.fotos.map((k) => {
         const u = String(k).startsWith('/img/') ? k : '/img/' + encodeURIComponent(k);
         return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img loading="lazy" src="' + esc(u) + '" alt="foto da aplicação"></a>';
@@ -168,8 +170,8 @@ function aplicacoes(recs, areas, hoje, plantio, out, semAplicadas) {
   if (!lista.length) return '';
   const haDe = (g) => g.tal.reduce((s, t) => s + (g.ha[t] || 0), 0);
 
-  let h = '<h2 class="talhao">Aplicações<small>' + (semAplicadas ? lista.length + ' a fazer ou em andamento' : lista.length + ' no total') + '</small></h2>' +
-    '<div class="ap-sub">Dose por hectare e quantidade total para a área de cada aplicação.</div>';
+  let h = '<h2 class="talhao">' + tr('Aplicações') + '<small>' + tr(semAplicadas ? lista.length + ' a fazer ou em andamento' : lista.length + ' no total') + '</small></h2>' +
+    '<div class="ap-sub">' + tr('Dose por hectare e quantidade total para a área de cada aplicação.') + '</div>';
   lista.forEach((g) => {
     const feitos = g.tal.filter((t) => g.feito[t]), datas = feitos.map((t) => g.feito[t]).sort(), ha = haDe(g);
     let st, sel;
@@ -185,19 +187,19 @@ function aplicacoes(recs, areas, hoje, plantio, out, semAplicadas) {
     const liq = g.calda > 0 && g.tanque > 0 && g.prods.some((p) => liquido(p[2]));
     const hat = liq ? g.tanque / g.calda : 0;
     const titulo = (cont[g.op] > 1 || g.total > 1) ? ordTxt(g.op, g.num) : g.op;
-    const topo = '<div class="ap-topo"><b>' + esc(titulo) + '</b><span class="selo ' + sel + '">' + st + '</span></div>' +
-      '<div class="ap-meta">' + (feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
-        (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : '') + '</div>';
+    const topo = '<div class="ap-topo"><b>' + tr(titulo) + '</b><span class="selo ' + sel + '">' + tr(st) + '</span></div>' +
+      '<div class="ap-meta">' + tr((feitos.length ? 'Aplicado ' : 'Prevista ') + quando +
+        (feitos.length && feitos.length < g.tal.length ? ' · ' + feitos.length + ' de ' + g.tal.length + ' talhões' : '')) + '</div>';
     const reg = registroCampo(g.reg);
-    const prox = g.prox && g.num < g.total ? '<div class="ap-prox">📅 Próxima aplicação: <b>' + (g.prox < hoje ? 'a programar' : curta(g.prox)) + '</b></div>' : '';
+    const prox = g.prox && g.num < g.total ? '<div class="ap-prox">📅 ' + tr('Próxima aplicação: ' + (g.prox < hoje ? 'a programar' : curta(g.prox))) + '</div>' : '';
     const corpo = '<div class="ap-tal">' + g.tal.map((t) => '<span class="' + (g.feito[t] ? 'ok' : '') + '">' +
         (g.feito[t] && feitos.length < g.tal.length ? '✔ ' : '') + esc(t) + (g.parc[t] ? ' · ◐ ' + fmt(g.parc[t]) + ' de ' + fmt(g.ha[t]) + ' ha' : '') +
         (!g.feito[t] && varias && g.prev[t] ? ' · ' + curta(g.prev[t]) : '') + '</span>').join('') +
         (ha ? '<em>' + fmt(ha) + ' ha</em>' : '') + '</div>' +
-      (liq ? '<div class="ap-calda">💧 Calda <b>' + g.calda + ' L/ha</b> · tanque de <b>' + fmt(g.tanque, 0) + ' L</b> cobre <b>' +
-        fmt(hat, 0) + ' ha</b>' + (ha ? '<br><span>' + tanques(ha, hat, g.calda) + '</span>' : '') + '</div>' : '') +
-      '<div class="ap-prod' + (liq ? ' q4' : '') + '"><div class="ap-th"><span>Produto</span><span>Dose/ha</span>' +
-        (liq ? '<span>Por tanque</span>' : '') + (ha ? '<span>Total</span>' : '') + '</div>' +
+      (liq ? '<div class="ap-calda">💧 ' + tr('Calda ' + g.calda + ' L/ha · tanque de ' + fmt(g.tanque, 0) + ' L cobre ' + fmt(hat, 0) + ' ha') +
+        (ha ? '<br><span>' + tr(tanques(ha, hat, g.calda)) + '</span>' : '') + '</div>' : '') +
+      '<div class="ap-prod' + (liq ? ' q4' : '') + '"><div class="ap-th">' + tr('Produto') + tr('Dose/ha') +
+        (liq ? tr('Por tanque') : '') + (ha ? tr('Total') : '') + '</div>' +
       g.prods.map((p) => '<div><span>' + esc(p[0]) + '</span><span>' + doseTxt(Number(p[1])) + ' ' + esc(unid(p[2])) + '</span>' +
         (liq ? '<span class="tq">' + volTotal(p[1] * hat, p[2]) + '</span>' : '') +
         (ha ? '<b>' + volTotal(p[1] * ha, p[2]) + '</b>' : '') + '</div>').join('') + '</div>' + reg;
@@ -212,7 +214,7 @@ function aplicacoes(recs, areas, hoje, plantio, out, semAplicadas) {
     });
     // já aplicada: fica recolhida (título, data e próxima aplicação à vista; talhões e produtos ao tocar)
     h += sel === 'v'
-      ? '<details class="ap-card ap-det"><summary>' + topo + prox + '<span class="ap-ver">Ver talhões e produtos</span></summary>' + corpo + '</details>'
+      ? '<details class="ap-card ap-det"><summary>' + topo + prox + '<span class="ap-ver">' + tr('Ver talhões e produtos') + '</span></summary>' + corpo + '</details>'
       : '<div class="ap-card">' + topo + corpo + prox + '</div>';
   });
   return h;
@@ -318,18 +320,18 @@ function mapaVariedade(mapa, plantio, hoje) {
   });
   let leg = '';
   Object.keys(grp).forEach((c) => {
-    leg += '<div class="lv-g"><span class="lv-c">' + esc(CULTURAS[c] || c) + '</span>' +
+    leg += '<div class="lv-g"><span class="lv-c">' + tr(CULTURAS[c] || c) + '</span>' +
       Object.keys(grp[c]).map((v) => '<span class="lv"><i style="background:' + cor(v) + '"></i>' + esc(codVar(v)) +
         (grp[c][v] ? ' <em>' + fmt(grp[c][v]) + ' ha</em>' : '') + '</span>').join('') + '</div>';
   });
   const semVar = feats.filter((f) => { const p = porTal[(f.properties || {}).nome]; return !(p && p.variedade); });
   if (semVar.length) {
     const ha = semVar.reduce((s, f) => s + ((f.properties && Number(f.properties.area_ha)) || 0), 0);
-    leg += '<div class="lv-g"><span class="lv-c">Outros</span><span class="lv"><i style="background:' + SEM_VAR +
-      '"></i>Sem variedade / pousio' + (ha ? ' <em>' + fmt(ha) + ' ha</em>' : '') + '</span></div>';
+    leg += '<div class="lv-g"><span class="lv-c">' + tr('Outros') + '</span><span class="lv"><i style="background:' + SEM_VAR +
+      '"></i>' + tr('Sem variedade / pousio') + (ha ? ' <em>' + fmt(ha) + ' ha</em>' : '') + '</span></div>';
   }
-  return '<details class="mv-det" open><summary><h2 class="talhao">Mapa por variedade<small>toque no talhão</small></h2></summary>' +
-    '<div class="mapa-cli">' + sv + '</div><div class="map-cap" id="mapCap">Toque em um talhão para ver os detalhes.</div>' +
+  return '<details class="mv-det" open><summary><h2 class="talhao">' + tr('Mapa por variedade') + '<small>' + tr('toque no talhão') + '</small></h2></summary>' +
+    '<div class="mapa-cli">' + sv + '</div><div class="map-cap" id="mapCap">' + tr('Toque em um talhão para ver os detalhes.') + '</div>' +
     '<div class="leg-var">' + leg + '</div></details>';
 }
 
@@ -376,7 +378,7 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   ln += ' H' + X(x1);
   g += '<path d="' + ln + ' V' + Y(0) + ' Z" class="ar"/><path d="' + ln + '" class="ln"/>';
   g += '<line x1="' + L + '" x2="' + (Wd - R) + '" y1="' + Y(total) + '" y2="' + Y(total) + '" class="tot"/><text x="' + (L + 4) + '" y="' + (Y(total) - 5) +
-    '" class="ax">área total ' + fmt(total, 0) + ' ha</text>';
+    '" class="ax"><tspan data-tr>' + esc('área total ' + fmt(total, 0) + ' ha') + '</tspan></text>';
   ev.forEach((e, i) => {
     g += '<circle class="pl-pt" cx="' + X(e.d) + '" cy="' + Y(e.cum) + '" r="' + (i === ev.length - 1 ? 6 : 4) + '"/>' +
       '<circle class="pl-hit" data-i="' + i + '" cx="' + X(e.d) + '" cy="' + Y(e.cum) + '" r="15" fill="transparent"/>';
@@ -388,15 +390,15 @@ function evolucaoPlantio(mapa, plantio, hoje) {
   const falta = Object.keys(areas).filter((t) => !naoPlanta[t] && areas[t] - (hp[t] || 0) > 0.05)
     .map((t) => ({ talhao: hp[t] ? t + ' (' + fmt(areas[t] - hp[t]) + ' ha)' : t, ha: areas[t] - (hp[t] || 0) }));
   const hf = falta.reduce((s, p) => s + p.ha, 0);
-  const tb = '<table class="pl-tab"><tr><th>Data</th><th>Talhões</th><th>ha</th><th>Acumulado</th></tr>' +
+  const tb = '<table class="pl-tab"><tr><th>' + tr('Data') + '</th><th>' + tr('Talhões') + '</th><th>ha</th><th>' + tr('Acumulado') + '</th></tr>' +
     ev.map((e) => '<tr><td>' + curta(e.d) + '</td><td>' + esc(e.tal.join(', ')) + '</td><td>' + fmt(e.ha) + '</td><td>' + fmt(e.cum) + '</td></tr>').join('') + '</table>';
   const dadosJs = JSON.stringify(ev.map((e) => ({ d: curta(e.d), tal: e.tal.join(', '), ha: fmt(e.ha), cum: fmt(e.cum), pc: fmt(e.cum / total * 100) })));
-  return '<h2 class="talhao">Evolução do plantio<small>área acumulada</small></h2>' +
-    '<div class="pl-stat"><b>' + fmt(ult.cum / total * 100) + '%</b> plantado <span>' + fmt(ult.cum, 0) + ' de ' + fmt(total, 0) + ' ha</span></div>' +
-    (falta.length ? '<div class="pl-falta">Falta plantar: ' + esc(falta.map((p) => p.talhao).join(', ')) + ' · ' + fmt(hf) + ' ha</div>' : '') +
-    (haFora ? '<div class="pl-falta">Fora da conta (pastagem/pousio): ' + esc(Object.keys(naoPlanta).filter((t) => areas[t]).join(', ')) + ' · ' + fmt(haFora) + ' ha</div>' : '') +
+  return '<h2 class="talhao">' + tr('Evolução do plantio') + '<small>' + tr('área acumulada') + '</small></h2>' +
+    '<div class="pl-stat"><b>' + fmt(ult.cum / total * 100) + '%</b> ' + tr('plantado') + ' <span>' + tr(fmt(ult.cum, 0) + ' de ' + fmt(total, 0) + ' ha') + '</span></div>' +
+    (falta.length ? '<div class="pl-falta">' + tr('Falta plantar:') + ' ' + esc(falta.map((p) => p.talhao).join(', ')) + ' · ' + fmt(hf) + ' ha</div>' : '') +
+    (haFora ? '<div class="pl-falta">' + tr('Fora da conta (pastagem/pousio):') + ' ' + esc(Object.keys(naoPlanta).filter((t) => areas[t]).join(', ')) + ' · ' + fmt(haFora) + ' ha</div>' : '') +
     '<div class="pl-graf">' + g + '</div><div class="map-cap" id="plCap"></div>' +
-    '<details class="pl-det"><summary>Ver em tabela</summary>' + tb + '</details>' +
+    '<details class="pl-det"><summary>' + tr('Ver em tabela') + '</summary>' + tb + '</details>' +
     '<script type="application/json" id="plDados">' + dadosJs.replace(/</g, '\\u003c') + '</script>';
 }
 
@@ -409,11 +411,23 @@ function chipsDoTalhao(nome, plantio, hoje) {
   let h = '<div class="cult">';
   const pts = partesDe(p, 0).filter((x) => x.variedade);
   const vtxt = pts.length > 1 ? pts.map((x) => codVar(x.variedade) + ' ' + fmt(x.ha) + ' ha').join(' + ') : (p.variedade ? codVar(p.variedade) : '');
-  if (p.cultura || p.variedade) h += '<span>🌱 ' + esc([CULTURAS[p.cultura] || '', vtxt].filter(Boolean).join(' · ')) + '</span>';
-  if (p.data_plantio) h += '<span>Plantio ' + curta(p.data_plantio) + '</span>';
+  if (p.cultura || p.variedade) h += '<span>🌱 ' + (CULTURAS[p.cultura] ? tr(CULTURAS[p.cultura]) + (vtxt ? ' · ' : '') : '') + esc(vtxt) + '</span>';
+  if (p.data_plantio) h += '<span>' + tr('Plantio') + ' ' + curta(p.data_plantio) + '</span>';
   if (dae !== null) h += '<span class="dae">DAE ' + dae + '</span>';
   if (p.sem_ha) h += '<span>' + (p.sem_m ? fmt(p.sem_m, 1) + ' sem/m · ' : '') + fmt(p.sem_ha / 1000, 0) + ' mil sem/ha</span>';
   return h + '</div>';
+}
+
+/* ---------------- textos para traduzir (o servidor só traduz o que o relatório tem) ---------------- */
+export function textosAgro(ag) {
+  if (!ag) return [];
+  const html = [ag.evolucao, ag.topo, ag.mapaVar, ag.fim].filter(Boolean).join('');
+  const un = (s) => s.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const set = new Set(Object.values(CULTURAS).concat(['Plantio']));
+  const re = /<(span|tspan) data-tr>([^<]*)<\/\1>/g;
+  let m;
+  while ((m = re.exec(html))) set.add(un(m[2]));
+  return [...set];
 }
 
 /* ---------------- junta tudo ---------------- */
