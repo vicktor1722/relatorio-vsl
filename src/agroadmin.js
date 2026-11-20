@@ -1224,6 +1224,8 @@ ${EXPORTA_CHUVA_JS}
         return '<div class="ag-parte">' + campoVarExtra(e, x, i) +
           '<div class="linha2"><div class="campo"><label>Área (ha)</label><input inputmode="decimal" data-x="ha" data-i="' + i + '" value="' + (x.ha ? String(x.ha).replace('.', ',') : '') + '"></div>' +
           '<div class="campo"><label>Data de plantio</label><input type="date" data-x="data_plantio" data-i="' + i + '" value="' + esc(x.data_plantio || e.data_plantio) + '"></div></div>' +
+          '<div class="linha2"><div class="campo"><label>População · sementes/m</label><input inputmode="decimal" data-x="sem_m" data-i="' + i + '" value="' + (x.sem_m ? String(x.sem_m).replace('.', ',') : '') + '" placeholder="' + (e.sem_m ? String(e.sem_m).replace('.', ',') + ' (igual à de cima)' : 'ex.: 12') + '"></div>' +
+          '<div class="campo"><label>Sementes/ha</label><input inputmode="numeric" data-x="sem_ha" data-i="' + i + '" value="' + (x.sem_ha ? fmt(x.sem_ha, 0) : '') + '" placeholder="' + (e.sem_ha ? fmt(e.sem_ha, 0) : '') + '"></div></div>' +
           '<button class="ag-link" data-a="pextradel" data-v="' + i + '">remover esta variedade</button></div>';
       }).join('') +
       '<datalist id="agVarsCat">' + nomes.map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
@@ -1372,8 +1374,10 @@ ${EXPORTA_CHUVA_JS}
       }
       var soma = Number(e.haMain) + ex.reduce(function (s, x) { return s + Number(x.ha); }, 0);
       if (tt.ha && soma > tt.ha + 0.05) { toast('As áreas somam ' + fmt(soma) + ' ha: passa dos ' + fmt(tt.ha) + ' ha do talhão'); return; }
-      partes = [{ variedade: e.variedade, ha: Number(e.haMain), data_plantio: e.data_plantio }].concat(ex.map(function (x) {
-        return { variedade: String(x.variedade).trim(), ha: Number(x.ha), data_plantio: x.data_plantio || e.data_plantio };
+      partes = [{ variedade: e.variedade, ha: Number(e.haMain), data_plantio: e.data_plantio, sem_m: Number(e.sem_m) || 0, sem_ha: Number(e.sem_ha) || 0 }].concat(ex.map(function (x) {
+        // população da outra variedade: a dela, ou a mesma da variedade de cima se não preencheu
+        return { variedade: String(x.variedade).trim(), ha: Number(x.ha), data_plantio: x.data_plantio || e.data_plantio,
+          sem_m: Number(x.sem_m) || Number(e.sem_m) || 0, sem_ha: Number(x.sem_ha) || Number(e.sem_ha) || 0 };
       }));
     }
     alvo.forEach(function (nome) {
@@ -1414,7 +1418,7 @@ ${EXPORTA_CHUVA_JS}
       P.nome = v; P.outros = []; P.ren = null;
       var pts0 = r ? partesPl(r) : [];
       P.ed = r ? { cultura: r.cultura || '', variedade: r.variedade || '', data_plantio: r.data_plantio || '', data_emerg: r.data_emerg || '', espac_cm: r.espac_cm || 0, sem_m: r.sem_m || 0, sem_ha: r.sem_ha || 0,
-          haMain: pts0.length ? Number(pts0[0].ha) : 0, extras: pts0.slice(1).map(function (x) { return { variedade: x.variedade || '', ha: Number(x.ha) || 0, data_plantio: x.data_plantio || '' }; }) }
+          haMain: pts0.length ? Number(pts0[0].ha) : 0, extras: pts0.slice(1).map(function (x) { return { variedade: x.variedade || '', ha: Number(x.ha) || 0, data_plantio: x.data_plantio || '', sem_m: Number(x.sem_m) || 0, sem_ha: Number(x.sem_ha) || 0 }; }) }
         : { cultura: '', variedade: '', data_plantio: '', data_emerg: '', espac_cm: 0, sem_m: 0, sem_ha: 0 };
       pintarPlantio(); topoRolagem(); return;
     }
@@ -2857,6 +2861,13 @@ ${EXPORTA_CHUVA_JS}
         if (n.dataset && n.dataset.x && P.ed && P.ed.extras) {   // plantio parcial: outra variedade do talhão
           var px = P.ed.extras[Number(n.dataset.i)]; if (!px) return;
           px[n.dataset.x] = n.dataset.x === 'ha' ? numBR(n.value) : n.value;
+        if (n.dataset.x === 'sem_m' || n.dataset.x === 'sem_ha') {   // população: uma calcula a outra pelo espaçamento da linha de cima
+          var espX = espDe(P.ed.cultura, P.ed.espac_cm);
+          if (n.dataset.x === 'sem_m') { px.sem_m = numBR(n.value); px.sem_ha = px.sem_m && espX ? Math.round(px.sem_m * 10000 / (espX / 100)) : 0; }
+          else { px.sem_ha = Math.round(numBR(n.value)); px.sem_m = px.sem_ha && espX ? Math.round(px.sem_ha * (espX / 100) / 10000 * 10) / 10 : 0; }
+          var outro = tP.querySelector('[data-x="' + (n.dataset.x === 'sem_m' ? 'sem_ha' : 'sem_m') + '"][data-i="' + n.dataset.i + '"]');
+          if (outro) outro.value = n.dataset.x === 'sem_m' ? (px.sem_ha ? fmt(px.sem_ha, 0) : '') : (px.sem_m ? String(px.sem_m).replace('.', ',') : '');
+        }
           var rp = $('#agPartes', tP); if (rp) rp.innerHTML = resumoPartes(P.ed, talhaoEd());
         }
       });

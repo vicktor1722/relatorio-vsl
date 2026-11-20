@@ -84,7 +84,8 @@ export function partesDe(p, area) {
   let l = [];
   try { l = typeof (p && p.partes) === 'string' ? JSON.parse(p.partes || '[]') : ((p && p.partes) || []); } catch (e) { l = []; }
   l = (Array.isArray(l) ? l : []).filter((x) => x && Number(x.ha) > 0)
-    .map((x) => ({ variedade: String(x.variedade || ''), ha: Number(x.ha), data_plantio: /^\d{4}-\d{2}-\d{2}$/.test(x.data_plantio || '') ? x.data_plantio : '' }));
+    .map((x) => Object.assign({ variedade: String(x.variedade || ''), ha: Number(x.ha), data_plantio: /^\d{4}-\d{2}-\d{2}$/.test(x.data_plantio || '') ? x.data_plantio : '' },
+      Number(x.sem_m) > 0 ? { sem_m: Number(x.sem_m) } : {}, Number(x.sem_ha) > 0 ? { sem_ha: Number(x.sem_ha) } : {}));
   if (l.length) {
     let resto = area > 0 ? area : Infinity;
     return l.map((x) => { const ha = Math.min(x.ha, resto); resto -= ha; return Object.assign(x, { ha }); }).filter((x) => x.ha > 0);

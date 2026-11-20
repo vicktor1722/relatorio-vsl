@@ -696,7 +696,8 @@ export async function rotasAgro(env, req, me, rota, url) {
       // talhão em partes (mais de uma variedade): [{variedade, ha, data_plantio}]; sem a lista (app antigo) mantém o que estava
       let partes = null;
       if (Array.isArray(t.partes)) {
-        const l = t.partes.slice(0, 20).map((x) => ({ variedade: variedadePadrao(txt(x && x.variedade, 80), txt(t.cultura, 20)), ha: Math.round(num(x && x.ha) * 100) / 100, data_plantio: dia(x && x.data_plantio) }))
+        const l = t.partes.slice(0, 20).map((x) => Object.assign({ variedade: variedadePadrao(txt(x && x.variedade, 80), txt(t.cultura, 20)), ha: Math.round(num(x && x.ha) * 100) / 100, data_plantio: dia(x && x.data_plantio) },
+            num(x && x.sem_m) > 0 ? { sem_m: Math.round(num(x.sem_m) * 10) / 10 } : {}, num(x && x.sem_ha) > 0 ? { sem_ha: Math.round(num(x.sem_ha)) } : {}))   // população de cada variedade
           .filter((x) => x.ha > 0);
         partes = l.length ? JSON.stringify(l) : '';   // 1 parte = plantio parcial com uma variedade só (parte do talhão)
       }

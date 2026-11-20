@@ -414,7 +414,10 @@ function chipsDoTalhao(nome, plantio, hoje) {
   if (p.cultura || p.variedade) h += '<span>🌱 ' + (CULTURAS[p.cultura] ? tr(CULTURAS[p.cultura]) + (vtxt ? ' · ' : '') : '') + esc(vtxt) + '</span>';
   if (p.data_plantio) h += '<span>' + tr('Plantio') + ' ' + curta(p.data_plantio) + '</span>';
   if (dae !== null) h += '<span class="dae">DAE ' + dae + '</span>';
-  if (p.sem_ha) h += '<span>' + (p.sem_m ? fmt(p.sem_m, 1) + ' sem/m · ' : '') + fmt(p.sem_ha / 1000, 0) + ' mil sem/ha</span>';
+  // mais de uma variedade com população própria: uma etiqueta por variedade; senão, a do talhão
+  const popV = pts.length > 1 && pts.some((x) => x.sem_m || x.sem_ha);
+  if (popV) pts.forEach((x) => { if (x.sem_m || x.sem_ha) h += '<span>' + esc(codVar(x.variedade)) + ': ' + (x.sem_m ? fmt(x.sem_m, 1) + ' sem/m' : '') + (x.sem_m && x.sem_ha ? ' · ' : '') + (x.sem_ha ? fmt(x.sem_ha / 1000, 0) + ' mil sem/ha' : '') + '</span>'; });
+  else if (p.sem_ha) h += '<span>' + (p.sem_m ? fmt(p.sem_m, 1) + ' sem/m · ' : '') + fmt(p.sem_ha / 1000, 0) + ' mil sem/ha</span>';
   return h + '</div>';
 }
 
