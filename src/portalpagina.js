@@ -1175,6 +1175,26 @@ body.sem-rolar{overflow:hidden}
     });
     return { tot: tot, n: Object.keys(lotes).length, ult: ult };
   }
+  // talhão sem chuva lançada: estimada pelos talhões vizinhos que têm (média ponderada pela distância, os 4 mais perto)
+  function plvEstimar(tot) {
+    var cen = {}, est = {};
+    ((D.mapa && D.mapa.features) || []).forEach(function (f) {
+      var nm = (f.properties || {}).nome; if (!nm || cen[nm]) return;
+      var p = rotulosParte(f.geometry)[0]; if (p) cen[nm] = p;
+    });
+    var com = Object.keys(tot).filter(function (t) { return cen[t] && tot[t] > 0; });
+    if (!com.length) return est;
+    Object.keys(cen).forEach(function (nm) {
+      if (tot[nm]) return;
+      var c = cen[nm], kx = Math.cos(c.y * Math.PI / 180);
+      var viz = com.map(function (t) { var dx = (cen[t].x - c.x) * kx, dy = cen[t].y - c.y; return { v: tot[t], d: Math.sqrt(dx * dx + dy * dy) }; })
+        .sort(function (a, b) { return a.d - b.d; }).slice(0, 4);
+      var sw = 0, sv = 0;
+      viz.forEach(function (x) { var w = 1 / Math.max(1e-9, x.d * x.d); sw += w; sv += w * x.v; });
+      if (sw) est[nm] = sv / sw;
+    });
+    return est;
+  }
   // azul claro (pouca) → azul escuro (muita), relativo ao maior acumulado do período
   // (nome próprio: corChuva já é a escala da previsão de chuva no Início)
   function corPluvio(mm, max) {
@@ -1188,7 +1208,7 @@ body.sem-rolar{overflow:hidden}
   function vistaClima() {
     if (D.todas) { $('#conteudo').innerHTML = abas() + '<div class="vazio">Para ver e lançar a chuva por talhão, escolha uma fazenda no topo.</div>'; return; }
     plvCarregar();
-    var areas = areasMapa(), S = plvSoma(), max = 0, somaHa = 0, somaMmHa = 0;
+    var areas = areasMapa(), S = plvSoma(), max = 0, somaHa = 0, somaMmHa = 0, EST = plvEstimar(S.tot), nEst = Object.keys(EST).length;
     Object.keys(S.tot).forEach(function (t) { max = Math.max(max, S.tot[t]); if (areas[t]) { somaHa += areas[t]; somaMmHa += S.tot[t] * areas[t]; } });
     var media = somaHa ? somaMmHa / somaHa : 0, nSel = PLV.sel.length;
     var titulo = PLV.per === 'safra' ? 'safra ' + (D.safra || '') : 'últimos ' + PLV.per + ' dias';
@@ -1199,6 +1219,7 @@ body.sem-rolar{overflow:hidden}
       '<div class="tg">' + [['safra', 'Safra'], ['30', '30 dias'], ['7', '7 dias']].map(function (x) { return '<button data-plvp="' + x[0] + '" class="' + (PLV.per === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<div class="mapa-sat" id="mapaChuva"></div>' +
       (max ? '<div class="plv-esc"><span>0</span><i></i><span>' + n(max) + ' mm</span></div>' : '') +
+      (nEst ? '<div class="sem" style="font-size:12.5px;margin-top:4px">〰️ <b>~</b> e contorno tracejado = estimada pelos talhões vizinhos (sem chuva lançada); não entra na média.</div>' : '') +
       '<div class="sem" style="font-size:12.5px;margin-top:6px">👆 Toque nos talhões do mapa para marcar onde lançar a chuva.' + (nSel ? ' <a href="#" id="plvLimpar">Desmarcar</a>' : '') + '</div></div>';
     // lançamentos (um por lote: data, mm e talhões)
     var lotes = {}, ordem = [];
@@ -1217,11 +1238,12 @@ body.sem-rolar{overflow:hidden}
     $('#conteudo').innerHTML = h;
     ligarAbas();
     var estilo = function (nm) {
-      var mm = S.tot[nm] || 0, sel = PLV.sel.indexOf(nm) >= 0;
-      return { color: sel ? '#FFD400' : '#FFFFFF', weight: sel ? 4 : 2, fillColor: mm ? corPluvio(mm, max) : '#9AA5A0', fillOpacity: mm ? 0.85 : 0.35 };
+      var mm = S.tot[nm] || 0, sel = PLV.sel.indexOf(nm) >= 0, es = !mm && EST[nm];
+      if (es) return { color: sel ? '#FFD400' : '#FFFFFF', weight: sel ? 4 : 2, dashArray: sel ? null : '5 4', fillColor: corPluvio(es, max), fillOpacity: 0.5 };
+      return { color: sel ? '#FFD400' : '#FFFFFF', weight: sel ? 4 : 2, dashArray: null, fillColor: mm ? corPluvio(mm, max) : '#9AA5A0', fillOpacity: mm ? 0.85 : 0.35 };
     };
     var mm1 = desenharMapa($('#mapaChuva'), estilo, function () { return ''; }, function (nm) {
-      var mm = S.tot[nm] || 0; return esc(nm) + '<small>' + (mm ? n(mm, mm % 1 ? 1 : 0) + ' mm' : '—') + '</small>';
+      var mm = S.tot[nm] || 0, es = !mm && EST[nm]; return esc(nm) + '<small>' + (mm ? n(mm, mm % 1 ? 1 : 0) + ' mm' : es ? '<i>~' + n(es, 0) + ' mm</i>' : '—') + '</small>';
     }, function (nm) {
       var i = PLV.sel.indexOf(nm); if (i >= 0) PLV.sel.splice(i, 1); else PLV.sel.push(nm);
       if (mm1 && mm1.camada) mm1.camada.setStyle(function (f) { return estilo((f.properties || {}).nome || ''); });
