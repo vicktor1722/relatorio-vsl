@@ -229,12 +229,15 @@ export async function timeline(env, me, adm, antes) {
   if (!ids.length) return { ok: true, posts: [], mais: null };
   const filtro = ' AND r.usuario_id IN (' + marcas(ids) + ')';
   const corte = /^\d{4}-\d{2}-\d{2}/.test(String(antes || '')) ? String(antes) : '9999';
+  // ordem: data da visita (a que aparece no post), da mais nova para a mais velha; no mesmo dia, a publicada por último primeiro
+  const QUANDO = 'COALESCE(r.publicado_em, r.atualizado_em, r.criado_em)';
+  const CHAVE = "(COALESCE(NULLIF(substr(r.data_inicio, 1, 10), ''), substr(" + QUANDO + ", 1, 10)) || '|' || " + QUANDO + ')';
   const { results: rels } = await env.DB.prepare(`SELECT r.id, r.usuario_id, r.fazenda, r.produtor, r.servico, r.responsavel, r.status, r.data_inicio, r.observacoes,
-        COALESCE(r.publicado_em, r.atualizado_em, r.criado_em) AS quando, u.nome AS autor, u.email AS autor_email
+        ${QUANDO} AS quando, ${CHAVE} AS chave, u.nome AS autor, u.email AS autor_email
       FROM relatorios r LEFT JOIN usuarios u ON u.id = r.usuario_id
-     WHERE COALESCE(r.publicado_em, r.atualizado_em, r.criado_em) < ?${filtro}
+     WHERE ${CHAVE} < ?${filtro}
        AND EXISTS (SELECT 1 FROM itens i WHERE i.relatorio_id = r.id AND i.tipo IN ('foto','video') AND i.midia IS NOT NULL)
-     ORDER BY quando DESC LIMIT 8`).bind(corte, ...ids).all();
+     ORDER BY chave DESC LIMIT 8`).bind(corte, ...ids).all();
   const lista = rels || [];
   if (!lista.length) return { ok: true, posts: [], mais: null };
   const { results: its } = await env.DB.prepare(`SELECT id, relatorio_id, tipo, legenda, midia, talhao, capturado_em, pos FROM itens
@@ -260,7 +263,7 @@ export async function timeline(env, me, adm, antes) {
   // visualizações do link do relatório (quantas vezes foi aberto, por quantas pessoas e quando por último)
   const vis = await acessosDe(env, posts.map((p) => p.id)).catch(() => ({}));
   posts.forEach((p) => { const a = vis[p.id] || {}; p.vis = { total: Number(a.total || 0), pessoas: Number(a.visitantes || 0), ultimo: a.ultimo || null }; });
-  return { ok: true, posts, mais: lista.length === 8 ? lista[lista.length - 1].quando : null };
+  return { ok: true, posts, mais: lista.length === 8 ? lista[lista.length - 1].chave : null };
 }
 
 /* ---------- corrigir legendas e observações gerais (relatório já sincronizado) ---------- */
