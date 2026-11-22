@@ -347,6 +347,22 @@ export default {
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
       // consulta temporária (protegida por chave), só leitura: plantio da La Gloria (conferir a % plantada)
+      // TEMPORÁRIO: logo da conta da Oligon (pedido do administrador); sai logo depois de usar
+      if (rota === '/api/status/logo-conta') {
+        const k = String(url.searchParams.get('k') || '');
+        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
+        if (hx !== '4cad7420d7e620715c09868949c5a4dba6ccd139a0ae40672b4817b173dd5be8') return json({ erro: 'não encontrado' }, 404);
+        const { results } = await env.DB.prepare(`SELECT u.id, u.nome, u.email, p.empresa, length(p.logo) AS logo_len FROM usuarios u LEFT JOIN perfis p ON p.usuario_id = u.id
+            WHERE lower(u.nome) LIKE '%oligon%' OR lower(u.email) LIKE '%oligon%' OR lower(COALESCE(p.empresa, '')) LIKE '%oligon%'`).all();
+        if (req.method !== 'POST') return json({ ok: true, contas: results || [] });
+        const id = String(url.searchParams.get('id') || ''), b = await req.json().catch(() => ({}));
+        if (!(results || []).some((x) => x.id === id)) return json({ erro: 'conta não confere' }, 400);
+        const logo = String(b.logo || '');
+        if (!/^data:image\/(png|jpeg);base64,/.test(logo) || logo.length > 400000) return json({ erro: 'logo inválido' }, 400);
+        await env.DB.prepare(`INSERT INTO perfis (usuario_id, empresa, cidade, logo, atualizado_em) VALUES (?, '', '', ?, datetime('now'))
+            ON CONFLICT(usuario_id) DO UPDATE SET logo = excluded.logo, atualizado_em = datetime('now')`).bind(id, logo).run();
+        return json({ ok: true, id });
+      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
