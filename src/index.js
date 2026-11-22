@@ -347,6 +347,18 @@ export default {
       if (rota === '/api/status/calib') { const { results: cs } = await env.DB.prepare("SELECT chave, valor FROM config WHERE chave IN ('calib:pontes-1311','calib:comodoro-1311')").all().catch(() => ({ results: [] })); const o = {}; (cs || []).forEach((c) => { o[c.chave] = JSON.parse(c.valor); }); return json(Object.keys(o).length ? o : { pendente: true }); }
       if (rota === '/api/status/limpeza') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'limpeza:protocolos-1211'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { pendente: true }); }
       // consulta temporária (protegida por chave), só leitura: plantio da La Gloria (conferir a % plantada)
+      // TEMPORÁRIO: nome da empresa na conta da Oligon (pedido do administrador); sai logo depois de usar
+      if (rota === '/api/status/empresa-conta') {
+        const k = String(url.searchParams.get('k') || '');
+        const hx = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(k)))).map((b) => b.toString(16).padStart(2, '0')).join('');
+        if (hx !== '07b06311491d63326fc2177cf82d1d04adfed8238594b27a39fdc51493c39805') return json({ erro: 'não encontrado' }, 404);
+        const ID = 'umwrwhqpwlesk6p';
+        if (req.method === 'POST') {
+          await env.DB.prepare(`INSERT INTO perfis (usuario_id, empresa, cidade, logo, atualizado_em) VALUES (?, ?, '', '', datetime('now'))
+              ON CONFLICT(usuario_id) DO UPDATE SET empresa = excluded.empresa, atualizado_em = datetime('now')`).bind(ID, 'Oligon Soluções Agrícolas').run();
+        }
+        return json({ ok: true, perfil: await env.DB.prepare('SELECT empresa, cidade, length(logo) AS logo_len FROM perfis WHERE usuario_id = ?').bind(ID).first() });
+      }
       if (rota === '/api/status/renomeio') { const c = await env.DB.prepare("SELECT valor FROM config WHERE chave = 'renomeio:pindaituba-127'").first().catch(() => null); return json(c ? JSON.parse(c.valor) : { feito: false }); }
       // diagnóstico só de tamanhos (sem nomes nem conteúdo): ajuda a achar dado grande que estoura o processamento
       if (rota === '/api/status/tamanhos') {
