@@ -449,11 +449,21 @@
         continue;
       }
       let diaAtual = '';
-      for (const it of itens) {
+      for (let k = 0; k < itens.length; k++) {
+        const it = itens[k];
         const dia = dataExt(it.capturado_em);
         if (dia !== diaAtual) { diaAtual = dia; html += '<div class="divisor"><span>' + esc(dia) + '</span></div>'; }
-        html += bolhaHTML(it, !visitaFechada(v));
-        st.itens.push(it);
+        // fotos e vídeos seguidos com a mesma legenda: um balão só, como no WhatsApp (cada um continua sendo um registro;
+        // no modo de ordem ficam separados para poder mover um por um)
+        const gr = [it];
+        while (!st.ordem && agrupavel(it) && k + gr.length < itens.length) {
+          const nx = itens[k + gr.length];
+          if (!agrupavel(nx) || chaveLegenda(nx) !== chaveLegenda(it) || dataExt(nx.capturado_em) !== dia) break;
+          gr.push(nx);
+        }
+        html += gr.length > 1 ? grupoHTML(gr, !visitaFechada(v)) : bolhaHTML(it, !visitaFechada(v));
+        gr.forEach(function (x) { st.itens.push(x); });
+        k += gr.length - 1;
       }
     }
 
@@ -524,6 +534,39 @@
   // ordem da conversa e do relatório: pos (ms) quando o consultor trocou de lugar; senão a hora do registro
   function chaveOrdem(i) { const p = Number(i.pos); return p > 1e11 ? p : (Date.parse(i.capturado_em) || 0); }
   function ordenarConversa(l) { return l.slice().sort(function (a, b) { return chaveOrdem(a) - chaveOrdem(b) || String(a.capturado_em).localeCompare(String(b.capturado_em)); }); }
+
+  function agrupavel(i) { return (i.tipo === 'foto' || i.tipo === 'video') && !!String(i.legenda || '').trim(); }
+  function chaveLegenda(i) { return String(i.legenda || '').trim(); }
+
+  function grupoHTML(gr, editavel) {
+    const ids = gr.map(function (i) { return i.id; }), n = gr.length, ult = gr[n - 1];
+    const lapis = editavel ? '<button type="button" class="lapis" data-editar="' + ids[0] + '" title="Editar legenda" aria-label="Editar legenda">' +
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' : '';
+    const erro = gr.find(function (i) { return i.sync_state === 'erro'; });
+    const ticks = gr.every(function (i) { return i.sync_state === 'ok'; })
+      ? '<span class="ticks ok">✓✓</span>'
+      : erro ? '<span class="ticks erro" title="' + esc(erro.erro || '') + '">!</span>' : '<span class="ticks">✓</span>';
+    const tals = [];
+    gr.forEach(function (i) { const t = i.talhao || ''; if (tals.indexOf(t) < 0) tals.push(t); });
+    const chips = tals.map(function (t) {
+      if (!t) return '<div class="chip-talhao fora">📍 fora dos talhões</div>';
+      const pr = tals.length === 1 && gr[0].precisao_m ? ' · ±' + Math.round(gr[0].precisao_m) + 'm' : '';
+      return '<div class="chip-talhao">📍 ' + esc(t) + pr + '</div>';
+    }).join('');
+    const cel = gr.slice(0, 4).map(function (it, j) {
+      return '<div class="g-cel"><div class="midia" data-midia="' + it.id + '" data-abrir="' + it.id + '" data-sem-prop="1"></div>' +
+        (j === 3 && n > 4 ? '<div class="g-mais" data-abrir="' + it.id + '">+' + (n - 4) + '</div>' : '') + '</div>';
+    }).join('');
+    const fotos = gr.every(function (i) { return i.tipo === 'foto'; }), videos = gr.every(function (i) { return i.tipo === 'video'; });
+    const qt = n + (fotos ? ' fotos' : videos ? ' vídeos' : ' arquivos');
+    const bytes = gr.reduce(function (s, i) { return s + (Number(i.bytes) || 0); }, 0);
+    return '<div class="msg eu" data-id="' + ids[0] + '" data-grupo="' + ids.join(',') + '"><div class="bolha com-midia grupo">' +
+      '<div class="galeria g' + Math.min(n, 4) + '">' + cel + '</div>' + chips +
+      '<div class="legenda">' + ZAP.html(esc(gr[0].legenda)) + '</div>' +
+      '<div class="rodape">' + lapis + '<span class="g-qt">' + qt + '</span>' + (bytes ? '<span>' + bytesFmt(bytes) + '</span>' : '') +
+      '<span>' + hora(ult.capturado_em) + '</span>' + ticks + '</div></div></div>';
+  }
 
   function bolhaHTML(it, editavel) {
     // lápis para editar a legenda (só nas visitas ainda em aberto)
@@ -2227,7 +2270,8 @@
     return !!(st.rel && (st.rel.status === 'publicado' || st.rel.na_fila));
   }
 
-  async function abrirEdicao(item) {
+  async function abrirEdicao(item, grp) {
+    const ids = grp && grp.ids.length > 1 ? grp.ids : null;   // balão agrupado: a legenda é de todas as fotos dele
     const dono = st.visitas.find(function (v) { return v.id === item.relatorio_id; });
     if (visitaFechada(dono)) {
       toast('Esta visita já foi finalizada — os registros dela não mudam mais', 3800);
@@ -2235,7 +2279,8 @@
     }
     const veu = document.createElement('div'); veu.className = 'veu';
     const folha = document.createElement('div'); folha.className = 'folha';
-    const titulo = item.tipo === 'texto' ? 'Editar observação' : 'Editar legenda';
+    const titulo = item.tipo === 'texto' ? 'Editar observação' : ids ? 'Editar legenda das ' + ids.length + ' fotos' : 'Editar legenda';
+    const umaFoto = item.tipo === 'foto' ? 'esta foto' : 'este vídeo';
     folha.innerHTML =
       '<div class="alca"></div>' +
       '<h2 style="margin-top:0">' + titulo + '</h2>' +
@@ -2246,7 +2291,8 @@
       '<span>selecione o texto e toque</span></div>' +
       '<div class="campo"><div id="edTxt" class="rico" contenteditable="true" role="textbox" aria-multiline="true"></div></div>' +
       '<button class="btn" id="edOk">Salvar</button>' +
-      '<button class="btn perigo" id="edApagar">Apagar registro</button>' +
+      (ids && !grp.foto ? '<div style="font-size:12.5px;color:#667781;margin:2px 0 8px">Para apagar uma foto do grupo, segure em cima dela.</div>'
+        : '<button class="btn perigo" id="edApagar">' + (ids ? 'Apagar ' + umaFoto : 'Apagar registro') + '</button>') +
       '<button class="btn secundario" id="edCancel">Cancelar</button>';
     veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
     const campo = campoRico(folha.querySelector('#edTxt'), folha.querySelector('.fmt-barra'));
@@ -2260,18 +2306,23 @@
       if (item.tipo === 'texto' && !novo) { toast('A observação não pode ficar vazia'); return; }
       // grava em cima do registro como está AGORA no aparelho (o envio pode ter mexido nele enquanto a folha
       // estava aberta) e sempre volta para a fila, mesmo se estiver subindo neste instante
-      const atual = (await DB.get('itens', item.id)) || item;
-      atual.legenda = novo; atual.erro = null;
-      if (atual.sync_state !== 'preparando') atual.sync_state = 'pendente';   // vídeo ainda sendo reduzido: sobe quando terminar
-      item.legenda = novo; item.sync_state = 'pendente';
-      await DB.put('itens', atual);
+      for (const id of (ids || [item.id])) {
+        const mem = st.itens.find(function (i) { return i.id === id; }) || (id === item.id ? item : null);
+        const atual = (await DB.get('itens', id)) || mem;
+        if (!atual) continue;
+        atual.legenda = novo; atual.erro = null;
+        if (atual.sync_state !== 'preparando') atual.sync_state = 'pendente';   // vídeo ainda sendo reduzido: sobe quando terminar
+        if (mem) { mem.legenda = novo; mem.sync_state = 'pendente'; }
+        await DB.put('itens', atual);
+      }
       sair();
       await renderChat(); atualizarSync();
       if (navigator.onLine) Sync.sincronizar(st.rel.id);
     };
 
-    folha.querySelector('#edApagar').onclick = async function () {
-      if (!confirm('Apagar este registro do relatório?')) return;
+    const btApagar = folha.querySelector('#edApagar');
+    if (btApagar) btApagar.onclick = async function () {
+      if (!confirm(ids ? 'Apagar ' + umaFoto + ' do relatório?' : 'Apagar este registro do relatório?')) return;
       await DB.del('midias', item.id);
       await DB.del('itens', item.id);
       sair();
@@ -2289,17 +2340,24 @@
     const achaItem = function (alvo) {
       const el = alvo.closest('[data-id]');
       if (!el) return null;
-      return st.itens.find(function (i) { return i.id === el.dataset.id; }) || null;
+      const m = el.dataset.grupo ? alvo.closest('[data-midia]') : null;   // foto tocada dentro de um balão agrupado
+      const id = m ? m.dataset.midia : el.dataset.id;
+      return st.itens.find(function (i) { return i.id === id; }) || null;
+    };
+    const grupoDe = function (alvo) {
+      const g = alvo.closest('[data-grupo]');
+      return g ? { ids: g.dataset.grupo.split(','), foto: !!alvo.closest('[data-midia]') } : null;
     };
 
     const inicio = function (e) {
       const item = achaItem(e.target);
       if (!item) return;
+      const grp = grupoDe(e.target);
       segurou = false;
       timer = setTimeout(function () {
         segurou = true;
         if (navigator.vibrate) navigator.vibrate(20);
-        abrirEdicao(item);
+        abrirEdicao(item, grp);
       }, 500);
     };
     const fim = function () { clearTimeout(timer); };
@@ -2341,7 +2399,7 @@
     chat.addEventListener('click', function (e) {
       if (segurou) { segurou = false; e.stopPropagation(); return; }
       const item = achaItem(e.target);
-      if (item && e.target.closest('[data-editar]')) { abrirEdicao(item); return; }
+      if (item && e.target.closest('[data-editar]')) { abrirEdicao(item, grupoDe(e.target)); return; }
       if (item && item.tipo === 'texto') abrirEdicao(item);
     });
   }
@@ -2549,20 +2607,57 @@
     $('#chat').addEventListener('click', async function (e) {
       const alvo = e.target.closest('[data-abrir]');
       if (!alvo) return;
-      const it = st.itens.find(function (i) { return i.id === alvo.dataset.abrir; });
-      if (!it) return;
-      const blob = await DB.lerMidia(it.id);
-      let u = null;
-      if (blob) u = objURL(blob);
-      else if (it.midia) {
-        if (!navigator.onLine) { toast('Sem internet: o original está na nuvem. Conecte para abrir.'); return; }
-        u = await Sync.urlMidia(it);
-      }
-      if (!u) return;
+      // num balão agrupado, o visor passa pelas fotos do grupo (deslizar ou ‹ ›)
+      const grp = alvo.closest('[data-grupo]');
+      const ids = grp ? grp.dataset.grupo.split(',') : [alvo.dataset.abrir];
+      let pos = Math.max(0, ids.indexOf(alvo.dataset.abrir));
+      const abrirUm = async function (id) {
+        const it = st.itens.find(function (i) { return i.id === id; });
+        if (!it) return null;
+        const blob = await DB.lerMidia(it.id);
+        let u = null;
+        if (blob) u = objURL(blob);
+        else if (it.midia) {
+          if (!navigator.onLine) { toast('Sem internet: o original está na nuvem. Conecte para abrir.'); return null; }
+          u = await Sync.urlMidia(it);
+        }
+        return u ? { it: it, u: u } : null;
+      };
+      const pr = await abrirUm(ids[pos]);
+      if (!pr) return;
       const v = document.createElement('div'); v.className = 'visor';
-      v.innerHTML = '<button class="fechar">✕</button>' +
-        (it.tipo === 'foto' ? '<img src="' + u + '">' : '<video src="' + u + '" controls autoplay playsinline></video>');
-      v.onclick = function (ev) { if (ev.target === v || ev.target.className === 'fechar') v.remove(); };
+      v.innerHTML = '<button class="fechar">✕</button><div class="v-corpo"></div>' + (ids.length > 1
+        ? '<button type="button" class="v-nav ant" aria-label="Anterior">‹</button><button type="button" class="v-nav prox" aria-label="Próxima">›</button><div class="v-cont"></div>' : '');
+      const corpo = v.querySelector('.v-corpo');
+      const pintarV = function (x) {
+        corpo.innerHTML = x.it.tipo === 'foto' ? '<img src="' + x.u + '">' : '<video src="' + x.u + '" controls autoplay playsinline></video>';
+        const c = v.querySelector('.v-cont'); if (c) c.textContent = (pos + 1) + ' / ' + ids.length;
+        const a = v.querySelector('.v-nav.ant'), b = v.querySelector('.v-nav.prox');
+        if (a) a.disabled = pos === 0;
+        if (b) b.disabled = pos === ids.length - 1;
+      };
+      const ir = async function (d) {
+        const np = pos + d;
+        if (np < 0 || np >= ids.length) return;
+        const x = await abrirUm(ids[np]);
+        if (!x) return;
+        pos = np; pintarV(x);
+      };
+      pintarV(pr);
+      v.onclick = function (ev) {
+        const nav = ev.target.closest && ev.target.closest('.v-nav');
+        if (nav) { ev.stopPropagation(); ir(nav.classList.contains('ant') ? -1 : 1); return; }
+        if (ev.target === v || ev.target === corpo || ev.target.className === 'fechar') v.remove();
+      };
+      if (ids.length > 1) {
+        let x0 = null;
+        v.addEventListener('touchstart', function (ev) { x0 = ev.touches.length === 1 ? ev.touches[0].clientX : null; }, { passive: true });
+        v.addEventListener('touchend', function (ev) {
+          if (x0 === null || !ev.changedTouches.length) return;
+          const dx = ev.changedTouches[0].clientX - x0; x0 = null;
+          if (Math.abs(dx) > 50) ir(dx < 0 ? 1 : -1);
+        });
+      }
       document.body.appendChild(v);
     });
 
