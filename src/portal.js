@@ -380,7 +380,8 @@ async function dadosFazenda(env, acesso, fid, safraPedida, op) {
 
   if (acesso.papel === 'operador') return Object.assign(base, { aplicacoes });
 
-  const bl = op.leve ? {} : blocosAgro({ plantio, recs: recs.filter(daSafra).filter((r) => r.mostrar), mapa }) || {};
+  // no app da fazenda (dono, gerente) a programação mostra todas; "mostrar" vale só para o relatório do cliente
+  const bl = op.leve ? {} : blocosAgro({ plantio, recs: recs.filter(daSafra), mapa }) || {};
   let custo = null;
   if (op.custo !== false && !op.leve) {
     try {
