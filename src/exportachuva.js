@@ -252,7 +252,8 @@ var ExportaChuva = (function () {
         // iPhone/iPad e app instalado na tela inicial: o "baixar" do navegador não funciona; o menu de compartilhar tem "Salvar vídeo/imagem"
         var ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         var instalado = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-        var viaMenu = podeComp && (ios || instalado);
+        var movel = ios || /Android/.test(navigator.userAgent);
+        var viaMenu = podeComp && (ios || (instalado && movel));   // no computador (mesmo com o app instalado) baixa direto
         var tam = (blob.size / 1048576).toFixed(1).replace('.', ',') + ' MB';
         pronto = true; go.hidden = true;   // pronto: só o botão de salvar (sem prévia)
         res.innerHTML = '<button class="ex-go ex-salva">' + (viaMenu ? '💾 Salvar ' + (fmt === 'gif' ? 'GIF' : 'vídeo') + ' / compartilhar' : '⬇ Baixar ' + (fmt === 'gif' ? 'GIF' : 'vídeo')) + ' (' + tam + ')</button>' +
