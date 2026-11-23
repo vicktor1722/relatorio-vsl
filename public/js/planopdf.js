@@ -73,10 +73,15 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     if (aviso) aviso('PDF salvo em Downloads');
   }
+  // celular/tablet: o menu de compartilhar é o caminho para salvar/enviar; no computador o arquivo baixa direto
+  function celular() {
+    return /iP(hone|ad|od)|Android/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
   function entregar(dados, nome, titulo, aviso, subir) {
     var blob = new Blob([dados], { type: 'application/pdf' }), arq = null, podeArq = false;
     try { arq = new File([blob], nome, { type: 'application/pdf' }); } catch (e) { arq = null; }
     try { podeArq = !!(arq && navigator.canShare && navigator.canShare({ files: [arq] })); } catch (e) { podeArq = false; }
+    if (!celular()) { baixar(blob, nome, aviso); return; }
     if (podeArq) {
       navigator.share({ files: [arq], title: titulo }).catch(function (e) { if (!e || e.name !== 'AbortError') folha(); });
       return;
@@ -441,9 +446,7 @@
   function entregarArquivo(dados, nome, tipo, titulo, aviso) {
     var blob = new Blob([dados], { type: tipo }), arq = null, pode = false;
     try { arq = new File([blob], nome, { type: tipo }); pode = !!(navigator.canShare && navigator.canShare({ files: [arq] })); } catch (e) { pode = false; }
-    var ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    var instalado = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-    if (pode && (ios || instalado || /Android/.test(navigator.userAgent))) {
+    if (pode && celular()) {
       navigator.share({ files: [arq], title: titulo }).catch(function (e) { if (!e || e.name !== 'AbortError') baixar(blob, nome, null); });
       return;
     }
