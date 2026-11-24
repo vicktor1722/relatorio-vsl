@@ -505,7 +505,7 @@ export async function resumoAdmin(env, me, adm) {
   const arg = ids;
   await garantirTermos(env).catch(() => {});
   const contas = await env.DB.prepare(`
-    SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin, u.papel, u.cota, u.equipe_id, COALESCE(u.admin_ve,0) AS admin_ve,
+    SELECT u.id, u.email, u.nome, u.criado_em, COALESCE(u.admin,0) AS admin, u.papel, u.cota, u.equipe_id, COALESCE(u.admin_ve,0) AS admin_ve, u.documento,
            (SELECT t.aceito_em FROM termos_aceite t WHERE t.usuario_id = u.id AND t.versao = '${TERMOS_VERSAO}') AS termos_em,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id) AS relatorios,
            (SELECT COUNT(*) FROM relatorios r WHERE r.usuario_id = u.id AND r.status='publicado') AS publicados,
@@ -673,14 +673,31 @@ export async function criarConta(env, corpo) {
   // Adm de equipe: confere a quantidade de usuários comuns antes de criar a conta
   const cota = Math.floor(Number(corpo.cota));
   if (corpo.equipe_adm && !(cota >= 0 && cota <= 500)) throw new Error('informe quantos usuários comuns o Adm pode criar (0 a 500)');
+  const doc = lerDocumento(corpo.documento);
   const id = novoId('u');
   await env.DB.prepare('INSERT INTO usuarios (id,email,senha_hash,nome,admin) VALUES (?,?,?,?,?)')
     .bind(id, email, await hashSenha(senha), String(corpo.nome || '').trim(), corpo.admin ? 1 : 0).run();
   // "visualizar dados": o administrador geral passa a ver os relatórios desta conta (as antigas ficam só com os números)
   if (corpo.equipe_adm && !corpo.admin) { try { await definirAdm(env, id, true, cota); } catch (e) { /* a conta já existe; o Adm pode ser marcado depois em Contas */ } }
   if (corpo.ver_dados) { try { await garantirEquipe(env); await env.DB.prepare('UPDATE usuarios SET admin_ve = 1 WHERE id = ?').bind(id).run(); } catch (e) {} }
+  if (doc) { try { await garantirEquipe(env); await env.DB.prepare('UPDATE usuarios SET documento = ? WHERE id = ?').bind(doc, id).run(); } catch (e) { /* pode ser preenchido depois em Contas */ } }
   try { await definirPrazo(env, id, prazo); } catch (e) { /* a conta já existe; o prazo pode ser ajustado depois */ }
   return { ok: true, id, email, prazo_dias: prazo };
+}
+
+// CPF (11 dígitos) ou CNPJ (14 dígitos), guardado só com os números; vazio = sem documento
+function lerDocumento(v) {
+  const d = String(v || '').replace(/[^0-9]/g, '');
+  if (!d) return '';
+  if (d.length !== 11 && d.length !== 14) throw new Error('CPF tem 11 números e CNPJ tem 14: confira o documento');
+  return d;
+}
+export async function salvarDocumento(env, id, valor) {
+  const doc = lerDocumento(valor);
+  await garantirEquipe(env);
+  const r = await env.DB.prepare('UPDATE usuarios SET documento = ? WHERE id = ?').bind(doc || null, String(id || '')).run();
+  if (!r.meta || !r.meta.changes) throw new Error('conta não encontrada');
+  return { ok: true, documento: doc };
 }
 
 export async function promover(env, id, valor) {
@@ -1006,6 +1023,7 @@ ${AGRO_CSS}
           <div class="campo"><label>Nome</label><input id="nNome" placeholder="Nome de quem vai usar"></div>
           <div class="campo"><label>E-mail</label><input id="nEmail" type="email" placeholder="pessoa@exemplo.com"></div>
         </div>
+        <div class="campo"><label>CPF ou CNPJ <span style="font-weight:400;color:var(--fraco)">(opcional)</span></label><input id="nDoc" inputmode="numeric" maxlength="18" placeholder="000.000.000-00 ou 00.000.000/0000-00" autocomplete="off"></div>
         <div class="linha2">
           <div class="campo"><label>Senha</label><input id="nSenha" type="text" placeholder="mínimo 6 caracteres"></div>
           <div class="campo"><label>Acesso</label>
@@ -1328,6 +1346,7 @@ ${AGRO_CSS}
   function desenharContas() {
     var linhas = dados.contas.map(function (c) {
       return '<tr><td><b>' + esc(c.nome || '—') + '</b><br><span style="color:var(--fraco);font-size:12px">' + esc(c.email) + '</span>' +
+        (c.documento ? '<br><span class="peq">' + (String(c.documento).length === 14 ? 'CNPJ ' : 'CPF ') + esc(fmtDoc(c.documento)) + '</span>' : '') +
         (Number(c.admin) === 1 ? ' <span class="selo adm">admin</span>' : '') +
         (c.papel === 'adm' ? ' <span class="selo pub">Adm · até ' + (Number(c.cota) || 0) + ' usuário' + (Number(c.cota) === 1 ? '' : 's') + '</span>' : '') +
         (c.equipe_id ? ' <span class="selo">equipe de ' + esc(c.equipe_nome || '') + '</span>' : '') +
@@ -1346,6 +1365,7 @@ ${AGRO_CSS}
           '<button class="selo" data-pago="' + esc(c.id) + '">marcar pago</button> ' +
           (c.equipe_id ? '' : '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ') +
           (c.equipe_id ? '' : '<button class="selo" data-adm="' + esc(c.id) + '">' + (c.papel === 'adm' ? 'Adm: usuários' : 'tornar Adm') + '</button> ') +
+          '<button class="selo" data-doc="' + esc(c.id) + '">CPF/CNPJ</button> ' +
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
           '<button class="selo" data-kml="' + esc(c.id) + '" data-nome="' + esc(c.nome || c.email) + '">📐 mapa KML</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
@@ -1357,6 +1377,7 @@ ${AGRO_CSS}
     $('#tContas').innerHTML =
       '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Espaço</th><th>Tempo de uso</th><th>Pagamento</th><th>Última atividade</th><th></th></tr>' + linhas;
     document.querySelectorAll('[data-adm]').forEach(function (b) { b.onclick = function () { abrirAdm(b.dataset.adm); }; });
+    document.querySelectorAll('[data-doc]').forEach(function (b) { b.onclick = function () { abrirDoc(b.dataset.doc); }; });
     document.querySelectorAll('[data-prom]').forEach(function (b) {
       b.onclick = async function () {
         b.disabled = true;
@@ -1922,6 +1943,32 @@ ${AGRO_CSS}
   // filtro vindo do quadro "Relatórios por responsável": { nome, conta } ou null
   var filtroResp = null;
   function nomeResp(r) { return String(r.responsavel || '').trim().replace(/ +/g, ' ').toLowerCase(); }
+
+  /* ---------- CPF/CNPJ da conta ---------- */
+  function fmtDoc(v) {
+    var d = String(v || '').replace(/[^0-9]/g, '').slice(0, 14);
+    if (d.length <= 11) {
+      return d.slice(0, 3) + (d.length > 3 ? '.' + d.slice(3, 6) : '') + (d.length > 6 ? '.' + d.slice(6, 9) : '') + (d.length > 9 ? '-' + d.slice(9, 11) : '');
+    }
+    return d.slice(0, 2) + '.' + d.slice(2, 5) + '.' + d.slice(5, 8) + '/' + d.slice(8, 12) + (d.length > 12 ? '-' + d.slice(12, 14) : '');
+  }
+  function abrirDoc(id) {
+    var c = (dados.contas || []).filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    var m = modalBase();
+    m.cx.innerHTML = '<h2 style="margin:0 0 4px">CPF ou CNPJ</h2>' +
+      '<p style="margin:0 0 14px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) + '</p>' +
+      '<div class="campo"><label>Documento (deixe vazio para tirar)</label><input id="docV" inputmode="numeric" maxlength="18" placeholder="000.000.000-00 ou 00.000.000/0000-00" value="' + esc(fmtDoc(c.documento || '')) + '"></div>' +
+      '<div id="docMsg"></div><button class="btn" id="docOk">Salvar</button>' +
+      '<button class="btn sec" id="docNao" style="margin-top:8px">Cancelar</button>';
+    var campo = m.cx.querySelector('#docV'), msg = m.cx.querySelector('#docMsg');
+    campo.oninput = function () { campo.value = fmtDoc(campo.value); };
+    m.cx.querySelector('#docNao').onclick = m.sair;
+    m.cx.querySelector('#docOk').onclick = async function () {
+      try { await api('/api/admin/documento', { id: id, documento: campo.value }); m.sair(); await abrirPainel(); }
+      catch (e) { aviso(msg, e.message, true); }
+    };
+    setTimeout(function () { campo.focus(); }, 100);
+  }
 
   /* ---------- Adm de equipe (administrador geral define e dá a cota) ---------- */
   function abrirAdm(id) {
@@ -2556,6 +2603,7 @@ ${AGRO_CSS}
 
   /* ---------- criar conta ---------- */
   $('#nAdmin').onchange = function () { $('#nCotaBox').hidden = this.value !== 'adm'; };
+  $('#nDoc').oninput = function () { this.value = fmtDoc(this.value); };
   $('#btnCriar').onclick = async function () {
     var msg = $('#nMsg');
     aviso(msg, 'Criando…');
@@ -2563,6 +2611,7 @@ ${AGRO_CSS}
       await api('/api/admin/usuario', {
         nome: $('#nNome').value.trim(),
         email: $('#nEmail').value.trim(),
+        documento: $('#nDoc').value.trim(),
         senha: $('#nSenha').value,
         admin: $('#nAdmin').value === '1',
         equipe_adm: $('#nAdmin').value === 'adm',
@@ -2570,7 +2619,7 @@ ${AGRO_CSS}
         prazo_dias: $('#nPrazo').value,
         ver_dados: $('#nVer').checked
       });
-      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365'; $('#nVer').checked = false; $('#nAdmin').value = '0'; $('#nCota').value = '3'; $('#nCotaBox').hidden = true;
+      $('#nNome').value = ''; $('#nEmail').value = ''; $('#nDoc').value = ''; $('#nSenha').value = ''; $('#nPrazo').value = '365'; $('#nVer').checked = false; $('#nAdmin').value = '0'; $('#nCota').value = '3'; $('#nCotaBox').hidden = true;
       aviso(msg, 'Conta criada.');
       await abrirPainel();
       document.querySelector('.abas button[data-aba="contas"]').click();

@@ -16,7 +16,8 @@ let pronto = false;
 export async function garantirEquipe(env) {
   if (pronto) return;
   for (const sql of ['ALTER TABLE usuarios ADD COLUMN papel TEXT', 'ALTER TABLE usuarios ADD COLUMN cota INTEGER', 'ALTER TABLE usuarios ADD COLUMN equipe_id TEXT',
-    'ALTER TABLE usuarios ADD COLUMN admin_ve INTEGER', 'ALTER TABLE usuarios ADD COLUMN leitor_de TEXT']) {
+    'ALTER TABLE usuarios ADD COLUMN admin_ve INTEGER', 'ALTER TABLE usuarios ADD COLUMN leitor_de TEXT',
+    'ALTER TABLE usuarios ADD COLUMN documento TEXT']) {
     try { await env.DB.prepare(sql).run(); } catch (e) { /* já existe */ }
   }
   try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS usuarios_equipe ON usuarios (equipe_id)').run(); } catch (e) {}
