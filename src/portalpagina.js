@@ -471,7 +471,7 @@ body.sem-rolar{overflow:hidden}
 
   function vistaMapas() {
     var vars = {}, haVar = {}, i = 0, areas = {};
-    ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
+    ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = (areas[q.nome] || 0) + (Number(q.area_ha) || 0); });
     (D.plantio || []).forEach(function (p) {
       var pts = p.partes && p.partes.length ? p.partes.map(function (x) { return [x.variedade, x.ha]; }) : [[p.variedade || (p.cultura ? NC[p.cultura] || p.cultura : ''), areas[p.talhao] || 0]];
       pts.forEach(function (x) { var k = x[0]; if (!k) return; if (!vars[k]) vars[k] = CORES[i++ % CORES.length]; haVar[k] = (haVar[k] || 0) + x[1]; });
@@ -1026,7 +1026,7 @@ body.sem-rolar{overflow:hidden}
   }
   function previsoes() {
     var areas = {}, col = {};
-    ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
+    ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = (areas[q.nome] || 0) + (Number(q.area_ha) || 0); });
     (D.colheita || []).forEach(function (c) { if (c.sc_ha) col[c.talhao] = c; });
     var lista = [];
     (D.plantio || []).filter(function (p) { return p.cultura && p.cultura !== 'pastagem' && p.cultura !== 'pousio'; }).forEach(function (p) {
@@ -1148,7 +1148,7 @@ body.sem-rolar{overflow:hidden}
   }
 
   /* ---------- plantio: evolução, talhões e lançamento da área plantada no dia (gerente) ---------- */
-  function areasMapa() { var o = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) o[q.nome] = Number(q.area_ha) || 0; }); return o; }
+  function areasMapa() { var o = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) o[q.nome] = (o[q.nome] || 0) + (Number(q.area_ha) || 0); }); return o; }
   function porNome(a, b) { return String(a).localeCompare(String(b), 'pt-BR', { numeric: true }); }
   // gráfico com troca para o lado (plantio ⇄ previsão de colheita); st = estado da aba
   function grafHtml(st, so) { return D.graf ? '<div class="caixa gr">' + DPG.html(st, D.graf, { resumo: true, so: so }) + '</div>' : ''; }
@@ -1546,7 +1546,7 @@ body.sem-rolar{overflow:hidden}
   function mapaOperador() {
     var ap = (D.aplicacoes || []).slice().sort(function (x, y) { return (x.status === 'aplicada') - (y.status === 'aplicada') || (x.data < y.data ? -1 : 1); });
     if (opMapa !== '*' && !ap.some(function (x) { return x.id === opMapa; })) opMapa = '*';
-    var areas = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = Number(q.area_ha) || 0; });
+    var areas = {}; ((D.mapa && D.mapa.features) || []).forEach(function (f) { var q = f.properties || {}; if (q.nome) areas[q.nome] = (areas[q.nome] || 0) + (Number(q.area_ha) || 0); });
     // situação de cada talhão: numa aplicação escolhida, ou somando todas (pior situação vence)
     var st = {}, det = {}, peso = { atr: 3, pend: 2, ok: 1 };
     ap.forEach(function (x) {
