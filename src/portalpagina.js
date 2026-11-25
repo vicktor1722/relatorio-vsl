@@ -1331,7 +1331,7 @@ body.sem-rolar{overflow:hidden}
   var CULT = null;
   function carregarCult() {
     if (CULT) return Promise.resolve(CULT);
-    return api('/api/portal/cultivares').then(function (r) { CULT = r.catalogo || []; return CULT; }).catch(function () { return []; });
+    return api('/api/portal/cultivares?v=2026-11-25').then(function (r) { CULT = r.catalogo || []; return CULT; }).catch(function () { return []; });
   }
   async function enviarPlantio(corpo, msg) {
     var r = null;

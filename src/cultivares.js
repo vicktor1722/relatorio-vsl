@@ -14,6 +14,7 @@ export const FONTES_CULT = {
   ns: 'Catálogos Nidera 2025 (Norte/Nordeste e Sul/Sudeste)',
   basf: 'Guia de variedades BASF Soytech 2026 Centro-Norte',
   bs: 'Fichas técnicas Boa Safra Sementes 2026/27',
+  dm: 'donmario.com.br (cultivares Cerrado e Sul)',
   zarc: 'ZARC soja MT 2025/26 (Portaria SPA/MAPA nº 372)'
 };
 
@@ -34,6 +35,17 @@ export const CATALOGO = [
     ["BMX Supera I2X", 7.3], ["BMX Tanque I2X", 7.5, 102], ["BMX Titanium I2X", 5.8], ["BMX Tormenta CE", 7.6, 103],
     ["BMX Torpedo I2X", 6.2], ["BMX Torque I2X", 5.7], ["BMX Trovão I2X", 5.2], ["BMX Vênus CE", 5.7],
     ["BMX Zeus IPRO", 5.5]
+  ]],
+  // Don Mario (GDM): GMR das fichas oficiais; quando a ficha separa por região, vale o da macrorregião 4 (MT)
+  ["Don Mario", ["dm"], [
+    ["DM 75IX75 I2X", 7.5], ["DM 79K80 CE", 7.9], ["DM 70IX70 I2X", 7.0], ["DM 64IX65 I2X", 6.4],
+    ["DM 78IX80 I2X", 7.8], ["DM 80I85 IPRO", 8.0], ["DM 68I69 IPRO", 6.8], ["DM 73I75 IPRO", 7.3],
+    ["DM 75I74 IPRO", 7.5], ["DM 72IX74 I2X", 7.2], ["DM 82I78 IPRO", 8.2], ["DM 80I79 IPRO", 8.0],
+    ["DM 79I81 IPRO", 7.9], ["DM 74K75 CE", 7.7], ["DM 69IX69 I2X", 6.9], ["DM 76IX78 I2X", 7.6],
+    ["DM 83IX84 I2X", 8.3], ["DM 81I84 IPRO", 8.1], ["DM 82K84 CE", 8.2],
+    ["DM 64K67 CE", 6.5], ["DM 65IX67 I2X", 6.5], ["DM 56I59 IPRO", 5.7], ["DM 59IX61 I2X", 6.0],
+    ["DM 70I71 IPRO", 7.0], ["DM 54IX57 I2X", 5.4], ["DM 60IX64 I2X", 5.9], ["DM 66I68 IPRO", 6.6],
+    ["DM 64I63 IPRO", 6.4], ["DM 5958 IPRO", 5.8]
   ]],
   ["Neogen", ["neo"], [
     ["NEO 550 I2X", 5.5], ["NEO 780 CE", 7.8, 110], ["NEO 791 CE", 7.9], ["NEO 811 I2X", 8.1],
