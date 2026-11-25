@@ -692,6 +692,16 @@ function lerDocumento(v) {
   if (d.length !== 11 && d.length !== 14) throw new Error('CPF tem 11 números e CNPJ tem 14: confira o documento');
   return d;
 }
+// editar a conta pelo painel: nome e CPF/CNPJ
+export async function salvarDadosConta(env, id, corpo) {
+  const nome = String(corpo.nome || '').trim().slice(0, 120);
+  if (!nome) throw new Error('informe o nome');
+  const doc = lerDocumento(corpo.documento);
+  await garantirEquipe(env);
+  const r = await env.DB.prepare('UPDATE usuarios SET nome = ?, documento = ? WHERE id = ?').bind(nome, doc || null, String(id || '')).run();
+  if (!r.meta || !r.meta.changes) throw new Error('conta não encontrada');
+  return { ok: true, nome, documento: doc };
+}
 export async function salvarDocumento(env, id, valor) {
   const doc = lerDocumento(valor);
   await garantirEquipe(env);
@@ -1360,12 +1370,10 @@ ${AGRO_CSS}
         '<td>' + pagCel(c) + '</td>' +
         '<td>' + dataBR(c.ultima_atividade) + '</td>' +
         '<td class="acoes">' +
-          '<button class="selo" data-cobr="' + esc(c.id) + '">cobrança</button> ' +
-          '<button class="selo" data-gerar="' + esc(c.id) + '">gerar link</button> ' +
           '<button class="selo" data-pago="' + esc(c.id) + '">marcar pago</button> ' +
           (c.equipe_id ? '' : '<button class="selo" data-prazo="' + esc(c.id) + '">prazo</button> ') +
           (c.equipe_id ? '' : '<button class="selo" data-adm="' + esc(c.id) + '">' + (c.papel === 'adm' ? 'Adm: usuários' : 'tornar Adm') + '</button> ') +
-          '<button class="selo" data-doc="' + esc(c.id) + '">CPF/CNPJ</button> ' +
+          '<button class="selo" data-edt="' + esc(c.id) + '">✎ editar</button> ' +
           '<button class="selo" data-senha="' + esc(c.id) + '" data-email="' + esc(c.email) + '">trocar senha</button> ' +
           '<button class="selo" data-kml="' + esc(c.id) + '" data-nome="' + esc(c.nome || c.email) + '">📐 mapa KML</button> ' +
           '<button class="selo" data-prom="' + esc(c.id) + '" data-v="' + (Number(c.admin) === 1 ? 0 : 1) + '">' +
@@ -1377,7 +1385,7 @@ ${AGRO_CSS}
     $('#tContas').innerHTML =
       '<tr><th>Conta</th><th>Relatórios</th><th>Prod./Faz.</th><th>Espaço</th><th>Tempo de uso</th><th>Pagamento</th><th>Última atividade</th><th></th></tr>' + linhas;
     document.querySelectorAll('[data-adm]').forEach(function (b) { b.onclick = function () { abrirAdm(b.dataset.adm); }; });
-    document.querySelectorAll('[data-doc]').forEach(function (b) { b.onclick = function () { abrirDoc(b.dataset.doc); }; });
+    document.querySelectorAll('[data-edt]').forEach(function (b) { b.onclick = function () { abrirEditar(b.dataset.edt); }; });
     document.querySelectorAll('[data-prom]').forEach(function (b) {
       b.onclick = async function () {
         b.disabled = true;
@@ -1707,7 +1715,7 @@ ${AGRO_CSS}
     if (!adm) { el.innerHTML = ''; return; }
     var lista = (dados.contas || []).filter(function (c) { return c.assin && c.assin.forma === 'pix_automatico'; });
     if (!lista.length) {
-      el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma conta no Pix Automático ainda. Cadastre o cliente no app do C6 Empresas e, aqui, toque em "cobrança" na conta para registrar o valor e o dia do débito.</div>';
+      el.innerHTML = '<div style="color:var(--fraco);font-size:13px">Nenhuma conta no Pix Automático ainda. Cadastre o cliente no app do C6 Empresas e, aqui, registre o valor e o dia do débito na conta.</div>';
       return;
     }
     var agora = new Date(), ano = agora.getFullYear(), mes = agora.getMonth();
@@ -1952,22 +1960,23 @@ ${AGRO_CSS}
     }
     return d.slice(0, 2) + '.' + d.slice(2, 5) + '.' + d.slice(5, 8) + '/' + d.slice(8, 12) + (d.length > 12 ? '-' + d.slice(12, 14) : '');
   }
-  function abrirDoc(id) {
+  function abrirEditar(id) {
     var c = (dados.contas || []).filter(function (x) { return x.id === id; })[0]; if (!c) return;
     var m = modalBase();
-    m.cx.innerHTML = '<h2 style="margin:0 0 4px">CPF ou CNPJ</h2>' +
-      '<p style="margin:0 0 14px;font-size:13px;color:var(--fraco)">' + esc(c.nome || c.email) + '</p>' +
-      '<div class="campo"><label>Documento (deixe vazio para tirar)</label><input id="docV" inputmode="numeric" maxlength="18" placeholder="000.000.000-00 ou 00.000.000/0000-00" value="' + esc(fmtDoc(c.documento || '')) + '"></div>' +
+    m.cx.innerHTML = '<h2 style="margin:0 0 4px">Editar conta</h2>' +
+      '<p style="margin:0 0 14px;font-size:13px;color:var(--fraco)">' + esc(c.email) + '</p>' +
+      '<div class="campo"><label>Nome</label><input id="edNome" maxlength="120" value="' + esc(c.nome || '') + '"></div>' +
+      '<div class="campo"><label>CPF ou CNPJ (opcional)</label><input id="docV" inputmode="numeric" maxlength="18" placeholder="000.000.000-00 ou 00.000.000/0000-00" value="' + esc(fmtDoc(c.documento || '')) + '"></div>' +
       '<div id="docMsg"></div><button class="btn" id="docOk">Salvar</button>' +
       '<button class="btn sec" id="docNao" style="margin-top:8px">Cancelar</button>';
-    var campo = m.cx.querySelector('#docV'), msg = m.cx.querySelector('#docMsg');
+    var campo = m.cx.querySelector('#docV'), nome = m.cx.querySelector('#edNome'), msg = m.cx.querySelector('#docMsg');
     campo.oninput = function () { campo.value = fmtDoc(campo.value); };
     m.cx.querySelector('#docNao').onclick = m.sair;
     m.cx.querySelector('#docOk').onclick = async function () {
-      try { await api('/api/admin/documento', { id: id, documento: campo.value }); m.sair(); await abrirPainel(); }
+      try { await api('/api/admin/conta-dados', { id: id, nome: nome.value, documento: campo.value }); m.sair(); await abrirPainel(); }
       catch (e) { aviso(msg, e.message, true); }
     };
-    setTimeout(function () { campo.focus(); }, 100);
+    setTimeout(function () { nome.focus(); }, 100);
   }
 
   /* ---------- Adm de equipe (administrador geral define e dá a cota) ---------- */

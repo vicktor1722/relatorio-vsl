@@ -36,7 +36,7 @@ import { UFS_LINHAS } from './ufs.js';
 import { atualizarChuva, mapaRapido } from './chuva.js';
 import { rotasPainelFaz } from './painelfaz.js';
 import { PORTAL_MANIFEST, PORTAL_SW } from './portalsw.js';
-import { areasAdmin, resumoLeitor, cancelarCobranca, criarCobranca, criarConta, salvarDocumento, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
+import { areasAdmin, resumoLeitor, cancelarCobranca, criarCobranca, criarConta, salvarDocumento, salvarDadosConta, definirPrazo, ehAdmin, excluirConta, listarPagamentos, pagamentoManual, paginaAdmin, promover, resumoAdmin, salvarAssinatura, salvarConfigPagto, trocarSenha, webhookPicPay } from './admin.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -661,6 +661,10 @@ export default {
         if (rota === '/api/admin/adm' && req.method === 'POST') {
           const b = await req.json();
           try { return json(await definirAdm(env, String(b.id || ''), !!b.adm, b.cota)); } catch (e) { return json({ erro: e.message }, 400); }
+        }
+        if (rota === '/api/admin/conta-dados' && req.method === 'POST') {
+          const b = await req.json();
+          try { const r = await salvarDadosConta(env, b.id, b); await mudouDados(env).catch(() => {}); return json(r); } catch (e) { return json({ erro: e.message }, 400); }
         }
         if (rota === '/api/admin/documento' && req.method === 'POST') {
           const b = await req.json();
