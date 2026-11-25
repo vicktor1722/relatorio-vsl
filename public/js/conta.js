@@ -372,7 +372,50 @@
     $('#fzStatusKml').innerHTML = '<div class="ic">📐</div><div class="txt"><b>' +
       (qtd ? qtd + ' talhões · ' + ha.toFixed(1) + ' ha' : 'Nenhum talhão carregado') + '</b><span>' +
       (qtd ? 'toque no mapa abaixo para conferir' : 'Importe o KML da fazenda') + '</span></div>';
+    // com o desenho dos talhões: mapa com satélite; o total vai no título e o "Trocar KML" fica ao lado da lista
+    const temMapa = !!(gj && gj.features && gj.features.length);
+    $('#fzStatusKml').classList.toggle('oculto', temMapa);
+    $('#btnFzKml').classList.toggle('oculto', temMapa);
+    $('#fzTotal').textContent = temMapa ? qtd + (qtd === 1 ? ' talhão · ' : ' talhões · ') + ha.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' ha' : '';
     desenharTalhoes(gj);
+  }
+
+  // Leaflet (o mesmo do mapa de chuva), carregado só quando a tela precisa
+  let promLeaflet = null, mapaFz = null;
+  function carregarLeaflet() {
+    if (window.L && window.L.map) return Promise.resolve();
+    if (promLeaflet) return promLeaflet;
+    promLeaflet = new Promise(function (ok, erro) {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(css);
+      const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      s.onload = function () { ok(); }; s.onerror = function () { promLeaflet = null; erro(new Error('sem mapa')); };
+      document.head.appendChild(s);
+    });
+    return promLeaflet;
+  }
+  function mapaTalhoes(box, gj) {
+    if (mapaFz) { try { mapaFz.remove(); } catch (e) {} mapaFz = null; }
+    const m = L.map(box, { attributionControl: false, zoomSnap: 0.5 });
+    mapaFz = m;
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(m);
+    // um rótulo por talhão (na maior parte, quando o talhão tem várias)
+    const maior = {};
+    const camada = L.geoJSON(gj, {
+      style: function () { return { color: '#FFD54A', weight: 2, fillColor: '#FFD54A', fillOpacity: 0.12 }; },
+      onEachFeature: function (f, l) {
+        const nm = String((f.properties && f.properties.nome) || '').trim(), a = Number(f.properties && f.properties.area_ha) || 0;
+        if (nm && (!maior[nm] || a > maior[nm].a)) maior[nm] = { l: l, a: a };
+      }
+    }).addTo(m);
+    Object.keys(maior).forEach(function (nm) {
+      maior[nm].l.bindTooltip(esc(nm), { permanent: true, direction: 'center', className: 'fz-rot' });
+    });
+    const enquadrar = function () { try { m.invalidateSize(); m.fitBounds(camada.getBounds(), { padding: [14, 14] }); } catch (e) {} };
+    enquadrar();
+    // a tela pode estar abrindo (ainda sem tamanho): enquadra de novo
+    setTimeout(enquadrar, 120); setTimeout(enquadrar, 450);
+    return enquadrar;
   }
 
   // mapa + lista dos talhões na tela da fazenda
@@ -382,15 +425,27 @@
       mapa.classList.add('oculto'); mapa.innerHTML = ''; lista.innerHTML = '';
       return;
     }
-    mapa.classList.remove('oculto');
-    mapa.innerHTML = Geo.svgTalhoes(gj);
+    mapa.classList.remove('oculto'); mapa.classList.remove('cheia');
+    mapa.innerHTML = '<div class="fz-mapa-box"></div><button type="button" class="fz-cheia" aria-label="Tela cheia">⛶</button>';
+    const box = mapa.querySelector('.fz-mapa-box'), bt = mapa.querySelector('.fz-cheia');
+    let enquadrar = null;
+    carregarLeaflet().then(function () { enquadrar = mapaTalhoes(box, gj); })
+      .catch(function () { box.innerHTML = Geo.svgTalhoes(gj); });   // sem internet: o desenho de antes
+    bt.onclick = function () {
+      const cheia = mapa.classList.toggle('cheia');
+      bt.textContent = cheia ? '✕' : '⛶'; bt.setAttribute('aria-label', cheia ? 'Fechar tela cheia' : 'Tela cheia');
+      if (enquadrar) setTimeout(enquadrar, 60);
+    };
     const linhas = gj.features.map(function (f) {
       const a = f.properties.area_ha;
       return '<tr><td style="padding:4px 8px 4px 0">' + esc(f.properties.nome) + '</td>' +
         '<td style="padding:4px 0;text-align:right;color:#667781">' + (a ? a.toFixed(1) + ' ha' : '—') + '</td></tr>';
     }).join('');
-    lista.innerHTML = '<div class="lista-item" style="display:block"><table style="width:100%;font-size:13.5px">' +
-      linhas + '</table></div>';
+    lista.innerHTML = '<div class="fz-dica">Use + e − (ou dois dedos) para aproximar · ⛶ abre em tela cheia</div>' +
+      '<div class="fz-lista"><details><summary>Ver lista de talhões (' + gj.features.length + ')</summary>' +
+      '<table style="width:100%;font-size:13.5px;margin-top:6px">' + linhas + '</table></details>' +
+      '<button type="button" class="fz-troca">Trocar KML</button></div>';
+    lista.querySelector('.fz-troca').onclick = function () { $('#inpKml').click(); };
   }
 
   // seletor de qual atributo vira o nome do talhão

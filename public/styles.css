@@ -306,6 +306,23 @@ input,textarea,select{font:inherit}
 }
 
 /* mapa svg */
+/* tela da fazenda: KML num mapa com satélite */
+.fz-tit{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.fz-tit small{font-size:13px;font-weight:600;color:var(--verde);text-transform:none;letter-spacing:0}
+.fz-mapa{position:relative;height:330px;margin-top:10px;border-radius:12px;overflow:hidden;border:1px solid #CFD8D2;background:#E8EFE9}
+@media (max-width:600px){.fz-mapa{height:300px}}
+.fz-mapa .fz-mapa-box{position:absolute;inset:0}
+.fz-mapa .fz-mapa-box > svg{width:100%;height:100%;display:block}
+.fz-mapa.cheia{position:fixed;inset:0;z-index:6000;height:auto;margin:0;border-radius:0;border:0}
+.fz-cheia{position:absolute;right:10px;top:10px;z-index:900;width:34px;height:34px;border:0;border-radius:8px;background:#fff;color:#1B2B22;font-size:17px;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer}
+.fz-mapa.cheia .fz-cheia{top:calc(10px + var(--safe-top))}
+.fz-rot{background:rgba(255,255,255,.88);border:0;border-radius:6px;box-shadow:none;font-weight:700;font-size:11px;color:#14241A;padding:1px 5px}
+.fz-rot:before{display:none}
+.fz-dica{font-size:12px;color:var(--texto-fraco);margin:6px 2px 0}
+.fz-lista{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;background:#fff;border-radius:10px;padding:10px 12px;margin:10px 0 4px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.fz-lista details{flex:1;min-width:0}
+.fz-lista summary{cursor:pointer;font-size:14px;padding:4px 0}
+.fz-troca{flex:none;border:1.5px solid var(--verde);background:#fff;color:var(--verde);font-weight:600;font-size:13px;border-radius:16px;padding:6px 12px;cursor:pointer}
 .mapa-wrap{background:#fff;border-radius:12px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .mapa-wrap svg{width:100%;height:auto;display:block;background:#F3F7F3;border-radius:8px}
 .legenda-talhoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}

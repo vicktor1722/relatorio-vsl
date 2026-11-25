@@ -243,7 +243,7 @@
       <div class="campo"><label>Município</label><input id="fzMunicipio" placeholder="Pontes e Lacerda"></div>
       <div class="campo"><label>UF</label><input id="fzUf" placeholder="MT" maxlength="2"></div>
     </div>
-    <h2>Talhões</h2>
+    <h2 class="fz-tit">Talhões <small id="fzTotal"></small></h2>
     <div id="fzStatusKml" class="lista-item">
       <div class="ic">📐</div>
       <div class="txt"><b>Nenhum talhão carregado</b><span>Importe o KML da fazenda</span></div>
@@ -254,7 +254,7 @@
       <select id="fzCampoNome"></select>
       <div id="fzCampoNomeAmostra" style="font-size:12px;color:var(--texto-fraco);margin-top:5px"></div>
     </div>
-    <div class="mapa-wrap oculto" id="fzMapa" style="margin-top:12px"></div>
+    <div class="fz-mapa oculto" id="fzMapa"></div>
     <div id="fzListaTalhoes"></div>
     <button class="btn" id="btnSalvarFazenda">Salvar fazenda</button>
     <button class="btn perigo oculto" id="btnApagarFazenda">Apagar fazenda</button>
