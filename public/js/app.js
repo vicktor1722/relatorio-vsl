@@ -1264,6 +1264,9 @@
   /* ícone da câmera no composer: toque = foto, segurar = vídeo */
   function ligarBotaoCamera() {
     const btn = $('#btnCamera');
+    // Android: com foto e vídeo juntos no "accept", o Chrome mostra a lista (arquivos, câmera, vídeo) em vez de abrir a câmera.
+    // Só foto aqui: o toque abre direto a câmera; o vídeo continua no "segurar" (campo próprio de vídeo).
+    if (/Android/i.test(navigator.userAgent)) $('#inpFoto').setAttribute('accept', 'image/*');
     let timer = null, segurou = false;
 
     const inicio = function (e) {
