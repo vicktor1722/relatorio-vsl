@@ -81,6 +81,14 @@ h3.dia{margin:16px 0 10px;padding:0 0 4px;font-size:13px;font-weight:600;color:v
 .mapa>svg{width:100%;height:auto;display:block;background:#F5F8F5;border-radius:8px}
 .mapa-sat{height:360px;border-radius:8px;background:#DDE5DF}
 .mapa-sat .leaflet-popup-content{margin:10px 12px;font-size:13px;line-height:1.4}
+a.tag.coord{text-decoration:underline;text-underline-offset:2px;cursor:pointer;color:inherit}
+.mapa-foto{position:fixed;inset:0;z-index:2147483000;background:#0E1A13;display:flex;flex-direction:column}
+.mapa-foto .mf-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;background:#1B3A2A;color:#fff;font-size:15px}
+.mapa-foto .mf-x{border:0;background:rgba(255,255,255,.15);color:#fff;font-size:18px;width:38px;height:38px;border-radius:10px;cursor:pointer}
+.mapa-foto .mf-mapa{flex:1;min-height:0}
+.mapa-foto .mf-rod{background:#fff;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:center;justify-content:space-between;font-size:13.5px;color:#23322A}
+.mapa-foto .mf-rod span{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.mapa-foto .mf-g{flex:none;background:#1B7A43;color:#fff;border-radius:10px;padding:10px 13px;font-weight:700;text-decoration:none}
 .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:14px 0 4px}
 .resumo div{background:#F7F9F7;border:1px solid var(--linha);border-radius:10px;padding:10px 12px}
 .resumo b{display:block;font-size:19px;color:var(--verde-escuro)}
@@ -236,6 +244,28 @@ function mapaPontos(talhoes, itens) {
   if (!ta && P.length === 1) m.setView([P[0].la, P[0].lo], 16);
   else m.fitBounds(limites, { padding: [24, 24], maxZoom: 17 });
   if (ta) ta.addTo(m);
+  // toque na coordenada de uma foto: abre o mapa de satélite em tela cheia, com o ponto e os talhões
+  function verNoMapa(la, lo, leg, tal){
+    var tx = window.__t || function(k){ return { abrir_gmaps: 'Abrir no Google Maps' }[k] || k; };
+    var v = document.createElement('div'); v.className = 'mapa-foto';
+    v.innerHTML = '<div class="mf-topo"><b>📍 ' + (tal ? e(tal) + ' · ' : '') + la.toFixed(5) + ', ' + lo.toFixed(5) + '</b><button type="button" class="mf-x" aria-label="Fechar">✕</button></div>' +
+      '<div class="mf-mapa"></div><div class="mf-rod"><span>' + e(leg || '') + '</span>' +
+      '<a class="mf-g" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + la + ',' + lo + '">' + e(tx('abrir_gmaps')) + '</a></div>';
+    document.body.appendChild(v);
+    var mm = L.map(v.querySelector('.mf-mapa'), { attributionControl: false });
+    L.tileLayer(esri + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18 }).addTo(mm);
+    mm.setView([la, lo], 16);
+    if (A.length) L.geoJSON({ type: 'FeatureCollection', features: A }, { style: { color: '#B9F5CC', weight: 2, fillColor: '#2FA05A', fillOpacity: 0.12 },
+      onEachFeature: function(f, c){ var q = f.properties || {}; if (q.nome) c.bindTooltip(e(q.nome), { sticky: true }); } }).addTo(mm);
+    L.circleMarker([la, lo], { radius: 10, color: '#fff', weight: 3, fillColor: '#FFC928', fillOpacity: 1 }).addTo(mm);
+    setTimeout(function(){ mm.invalidateSize(); }, 80);
+    v.querySelector('.mf-x').onclick = function(){ mm.remove(); v.remove(); };
+  }
+  document.addEventListener('click', function(ev){
+    var a = ev.target && ev.target.closest ? ev.target.closest('a.coord') : null; if (!a) return;
+    var la = Number(a.getAttribute('data-la')), lo = Number(a.getAttribute('data-lo')); if (!isFinite(la) || !isFinite(lo)) return;
+    ev.preventDefault(); verNoMapa(la, lo, a.getAttribute('data-leg'), a.getAttribute('data-tal'));
+  });
   P.forEach(function(p){
     L.circleMarker([p.la, p.lo], { radius: 7, color: '#fff', weight: 2.5, fillColor: p.v ? '#D93025' : '#1B7A43', fillOpacity: .95 })
       .bindPopup((p.m ? '<img src="' + p.m + '" style="display:block;width:180px;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:6px">' : '') +
@@ -305,7 +335,7 @@ function celulaMidia(i) {
       : `<video controls preload="metadata" playsinline src="${src}"></video>`) +
     `</figure><div class="meta">` +
     `<span class="tag cinza">${hora(i.capturado_em)}</span>` +
-    (i.lat != null ? `<span class="tag cinza">${i.lat.toFixed(5)}, ${i.lon.toFixed(5)}</span>` : '') +
+    (i.lat != null ? `<a class="tag cinza coord" href="https://www.google.com/maps/search/?api=1&amp;query=${i.lat},${i.lon}" target="_blank" rel="noopener" data-la="${i.lat}" data-lo="${i.lon}" data-leg="${esc(semZap(i.legenda || '').slice(0, 160))}" data-tal="${esc(i.talhao || '')}">📍 ${i.lat.toFixed(5)}, ${i.lon.toFixed(5)}</a>` : '') +
     (i.precisao_m ? `<span class="tag cinza">±${Math.round(i.precisao_m)} m</span>` : '') +
     (i.tipo === 'video' && i.duracao_s ? `<span class="tag cinza">${Math.round(i.duracao_s)}s</span>` : '') +
     (i.tipo === 'video' ? `<a class="tag baixar" href="${esc(dl)}" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg><span data-i="baixar_midia">Baixar</span></a>` : '') +
@@ -393,7 +423,7 @@ const DICT = {
     obs_gerais: 'Observações gerais', fora: 'Fora dos talhões', registros: 'Registros da visita', reg: '{n} registro(s)',
     concluido: 'Serviço concluído ✔️', baixar_midia: 'Baixar', audio: 'Áudio', pdf: 'Baixar PDF', compartilhar: 'Compartilhar', link_copiado: 'Link copiado',
     publicado: 'Publicado em {d}', gerado_por: 'Gerado por',
-    traduzindo: 'Traduzindo…', auto: 'Tradução automática', ver_original: 'ver original', indisp: 'Tradução indisponível no momento'
+    traduzindo: 'Traduzindo…', auto: 'Tradução automática', ver_original: 'ver original', indisp: 'Tradução indisponível no momento', abrir_gmaps: 'Abrir no Google Maps'
   },
   en: {
     rel_visita: 'Visit report', rel_visitas: 'Report of {n} visits',
@@ -406,7 +436,7 @@ const DICT = {
     obs_gerais: 'General notes', fora: 'Outside the fields', registros: 'Visit records', reg: '{n} record(s)',
     concluido: 'Service completed ✔️', baixar_midia: 'Download', audio: 'Audio', pdf: 'Download PDF', compartilhar: 'Share', link_copiado: 'Link copied',
     publicado: 'Published on {d}', gerado_por: 'Generated by',
-    traduzindo: 'Translating…', auto: 'Automatic translation', ver_original: 'view original', indisp: 'Translation unavailable right now'
+    traduzindo: 'Translating…', auto: 'Automatic translation', ver_original: 'view original', indisp: 'Translation unavailable right now', abrir_gmaps: 'Open in Google Maps'
   },
   es: {
     rel_visita: 'Informe de visita', rel_visitas: 'Informe de {n} visitas',
@@ -419,7 +449,7 @@ const DICT = {
     obs_gerais: 'Observaciones generales', fora: 'Fuera de los lotes', registros: 'Registros de la visita', reg: '{n} registro(s)',
     concluido: 'Servicio concluido ✔️', baixar_midia: 'Descargar', audio: 'Audio', pdf: 'Descargar PDF', compartilhar: 'Compartir', link_copiado: 'Enlace copiado',
     publicado: 'Publicado el {d}', gerado_por: 'Generado por',
-    traduzindo: 'Traduciendo…', auto: 'Traducción automática', ver_original: 'ver original', indisp: 'Traducción no disponible por ahora'
+    traduzindo: 'Traduciendo…', auto: 'Traducción automática', ver_original: 'ver original', indisp: 'Traducción no disponible por ahora', abrir_gmaps: 'Abrir en Google Maps'
   }
 };
 

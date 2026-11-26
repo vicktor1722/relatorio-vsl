@@ -743,9 +743,7 @@
           ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px">🎤 Áudio gravado</div><audio src="' + u + '" controls style="width:100%"></audio>'
           : '<video src="' + u + '" controls playsinline style="width:100%;border-radius:10px;max-height:34dvh"></video>') +
         '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 2px">' +
-          '<div style="flex:1;font-size:12.5px;color:#667781">' +
-          (st.pos ? '📍 GPS ±' + Math.round(st.pos.acc) + ' m' + (t ? ' · detectou ' + esc(t.nome) : ' · fora dos talhões')
-                  : '📍 sem GPS neste aparelho — escolha o talhão abaixo') + '</div>' +
+          '<div id="legGps" style="flex:1;font-size:12.5px;color:#667781"></div>' +
           (tipo === 'foto' && !varios ? '<button type="button" id="legMais" title="Tirar mais uma foto com a mesma legenda" ' +
             'style="flex:none;border:1.5px solid #1B7A43;background:#E8F4EC;color:#1B7A43;border-radius:12px;padding:8px 12px;font-size:18px;font-weight:700;line-height:1">📷＋</button>' : '') +
         '</div>' +
@@ -757,10 +755,52 @@
         '<button class="btn secundario" id="legCancel">' + (total > 1 ? 'Descartar as ' + total + ' fotos' : 'Descartar') + '</button>';
       veu.appendChild(folha); document.body.appendChild(veu); medirAltura();
 
+      // foto e vídeo só entram com a localização do aparelho (dentro ou fora dos talhões): sem ela o
+      // registro ficava sem talhão. Enquanto o GPS não responde, os botões de adicionar ficam travados.
+      const precisaGps = tipo !== 'audio';
+      const gpsOk = function () { return !!(st.pos && Date.now() - (st.pos.t || 0) < 120000); };
+      let mexeuTalhao = false, tGps = null;
+      const selTal = folha.querySelector('#legTalhao');
+      if (selTal) selTal.addEventListener('change', function () { mexeuTalhao = true; });
+      const pintarGps = function () {
+        const el = folha.querySelector('#legGps'); if (!el) return;
+        const ok = !precisaGps || gpsOk();
+        ['#legOk', '#legMais'].forEach(function (q) { const b = folha.querySelector(q); if (b) { b.disabled = !ok; b.style.opacity = ok ? '' : '.45'; } });
+        if (st.pos && gpsOk()) {
+          const tt = talhaoAtual();
+          el.style.color = '#667781';
+          el.innerHTML = '📍 GPS ±' + Math.round(st.pos.acc) + ' m' + (tt ? ' · detectou ' + esc(tt.nome) : ' · fora dos talhões');
+          if (selTal && !mexeuTalhao && !pre) selTal.value = tt ? tt.nome : '';
+        } else if (!precisaGps) {
+          el.textContent = '📍 sem GPS neste aparelho — escolha o talhão abaixo';
+        } else if (st.gpsNegado) {
+          el.style.color = '#B3261E';
+          el.innerHTML = '📍 <b>Localização bloqueada.</b> Libere a localização para o app nas configurações do celular e toque em ' +
+            '<button type="button" id="legGpsTenta" style="border:1.5px solid #1B7A43;background:#fff;color:#1B7A43;border-radius:8px;padding:2px 8px;font-weight:700">Tentar de novo</button>';
+          const bt = el.querySelector('#legGpsTenta');
+          if (bt) bt.onclick = function () { st.gpsNegado = false; buscarGps(); pintarGps(); };
+        } else {
+          el.style.color = '#8A5A00';
+          el.innerHTML = '📍 <b>Buscando a sua localização…</b> a foto entra assim que o GPS responder (dentro ou fora do talhão).';
+        }
+      };
+      const buscarGps = function () {
+        if (!navigator.geolocation) return;
+        if (st.vigiaGps == null) iniciarGPS();
+        navigator.geolocation.getCurrentPosition(function (p) {
+          st.pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp || Date.now() };
+          st.gpsNegado = false; atualizarGPS(); pintarGps();
+        }, function (err) { if (err && err.code === 1) st.gpsNegado = true; pintarGps(); }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+      };
+      pintarGps();
+      if (precisaGps && !gpsOk()) buscarGps();
+      tGps = setInterval(pintarGps, 1000);
+
       let respondeu = false;
       const fechar2 = function (valor) {
         if (respondeu) return;
         respondeu = true;
+        clearInterval(tGps);
         veu.remove(); folha.remove();
         setTimeout(function () { urls.forEach(URL.revokeObjectURL); }, 1000);
         resolve(valor);
@@ -785,11 +825,13 @@
         };
       };
       folha.querySelector('#legOk').onclick = function () {
+        if (precisaGps && !gpsOk()) { toast('Aguarde a localização do GPS para adicionar'); return; }
         if (tipo === 'video' && blob && blob.size > VIDEO_REDUZIR_MB * 1048576 && !st.ctxVideo) st.ctxVideo = ctxDoToque();
         fechar2(resposta());
       };
       const mais = folha.querySelector('#legMais');
       if (mais) mais.onclick = function () {
+        if (precisaGps && !gpsOk()) { toast('Aguarde a localização do GPS para adicionar'); return; }
         const r = resposta(); r.mais = true;
         st.esperaCamera = Date.now();
         $('#inpFoto').click();   // tem que ser aqui, no próprio toque (o iPhone só abre a câmera assim)
@@ -814,8 +856,8 @@
     let lote = fixo ? null : await lerLote();
     if (lote && !loteDaqui(lote)) lote = null;
     if (lote && (tipo !== 'foto' || (posicao && posicao.total > 1))) { await concluirLote(); lote = null; }
-    const pos = st.pos;
     const r = fixo || await pedirLegenda(blob, tipo, posicao, lote);
+    const pos = st.pos;
     if (!r) {
       if (lote) await descartarLote(lote);
       return null;
