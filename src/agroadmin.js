@@ -1493,6 +1493,7 @@ ${EXPORTA_CHUVA_JS}
     var v = R.view;
     if (v === 'det') return pintarOrdem();
     if (v === 'wiz') return pintarWiz();
+    if (v === 'copiar') return pintarCopiar();
     if (v === 'prods') return pintarCatalogo();
     if (v === 'cal') return pintarCalendario();
     if (v === 'estoque') return pintarEstoque();
@@ -1802,6 +1803,7 @@ ${EXPORTA_CHUVA_JS}
       h += '<button class="btn secundario" data-a="prog" data-v="' + esc(r.id) + '|' + e.d + '">+ Programar ' + esc(ordTxt(r.operacao, (Number(d.num) || 1) + 1)) + ' (' + curta(e.d) + ' · ' + esc(e.tal.join(', ')) + ')</button>';
     });
     h += '<label class="ag-sw"><input type="checkbox" data-a="mostrar"' + (r.mostrar ? ' checked' : '') + '> Mostrar no relatório do cliente <small style="color:#6B7B72;font-weight:400">(no app da fazenda e do operador aparece sempre)</small></label>' +
+      '<button class="btn secundario" data-a="copiarrec">📋 Copiar para outra fazenda</button>' +
       '<button class="btn secundario" data-a="editarrec">Editar recomendação</button><button class="btn perigo" data-a="excluirrec">Excluir recomendação</button>';
     pintar(tR, 'Ordem de campo', f ? f.nome : '', '', h);
   }
@@ -1851,6 +1853,29 @@ ${EXPORTA_CHUVA_JS}
       ov.remove(); salvarRecLocal(r); pintarOrdem();
       toast('✔ Aplicação registrada · ' + stRec(r));
     };
+  }
+
+  /* ----- copiar uma recomendação para outra fazenda: produtos, doses e calda vão prontos; só escolhe os talhões ----- */
+  function pintarCopiar() {
+    var r = recDe(R.id); if (!r) { R.view = 'lista'; return pintarRecs(); }
+    var d = dd(r), f = fazDe(r.fazenda_id), lf = fazendas();
+    if (!R.copFaz || !fazDe(R.copFaz)) R.copFaz = (lf.filter(function (x) { return x.id !== r.fazenda_id; })[0] || lf[0] || {}).id || '';
+    var h = '<div class="ag-sec"><b>' + esc(Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao) + '</b><small>de ' + esc(f ? f.nome : '') + '</small>' +
+      prodsDe(r).filter(function (x) { return x[0]; }).map(function (x, i) { return '<small>' + (i + 1) + '. ' + esc(x[0]) + ' · ' + doseTxt(x[1]) + ' ' + esc(x[2]) + '</small>'; }).join('') +
+      (d.calda ? '<small>💧 Calda ' + fmt(d.calda, 0) + ' L/ha · tanque ' + fmt(d.tanque || 0, 0) + ' L</small>' : '') + '</div>' +
+      '<div class="campo"><label>Copiar para a fazenda</label><select data-c="copfaz">' + lf.map(function (x) {
+        var np = nomeProd(produtorDe(x));
+        return '<option value="' + esc(x.id) + '"' + (x.id === R.copFaz ? ' selected' : '') + '>' + esc(x.nome) + (np ? ' · ' + esc(np) : '') + (x.id === r.fazenda_id ? ' (mesma fazenda)' : '') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="ag-dica">Produtos, doses, calda e observação já vão preenchidos. Na próxima tela você só escolhe os talhões; dá para mudar o resto antes de salvar.</div>' +
+      '<button class="btn" data-a="copiarok">Escolher os talhões →</button>';
+    pintar(tR, 'Copiar recomendação', f ? f.nome : '', '', h);
+  }
+  function wCopia(r, fid) {
+    var d = dd(r), W = novoW(fid);
+    W.copia = true; W.safra = r.safra || W.safra; W.op = r.operacao; W.prods = cp(prodsDe(r)); W.calda = d.calda || 100; W.tanque = d.tanque || 3000;
+    W.dae = d.dae || 0; W.data = r.data_prevista && r.data_prevista >= hoje() ? r.data_prevista : hoje(); W.resp = d.resp || ''; W.obs = d.obs || ''; W.mostrar = !!r.mostrar;
+    W.rep = Number(d.rep) || 0; W.total = Number(d.total) || 1; W.aviso = d.aviso == null ? 3 : Number(d.aviso); W.repMan = true; W.num = Number(d.num) || 1;
+    return W;
   }
 
   /* ----- assistente (Onde · O quê · Quando) ----- */
@@ -2070,7 +2095,7 @@ ${EXPORTA_CHUVA_JS}
     }
     h += '<div class="ag-rodape">' + (W.passo > 1 ? '<button class="btn secundario" data-a="wvoltar">← Voltar</button>' : '') +
       (W.passo < 3 ? '<button class="btn" data-a="wprox">Continuar →</button>' : '<button class="btn" data-a="wsalvar">' + (W.id ? 'Salvar alterações' : 'Salvar recomendação') + '</button>') + '</div>';
-    pintar(tR, W.origem ? 'Programar ' + ordTxt(W.op, W.num) : (W.id ? 'Editar recomendação' : 'Nova recomendação'), 'Passo ' + W.passo + ' de 3', '', h);
+    pintar(tR, W.origem ? 'Programar ' + ordTxt(W.op, W.num) : (W.id ? 'Editar recomendação' : W.copia ? 'Copiar recomendação' : 'Nova recomendação'), 'Passo ' + W.passo + ' de 3', '', h);
   }
 
   function wProx() {
@@ -2103,6 +2128,7 @@ ${EXPORTA_CHUVA_JS}
     }
     if (r.dados.dae > 0) { r.dados.datas = datasTal(r); } else delete r.dados.datas;
     salvarRecLocal(r);
+    if (R.faz !== r.fazenda_id) { R.faz = r.fazenda_id; R.prod = ''; ST.ult.faz = R.faz; }   // cópia para outra fazenda: a lista vai junto
     ST.ult.safra = r.safra; gravar();
     R.W = null; R.id = r.id; R.view = 'det'; pintarRecs(); topoRolagem();
     toast('Recomendação salva');
@@ -2253,8 +2279,9 @@ ${EXPORTA_CHUVA_JS}
     if (a === 'voltar') {
       if (R.view === 'wiz') {
         if (!confirm('Descartar esta recomendação?')) return;
-        R.view = R.W && R.W.id ? 'det' : 'lista'; R.W = null; pintarRecs(); return;
+        R.view = R.W && (R.W.id || R.W.copia) ? 'det' : 'lista'; R.W = null; pintarRecs(); return;
       }
+      if (R.view === 'copiar') { R.view = 'det'; pintarRecs(); return; }
       if (R.view === 'det' || R.view === 'prods' || R.view === 'cal') { R.view = (R.view === 'det' && R.de === 'cal') ? 'cal' : 'lista'; R.de = ''; pintarRecs(); return; }
       return;
     }
@@ -2287,6 +2314,11 @@ ${EXPORTA_CHUVA_JS}
       delete dx.feito[v]; salvarRecLocal(r); pintarOrdem(); return;
     }
     if (a === 'editarrec') { R.W = wDeRec(recDe(R.id)); R.view = 'wiz'; pintarRecs(); topoRolagem(); return; }
+    if (a === 'copiarrec') { R.copFaz = ''; R.view = 'copiar'; pintarRecs(); topoRolagem(); return; }
+    if (a === 'copiarok') {
+      var rc = recDe(R.id); if (!rc || !R.copFaz) return;
+      R.W = wCopia(rc, R.copFaz); R.view = 'wiz'; pintarRecs(); topoRolagem(); return;
+    }
     if (a === 'excluirrec') {
       if (!confirm('Excluir esta recomendação? Isso também tira do relatório do cliente.')) return;
       var id = R.id; ST.recs = ST.recs.filter(function (x) { return x.id !== id; }); gravar(); enfileirar('/api/agro/rec/apagar', { id: id });
@@ -2307,6 +2339,7 @@ ${EXPORTA_CHUVA_JS}
     if (R.view === 'wiz' && el.dataset.w) { entradaWiz(el); return; }
     if (el.dataset.c === 'prod') { trocaProd(R, el.value); pintarRecs(); return; }
     if (el.dataset.c === 'faz') { R.faz = el.value; ST.ult.faz = R.faz; gravar(); pintarRecs(); return; }
+    if (el.dataset.c === 'copfaz') { R.copFaz = el.value; return; }
     if (el.dataset.a === 'mostrar') { var r = recDe(R.id); r.mostrar = el.checked; salvarRecLocal(r); toast(el.checked ? 'Vai aparecer no relatório do cliente' : 'Escondida do relatório do cliente'); }
   }
 
