@@ -976,6 +976,18 @@ header.topo{background:linear-gradient(135deg,#1B7A43,#146034)}
 .modal.larga{max-width:480px;max-height:92dvh;overflow-y:auto}
 ${AGRO_CSS}
   .entrar .instala{margin:4px 0 14px}
+  .ins-guia{position:fixed;inset:0;z-index:9000;background:rgba(10,25,16,.62);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:0 14px calc(70px + env(safe-area-inset-bottom,0px))}
+  .ins-guia.topo{justify-content:flex-start;align-items:flex-end;padding:70px 18px 0}
+  .ins-guia .ig-cx{background:#fff;border-radius:18px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  .ins-guia .ig-cx img{width:48px;height:48px;border-radius:12px;display:block;margin:0 auto 8px}
+  .ins-guia .ig-cx > b{display:block;text-align:center;font-size:17px;color:#14361F;margin-bottom:6px}
+  .ins-guia ol{margin:6px 0 4px;padding-left:22px;font-size:15px;line-height:1.5;color:#1B2B22}
+  .ins-guia li{margin:6px 0}
+  .ins-guia .ig-ic{display:inline-block;min-width:24px;text-align:center;border:1.5px solid #1B7A43;border-radius:6px;color:#1B7A43;font-weight:700;font-size:13px;line-height:20px}
+  .ins-guia .ins-bt{display:block;width:100%;margin-top:10px;border:0;background:#1B7A43;color:#fff;font-weight:700;font-size:15px;border-radius:10px;padding:11px 14px}
+  .ins-guia .ig-seta{color:#fff;font-size:44px;line-height:1;margin-top:8px;text-shadow:0 2px 8px rgba(0,0,0,.5);animation:igPula 1s ease-in-out infinite alternate}
+  .ins-guia.topo .ig-seta{order:-1;margin:0 18px 8px 0}
+  @keyframes igPula{from{transform:translateY(0)}to{transform:translateY(10px)}}
   .instala{background:#E8F4EC;border:1.5px solid #1B7A43;border-radius:14px;padding:12px 14px;margin:0 0 12px;max-width:560px}
   .instala .ins-top{display:flex;align-items:flex-start;gap:12px}
   .instala img{width:44px;height:44px;border-radius:10px;flex:none;background:#fff}
@@ -2269,6 +2281,22 @@ ${AGRO_CSS}
     var ua = navigator.userAgent;
     return noAndroid() && ['; wv)', 'GSA/', 'FBAN', 'FBAV', 'FB_IAB', 'Instagram', 'Line/', 'WhatsApp'].some(function (k) { return ua.indexOf(k) >= 0; });
   }
+  function iphoneForaDoSafari() {
+    var ua = navigator.userAgent;
+    return noIphone() && ['GSA/', 'FBAN', 'FBAV', 'Instagram', 'Line/'].some(function (k) { return ua.indexOf(k) >= 0; });
+  }
+  function abrirNoSafari() { location.href = 'x-safari-https://' + location.host + '/admin?instalar=1'; }
+  function ipad() { return /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function guiaIphone() {
+    var v = document.createElement('div'); v.className = 'ins-guia' + (ipad() ? ' topo' : '');
+    v.innerHTML = '<div class="ig-cx"><img src="/api/icone/adm.png" alt=""><b>Instalar o Painel</b>' +
+      '<ol><li>Toque em <span class="ig-ic">⬆︎</span> <b>Compartilhar</b> ' + (ipad() ? '(em cima, à direita)' : '(embaixo; se não aparecer, toque antes em <b>···</b>)') + '</li>' +
+      '<li>Role e toque em <b>Adicionar à Tela de Início</b> <span class="ig-ic">＋</span></li>' +
+      '<li>Toque em <b>Adicionar</b></li></ol><button type="button" class="ins-bt">Entendi</button></div>' +
+      '<div class="ig-seta">' + (ipad() ? '⬆' : '⬇') + '</div>';
+    v.onclick = function (e) { if (e.target === v || e.target.closest('.ins-bt')) v.remove(); };
+    document.body.appendChild(v);
+  }
   var veioInstalar = location.search.indexOf('instalar=1') >= 0;   // aberto pelo botão: já mostra o cartão no Chrome
   function abrirNoChrome() {
     var alvo = location.host + '/admin?instalar=1';
@@ -2288,6 +2316,7 @@ ${AGRO_CSS}
       '<div class="ins-como" hidden></div><button type="button" class="ins-bt">📲 Instalar</button>';
     c.querySelector('.ins-bt').onclick = async function () {
       if (!pedidoInstalar && foraDoChrome()) { abrirNoChrome(); return; }
+      if (noIphone()) { if (iphoneForaDoSafari()) abrirNoSafari(); else guiaIphone(); return; }
       if (!pedidoInstalar && noAndroid()) await esperarPedido(2500);   // o Chrome às vezes libera a instalação uns segundos depois
       if (pedidoInstalar) {
         var ev = pedidoInstalar; pedidoInstalar = null;
@@ -2311,7 +2340,7 @@ ${AGRO_CSS}
     var pode = !painelInstalado() && (pedidoInstalar || noAndroid() || noIphone()) && (veioInstalar || Date.now() - fechado > 7 * 86400000);
     cartoesInstalar.forEach(function (c) {
       c.hidden = !pode;
-      if (pode) c.querySelector('.ins-bt').textContent = noIphone() ? '📲 Como instalar' : veioInstalar && pedidoInstalar ? '📲 Toque aqui para instalar' : '📲 Instalar';
+      if (pode) c.querySelector('.ins-bt').textContent = veioInstalar && (pedidoInstalar || noIphone()) ? '📲 Toque aqui para instalar' : '📲 Instalar';
     });
   }
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); pedidoInstalar = e; mostrarInstalar(); });
