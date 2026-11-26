@@ -2095,7 +2095,7 @@ ${EXPORTA_CHUVA_JS}
         var hat = W.tanque / (W.calda || 1);
         h += '<div class="ag-sec azul"><b>💧 Calda</b><div class="linha2" style="margin-top:6px"><div class="campo"><label>Vazão (L/ha)</label><input inputmode="numeric" data-w="calda" value="' + W.calda + '"></div>' +
           '<div class="campo"><label>Tanque do pulverizador (L)</label><input inputmode="numeric" data-w="tanque" value="' + W.tanque + '"></div></div>' +
-          '<div class="ag-chips">' + [2000, 3000, 4000].map(function (v) { return '<button class="ag-chip' + (W.tanque === v ? ' on' : '') + '" data-a="wtanque" data-v="' + v + '">Jacto ' + v.toLocaleString('pt-BR') + ' L</button>'; }).join('') + '</div>' +
+          '<div class="ag-chips">' + [2000, 2500, 3000, 4000].map(function (v) { return '<button class="ag-chip' + (Number(W.tanque) === v ? ' on' : '') + '" data-a="wtanque" data-v="' + v + '">Jacto ' + v.toLocaleString('pt-BR') + ' L</button>'; }).join('') + '</div>' +
           '<small>Cada tanque cobre <b>' + fmt(hat, 0) + ' ha</b>' + (ha ? ' · ' + tanques(ha, hat, W.calda) : '') + '. Por tanque cheio, na ordem de mistura:</small>' +
           W.prods.filter(function (p) { return p[0]; }).map(function (p, i) { return '<div class="ag-mix"><span>' + (i + 1) + '. ' + esc(p[0]) + '</span><em>' + fmt(p[1] * hat, p[1] * hat < 10 ? 2 : 1) + ' ' + esc(unid(p[2])) + '</em></div>'; }).join('') + '</div>';
       }
