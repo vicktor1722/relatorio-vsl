@@ -130,7 +130,7 @@ export async function enviarPush(env, sub, msg) {
 
 /* ---------------- próximas aplicações de uma conta ---------------- */
 const FEM = /^(Dessecação|Adubação|Outra)/;
-const ordTxt = (op, n) => n + (FEM.test(op) ? 'ª ' : 'º ') + op;
+const ordTxt = (op, n) => (/^\s*\d+\s*[ºª°]/.test(op || '') ? op : n + (FEM.test(op) ? 'ª ' : 'º ') + op);   // operação que já traz o número fica como está
 function hojeMT() { return new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10); }
 function somaDias(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function difDias(a, b) { return Math.round((new Date(a + 'T12:00:00Z') - new Date(b + 'T12:00:00Z')) / 864e5); }
