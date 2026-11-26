@@ -2264,6 +2264,22 @@ ${AGRO_CSS}
   function painelInstalado() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
   function noIphone() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
   function noAndroid() { return /Android/.test(navigator.userAgent); }
+  // navegador de dentro de outro app (Google, WhatsApp, Facebook, Instagram...): não instala; abre no Chrome para instalar
+  function foraDoChrome() {
+    var ua = navigator.userAgent;
+    return noAndroid() && ['; wv)', 'GSA/', 'FBAN', 'FBAV', 'FB_IAB', 'Instagram', 'Line/', 'WhatsApp'].some(function (k) { return ua.indexOf(k) >= 0; });
+  }
+  var veioInstalar = location.search.indexOf('instalar=1') >= 0;   // aberto pelo botão: já mostra o cartão no Chrome
+  function abrirNoChrome() {
+    var alvo = location.host + '/admin?instalar=1';
+    location.href = 'intent://' + alvo + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://' + alvo) + ';end';
+  }
+  function esperarPedido(ms) {
+    return new Promise(function (ok) {
+      if (pedidoInstalar) return ok(pedidoInstalar);
+      var fim = Date.now() + ms, t = setInterval(function () { if (pedidoInstalar || Date.now() > fim) { clearInterval(t); ok(pedidoInstalar); } }, 150);
+    });
+  }
   var cartoesInstalar = document.querySelectorAll('[data-instala]');
   cartoesInstalar.forEach(function (c) {
     c.innerHTML = '<div class="ins-top"><img src="/api/icone/adm.png" alt="">' +
@@ -2271,13 +2287,15 @@ ${AGRO_CSS}
       '<button type="button" class="ins-x" aria-label="Fechar">✕</button></div>' +
       '<div class="ins-como" hidden></div><button type="button" class="ins-bt">📲 Instalar</button>';
     c.querySelector('.ins-bt').onclick = async function () {
+      if (!pedidoInstalar && foraDoChrome()) { abrirNoChrome(); return; }
+      if (!pedidoInstalar && noAndroid()) await esperarPedido(2500);   // o Chrome às vezes libera a instalação uns segundos depois
       if (pedidoInstalar) {
         var ev = pedidoInstalar; pedidoInstalar = null;
         try { ev.prompt(); var r = await ev.userChoice; if (r && r.outcome === 'accepted') { esconderInstalar(); return; } } catch (e) {}
         mostrarInstalar(); return;
       }
       var como = c.querySelector('.ins-como');
-      como.innerHTML = noIphone()
+      como.innerHTML = foraDoChrome() ? 'Abra este endereço no <b>Chrome</b> para instalar: <b>' + location.host + '/admin</b>' : noIphone()
         ? 'No Safari, toque em <b>Compartilhar</b> (quadrado com seta, embaixo) e depois em <b>Adicionar à Tela de Início</b>.'
         : 'No Chrome, toque nos <b>⋮</b> (canto de cima, à direita) e depois em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.';
       como.hidden = false;
@@ -2290,10 +2308,10 @@ ${AGRO_CSS}
   function esconderInstalar() { cartoesInstalar.forEach(function (c) { c.hidden = true; }); }
   function mostrarInstalar() {
     var fechado = 0; try { fechado = Number(localStorage.getItem('adm-instala-fechado') || 0); } catch (e) {}
-    var pode = !painelInstalado() && (pedidoInstalar || noAndroid() || noIphone()) && Date.now() - fechado > 7 * 86400000;
+    var pode = !painelInstalado() && (pedidoInstalar || noAndroid() || noIphone()) && (veioInstalar || Date.now() - fechado > 7 * 86400000);
     cartoesInstalar.forEach(function (c) {
       c.hidden = !pode;
-      if (pode) c.querySelector('.ins-bt').textContent = pedidoInstalar ? '📲 Instalar' : '📲 Como instalar';
+      if (pode) c.querySelector('.ins-bt').textContent = noIphone() ? '📲 Como instalar' : veioInstalar && pedidoInstalar ? '📲 Toque aqui para instalar' : '📲 Instalar';
     });
   }
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); pedidoInstalar = e; mostrarInstalar(); });
