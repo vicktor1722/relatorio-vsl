@@ -2273,7 +2273,11 @@ ${AGRO_CSS}
 
   /* ---------- instalar o painel no celular (Android: botão do navegador; iPhone: instrução) ---------- */
   var pedidoInstalar = null;
-  function painelInstalado() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  var comoAppPainel = false;
+  try { if (location.search.indexOf('app=1') >= 0) sessionStorage.setItem('adm-app', '1'); comoAppPainel = sessionStorage.getItem('adm-app') === '1'; } catch (e) {}
+  function semBarra() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  function painelInstalado() { return semBarra() && (comoAppPainel || noIphone() || location.hostname.indexOf('painel.') === 0); }
+  function dentroDoAppDeCampo() { return semBarra() && !painelInstalado(); }
   function noIphone() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
   function noAndroid() { return /Android/.test(navigator.userAgent); }
   // navegador de dentro de outro app (Google, WhatsApp, Facebook, Instagram...): não instala; abre no Chrome para instalar
@@ -2298,8 +2302,14 @@ ${AGRO_CSS}
     document.body.appendChild(v);
   }
   var veioInstalar = location.search.indexOf('instalar=1') >= 0;   // aberto pelo botão: já mostra o cartão no Chrome
+  var hostPainel = location.hostname === 'amvs.ia.br' ? 'painel.amvs.ia.br' : '', painelNoAr = false;
+  if (hostPainel && noAndroid()) {
+    var pg = new Image(); pg.onload = function () { painelNoAr = true; };
+    pg.src = 'https://' + hostPainel + '/api/icone/adm-192.png?v=' + Date.now();
+  }
+  function destinoInstalar() { return (painelNoAr ? hostPainel : location.host) + '/admin?instalar=1'; }
   function abrirNoChrome() {
-    var alvo = location.host + '/admin?instalar=1';
+    var alvo = destinoInstalar();
     location.href = 'intent://' + alvo + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://' + alvo) + ';end';
   }
   function esperarPedido(ms) {
@@ -2315,9 +2325,10 @@ ${AGRO_CSS}
       '<button type="button" class="ins-x" aria-label="Fechar">✕</button></div>' +
       '<div class="ins-como" hidden></div><button type="button" class="ins-bt">📲 Instalar</button>';
     c.querySelector('.ins-bt').onclick = async function () {
-      if (!pedidoInstalar && foraDoChrome()) { abrirNoChrome(); return; }
+      if (!pedidoInstalar && (foraDoChrome() || (noAndroid() && dentroDoAppDeCampo()))) { abrirNoChrome(); return; }
       if (noIphone()) { if (iphoneForaDoSafari()) abrirNoSafari(); else guiaIphone(); return; }
       if (!pedidoInstalar && noAndroid()) await esperarPedido(2500);   // o Chrome às vezes libera a instalação uns segundos depois
+      if (!pedidoInstalar && noAndroid() && painelNoAr) { location.href = 'https://' + destinoInstalar(); return; }   // com o app de campo instalado, instala pelo endereço próprio
       if (pedidoInstalar) {
         var ev = pedidoInstalar; pedidoInstalar = null;
         try { ev.prompt(); var r = await ev.userChoice; if (r && r.outcome === 'accepted') { esconderInstalar(); return; } } catch (e) {}

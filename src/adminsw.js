@@ -9,7 +9,7 @@ export const ADMIN_MANIFEST = JSON.stringify({
   short_name: 'AMVS Painel',
   description: 'Painel de gestão do AMVS Relatório: relatórios, timeline, lavoura e avisos.',
   id: '/admin',
-  start_url: '/admin',
+  start_url: '/admin?app=1',
   scope: '/admin',
   display: 'standalone',
   orientation: 'portrait',
