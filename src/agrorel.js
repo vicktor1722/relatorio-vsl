@@ -26,7 +26,7 @@ const addDias = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDa
 const difDias = (a, b) => Math.round((new Date(a + 'T12:00:00Z') - new Date(b + 'T12:00:00Z')) / 864e5);
 
 const FEM = /^(Dessecação|Adubação|Outra)/;
-const ordTxt = (op, n) => n + (FEM.test(op) ? 'ª ' : 'º ') + op;
+const ordTxt = (op, n) => (/^\s*\d+\s*[ºª°]/.test(op || '') ? op : n + (FEM.test(op) ? 'ª ' : 'º ') + op);   // operação que já traz o número fica como está
 const unid = (u) => String(u || '').split('/')[0];
 const liquido = (u) => /^(L|mL)\//.test(String(u || ''));
 const volTotal = (v, u) => fmt(v, v < 10 ? 1 : 0) + ' ' + unid(u);

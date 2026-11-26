@@ -36,7 +36,7 @@ const EMERG_DIAS = 4;   // germinação/emergência: dias depois do plantio
 const hojeMT = () => new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);
 const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const FEM = /^(Dessecação|Adubação|Outra)/;
-const ordTxt = (op, n) => n + (FEM.test(op) ? 'ª ' : 'º ') + op;
+const ordTxt = (op, n) => (/^\s*\d+\s*[ºª°]/.test(op || '') ? op : n + (FEM.test(op) ? 'ª ' : 'º ') + op);   // operação que já traz o número fica como está
 const PAPEIS = { fazenda: 'Fazenda', operador: 'Operador / encarregado' };
 function lerJson(s, padrao) { try { const o = JSON.parse(s || ''); return o == null ? padrao : o; } catch (e) { return padrao; } }
 

@@ -926,7 +926,7 @@ ${EXPORTA_CHUVA_JS}
   function cp(o) { return JSON.parse(JSON.stringify(o)); }
   function toast(m) { var e = document.createElement('div'); e.className = 'ag-toast'; e.textContent = m; document.body.appendChild(e); setTimeout(function () { e.remove(); }, 2600); }
   var FEM = /^(Dessecação|Adubação|Outra)/;
-  function ordTxt(op, n) { return n + (FEM.test(op) ? 'ª ' : 'º ') + op; }
+  function ordTxt(op, n) { return /^\s*\d+\s*[ºª°]/.test(op || '') ? op : n + (FEM.test(op) ? 'ª ' : 'º ') + op; }
   function unid(u) { return String(u || '').split('/')[0]; }
   function liquido(u) { return /^(L|mL)\//.test(String(u || '')); }
   function volTotal(v, u) { return fmt(v, v < 10 ? 1 : 0) + ' ' + unid(u); }
@@ -1476,6 +1476,25 @@ ${EXPORTA_CHUVA_JS}
     if (n <= aviso) return { k: 'perto', t: 'Vence em ' + n + ' dia' + (n > 1 ? 's' : '') };
     return { k: 'ok', t: 'Em ' + n + ' dias' };
   }
+  // aplicações da sequência que já foram programadas (e ainda não aplicadas): ficam em "Próximas aplicações" como programadas
+  function programadasDe(fid) {
+    var out = [], vistos = {};
+    ST.recs.forEach(function (r) {
+      if (r.fazenda_id !== fid) return;
+      var d = dd(r), px = proxDe(r), g = {};
+      talDe(r).forEach(function (t) {
+        var v = px[t]; if (!v) return;
+        var p = typeof v === 'string' ? recDe(v) : null;
+        if (!p) {   // programadas antes desta versão: acha a próxima da sequência que tem esse talhão
+          p = ST.recs.filter(function (x) { return x.fazenda_id === fid && x.id !== r.id && (Number(dd(x).num) || 1) === (Number(d.num) || 1) + 1 && talDe(x).indexOf(t) >= 0; })[0] || null;
+        }
+        if (!p || stRec(p) === 'Aplicada') return;
+        (g[p.id] = g[p.id] || { p: p, tal: [] }).tal.push(t);
+      });
+      Object.keys(g).forEach(function (k) { if (vistos[k]) return; vistos[k] = 1; out.push({ d: g[k].p.data_prevista || '', p: g[k].p, tal: talDe(g[k].p) }); });
+    });
+    return out;
+  }
   function alertasDe(fid) {
     var out = [];
     ST.recs.forEach(function (r) {
@@ -1502,12 +1521,20 @@ ${EXPORTA_CHUVA_JS}
       var s = stRec(r);
       return R.filtro === 'todas' || (R.filtro === 'pend' && s === 'Pendente') || (R.filtro === 'and' && s === 'Em andamento') || (R.filtro === 'apl' && s === 'Aplicada');
     }).sort(function (a, b) { return (b.data_prevista || '') < (a.data_prevista || '') ? -1 : 1; });
+    var pr = programadasDe(R.faz).map(function (e) {
+      var d = dd(e.p), tt = Number(d.rep) > 0 || Number(d.num) > 1 ? ordTxt(e.p.operacao, Number(d.num) || 1) : e.p.operacao;
+      return { d: e.d, h: '<div class="ag-alerta" style="border-left-color:#3B78C3"><div class="ag-ai">📅</div><div class="ag-ac"><b>' + esc(tt) + '</b> <span class="badge" style="background:#E3EEFA;color:#1F4E86">✓ Programada</span>' +
+        '<span>' + curta(e.d) + ' · ' + esc(e.tal.join(', ')) + ' · ' + fmt(haDe(f, e.tal, d.parte)) + ' ha</span></div>' +
+        '<button class="ag-peq" data-a="abrirrec" data-v="' + esc(e.p.id) + '">Ver</button></div>' };
+    });
     var al = alertasDe(R.faz).map(function (e) {
       var d = dd(e.r), ic = e.sit.k === 'ok' ? '🟢' : e.sit.k === 'perto' ? '🟡' : '🔴';
       return '<div class="ag-alerta ' + e.sit.k + '"><div class="ag-ai">' + ic + '</div><div class="ag-ac"><b>' + esc(ordTxt(e.r.operacao, (Number(d.num) || 1) + 1)) + '</b> <span class="badge">' + esc(e.sit.t) + '</span>' +
         '<span>' + curta(e.d) + ' · ' + esc(e.tal.join(', ')) + ' · ' + fmt(haDe(f, e.tal, dd(e.r).parte)) + ' ha</span></div>' +
         '<button class="ag-peq" data-a="prog" data-v="' + esc(e.r.id) + '|' + e.d + '">Programar</button></div>';
-    }).join('');
+    });
+    al = al.map(function (h, i) { return { d: alertasDe(R.faz)[i].d, h: h }; }).concat(pr)
+      .sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; }).map(function (x) { return x.h; }).join('');
     var cards = lista.map(function (r) {
       var d = dd(r), ha = haDe(f, talDe(r), d.parte), pf = haDe(f, talDe(r).filter(function (t) { return feitoDe(r)[t]; }), d.parte), pc = ha ? Math.round(pf / ha * 100) : 0;
       return '<div class="lista-item ag-rec" data-a="abrirrec" data-v="' + esc(r.id) + '"><div class="ic">📋</div><div class="txt"><b>' + esc(Number(d.rep) > 0 ? ordTxt(r.operacao, Number(d.num) || 1) : r.operacao) + '</b>' +
@@ -2124,7 +2151,7 @@ ${EXPORTA_CHUVA_JS}
     if (antes) { Object.keys(r.dados.feito).forEach(function (t) { if (r.dados.tal.indexOf(t) < 0) delete r.dados.feito[t]; }); }
     if (W.origem) {
       var o = recDe(W.origem.id);
-      if (o) { var od = dd(o); od.prox = od.prox || {}; W.origem.tal.forEach(function (t) { od.prox[t] = true; }); salvarRecLocal(o); }
+      if (o) { var od = dd(o); od.prox = od.prox || {}; W.origem.tal.forEach(function (t) { od.prox[t] = r.id; }); salvarRecLocal(o); }
     }
     if (r.dados.dae > 0) { r.dados.datas = datasTal(r); } else delete r.dados.datas;
     salvarRecLocal(r);
