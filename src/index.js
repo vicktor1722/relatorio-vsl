@@ -167,8 +167,8 @@ function desenharIcone(tipo, S) {
   }
   return buf;
 }
-async function pngIcone(tipo) {
-  var S = 180, raw = desenharIcone(tipo, S), lin = new Uint8Array((S * 3 + 1) * S);
+async function pngIcone(tipo, tam) {
+  var S = tam || 180, raw = desenharIcone(tipo, S), lin = new Uint8Array((S * 3 + 1) * S);
   for (var y = 0; y < S; y++) lin.set(raw.subarray(y * S * 3, (y + 1) * S * 3), y * (S * 3 + 1) + 1);
   var cs = new Response(new Blob([lin]).stream().pipeThrough(new CompressionStream('deflate')));
   var z = new Uint8Array(await cs.arrayBuffer());
@@ -288,6 +288,8 @@ export default {
       // capa do app na tela inicial do iPhone (apple-touch-icon)
       if (rota === '/api/icone/app.png') return pngIcone('app');
       if (rota === '/api/icone/adm.png') return pngIcone('adm');
+      if (rota === '/api/icone/adm-192.png') return pngIcone('adm', 192);   // ícones do app do painel no tamanho que o manifesto diz
+      if (rota === '/api/icone/adm-512.png') return pngIcone('adm', 512);
 
       // aviso de pagamento da PicPay (a chave vai no cabeçalho authorization; sem login de usuário)
       if (rota === '/api/pagamentos/picpay' && req.method === 'POST') {
