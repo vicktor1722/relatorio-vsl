@@ -975,6 +975,14 @@ header.topo{background:linear-gradient(135deg,#1B7A43,#146034)}
 .pg-item{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--linha)}
 .modal.larga{max-width:480px;max-height:92dvh;overflow-y:auto}
 ${AGRO_CSS}
+  .instala{background:#E8F4EC;border:1.5px solid #1B7A43;border-radius:14px;padding:12px 14px;margin:0 0 12px;max-width:560px}
+  .instala .ins-top{display:flex;align-items:flex-start;gap:12px}
+  .instala img{width:44px;height:44px;border-radius:10px;flex:none;background:#fff}
+  .instala .ins-txt{flex:1;min-width:0;font-size:13px;color:#2F4A3A;line-height:1.35}
+  .instala .ins-tit{display:block;font-size:15px;font-weight:700;color:#14361F;margin-bottom:2px}
+  .instala .ins-x{flex:none;border:0;background:none;color:#5F6F66;font-size:18px;padding:0 2px;cursor:pointer}
+  .instala .ins-como{margin:10px 0 0;font-size:13px;color:#14361F;line-height:1.45;background:#fff;border-radius:10px;padding:10px 12px}
+  .instala .ins-bt{display:block;width:100%;margin-top:10px;border:0;background:#1B7A43;color:#fff;font-weight:700;font-size:15px;border-radius:10px;padding:11px 14px;cursor:pointer}
 </style>
 </head><body>
 
@@ -1006,6 +1014,13 @@ ${AGRO_CSS}
   </div>
   <main>
     <section class="painel on" id="pDash">
+      <div class="instala" id="instalaApp" hidden>
+        <div class="ins-top"><img src="/api/icone/adm.png" alt="">
+          <div class="ins-txt"><span class="ins-tit">Instalar o Painel no celular</span>Abre direto da tela inicial, como um aplicativo, e recebe os avisos.</div>
+          <button type="button" class="ins-x" id="instalaX" aria-label="Fechar">✕</button></div>
+        <div class="ins-como" id="instalaComo" hidden></div>
+        <button type="button" class="ins-bt" id="instalaBt">📲 Instalar</button>
+      </div>
       <div class="cartoes" id="kpis"></div>
       <div class="caixa">
         <h2>Visitas por dia</h2>
@@ -2247,6 +2262,36 @@ ${AGRO_CSS}
       catch (e) { alert(e.message); }
     }; });
   }
+
+  /* ---------- instalar o painel no celular (Android: botão do navegador; iPhone: instrução) ---------- */
+  var pedidoInstalar = null;
+  function painelInstalado() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  function noIphone() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function noAndroid() { return /Android/.test(navigator.userAgent); }
+  function mostrarInstalar() {
+    var c = $('#instalaApp'); if (!c) return;
+    var fechado = 0; try { fechado = Number(localStorage.getItem('adm-instala-fechado') || 0); } catch (e) {}
+    var pode = !painelInstalado() && (pedidoInstalar || noAndroid() || noIphone()) && Date.now() - fechado > 7 * 86400000;
+    c.hidden = !pode;
+    if (!pode) return;
+    $('#instalaBt').textContent = pedidoInstalar ? '📲 Instalar' : '📲 Como instalar';
+  }
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); pedidoInstalar = e; mostrarInstalar(); });
+  window.addEventListener('appinstalled', function () { pedidoInstalar = null; var c = $('#instalaApp'); if (c) c.hidden = true; });
+  $('#instalaBt').onclick = async function () {
+    if (pedidoInstalar) {
+      var ev = pedidoInstalar; pedidoInstalar = null;
+      try { ev.prompt(); var r = await ev.userChoice; if (r && r.outcome === 'accepted') { $('#instalaApp').hidden = true; return; } } catch (e) {}
+      mostrarInstalar(); return;
+    }
+    var como = $('#instalaComo');
+    como.innerHTML = noIphone()
+      ? 'No Safari, toque em <b>Compartilhar</b> (quadrado com seta) e depois em <b>Adicionar à Tela de Início</b>.'
+      : 'No Chrome, toque nos <b>⋮</b> (canto de cima, à direita) e depois em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.';
+    como.hidden = false;
+  };
+  $('#instalaX').onclick = function () { try { localStorage.setItem('adm-instala-fechado', String(Date.now())); } catch (e) {} $('#instalaApp').hidden = true; };
+  mostrarInstalar();
 
   /* ---------- sininho: quem curtiu, comentou e compartilhou os relatórios ---------- */
   function sinoN(n) { var b = $('#sinoN'); b.textContent = n > 99 ? '99+' : String(n || ''); b.style.display = n ? '' : 'none'; }
