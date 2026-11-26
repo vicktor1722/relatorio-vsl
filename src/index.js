@@ -285,6 +285,9 @@ export default {
         return Response.redirect('https://www.' + url.hostname + '/', 302);
       }
 
+      // endereço próprio do painel (painel.amvs.ia.br): a página inicial é o painel
+      if (url.hostname.startsWith('painel.') && (rota === '/' || rota === '/index.html')) return Response.redirect(origem + '/admin', 302);
+
       // capa do app na tela inicial do iPhone (apple-touch-icon)
       if (rota === '/api/icone/app.png') return pngIcone('app');
       if (rota === '/api/icone/adm.png') return pngIcone('adm');
