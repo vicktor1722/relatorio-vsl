@@ -8,6 +8,7 @@ export const ADMIN_MANIFEST = JSON.stringify({
   name: 'AMVS Painel',
   short_name: 'AMVS Painel',
   description: 'Painel de gestão do AMVS Relatório: relatórios, timeline, lavoura e avisos.',
+  id: '/admin',
   start_url: '/admin',
   scope: '/admin',
   display: 'standalone',
@@ -15,7 +16,8 @@ export const ADMIN_MANIFEST = JSON.stringify({
   background_color: '#F3F5F4',
   theme_color: '#1B7A43',
   icons: [
-    { src: '/api/icone/adm.png', sizes: '512x512', type: 'image/png', purpose: 'any' }
+    { src: '/api/icone/adm-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: '/api/icone/adm-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }
   ]
 });
 
