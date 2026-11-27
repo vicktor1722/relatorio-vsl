@@ -103,6 +103,7 @@
         acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp
       };
       atualizarGPS();
+      if (!st.climaPeloGps) { st.climaPeloGps = true; climaApp(); }
       // último lugar conhecido: a previsão do tempo abre na hora, mesmo antes do GPS responder
       try { localStorage.setItem('vsl-ult-pos', JSON.stringify({ lat: st.pos.lat, lon: st.pos.lon, t: Date.now() })); } catch (e) {}
     }, function (err) {
@@ -1510,9 +1511,24 @@
     setTimeout(function () { try { mc.mapa.invalidateSize(); } catch (e) {} }, 150);
     return mc;
   }
+  async function posDaFazenda() {
+    try {
+      let gj = st.rel && st.rel.talhoes, nome = st.rel ? st.rel.fazenda : '';
+      if (!(gj && gj.features && gj.features.length)) {
+        const cad = (await DB.cfg('cadastro')) || {};
+        const f = (cad.fazendas || []).filter(function (x) { return x.talhoes && x.talhoes.features && x.talhoes.features.length; })[0];
+        if (!f) return null;
+        gj = f.talhoes; nome = f.nome;
+      }
+      const b = Geo.bounds(gj);
+      if (!(b.maxX > b.minX || b.maxY > b.minY)) return null;
+      return { lat: (b.minY + b.maxY) / 2, lon: (b.minX + b.maxX) / 2, faz: nome || 'fazenda' };
+    } catch (e) { return null; }
+  }
   async function climaApp() {
     let pos = st.pos, guard = null;
     if (!pos) { try { pos = JSON.parse(localStorage.getItem('vsl-ult-pos') || 'null'); } catch (e) { pos = null; } }
+    if (!pos) pos = await posDaFazenda();   // GPS ainda sem resposta ou bloqueado: a previsão da fazenda
     try { guard = JSON.parse(localStorage.getItem('vsl-clima') || 'null'); } catch (e) { guard = null; }
     if (guard && guard.c) mostrarClima(guard.c, 'onde você está · ' + new Date(guard.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     if (!pos) return;
@@ -1522,7 +1538,7 @@
       const r = await Sync.clima(pos.lat, pos.lon);
       if (!r || !r.clima) return;
       try { localStorage.setItem('vsl-clima', JSON.stringify({ c: r.clima, t: Date.now(), lat: pos.lat, lon: pos.lon })); } catch (e) {}
-      mostrarClima(r.clima, 'onde você está · agora');
+      mostrarClima(r.clima, (pos.faz ? 'na ' + pos.faz : 'onde você está') + ' · agora');
     } catch (e) { /* sem internet: fica a última previsão guardada */ }
   }
 
