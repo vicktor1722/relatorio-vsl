@@ -102,7 +102,7 @@
         lat: p.coords.latitude, lon: p.coords.longitude,
         acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp
       };
-      atualizarGPS();
+      atualizarGPS(); esconderAvisoGps();
       if (!st.climaPeloGps) { st.climaPeloGps = true; climaApp(); }
       // último lugar conhecido: a previsão do tempo abre na hora, mesmo antes do GPS responder
       try { localStorage.setItem('vsl-ult-pos', JSON.stringify({ lat: st.pos.lat, lon: st.pos.lon, t: Date.now() })); } catch (e) {}
@@ -110,7 +110,41 @@
       $('#dotGps').className = 'dot ruim';
       st.gpsNegado = err.code === 1;
       $('#txtGps').textContent = 'GPS: ' + (st.gpsNegado ? 'permissão negada · toque' : 'sem sinal · toque');
+      if (!st.pos) mostrarAvisoGps();
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  }
+
+  // aviso pequeno quando não há localização: "Ativar" pede a localização no toque — no Android, com o GPS
+  // do celular desligado, o próprio sistema abre a janela para ligar; com a permissão bloqueada, explica onde liberar
+  function esconderAvisoGps() { const a = document.getElementById('avisoGps'); if (a) a.remove(); }
+  function mostrarAvisoGps() {
+    if (st.avisoGpsFechado || st.pos || document.getElementById('avisoGps')) return;
+    const a = document.createElement('div'); a.id = 'avisoGps'; a.className = 'aviso-gps';
+    a.innerHTML = '<span class="ag-txt">📍 Localização desligada</span><button type="button" class="ag-on">Ativar</button><button type="button" class="ag-x" aria-label="Fechar">✕</button>';
+    a.querySelector('.ag-x').onclick = function () { st.avisoGpsFechado = true; a.remove(); };
+    a.querySelector('.ag-on').onclick = function () {
+      const txt = a.querySelector('.ag-txt');
+      txt.textContent = '📍 Ligando a localização…';
+      navigator.geolocation.getCurrentPosition(function (p) {
+        st.pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, alt: p.coords.altitude, t: p.timestamp || Date.now() };
+        st.gpsNegado = false; atualizarGPS(); esconderAvisoGps(); iniciarGPS();
+        toast('Localização ativada ✓');
+      }, function (err) {
+        if (err && err.code === 1) {
+          st.gpsNegado = true;
+          const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+          const app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+          txt.textContent = ios ? '📍 Libere em Ajustes › Privacidade › Localização › Safari › Ao usar'
+            : app ? '📍 Segure o ícone do app › Informações › Permissões › Localização › Permitir'
+            : '📍 No Chrome: ⋮ › Configurações › Config. do site › Localização › Permitir';
+          a.classList.add('aberto'); a.querySelector('.ag-on').textContent = 'De novo';
+        } else {
+          txt.textContent = '📍 Sem sinal ainda · vá para um lugar aberto';
+          a.querySelector('.ag-on').textContent = 'De novo';
+        }
+      }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    };
+    document.body.appendChild(a);
   }
 
   // iPhone: a localização de site fica em "Perguntar" até a pessoa mudar nos Ajustes (nenhum site consegue
